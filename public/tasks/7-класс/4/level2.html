@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 2 - Файлы и Папки</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-black text-warning font-monospace vh-100 p-4 m-0 d-flex flex-column" onload="init()">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-warning pb-2">
+        <h2 class="m-0 fw-bold">ТЕРМИНАЛ // УРОВЕНЬ 2 (ПРОДВИНУТЫЙ)</h2>
+        <h3 class="m-0 text-white" id="phase-title">ФАЗА 1 / 5</h3>
+    </div>
+
+    <div id="task-container" class="flex-grow-1 d-flex flex-column justify-content-center">
+        <!-- Контент фаз будет генерироваться здесь -->
+    </div>
+
+    <script>
+        let currentPhase = parseInt(sessionStorage.getItem('lvl2_phase')) || 1;
+        let attempts = parseInt(sessionStorage.getItem('lvl2_attempts')) || 0;
+        let startTime = parseInt(sessionStorage.getItem('lvl2_start')) || Date.now();
+        let actionLog = JSON.parse(sessionStorage.getItem('lvl2_log')) || [];
+
+        function saveState() {
+            sessionStorage.setItem('lvl2_phase', currentPhase);
+            sessionStorage.setItem('lvl2_attempts', attempts);
+            sessionStorage.setItem('lvl2_start', startTime);
+            sessionStorage.setItem('lvl2_log', JSON.stringify(actionLog));
+        }
+
+        function sendTelemetry(action_type, status, success) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: '7 класс :: Урок 4 :: Уровень 2',
+                action_type: action_type,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success,
+                action_log: actionLog
+            }, '*');
+        }
+
+        function logAction(action) {
+            actionLog.push({time: new Date().toISOString(), action: action});
+            saveState();
+        }
+
+        function init() {
+            if (!sessionStorage.getItem('lvl2_start')) {
+                saveState();
+            }
+            sendTelemetry('in_progress', 'in_progress', false);
+            loadPhase(currentPhase);
+        }
+
+        function loadPhase(phase) {
+            currentPhase = phase;
+            saveState();
+            document.getElementById('phase-title').innerText = `ФАЗА ${phase} / 5`;
+            const container = document.getElementById('task-container');
+            container.innerHTML = ''; 
+
+            if (phase === 1) generatePhase1(container);
+            if (phase === 2) generatePhase2(container);
+            if (phase === 3) generatePhase3(container);
+            if (phase === 4) generatePhase4(container);
+            if (phase === 5) generatePhase5(container);
+            if (phase > 5) finishLevel();
+        }
+
+        function triggerError(phase, container, correct_msg = '') {
+            attempts++;
+            saveState();
+            logAction('error_phase_' + phase);
+            sendTelemetry('hardcore_reset', 'in_progress', false);
+            
+            const msg = correct_msg ? ` ${correct_msg}` : '';
+            container.innerHTML = `
+                <div class="alert alert-danger rounded-0 border-0 bg-danger text-black fw-bold fs-5">
+                    [!] ОШИБКА АНАЛИЗА.${msg}<br>Генерация новой задачи...
+                </div>
+            `;
+            setTimeout(() => {
+                loadPhase(phase);
+            }, 1500);
+        }
+
+        function setupInput(inputId, btnId, checkLogic) {
+            document.getElementById(btnId).onclick = () => {
+                const val = document.getElementById(inputId).value.trim();
+                checkLogic(val);
+            };
+            document.getElementById(inputId).addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    document.getElementById(btnId).click();
+                }
+            });
+            document.getElementById(inputId).focus();
+        }
+
+        // --- ФАЗА 1: Расширения (Текстовый ввод) ---
+        function generatePhase1(container) {
+            const types = [
+                {name: "Текстовый документ", ext: ["txt", "doc", "docx", "rtf"]},
+                {name: "Графический файл", ext: ["bmp", "jpg", "jpeg", "png", "gif"]},
+                {name: "Звуковой файл", ext: ["wav", "mp3"]},
+                {name: "Видеофайл", ext: ["avi", "mp4"]},
+                {name: "Исполняемая программа", ext: ["exe"]}
+            ];
+            
+            const target = types[Math.floor(Math.random() * types.length)];
+            
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Ручной ввод формата</h4>
+                <p class="fs-5">Файл содержит данные типа: <span class="text-white fw-bold">"${target.name}"</span>.</p>
+                <p class="fs-5">Напишите **любое одно** подходящее расширение для этого типа данных (без точки, только буквы):</p>
+                <div class="input-group mt-4" style="max-width: 400px;">
+                    <span class="input-group-text bg-black text-warning border-warning rounded-0 fw-bold">.</span>
+                    <input type="text" id="ans-input" class="form-control rounded-0 bg-dark text-warning border-warning fs-5 font-monospace" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-warning rounded-0 fw-bold px-4 fs-5" id="check-btn">ВВОД</button>
+                </div>
+            `;
+            
+            setupInput('ans-input', 'check-btn', (val) => {
+                logAction('phase1_input_' + val);
+                if (target.ext.includes(val.toLowerCase())) {
+                    loadPhase(2);
+                } else {
+                    triggerError(1, container, `Один из правильных ответов: ${target.ext[0]}`);
+                }
+            });
+        }
+
+        // --- ФАЗА 2: Парсинг имени файла ---
+        function generatePhase2(container) {
+            const paths = [
+                "C:\\Windows\\System32\\cmd.exe",
+                "D:\\Games\\Steam\\steamapps\\dota2.exe",
+                "E:\\School\\Projects\\History\\egypt_report.docx",
+                "C:\\Users\\Admin\\Downloads\\setup.exe",
+                "F:\\Photos\\Summer2023\\beach.jpg",
+                "D:\\Music\\Rock\\playlist.mp3"
+            ];
+            const path = paths[Math.floor(Math.random() * paths.length)];
+            const parts = path.split('\\');
+            const fileName = parts[parts.length - 1];
+
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Извлечение имени</h4>
+                <p class="fs-5">Система получила абсолютный путь:</p>
+                <p class="fs-4 text-white bg-dark p-2 d-inline-block border border-warning">${path}</p>
+                <p class="fs-5 mt-3">Извлеките и напишите только **имя файла вместе с расширением**:</p>
+                <div class="input-group mt-4" style="max-width: 500px;">
+                    <input type="text" id="ans-input" class="form-control rounded-0 bg-dark text-warning border-warning fs-5 font-monospace" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-warning rounded-0 fw-bold px-4 fs-5" id="check-btn">ВВОД</button>
+                </div>
+            `;
+            
+            setupInput('ans-input', 'check-btn', (val) => {
+                logAction('phase2_input_' + val);
+                if (val.toLowerCase() === fileName.toLowerCase()) {
+                    loadPhase(3);
+                } else {
+                    triggerError(2, container, `Ожидалось: ${fileName}`);
+                }
+            });
+        }
+
+        // --- ФАЗА 3: Парсинг директории ---
+        function generatePhase3(container) {
+            const disks = ['C', 'D', 'E', 'F'];
+            const disk = disks[Math.floor(Math.random() * disks.length)];
+            
+            const middleFolders = ['Documents', 'Downloads', 'Media', 'Backup', 'Work'];
+            const middle = middleFolders[Math.floor(Math.random() * middleFolders.length)];
+            
+            const lastFolders = ['Secret', 'Private', 'Archive', 'Temp', 'Important'];
+            const last = lastFolders[Math.floor(Math.random() * lastFolders.length)];
+            
+            const files = ['passwords.txt', 'data.dat', 'log.txt', 'key.bin'];
+            const file = files[Math.floor(Math.random() * files.length)];
+            
+            const path = `${disk}:\\${middle}\\${last}\\${file}`;
+
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Анализ окружения</h4>
+                <p class="fs-5">Перехвачен путь к секретному файлу:</p>
+                <p class="fs-4 text-white bg-dark p-2 d-inline-block border border-warning">${path}</p>
+                <p class="fs-5 mt-3">Как называется папка, в которой **непосредственно** лежит этот файл?</p>
+                <div class="input-group mt-4" style="max-width: 500px;">
+                    <input type="text" id="ans-input" class="form-control rounded-0 bg-dark text-warning border-warning fs-5 font-monospace" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-warning rounded-0 fw-bold px-4 fs-5" id="check-btn">ВВОД</button>
+                </div>
+            `;
+            
+            setupInput('ans-input', 'check-btn', (val) => {
+                logAction('phase3_input_' + val);
+                if (val.toLowerCase() === last.toLowerCase()) {
+                    loadPhase(4);
+                } else {
+                    triggerError(3, container, `Ожидалось: ${last}`);
+                }
+            });
+        }
+
+        // --- ФАЗА 4: Модификация пути ---
+        function generatePhase4(container) {
+            const disk = ['C', 'D'][Math.floor(Math.random() * 2)];
+            const rootDir = ['School', 'University', 'Office'][Math.floor(Math.random() * 3)];
+            
+            const subdirs = ['Math', 'Physics', 'History', 'Biology'];
+            // Выбираем две разные случайные папки
+            subdirs.sort(() => Math.random() - 0.5);
+            const oldSub = subdirs[0];
+            const newSub = subdirs[1];
+            
+            const file = ['homework.docx', 'report.pdf', 'notes.txt'][Math.floor(Math.random() * 3)];
+            
+            const oldPath = `${disk}:\\${rootDir}\\${oldSub}\\${file}`;
+            const correctPath = `${disk}:\\${rootDir}\\${newSub}\\${file}`;
+
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Модификация маршрута</h4>
+                <p class="fs-5">Файл сейчас находится по пути: <br><span class="text-white">${oldPath}</span></p>
+                <p class="fs-5">Требуется переместить файл из папки <b>${oldSub}</b> в параллельную папку <b>${newSub}</b> (которая лежит внутри ${rootDir}).</p>
+                <p class="fs-5 mt-3">Напишите НОВЫЙ полный абсолютный путь к файлу:</p>
+                <div class="input-group mt-4" style="max-width: 700px;">
+                    <input type="text" id="ans-input" class="form-control rounded-0 bg-dark text-warning border-warning fs-5 font-monospace" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-warning rounded-0 fw-bold px-4 fs-5" id="check-btn">ВВОД</button>
+                </div>
+            `;
+            
+            setupInput('ans-input', 'check-btn', (val) => {
+                logAction('phase4_input_' + val);
+                if (val.toLowerCase() === correctPath.toLowerCase()) {
+                    loadPhase(5);
+                } else {
+                    triggerError(4, container, `Ожидалось: ${correctPath}`);
+                }
+            });
+        }
+
+        // --- ФАЗА 5: Терминология операций ---
+        function generatePhase5(container) {
+            const questions = [
+                {q: "В результате какой операции файл появляется в новой папке, но ИСЧЕЗАЕТ из старой (оригинал не сохраняется)?", a: "перемещение"},
+                {q: "В результате какой операции создается точная копия файла, а оригинал ОСТАЕТСЯ на своем старом месте?", a: "копирование"},
+                {q: "Как называется операция изменения имени файла без изменения его местоположения на диске?", a: "переименование"},
+                {q: "Какая операция приводит к тому, что файл переносится в системную папку «Корзина»?", a: "удаление"}
+            ];
+            const target = questions[Math.floor(Math.random() * questions.length)];
+
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Терминологический контроль</h4>
+                <p class="fs-5 text-white">${target.q}</p>
+                <p class="fs-6 text-muted">Введите одно слово в именительном падеже (например, создание):</p>
+                <div class="input-group mt-4" style="max-width: 400px;">
+                    <input type="text" id="ans-input" class="form-control rounded-0 bg-dark text-warning border-warning fs-5 font-monospace" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-warning rounded-0 fw-bold px-4 fs-5" id="check-btn">ВВОД</button>
+                </div>
+            `;
+            
+            setupInput('ans-input', 'check-btn', (val) => {
+                logAction('phase5_input_' + val);
+                if (val.toLowerCase() === target.a) {
+                    finishLevel();
+                } else {
+                    triggerError(5, container, `Правильный ответ: ${target.a}`);
+                }
+            });
+        }
+
+        function finishLevel() {
+            currentPhase = 6;
+            saveState();
+            sendTelemetry('level_complete', 'completed', true);
+            const container = document.getElementById('task-container');
+            container.innerHTML = `
+                <div class="alert alert-warning rounded-0 border-0 bg-warning text-black fw-bold fs-3 text-center py-5">
+                    СИСТЕМА ЗАХВАЧЕНА.<br>ПРОДВИНУТЫЙ УРОВЕНЬ ПРОЙДЕН.
+                </div>
+            `;
+        }
+    </script>
+    <script src="/static/bootstrap.bundle.min.js"></script>
+</body>
+</html>

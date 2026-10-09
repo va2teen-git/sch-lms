@@ -1,0 +1,126 @@
+---
+import Terminal from '../../../../components/Terminal.astro';
+
+const phases = [
+  {
+    timeLimit: 35,
+    setup: `
+      window.attackerIP = \`192.168.\${rnd(10,50)}.\${rnd(100,200)}\`;
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Rapid SYN scan detected.\\nSource: \${window.attackerIP}\\nAction required: Block the attacking IP immediately.\\nTime remaining: 35 seconds\`;
+    `,
+    onCommand: `
+      if (cmd === 'ufw' && args[0] === 'deny' && args[1] === 'from' && args[2]) {
+        if (args[2] === window.attackerIP) return { success: true, message: 'Rule added' };
+        return { success: false, message: 'Rule added', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: You blocked the wrong IP. The attacker completed the scan and found a vulnerable service!\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    timeLimit: 25,
+    setup: `
+      window.shellPID = rnd(10000, 20000).toString();
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Interactive shell spawned by web server process (www-data).\\nAction required: Locate and terminate the malicious shell process.\\nTime remaining: 25 seconds\`;
+    `,
+    onCommand: `
+      if (cmd === 'ps') {
+        let out = 'USER       PID %CPU COMMAND\\nroot         1  0.0 /sbin/init\\nroot        42  0.0 sshd\\nwww-data   412  1.0 apache2';
+        out += \`\\nwww-data \${window.shellPID}  0.0 /bin/bash\`;
+        return { success: null, message: out }; 
+      }
+      if (cmd === 'kill' && args[0] === '-9' && args[1]) {
+        if (args[1] === window.shellPID) return { success: true, message: '' }; 
+        if (args[1] === '1' || args[1] === '42' || args[1] === '412') return { success: null, message: \`bash: kill: (\${args[1]}) - Operation not permitted\` };
+        return { success: false, message: \`bash: kill: (\${args[1]}) - No such process\`, failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: You failed to kill the shell. Attacker escalated privileges!\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    timeLimit: 25,
+    setup: `
+      if (!vfs['/']['tmp']) vfs['/']['tmp'] = {};
+      vfs['/']['tmp']['shadow.bak'] = 'root:$6$xyz...';
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Sensitive file /etc/shadow copied to /tmp/shadow.bak.\\nAction required: Delete the leaked file before exfiltration.\\nTime remaining: 25 seconds\`;
+    `,
+    onCommand: `
+      if (cmd === 'rm') {
+        const target = args[0];
+        if (!target) return { success: null, message: 'rm: missing operand' };
+        if (target === '/tmp/shadow.bak' || target === 'shadow.bak' && currentPath === '/tmp') {
+          return { success: true, message: '' };
+        }
+        return { success: false, message: '', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: The attacker successfully downloaded the shadow file and is cracking hashes offline!\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    timeLimit: 20,
+    setup: `
+      if (!vfs['/']['var']) vfs['/']['var'] = {};
+      if (!vfs['/']['var']['tmp']) vfs['/']['var']['tmp'] = {};
+      window.suidBin = 'suid_bash_' + rnd(100,999);
+      vfs['/']['var']['tmp'][window.suidBin] = '\\x7fELF...';
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: SUID binary created.\\nFile: /var/tmp/\${window.suidBin}\\nAction required: Remove the execute/SUID permissions from the binary.\\nTime remaining: 20 seconds\`;
+    `,
+    onCommand: `
+      if (cmd === 'chmod') {
+        const target = args[1];
+        if (!target) return { success: null, message: 'chmod: missing operand' };
+        if (target.includes(window.suidBin) && (args[0] === '-x' || args[0] === '644' || args[0] === '-s' || args[0] === '755')) {
+          return { success: true, message: '' };
+        }
+        return { success: false, message: '', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: The attacker executed the SUID binary and gained root!\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    timeLimit: 15,
+    setup: `
+      window.rogueUser = 'sys_' + rnd(10,99);
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Unauthorized account '\${window.rogueUser}' created with UID 0.\\nAction required: Lock the rogue account immediately.\\nTime remaining: 15 seconds\`;
+    `,
+    onCommand: `
+      if (cmd === 'passwd' && args[0] === '-l' && args[1]) {
+        if (args[1] === window.rogueUser) return { success: true, message: 'passwd: password expiry information changed.' };
+        return { success: false, message: \`passwd: user '\${args[1]}' does not exist\`, failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: Attacker logged in as the rogue root user! System compromised.\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    timeLimit: 15,
+    setup: `
+      window.bombPID = rnd(20000, 30000).toString();
+      return \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nnetdata ALARM: System load rapidly increasing (50.0). Suspected fork bomb 'stress-ng'.\\nAction required: Find and kill the process before kernel panic.\\nTime remaining: 15 seconds\`;
+    `,
+    onCommand: `
+      if (cmd === 'ps') {
+        let out = 'USER       PID %CPU COMMAND\\nroot         1  0.0 /sbin/init\\nroot        42  0.0 sshd';
+        out += \`\\nroot     \${window.bombPID} 100.0 stress-ng\`;
+        return { success: null, message: out }; 
+      }
+      if (cmd === 'kill' && args[0] === '-9' && args[1]) {
+        if (args[1] === window.bombPID) return { success: true, message: '' }; 
+        return { success: false, message: \`bash: kill: (\${args[1]}) - No such process\`, failMessage: \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nKERNEL PANIC - NOT SYNCING: Out of memory and no killable processes...\\nSYSTEM CRASHED.\` };
+      }
+      return { handled: false };
+    `
+  }
+];
+---
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3: Hardcore (Инцидент нулевого дня)</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-black vh-100 overflow-hidden d-flex flex-column m-0">
+    <Terminal missionName="10-класс_углубленный :: 19 :: Уровень 3" phases={JSON.stringify(phases)} requireStart={true} theme="red" hardcoreReset={true} />
+</body>
+</html>

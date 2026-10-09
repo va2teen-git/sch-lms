@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 1: Классификация сервисов</title>
+    <!-- Подключаем Bootstrap из локальной папки -->
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <style>
+        * { border-radius: 0 !important; }
+        body { background: #1a1a2e; color: #fff; font-family: 'Courier New', Courier, monospace; padding: 20px; margin: 0; }
+        .bucket { border: 2px solid #0f3460; min-height: 150px; padding: 10px; background: #16213e; cursor: pointer; transition: 0.2s; }
+        .bucket:hover, .bucket.active { border-color: #00ffcc; background: #1f2e54; }
+        .item-card { border: 1px solid #4a4e69; padding: 10px; margin: 5px; background: #22223b; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .item-card:hover, .item-card.selected { border-color: #e94560; background: #e94560; color: white; }
+        .progress-bar-custom { height: 10px; background: #111; margin-bottom: 20px; border: 1px solid #0f3460; }
+        .progress-fill { height: 100%; background: #00ffcc; width: 0%; transition: width 0.3s; }
+        .error-flash { animation: flashRed 0.5s; }
+        @keyframes flashRed { 0% { background: #ff4444; } 100% { background: #1a1a2e; } }
+    </style>
+</head>
+<body>
+
+    <h4 class="text-warning mb-3">Классификация веб-ресурсов</h4>
+    <p>Выберите карточку снизу, а затем кликните по подходящей категории (корзине).</p>
+    
+    <p>Прогресс: <span id="progress-text">0 / 3</span></p>
+    <div class="progress-bar-custom"><div class="progress-fill" id="progress-bar"></div></div>
+
+    <div id="game-area">
+        <div class="row text-center mb-4">
+            <div class="col-4">
+                <h5 class="text-info">Госуслуги (E-Gov)</h5>
+                <div class="bucket" data-category="gov" id="bucket-gov"></div>
+            </div>
+            <div class="col-4">
+                <h5 class="text-info">Коммерция (E-Com)</h5>
+                <div class="bucket" data-category="com" id="bucket-com"></div>
+            </div>
+            <div class="col-4">
+                <h5 class="text-info">Образование</h5>
+                <div class="bucket" data-category="edu" id="bucket-edu"></div>
+            </div>
+        </div>
+
+        <div id="items-container" class="d-flex flex-wrap justify-content-center border border-secondary p-3 bg-dark">
+            <!-- Items will be generated here -->
+        </div>
+    </div>
+
+    <div id="success-screen" style="display: none;" class="text-center mt-5">
+        <h2 class="text-success">УРОВЕНЬ ПРОЙДЕН!</h2>
+        <p>Вы успешно классифицировали все сервисы.</p>
+    </div>
+
+<script>
+    const MISSION_NAME = 'Сервисы Интернета :: Уровень 1';
+    
+    // База данных
+    const database = [
+        { name: 'Оформление загранпаспорта', cat: 'gov' },
+        { name: 'Wildberries', cat: 'com' },
+        { name: 'Ozon', cat: 'com' },
+        { name: 'Stepik', cat: 'edu' },
+        { name: 'Яндекс.Учебник', cat: 'edu' },
+        { name: 'Запись к стоматологу по ОМС', cat: 'gov' },
+        { name: 'Оплата налогов (nalog.gov.ru)', cat: 'gov' },
+        { name: 'СберМагет', cat: 'com' },
+        { name: 'Фоксфорд', cat: 'edu' },
+        { name: 'Выписка из ЕГРН', cat: 'gov' },
+        { name: 'AliExpress', cat: 'com' },
+        { name: 'Учи.ру', cat: 'edu' }
+    ];
+
+    let currentPhase = 0;
+    const TOTAL_PHASES = 3;
+    let selectedItem = null;
+    let itemsToSort = [];
+    
+    const startTime = Date.now();
+    let attempts = 0;
+    const actionLog = [];
+
+    function sendTelemetry(actionType, successStatus) {
+        const payload = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: actionType,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attempts,
+            success: successStatus,
+            status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+            action_log: actionLog
+        };
+        window.parent.postMessage(payload, '*');
+    }
+
+    function initPhase() {
+        if (currentPhase >= TOTAL_PHASES) {
+            document.getElementById('game-area').style.display = 'none';
+            document.getElementById('success-screen').style.display = 'block';
+            sendTelemetry('level_complete', true);
+            return;
+        }
+
+        // Обновляем прогресс
+        document.getElementById('progress-text').innerText = `${currentPhase} / ${TOTAL_PHASES}`;
+        document.getElementById('progress-bar').style.width = `${(currentPhase / TOTAL_PHASES) * 100}%`;
+
+        // Очищаем корзины и контейнер
+        document.querySelectorAll('.bucket').forEach(b => b.innerHTML = '');
+        const container = document.getElementById('items-container');
+        container.innerHTML = '';
+        selectedItem = null;
+
+        // Выбираем 4 случайных элемента
+        let shuffled = [...database].sort(() => 0.5 - Math.random());
+        itemsToSort = shuffled.slice(0, 4);
+
+        itemsToSort.forEach(item => {
+            let el = document.createElement('div');
+            el.className = 'item-card';
+            el.innerText = item.name;
+            el.dataset.cat = item.cat;
+            
+            el.onclick = () => {
+                document.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+                el.classList.add('selected');
+                selectedItem = el;
+            };
+            
+            container.appendChild(el);
+        });
+        
+        sendTelemetry('phase_started', false);
+    }
+
+    // Обработка клика по корзине
+    document.querySelectorAll('.bucket').forEach(bucket => {
+        bucket.onclick = () => {
+            if (!selectedItem) return;
+            
+            attempts++;
+            const targetCat = bucket.dataset.category;
+            const correctCat = selectedItem.dataset.cat;
+            const itemName = selectedItem.innerText;
+
+            if (targetCat === correctCat) {
+                // Правильно
+                actionLog.push(`Correct: ${itemName} -> ${targetCat}`);
+                bucket.appendChild(selectedItem);
+                selectedItem.onclick = null; // Отключаем клик
+                selectedItem.classList.remove('selected');
+                selectedItem = null;
+
+                // Проверяем, все ли отсортированы
+                if (document.getElementById('items-container').children.length === 0) {
+                    currentPhase++;
+                    setTimeout(initPhase, 500);
+                }
+            } else {
+                // Ошибка!
+                actionLog.push(`Error: ${itemName} -> ${targetCat}`);
+                document.body.classList.add('error-flash');
+                setTimeout(() => document.body.classList.remove('error-flash'), 500);
+                selectedItem.classList.remove('selected');
+                selectedItem = null;
+                
+                // Хардкор сброс
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    action_type: 'hardcore_reset'
+                }, '*');
+                
+                // Если не хардкор, просто пересоздаем фазу для предотвращения подбора
+                setTimeout(initPhase, 600);
+            }
+        };
+    });
+
+    // Запуск
+    initPhase();
+
+</script>
+</body>
+</html>

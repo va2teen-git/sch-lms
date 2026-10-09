@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3: Кибер-Камни</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <style>
+        * { border-radius: 0 !important; }
+        body { background: #050505; color: #ff0055; font-family: 'Courier New', Courier, monospace; padding: 20px; margin: 0; overflow-x: hidden; }
+        h4, h5 { color: #fff; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        p { color: #cccccc; font-size: 1.1rem; }
+        
+        .terminal-box { border: 1px solid #ff0055; background: #110000; padding: 20px; margin-bottom: 20px; box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.1); }
+        
+        .btn-cyber { background: transparent; border: 1px solid #ff0055; color: #ff0055; padding: 12px 24px; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s; font-size: 1.1rem; margin: 5px; }
+        .btn-cyber:hover { background: #ff0055; color: #000; }
+        .btn-cyber:disabled { border-color: #555; color: #555; cursor: not-allowed; background: transparent; }
+        
+        .progress-container { margin-bottom: 20px; border: 1px solid #333; height: 10px; background: #000; }
+        .progress-bar { height: 100%; background: #ff0055; width: 0%; transition: width 0.3s; }
+        
+        .timer-bar-bg { width: 100%; height: 20px; background: #220000; border: 1px solid #ff0055; margin-bottom: 15px; position: relative; }
+        .timer-bar-fill { height: 100%; background: #ff0055; width: 100%; transition: width 0.1s linear; }
+        .timer-text { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); color: #fff; font-weight: bold; }
+
+        .phase { display: none; animation: fadeIn 0.3s forwards; }
+        .phase.active { display: block; }
+
+        .data-display { font-size: 3rem; font-weight: bold; color: #fff; text-align: center; text-shadow: 0 0 10px #ff0055; margin: 20px 0; }
+        .log-box { font-size: 0.9rem; color: #888; max-height: 150px; overflow-y: auto; background: #000; padding: 10px; border: 1px dashed #555; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        .hardcore-flash { animation: flashRed 0.5s; }
+        @keyframes flashRed { 0% { background: #ff0000; } 100% { background: #050505; } }
+    </style>
+</head>
+<body>
+
+    <h4>Аркада: Кибер-Угроза (Теория Игр)</h4>
+    <p>Прогресс взлома серверов: <span id="progress-text">0 / 10</span></p>
+    <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+    <!-- START SCREEN -->
+    <div id="screen-start" class="phase active terminal-box text-center">
+        <h2 style="color: #ff0055;">ПРОТОКОЛ "КИБЕР-КАМНИ"</h2>
+        <p>Ваша задача — перегрузить сервера ИИ, доведя объем данных до критического предела (Цель).</p>
+        <p>Вы и ИИ ходите по очереди, добавляя терабайты. Вы ходите первым.</p>
+        <p style="color: #fff;">У вас будет <b>15 секунд</b> на каждый ход. Ошибка или таймаут = СБРОС ВСЕХ РАУНДОВ.</p>
+        <button class="btn-cyber mt-4" onclick="initRound()">НАЧАТЬ ВЗЛОМ</button>
+    </div>
+
+    <!-- GAMEPLAY SCREEN -->
+    <div id="screen-gameplay" class="phase terminal-box">
+        <div class="flex justify-between items-center mb-2">
+            <span id="game-target-text" style="color:#00ffcc; font-size: 1.2rem;">Цель: 21 ТБ</span>
+            <span id="game-status-text" style="color:#fff; font-weight:bold;">Ваш ход!</span>
+        </div>
+        
+        <div class="timer-bar-bg">
+            <div class="timer-bar-fill" id="timer-bar"></div>
+            <span class="timer-text" id="timer-val">15.0с</span>
+        </div>
+
+        <div class="data-display">
+            <span id="current-data">10</span> <span style="font-size:1.5rem; color:#ff0055;">ТБ</span>
+        </div>
+
+        <div class="text-center my-4" id="controls-container">
+            <!-- Buttons injected here -->
+        </div>
+
+        <div class="log-box" id="log-box"></div>
+    </div>
+
+    <!-- SUCCESS SCREEN -->
+    <div id="screen-success" class="phase terminal-box text-center" style="border-color: #00ffcc;">
+        <h2 style="color: #00ffcc;">[ СИСТЕМА ВЗЛОМАНА ]</h2>
+        <p>ИИ капитулировал. Вы продемонстрировали идеальное владение теорией игр.</p>
+        <p>Протокол Уровня 3 завершен.</p>
+    </div>
+
+    <script>
+        const MISSION_NAME = 'Основы теории игр :: Уровень 3 (Аркада)';
+        const TOTAL_ROUNDS = 10;
+        let currentRound = 0;
+        let startTimeGlobal = Date.now();
+
+        // Базовые конфигурации с диапазонами для рандомизации
+        const baseConfigs = [
+            { targetBase: 21, targetRange: 4, moves: [{t:'+',v:1}, {t:'+',v:2}, {t:'*',v:2}] }, // 21-24
+            { targetBase: 25, targetRange: 4, moves: [{t:'+',v:1}, {t:'+',v:3}, {t:'*',v:2}] }, // 25-28
+            { targetBase: 30, targetRange: 4, moves: [{t:'+',v:1}, {t:'*',v:2}] }, // 30-33
+            { targetBase: 33, targetRange: 4, moves: [{t:'+',v:1}, {t:'+',v:4}, {t:'*',v:2}] }, // 33-36
+            { targetBase: 38, targetRange: 4, moves: [{t:'+',v:2}, {t:'*',v:2}] }, // 38-41
+            { targetBase: 40, targetRange: 4, moves: [{t:'+',v:1}, {t:'*',v:3}] }, // 40-43
+            { targetBase: 45, targetRange: 5, moves: [{t:'+',v:2}, {t:'+',v:3}, {t:'*',v:2}] }, // 45-49
+            { targetBase: 50, targetRange: 5, moves: [{t:'+',v:1}, {t:'+',v:2}, {t:'*',v:3}] }, // 50-54
+            { targetBase: 55, targetRange: 5, moves: [{t:'+',v:2}, {t:'+',v:5}, {t:'*',v:2}] }, // 55-59
+            { targetBase: 60, targetRange: 6, moves: [{t:'+',v:1}, {t:'+',v:4}, {t:'*',v:2}, {t:'*',v:3}] } // 60-65
+        ];
+
+        let currentConfig = null;
+        let statusArray = [];
+        let currentData = 0;
+
+        // Timer vars
+        let timerInterval;
+        let timeLeft = 30.0;
+        let currentLimit = 30.0; // Dynamic limit
+        let isPlayerTurn = false;
+
+        function showScreen(id) {
+            document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function updateProgress() {
+            document.getElementById('progress-text').innerText = `${currentRound} / ${TOTAL_ROUNDS}`;
+            document.getElementById('progress-bar').style.width = `${(currentRound / TOTAL_ROUNDS) * 100}%`;
+        }
+
+        function failGame(reason) {
+            clearInterval(timerInterval);
+            isPlayerTurn = false;
+            document.querySelectorAll('#controls-container .btn-cyber').forEach(b => b.disabled = true);
+            document.body.classList.add('hardcore-flash');
+            
+            logMsg(`[КРИТИЧЕСКАЯ ОШИБКА]: ${reason}`, '#ff0000');
+            
+            // Show correct P-positions to help them learn
+            let pPos = [];
+            for(let i=1; i<currentConfig.target; i++) {
+                if(statusArray[i] === 'P') pPos.push(i);
+            }
+            logMsg(`Системная подсказка. Правильные П-позиции для этого сервера: ${pPos.join(', ')}`, '#ffff00');
+
+            // Signal parent
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: 'hardcore_reset'
+            }, '*');
+
+            setTimeout(() => {
+                document.body.classList.remove('hardcore-flash');
+                
+                const btnContainer = document.getElementById('controls-container');
+                btnContainer.innerHTML = '';
+                let restartBtn = document.createElement('button');
+                restartBtn.className = 'btn-cyber';
+                restartBtn.style.borderColor = '#ff0000';
+                restartBtn.style.color = '#ff0000';
+                restartBtn.innerText = 'ПЕРЕЗАГРУЗИТЬ АРКАДУ (РАУНД 1)';
+                restartBtn.onclick = () => {
+                    currentRound = 0; // Полный сброс аркады
+                    updateProgress();
+                    initRound();
+                };
+                btnContainer.appendChild(restartBtn);
+                
+                document.getElementById('game-status-text').innerText = "ВЗЛОМ ПРЕРВАН";
+                document.getElementById('game-status-text').style.color = "#ff0000";
+
+            }, 600);
+        }
+
+        function logMsg(msg, color="#888") {
+            const box = document.getElementById('log-box');
+            box.innerHTML = `<div style="color:${color}">> ${msg}</div>` + box.innerHTML;
+        }
+
+        function calculateV_P(config) {
+            let arr = [];
+            for (let i = config.target - 1; i >= 1; i--) {
+                let isWinningMoveFound = false;
+                for (let m of config.moves) {
+                    let next = (m.t === '+') ? i + m.v : i * m.v;
+                    if (next >= config.target) {
+                        isWinningMoveFound = true;
+                    } else if (arr[next] === 'P') {
+                        isWinningMoveFound = true;
+                    }
+                }
+                arr[i] = isWinningMoveFound ? 'V' : 'P';
+            }
+            return arr;
+        }
+
+        function initRound() {
+            if (currentRound >= TOTAL_ROUNDS) {
+                showScreen('screen-success');
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: MISSION_NAME,
+                    action_type: 'level_complete',
+                    start_time: new Date(startTimeGlobal).toISOString(),
+                    time_spent_sec: Math.floor((Date.now() - startTimeGlobal) / 1000),
+                    attempts_count: 1,
+                    success: true,
+                    action_log: [`Completed all ${TOTAL_ROUNDS} rounds`]
+                }, '*');
+                return;
+            }
+
+            let baseConf = baseConfigs[currentRound];
+            currentConfig = {
+                target: baseConf.targetBase + Math.floor(Math.random() * baseConf.targetRange),
+                moves: baseConf.moves
+            };
+            
+            currentLimit = 30.0 - (currentRound * 2); // 30s -> 12s per move
+            statusArray = calculateV_P(currentConfig);
+
+            // Find a valid starting V-position for player
+            let validStarts = [];
+            for (let i = Math.floor(currentConfig.target * 0.1); i <= Math.floor(currentConfig.target * 0.4); i++) {
+                if (statusArray[i] === 'V') validStarts.push(i);
+            }
+            if (validStarts.length === 0) {
+                for(let i = 1; i < currentConfig.target; i++) {
+                    if(statusArray[i] === 'V') validStarts.push(i);
+                }
+            }
+            if (validStarts.length === 0) validStarts.push(1); 
+            
+            currentData = validStarts[Math.floor(Math.random() * validStarts.length)];
+
+            logMsg(`>>> СЕРВЕР ${currentRound + 1} ПОДКЛЮЧЕН. ЦЕЛЬ: ${currentConfig.target} ТБ <<<`, '#ffff00');
+            startGameplay();
+        }
+
+        function startGameplay() {
+            document.getElementById('game-target-text').innerText = `Цель: >= ${currentConfig.target} ТБ`;
+            
+            const btnContainer = document.getElementById('controls-container');
+            btnContainer.innerHTML = '';
+            currentConfig.moves.forEach((m, idx) => {
+                let btn = document.createElement('button');
+                btn.className = 'btn-cyber';
+                btn.innerText = `${m.t}${m.v} ТБ`;
+                btn.onclick = () => makePlayerMove(idx);
+                btnContainer.appendChild(btn);
+            });
+
+            updateDataDisplay();
+            showScreen('screen-gameplay');
+            startPlayerTurn();
+        }
+
+        function updateDataDisplay() {
+            document.getElementById('current-data').innerText = currentData;
+        }
+
+        function startPlayerTurn() {
+            isPlayerTurn = true;
+            timeLeft = currentLimit;
+            document.getElementById('game-status-text').innerText = "ВАШ ХОД! Ожидание ввода...";
+            document.getElementById('game-status-text').style.color = "#00ffcc";
+            document.querySelectorAll('#controls-container .btn-cyber').forEach(b => b.disabled = false);
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft -= 0.1;
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    failGame("Время вышло! Вы не успели просчитать граф.");
+                }
+                document.getElementById('timer-val').innerText = timeLeft.toFixed(1) + 'с';
+                document.getElementById('timer-bar').style.width = `${(timeLeft / currentLimit) * 100}%`;
+            }, 100);
+        }
+
+        function makePlayerMove(moveIndex) {
+            if (!isPlayerTurn) return;
+            clearInterval(timerInterval);
+            isPlayerTurn = false;
+            document.querySelectorAll('#controls-container .btn-cyber').forEach(b => b.disabled = true);
+
+            let m = currentConfig.moves[moveIndex];
+            let nextData = (m.t === '+') ? currentData + m.v : currentData * m.v;
+            logMsg(`Вы использовали [${m.t}${m.v}]. Данные: ${currentData} -> ${nextData}`, '#00ffcc');
+            currentData = nextData;
+            updateDataDisplay();
+
+            if (currentData >= currentConfig.target) {
+                logMsg(`ПРЕДЕЛ ПРЕВЫШЕН! Вы победили ИИ в этом раунде.`, '#00ffcc');
+                setTimeout(() => {
+                    currentRound++;
+                    updateProgress();
+                    initRound();
+                }, 2000);
+                return;
+            }
+
+            // Check if player gave bot a V-position (error!)
+            if (statusArray[currentData] === 'V') {
+                setTimeout(() => failGame("Фатальная ошибка! Вы отдали ИИ Выигрышную позицию!"), 500);
+                return;
+            }
+
+            // Bot Turn
+            document.getElementById('game-status-text').innerText = "ИИ вычисляет ответ...";
+            document.getElementById('game-status-text').style.color = "#ff0055";
+
+            setTimeout(() => {
+                // Bot is in P-position, so ALL moves lead to V-position. Bot just picks random.
+                let botMove = currentConfig.moves[Math.floor(Math.random() * currentConfig.moves.length)];
+                let botNext = (botMove.t === '+') ? currentData + botMove.v : currentData * botMove.v;
+                
+                logMsg(`ИИ использует [${botMove.t}${botMove.v}]. Данные: ${currentData} -> ${botNext}`, '#ff0055');
+                currentData = botNext;
+                updateDataDisplay();
+
+                if (currentData >= currentConfig.target) {
+                    failGame("ИИ перегрузил сервер первым! Вы проиграли.");
+                    return;
+                }
+
+                startPlayerTurn();
+            }, 1500 + Math.random() * 1000); // 1.5 - 2.5s delay
+        }
+    </script>
+</body>
+</html>

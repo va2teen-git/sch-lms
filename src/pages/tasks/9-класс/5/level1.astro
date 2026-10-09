@@ -1,0 +1,126 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import WriterEmulator from '../../../../components/WriterEmulator.astro';
+
+const missionName = "9 класс :: Урок 5 :: Уровень 1";
+---
+
+<Layout title="Практика: Онлайн-офис">
+    <div class="container-fluid h-100 d-flex flex-column p-0 bg-black overflow-auto">
+        <!-- Инструкция -->
+        <div class="bg-dark text-white p-3 border-bottom border-success flex-shrink-0">
+            <h4 class="text-success fw-bold">Миссия: Навыки форматирования документов</h4>
+            <div id="instruction-panel" class="fs-5 mt-3">
+                Загрузка задания...
+            </div>
+            <div class="mt-3">
+                <span class="badge bg-secondary fs-6">Фаза <span id="phase-counter">1</span> / 3</span>
+            </div>
+        </div>
+
+        <!-- Рабочая область -->
+        <div class="flex-grow-1 position-relative p-3" style="min-height: 500px;">
+            <WriterEmulator 
+                missionName={missionName} 
+                initialHTML="" 
+            />
+        </div>
+    </div>
+</Layout>
+
+<script>
+    // Процедурная генерация фраз для заданий (ГЛАВНЫЙ ПРИНЦИП из ТЗ)
+    const subjects = ['Процессор', 'Монитор', 'Сервер', 'Маршрутизатор', 'Алгоритм', 'Облако', 'Шифратор'];
+    const actions = ['обрабатывает', 'передает', 'сохраняет', 'вычисляет', 'защищает', 'кодирует'];
+    const objects = ['информацию', 'пакеты', 'файлы', 'сигналы', 'команды', 'запросы'];
+
+    let currentPhase = 1;
+    let targetWord = '';
+    let targetFormat = null;
+    let currentSentence = '';
+
+    const instructionEl = document.getElementById('instruction-panel');
+    const phaseEl = document.getElementById('phase-counter');
+
+    function getRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function generatePhase() {
+        const subject = getRandom(subjects);
+        const action = getRandom(actions);
+        const object = getRandom(objects);
+        currentSentence = `${subject} ${action} ${object}.`;
+
+        const words = [subject, action, object];
+        targetWord = getRandom(words);
+        
+        const formats = [
+            { id: 'bold', label: 'ЖИРНЫМ', tag: 'strong', tag2: 'b' },
+            { id: 'italic', label: 'КУРСИВОМ', tag: 'em', tag2: 'i' },
+            { id: 'underline', label: 'ПОДЧЕРКНУТЫМ', tag: 'u', tag2: 'u' }
+        ];
+        
+        targetFormat = getRandom(formats);
+
+        instructionEl.innerHTML = `
+            Наберите следующее предложение в редакторе (без кавычек):<br>
+            <span class="text-info font-monospace d-inline-block mt-2 mb-2 p-2 border border-info">"${currentSentence}"</span><br>
+            Затем сделайте слово <span class="text-warning fw-bold">«${targetWord}»</span> <span class="text-danger fw-bold">${targetFormat.label}</span> шрифтом и нажмите кнопку отправки.
+        `;
+        phaseEl.innerText = currentPhase;
+    }
+
+    // Ждем загрузки DOM перед генерацией
+    document.addEventListener('DOMContentLoaded', () => {
+        generatePhase();
+    });
+
+    document.addEventListener('writer-check', (e) => {
+        // @ts-ignore
+        const html = e.detail.html;
+        
+        // Очищаем HTML от лишних тегов Jodit, оставляем только суть для проверки
+        const cleanHtml = html.replace(/&nbsp;/g, ' ');
+        
+        // Регулярные выражения для проверки обертки конкретного слова
+        const regex1 = new RegExp(`<${targetFormat.tag}[^>]*>\\s*${targetWord}\\s*<\\/${targetFormat.tag}>`, 'i');
+        const regex2 = new RegExp(`<${targetFormat.tag2}[^>]*>\\s*${targetWord}\\s*<\\/${targetFormat.tag2}>`, 'i');
+        // Запасной вариант для underline, если Jodit использует span
+        const regex3 = new RegExp(`<span[^>]*style="[^"]*text-decoration[^"]*underline[^"]*"[^>]*>\\s*${targetWord}\\s*<\\/span>`, 'i'); 
+
+        let success = regex1.test(cleanHtml) || regex2.test(cleanHtml) || (targetFormat.id === 'underline' && regex3.test(cleanHtml));
+
+        // Дополнительная проверка: ученик должен был набрать всё предложение, а не только одно слово
+        const strippedText = cleanHtml.replace(/<[^>]*>?/gm, '').trim();
+        const sentenceClean = currentSentence.replace(/[^а-яА-ЯёЁ0-9]/ig, '');
+        const studentClean = strippedText.replace(/[^а-яА-ЯёЁ0-9]/ig, '');
+
+        if (!studentClean.includes(sentenceClean)) {
+            success = false;
+            // @ts-ignore
+            e.detail.resolve(false, 'Предложение набрано не полностью или содержит опечатки!');
+            // При ошибке генерируем новую задачу (правило 1-2 уровней)
+            setTimeout(generatePhase, 1500); 
+            return;
+        }
+
+        if (success) {
+            if (currentPhase < 3) {
+                // @ts-ignore
+                e.detail.resolve(true, `Фаза ${currentPhase} пройдена!`);
+                currentPhase++;
+                setTimeout(generatePhase, 1500);
+            } else {
+                // @ts-ignore
+                e.detail.resolve(true, 'МИССИЯ ВЫПОЛНЕНА УСПЕШНО!');
+                instructionEl.innerHTML = '<span class="text-success fw-bold fs-4">ЗАДАНИЕ УСПЕШНО ВЫПОЛНЕНО!</span><br>Вы научились базовому форматированию документов.';
+                document.getElementById('check-btn').style.display = 'none'; // Прячем кнопку
+            }
+        } else {
+            // @ts-ignore
+            e.detail.resolve(false, `Слово "${targetWord}" не отформатировано правильно!`);
+            setTimeout(generatePhase, 1500);
+        }
+    });
+</script>

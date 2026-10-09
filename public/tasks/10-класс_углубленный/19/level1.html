@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 1: Отражение базовых атак (Терминал)</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-black text-light font-monospace vh-100 overflow-hidden d-flex flex-column">
+    <div class="container-fluid p-4 d-flex flex-column flex-grow-1 h-100">
+        
+        <!-- Terminal Output -->
+        <div id="terminal-output" class="flex-grow-1 overflow-auto bg-black p-3 rounded-0" style="font-size: 1.1rem; line-height: 1.4;">
+            <div>Ubuntu 24.04.1 LTS sys-server tty1</div>
+            <br>
+            <div>sys-server login: root</div>
+            <div>Password: </div>
+            <div>Last login: Wed Oct  7 09:12:45 2026 from 192.168.1.10</div>
+            <br>
+            <div>Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 6.8.0-45-generic x86_64)</div>
+            <div> * Documentation:  https://help.ubuntu.com</div>
+            <div> * Management:     https://landscape.canonical.com</div>
+            <div> * Support:        https://ubuntu.com/pro</div>
+            <br>
+            <div>No mail.</div>
+            <div class="text-secondary">Type 'help' for a list of available commands in this simulation.</div>
+            <br>
+        </div>
+
+        <!-- Terminal Input -->
+        <div class="input-group bg-black">
+            <span class="input-group-text bg-black text-success border-0 rounded-0 font-monospace pe-2" id="prompt-path" style="font-size: 1.1rem;">root@sys-server:/#</span>
+            <input type="text" id="cmd-input" class="form-control bg-black text-light border-0 rounded-0 shadow-none font-monospace px-0" autocomplete="off" autofocus style="font-size: 1.1rem;">
+        </div>
+    </div>
+
+    <script>
+        const MISSION_NAME = '10-класс_углубленный :: 19 :: Уровень 1';
+        let startTime = Date.now();
+        let attempts = 0;
+        let currentPhase = 1;
+        let isLocked = false;
+
+        // VFS & State
+        let currentPath = '/';
+        const vfs = { '/': { 'var': { 'log': { 'auth.log': '' } } } };
+        let attackerIP = '';
+        let malwarePID = '';
+        let malwareName = '';
+        let compromisedUser = '';
+
+        const outputDiv = document.getElementById('terminal-output');
+        const inputField = document.getElementById('cmd-input');
+        const promptPath = document.getElementById('prompt-path');
+
+        function sendTelemetry(actionType, status, success = false, actionLog = null) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            const msg = {
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: actionType,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            };
+            if (actionLog) msg.action_log = [actionLog];
+            window.parent.postMessage(msg, '*');
+        }
+
+        sendTelemetry('in_progress', 'in_progress');
+
+        function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        function getBroadcastTime() {
+            const now = new Date();
+            return `(${now.toDateString()} ${now.toTimeString().split(' ')[0]})`;
+        }
+
+        function generatePhase1() {
+            attackerIP = `${rnd(11,250)}.${rnd(0,255)}.${rnd(0,255)}.${rnd(1,254)}`;
+            const time1 = `10:${rnd(10,59)}:${rnd(10,59)}`;
+            const time2 = `10:${rnd(10,59)}:${rnd(10,59)}`;
+            const time3 = `10:${rnd(10,59)}:${rnd(10,59)}`;
+            
+            vfs['/']['var']['log']['auth.log'] = `Oct  7 10:15:22 sys-server sshd[14510]: Accepted publickey for admin from 192.168.1.15 port 39122\nOct  7 ${time1} sys-server sshd[14522]: Failed password for invalid user admin from ${attackerIP} port 45192 ssh2\nOct  7 ${time2} sys-server sshd[14524]: Failed password for root from ${attackerIP} port 45194 ssh2\nOct  7 ${time3} sys-server sshd[14526]: Failed password for root from ${attackerIP} port 45201 ssh2`;
+
+            return `\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nCRITICAL ALERT: High rate of SSH authentication failures detected by IDS.\nPlease investigate /var/log/auth.log and block the attacking IP using 'ufw deny from [IP]'.\n`;
+        }
+
+        function generatePhase2() {
+            malwarePID = rnd(1000, 9999).toString();
+            const prefixes = ['crypto', 'sys', 'net', 'win', 'data', 'kworker'];
+            const exts = ['sh', 'elf'];
+            malwareName = `${prefixes[rnd(0, prefixes.length-1)]}_miner.${exts[rnd(0,1)]}`;
+            return `\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nALERT: CPU usage spike detected. System load average is critically high (99.9%).\nIdentify the malicious process using 'ps' and terminate it immediately using 'kill -9 [PID]'.\n`;
+        }
+
+        function generatePhase3() {
+            compromisedUser = `service_${rnd(100,999)}`;
+            return `\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nSECURITY INCIDENT: Suspicious data exfiltration detected from user account '${compromisedUser}'.\nLock the compromised user account immediately using 'passwd -l [USERNAME]' to stop the breach.\n`;
+        }
+
+        function printLine(text, colorClass = 'text-light', escapeHTML = false) {
+            const div = document.createElement('div');
+            div.className = colorClass;
+            // Handle basic HTML line breaks if not escaping fully
+            if (escapeHTML) {
+                div.textContent = text;
+            } else {
+                div.innerHTML = text.replace(/\n/g, '<br>');
+            }
+            outputDiv.appendChild(div);
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+
+        function updatePrompt() {
+            let displayPath = currentPath;
+            if (displayPath !== '/') displayPath = displayPath.replace(/\/$/, '');
+            promptPath.innerText = `root@sys-server:${displayPath}#`;
+        }
+
+        function failPhase(msg) {
+            sendTelemetry('hardcore_reset', 'in_progress', false, {time: new Date().toISOString(), action: `error_phase_${currentPhase}`});
+            isLocked = true;
+            
+            setTimeout(() => {
+                printLine(msg, 'text-warning');
+                setTimeout(() => {
+                    if (currentPhase === 1) printLine(generatePhase1(), 'text-warning');
+                    if (currentPhase === 2) printLine(generatePhase2(), 'text-warning');
+                    if (currentPhase === 3) printLine(generatePhase3(), 'text-warning');
+                    isLocked = false;
+                    inputField.focus();
+                }, 1500);
+            }, 1000);
+        }
+
+        function completePhase() {
+            sendTelemetry('in_progress', 'in_progress', false, {time: new Date().toISOString(), action: `success_phase_${currentPhase}`});
+            currentPhase++;
+            isLocked = true;
+            
+            if (currentPhase > 3) {
+                setTimeout(() => {
+                    printLine(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nSYSTEM RECOVERY COMPLETE. All threats neutralized.\nDisconnecting...`, 'text-success fw-bold');
+                    sendTelemetry('level_complete', 'completed', true);
+                    inputField.disabled = true;
+                }, 1500);
+            } else {
+                setTimeout(() => {
+                    if (currentPhase === 2) printLine(generatePhase2(), 'text-warning');
+                    if (currentPhase === 3) printLine(generatePhase3(), 'text-warning');
+                    isLocked = false;
+                    inputField.focus();
+                }, 2000);
+            }
+        }
+
+        inputField.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmdText = inputField.value.trim().replace(/\s+/g, ' ');
+                inputField.value = '';
+                if (cmdText) {
+                    printLine(`<span class="text-success">${promptPath.innerText}</span> ${cmdText}`);
+                    processCommand(cmdText);
+                }
+            }
+        });
+
+        // Click on terminal focuses input
+        document.body.addEventListener('click', () => {
+            if (!isLocked) inputField.focus();
+        });
+
+        function processCommand(cmdLine) {
+            if (isLocked) return;
+            const args = cmdLine.split(' ');
+            const cmd = args[0].toLowerCase();
+            attempts++;
+
+            switch(cmd) {
+                case 'help':
+                    printLine(`GNU bash, version 5.1.16(1)-release (x86_64-pc-linux-gnu)\nAvailable commands: help, clear, pwd, cd, ls, cat, ps, ufw, kill, passwd`);
+                    break;
+                case 'clear':
+                    outputDiv.innerHTML = '';
+                    break;
+                case 'pwd':
+                    printLine(currentPath);
+                    break;
+                case 'ls':
+                    if (currentPath === '/') printLine('<span class="text-primary fw-bold">var</span>');
+                    else if (currentPath === '/var') printLine('<span class="text-primary fw-bold">log</span>');
+                    else if (currentPath === '/var/log') printLine('auth.log');
+                    else printLine('');
+                    break;
+                case 'cd':
+                    let target = args[1];
+                    if (!target || target === '~' || target === '/') currentPath = '/';
+                    else if (currentPath === '/' && target === 'var') currentPath = '/var';
+                    else if (currentPath === '/var' && target === 'log') currentPath = '/var/log';
+                    else if (target === '/var/log') currentPath = '/var/log';
+                    else if (target === '..') {
+                        if (currentPath === '/var/log') currentPath = '/var';
+                        else if (currentPath === '/var') currentPath = '/';
+                    } else printLine(`bash: cd: ${target}: No such file or directory`);
+                    updatePrompt();
+                    break;
+                case 'cat':
+                    const file = args[1];
+                    if ((currentPath === '/var/log' && file === 'auth.log') || file === '/var/log/auth.log') {
+                        printLine(vfs['/']['var']['log']['auth.log']);
+                    } else {
+                        printLine(`cat: ${file || ''}: No such file or directory`);
+                    }
+                    break;
+                case 'ps':
+                    if (args[1] && !['aux', '-ef', '-e', '-a'].includes(args[1])) {
+                        printLine(`ps: invalid option -- '${args[1].replace('-','')}'\nTry 'ps --help' for more information.`);
+                        break;
+                    }
+                    printLine(`USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\nroot           1  0.0  0.1 168988 11624 ?        Ss   Oct06   0:05 /sbin/init\nroot          42  0.0  0.0  12216  4528 ?        Ss   Oct06   0:00 sshd: /usr/sbin/sshd -D`);
+                    if (currentPhase === 2) {
+                        printLine(`www-data    ${malwarePID} 99.9  1.5  45212 12100 ?        Rsl  10:25  14:21 ./${malwareName}`);
+                    }
+                    break;
+                case 'ufw':
+                    if (args[1] === 'deny' && args[2] === 'from' && args[3]) {
+                        printLine(`Rule added`);
+                        if (currentPhase === 1 && args[3] === attackerIP) {
+                            completePhase();
+                        } else if (currentPhase === 1) {
+                            failPhase(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nCRITICAL ALERT: SSH brute force continues! Previous action was ineffective.\nAttacker has rotated IP address. Check /var/log/auth.log again.\n`);
+                        }
+                    } else {
+                        printLine(`ERROR: Invalid syntax`);
+                    }
+                    break;
+                case 'kill':
+                    if (args[1] === '-9' && args[2]) {
+                        if (args[2] === malwarePID && currentPhase === 2) {
+                            // kill command outputs nothing on success
+                            completePhase();
+                        } else if (args[2] === '1' || args[2] === '42') {
+                            printLine(`bash: kill: (${args[2]}) - Operation not permitted`);
+                        } else if (currentPhase === 2) {
+                            printLine(`bash: kill: (${args[2]}) - No such process`);
+                            failPhase(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nALERT: CPU usage is still at 100%. The malicious process has evaded termination and changed PID!\n`);
+                        } else {
+                            printLine(`bash: kill: (${args[2]}) - No such process`);
+                        }
+                    } else {
+                        printLine(`kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]`);
+                    }
+                    break;
+                case 'passwd':
+                    if (args[1] === '-l' && args[2]) {
+                        if (currentPhase === 3 && args[2] === compromisedUser) {
+                            printLine(`passwd: password expiry information changed.`);
+                            completePhase();
+                        } else if (currentPhase === 3) {
+                            printLine(`passwd: user '${args[2]}' does not exist`);
+                            failPhase(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nSECURITY INCIDENT: Breach continues! Account was not locked. Attacker changed access points.\n`);
+                        } else {
+                            printLine(`passwd: user '${args[2]}' does not exist`);
+                        }
+                    } else {
+                        printLine(`Usage: passwd [options] [LOGIN]`);
+                    }
+                    break;
+                default:
+                    printLine(`bash: ${cmd}: command not found`);
+            }
+        }
+
+        // Start initial phase
+        setTimeout(() => {
+            printLine(generatePhase1(), 'text-warning');
+        }, 1500);
+
+    </script>
+</body>
+</html>

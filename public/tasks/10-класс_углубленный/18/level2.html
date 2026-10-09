@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 2: Антифишинг-фильтр</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <style>
+        * { border-radius: 0 !important; }
+        body { background: #0f172a; color: #e2e8f0; font-family: 'Courier New', Courier, monospace; padding: 20px; margin: 0; }
+        .terminal { background: #020617; border: 1px solid #334155; padding: 20px; position: relative; }
+        .terminal-header { border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px; color: #38bdf8; font-weight: bold; text-transform: uppercase; }
+        
+        .progress-bar-custom { height: 12px; background: #1e293b; margin-bottom: 20px; border: 1px solid #475569; }
+        .progress-fill { height: 100%; background: #3b82f6; width: 0%; transition: width 0.3s; }
+        
+        .request-box { border: 2px dashed #64748b; padding: 15px; margin-bottom: 20px; background: #1e293b; }
+        .url-box { font-size: 1.2rem; padding: 10px; background: #000; border: 1px solid #f59e0b; color: #fcd34d; word-break: break-all; margin-bottom: 20px; text-align: center; font-weight: bold; }
+        
+        .btn-custom { border: 2px solid transparent; padding: 15px 30px; font-weight: bold; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; width: 48%; }
+        .btn-accept { border-color: #22c55e; background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+        .btn-accept:hover { background: #22c55e; color: #000; }
+        .btn-block { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .btn-block:hover { background: #ef4444; color: #000; }
+
+        .error-flash { animation: flashRed 0.5s; }
+        @keyframes flashRed { 0% { background: #7f1d1d; } 100% { background: #0f172a; } }
+        
+        .scan-line { width: 100%; height: 2px; background: rgba(56, 189, 248, 0.5); position: absolute; top: 0; left: 0; animation: scan 3s infinite linear; pointer-events: none; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+    </style>
+</head>
+<body>
+
+    <div class="terminal">
+        <div class="scan-line"></div>
+        <div class="terminal-header">Модуль безопасности DPI: Инспекция SSL-соединений</div>
+        
+        <p class="text-sm text-slate-400 mb-4"><strong>Легенда:</strong> Вы — инженер кибербезопасности. В корпоративной сети замечен всплеск фишинговых атак, маскирующихся под государственные и коммерческие сервисы. Анализируйте запросы сотрудников и блокируйте поддельные URL-адреса.</p>
+        
+        <p>Обработано пакетов: <span id="progress-text">0 / 5</span></p>
+        <div class="progress-bar-custom"><div class="progress-fill" id="progress-bar"></div></div>
+
+        <div id="game-area">
+            <div class="request-box">
+                <span class="text-slate-400">Цель запроса пользователя:</span>
+                <h4 id="user-intent" class="mt-2 text-white">...</h4>
+            </div>
+            
+            <p class="text-center text-slate-400 mb-1">Запрашиваемый URL:</p>
+            <div class="url-box" id="target-url">https://...</div>
+            
+            <p class="text-center text-slate-400 mb-1">Введите официальный домен сервиса (даже если выше указан верный):</p>
+            <div class="d-flex justify-content-center mb-3">
+                <input type="text" id="domain-input" class="form-control bg-dark text-white border-warning" style="max-width: 400px; text-align: center; font-size: 1.2rem;" placeholder="domain.ru" autocomplete="off">
+            </div>
+            
+            <div class="d-flex justify-content-center">
+                <button class="btn-custom btn-accept" style="width: 100%; max-width: 400px;" onclick="checkAnswer()">ПРОВЕРИТЬ ДОМЕН</button>
+            </div>
+        </div>
+
+        <div id="success-screen" style="display: none;" class="text-center mt-5 py-5 border border-success">
+            <h2 class="text-success mb-3">СЕТЬ В БЕЗОПАСНОСТИ</h2>
+            <p class="text-slate-300">Все сервисы настроены корректно.</p>
+        </div>
+    </div>
+
+<<script>
+    const MISSION_NAME = 'Сервисы Интернета :: Уровень 2 (Антифишинг)';
+    const TOTAL_PHASES = 5;
+    
+    // База данных сценариев (20 сервисов)
+    const database = [
+        { intent: 'Госуслуги', correctDomains: ['gosuslugi.ru', 'www.gosuslugi.ru'], fake: ['gosuslugi-auth.ru', 'gosuslygi.ru', 'login-gosuslugi.com'] },
+        { intent: 'ФНС (Налоговая)', correctDomains: ['nalog.gov.ru', 'www.nalog.gov.ru', 'nalog.ru'], fake: ['nalog-gov-ru.net', 'lkfl-nalog.ru'] },
+        { intent: 'Социальный фонд (СФР)', correctDomains: ['sfr.gov.ru', 'www.sfr.gov.ru'], fake: ['sfr-gov.ru', 'pfrf-sfr.ru'] },
+        { intent: 'Росреестр', correctDomains: ['rosreestr.gov.ru', 'www.rosreestr.gov.ru'], fake: ['rosreestr-gov.ru', 'rosreestr-online.ru'] },
+        { intent: 'Сайт Администрации Санкт-Петербурга', correctDomains: ['gov.spb.ru', 'www.gov.spb.ru'], fake: ['spb-gov.ru', 'gov-spb-login.com'] },
+        { intent: 'Здоровье петербуржца (Запись к врачу)', correctDomains: ['gorzdrav.spb.ru', 'www.gorzdrav.spb.ru'], fake: ['gorzdrav.online-med.ru', 'spb-gorzdrav.com'] },
+        { intent: 'Сбербанк Онлайн', correctDomains: ['online.sberbank.ru', 'sberbank.ru', 'www.sberbank.ru'], fake: ['sberbank-online.com', 'sber-online-login.ru'] },
+        { intent: 'Т-Банк (Тинькофф)', correctDomains: ['tbank.ru', 'www.tbank.ru', 'tinkoff.ru'], fake: ['t-bank-online.ru', 'tinkoff-tbank.ru'] },
+        { intent: 'Альфа-Банк', correctDomains: ['alfabank.ru', 'www.alfabank.ru'], fake: ['alfa-bank-login.ru', 'alfabank-ru.com'] },
+        { intent: 'Ozon', correctDomains: ['ozon.ru', 'www.ozon.ru'], fake: ['ozon-sale.ru', 'ozon-market.com'] },
+        { intent: 'Wildberries', correctDomains: ['wildberries.ru', 'www.wildberries.ru'], fake: ['wildberies.ru', 'wb-sale24.ru'] },
+        { intent: 'Авито', correctDomains: ['avito.ru', 'www.avito.ru'], fake: ['avito-delivery.ru', 'avito-pay.ru'] },
+        { intent: 'РЖД', correctDomains: ['rzd.ru', 'www.rzd.ru'], fake: ['rzd-ticket.ru', 'rzd-online.com'] },
+        { intent: 'Аэрофлот', correctDomains: ['aeroflot.ru', 'www.aeroflot.ru'], fake: ['aeroflot-tickets.ru', 'aeroflot-ru.com'] },
+        { intent: 'Почта России', correctDomains: ['pochta.ru', 'www.pochta.ru'], fake: ['pochta-tracking.ru', 'pochta-ru.com'] },
+        { intent: 'Электронный дневник', correctDomains: ['dnevnik.ru', 'www.dnevnik.ru'], fake: ['dnevnik-school.ru', 'login-dnevnik.ru'] },
+        { intent: 'Stepik', correctDomains: ['stepik.org', 'www.stepik.org'], fake: ['stepik-courses.ru', 'stepik.com'] },
+        { intent: 'Учи.ру', correctDomains: ['uchi.ru', 'www.uchi.ru'], fake: ['uchi-ru-login.com', 'uchi-school.ru'] },
+        { intent: 'ВКонтакте', correctDomains: ['vk.com', 'www.vk.com'], fake: ['vk-login.com', 'vk.ru.com'] },
+        { intent: 'Яндекс', correctDomains: ['ya.ru', 'yandex.ru', 'www.ya.ru'], fake: ['yandex-search.com', 'ya-ru.online'] }
+    ];
+
+    let currentPhase = 0;
+    let currentScenario = null;
+    let displayedUrl = '';
+    let startTime = Date.now();
+    let attempts = 0;
+    let actionLog = [];
+
+    function sendTelemetry(actionType, successStatus) {
+        const payload = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: actionType,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attempts,
+            success: successStatus,
+            status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+            action_log: actionLog
+        };
+        window.parent.postMessage(payload, '*');
+    }
+
+    function initPhase() {
+        if (currentPhase >= TOTAL_PHASES) {
+            document.getElementById('game-area').style.display = 'none';
+            document.getElementById('success-screen').style.display = 'block';
+            sendTelemetry('level_complete', true);
+            return;
+        }
+
+        document.getElementById('progress-text').innerText = `${currentPhase} / ${TOTAL_PHASES}`;
+        document.getElementById('progress-bar').style.width = `${(currentPhase / TOTAL_PHASES) * 100}%`;
+
+        // Выбираем случайный сценарий
+        currentScenario = database[Math.floor(Math.random() * database.length)];
+        
+        // 50% шанс показать реальный домен, 50% - фишинговый
+        const isReal = Math.random() > 0.5;
+        if (isReal) {
+            displayedUrl = 'https://' + currentScenario.correctDomains[0] + '/login';
+        } else {
+            const randomFake = currentScenario.fake[Math.floor(Math.random() * currentScenario.fake.length)];
+            displayedUrl = 'http://' + randomFake + '/secure';
+        }
+
+        document.getElementById('user-intent').innerText = currentScenario.intent;
+        document.getElementById('target-url').innerText = displayedUrl;
+        
+        const inputField = document.getElementById('domain-input');
+        inputField.value = '';
+        inputField.focus();
+        
+        sendTelemetry('phase_started', false);
+    }
+
+    function checkAnswer() {
+        attempts++;
+        const inputField = document.getElementById('domain-input');
+        const userAnswer = inputField.value.trim().toLowerCase();
+        
+        if (!userAnswer) return;
+
+        const isCorrect = currentScenario.correctDomains.includes(userAnswer);
+        
+        // Отключаем интерфейс
+        inputField.disabled = true;
+        const btn = document.querySelector('.btn-accept');
+        btn.disabled = true;
+
+        if (isCorrect) {
+            actionLog.push(`Correct: ${currentScenario.intent} -> ${userAnswer}`);
+            currentPhase++;
+            
+            inputField.style.borderColor = '#22c55e';
+            inputField.style.color = '#22c55e';
+            
+            setTimeout(() => {
+                inputField.disabled = false;
+                btn.disabled = false;
+                inputField.style.borderColor = '#f59e0b';
+                inputField.style.color = '#ffffff';
+                initPhase();
+            }, 1000);
+        } else {
+            actionLog.push(`Error: ${currentScenario.intent} -> ${userAnswer}`);
+            
+            // Визуальный фидбек ошибки
+            document.body.classList.add('error-flash');
+            const intentEl = document.getElementById('user-intent');
+            const originalIntent = intentEl.innerText;
+            intentEl.innerText = "ОШИБКА! НЕВЕРНЫЙ ДОМЕН!";
+            intentEl.classList.add('text-danger');
+            
+            inputField.style.borderColor = '#ef4444';
+            inputField.style.color = '#ef4444';
+            
+            // Хардкор сброс
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                action_type: 'hardcore_reset'
+            }, '*');
+            
+            // Ждем 2 секунды, чтобы ученик осознал ошибку, но НЕ сбрасываем currentPhase
+            setTimeout(() => {
+                document.body.classList.remove('error-flash');
+                intentEl.classList.remove('text-danger');
+                intentEl.innerText = originalIntent;
+                
+                inputField.value = '';
+                inputField.style.borderColor = '#f59e0b';
+                inputField.style.color = '#ffffff';
+                inputField.disabled = false;
+                btn.disabled = false;
+                inputField.focus();
+            }, 2000);
+        }
+    }
+
+    // Обработка Enter
+    document.getElementById('domain-input').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkAnswer();
+    });
+
+    // Старт
+    initPhase();
+</script>
+</body>
+</html>

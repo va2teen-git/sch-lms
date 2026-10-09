@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 2: Терминал доступа</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <style>
+        * { border-radius: 0 !important; }
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+        }
+        .terminal-box {
+            border: 1px solid #30363d;
+            background-color: #010409;
+            padding: 20px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(88, 166, 255, 0.1);
+        }
+        .terminal-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 10px; height: 10px;
+            border-top: 2px solid #58a6ff;
+            border-left: 2px solid #58a6ff;
+        }
+        .cyber-title {
+            color: #58a6ff;
+            text-transform: uppercase;
+            font-weight: bold;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        .question-text {
+            font-size: 1.1em;
+            color: #7ee787;
+            margin-bottom: 20px;
+            min-height: 80px;
+        }
+        .input-cyber {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 10px;
+            width: 100%;
+            font-family: inherit;
+            font-size: 1.2em;
+            transition: border-color 0.3s;
+        }
+        .input-cyber:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 5px rgba(88, 166, 255, 0.5);
+        }
+        .input-cyber.error {
+            border-color: #f85149;
+            box-shadow: 0 0 5px rgba(248, 81, 73, 0.5);
+        }
+        .btn-cyber {
+            background-color: #1f6feb;
+            color: white;
+            border: 1px solid #388bfd;
+            padding: 10px 20px;
+            text-transform: uppercase;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+        }
+        .btn-cyber:hover {
+            background-color: #388bfd;
+        }
+        .progress-bar {
+            height: 5px;
+            background-color: #1f6feb;
+            width: 0%;
+            transition: width 0.3s;
+            margin-bottom: 20px;
+        }
+        .feedback {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #f85149;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="terminal-box">
+        <div class="cyber-title" id="phaseTitle">Уровень 2: Аутентификация знаний</div>
+        
+        <div id="gameArea">
+            <div class="question-text" id="questionText">Инициализация...</div>
+            <input type="text" id="answerInput" class="input-cyber" placeholder="Введите ответ (статью УК или термин)..." autocomplete="off">
+            <div class="feedback" id="feedbackMsg"></div>
+            <button id="checkBtn" class="btn-cyber">Отправить запрос</button>
+        </div>
+
+        <div id="successArea" style="display: none; text-align: center; padding: 40px 0;">
+            <div style="color: #3fb950; font-size: 1.5em; margin-bottom: 15px;">БАЗА ДАННЫХ УСПЕШНО ОБНОВЛЕНА</div>
+            <div style="color: #8b949e;">Вы можете переходить к следующему уровню.</div>
+        </div>
+    </div>
+
+<script>
+    // System Telemetry
+    const MISSION_NAME = 'Законодательство РФ :: Уровень 2';
+    let startTime = Date.now();
+    let attemptsCount = 0;
+    let actionLog = [];
+
+    function sendTelemetry(actionType, success = false) {
+        const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+        const event = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: actionType,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success,
+            action_log: actionLog
+        };
+        window.parent.postMessage(event, '*');
+    }
+
+    sendTelemetry('start');
+
+    // Data Bank (21 unique questions)
+    const questionsBank = [
+        { q: "Взлом пароля от чужой страницы ВКонтакте и копирование личных переписок. Номер статьи УК РФ:", a: "272" },
+        { q: "Студент подобрал пароль к серверу университета и стер базу данных абитуриентов. Номер статьи УК РФ:", a: "272" },
+        { q: "Неправомерный доступ к компьютерной информации, повлекший её модификацию. Номер статьи УК РФ:", a: "272" },
+        { q: "Разработка программы-шифровальщика, которая блокирует файлы и требует выкуп. Номер статьи УК РФ:", a: "273" },
+        { q: "Распространение зараженных флешек с вирусом у здания конкурентов. Номер статьи УК РФ:", a: "273" },
+        { q: "Создание компьютерных программ, заведомо предназначенных для несанкционированного уничтожения данных. Статья УК РФ:", a: "273" },
+        { q: "Системный администратор нарушил правила эксплуатации сервера, из-за чего была удалена база пациентов клиники. Статья УК РФ:", a: "274" },
+        { q: "Несоблюдение правил безопасности сотрудником, приведшее к блокировке корпоративной сети по неосторожности. Статья УК РФ:", a: "274" },
+        { q: "Хакерская атака на базу данных системы городского водоканала (объект критической инфраструктуры). Статья УК РФ:", a: "274.1" },
+        { q: "Атака на сервер государственного банка, повлекшая сбой в его работе. Статья УК РФ:", a: "274.1" },
+        { q: "Использование нелицензионного ПО на сумму свыше 100 тысяч рублей (крупный ущерб). Статья УК РФ:", a: "146" },
+        { q: "Установка пиратской версии 3ds Max в студии дизайна, ущерб правообладателю 2 млн рублей. Статья УК РФ:", a: "146" },
+        { q: "Бесплатное ПО с закрытым исходным кодом. Разработчик не берет денег, но код скрыт. (Термин на англ.)", a: "freeware" },
+        { q: "Программа, за которую не нужно платить, код закрыт. Нельзя продавать от своего имени. (Термин на англ.)", a: "freeware" },
+        { q: "Условно-бесплатное ПО. Есть пробный период 30 дней. (Термин на англ.)", a: "shareware" },
+        { q: "Программа, которая постоянно просит купить лицензию после окончания trial-периода. (Термин на англ.)", a: "shareware" },
+        { q: "Свободное ПО с открытым исходным кодом, которое можно менять. (Термин на англ., без пробелов)", a: "opensource" },
+        { q: "ПО, которое разрабатывается сообществом программистов по всему миру и доступно бесплатно вместе с кодом. (Термин на англ., без пробелов)", a: "opensource" },
+        { q: "Коммерческое ПО, исходный код которого является собственностью компании. Копирование запрещено. (Термин на англ.)", a: "proprietary" },
+        { q: "Программа продается за деньги, исходный код закрыт. Например, Microsoft Office. (Термин на англ.)", a: "proprietary" },
+        { q: "Договор между пользователем и разработчиком, определяющий права на использование программы. (Одно слово на русском)", a: "лицензия" }
+    ];
+
+    const TOTAL_PHASES = 5;
+    let currentPhase = 0;
+    let currentQuestion = null;
+    let availableQuestions = [...questionsBank];
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    availableQuestions = shuffle(availableQuestions);
+
+    function initPhase() {
+        document.getElementById('phaseTitle').innerText = `Этап ${currentPhase + 1} из ${TOTAL_PHASES}`;
+        document.getElementById('progressBar').style.width = `${(currentPhase / TOTAL_PHASES) * 100}%`;
+        document.getElementById('answerInput').value = '';
+        document.getElementById('answerInput').classList.remove('error');
+        document.getElementById('feedbackMsg').innerText = '';
+        
+        currentQuestion = availableQuestions.pop();
+        document.getElementById('questionText').innerText = currentQuestion.q;
+        
+        document.getElementById('answerInput').focus();
+        actionLog.push(`Phase ${currentPhase + 1} started`);
+    }
+
+    function checkAnswer() {
+        const inputEl = document.getElementById('answerInput');
+        const feedbackEl = document.getElementById('feedbackMsg');
+        
+        let answer = inputEl.value.trim().toLowerCase();
+        // remove spaces in case user types 'open source' instead of 'opensource'
+        answer = answer.replace(/\s+/g, '');
+        
+        let correctAnswer = currentQuestion.a.toLowerCase().replace(/\s+/g, '');
+
+        attemptsCount++;
+
+        if (answer === correctAnswer) {
+            actionLog.push(`Phase ${currentPhase + 1} passed`);
+            currentPhase++;
+            
+            if (currentPhase < TOTAL_PHASES) {
+                initPhase();
+            } else {
+                document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('gameArea').style.display = 'none';
+                document.getElementById('successArea').style.display = 'block';
+                document.getElementById('phaseTitle').innerText = 'ДОСТУП РАЗРЕШЕН';
+                sendTelemetry('level_complete', true);
+            }
+        } else {
+            actionLog.push(`Phase ${currentPhase + 1} failed check (input: ${answer})`);
+            inputEl.classList.add('error');
+            feedbackEl.innerText = 'ОШИБКА: Неверный идентификатор. Попробуйте еще раз.';
+            setTimeout(() => {
+                inputEl.classList.remove('error');
+            }, 500);
+            
+            // Хардкор сброс
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                action_type: 'hardcore_reset'
+            }, '*');
+        }
+    }
+
+    document.getElementById('checkBtn').onclick = checkAnswer;
+    document.getElementById('answerInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkAnswer();
+    });
+
+    initPhase();
+</script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3: Аркада (AlphaGo)</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <script src="/static/vue.global.js"></script>
+</head>
+<body class="bg-black text-danger p-4 rounded-0" style="font-family: monospace; overflow-x: hidden;">
+    <div id="app" class="container-fluid">
+        <h2 class="text-uppercase mb-3 border-bottom border-danger pb-2 text-center">
+            Уровень 3: Матч Века (AlphaGo vs Ли Седоль, 2016)
+        </h2>
+
+        <!-- История / Интро (Показывается до старта) -->
+        <div v-if="state === 'intro'" class="card bg-dark text-danger border-danger rounded-0 mb-4 p-4 text-center">
+            <h3 class="mb-3">ИСТОРИЧЕСКАЯ СПРАВКА</h3>
+            <p class="text-white-50 text-start">
+                В 2016 году свершилось невозможное. ИИ <strong>AlphaGo</strong> от DeepMind бросил вызов Ли Седолю, 
+                чемпиону мира по древней игре Го. До этого считалось, что ИИ не сможет играть в Го еще минимум 10 лет 
+                из-за астрономического количества комбинаций (больше, чем атомов во Вселенной), где простой перебор невозможен.
+            </p>
+            <p class="text-white-50 text-start">
+                AlphaGo объединил глубокие нейросети и алгоритм поиска в дереве Монте-Карло (MCTS). 
+                В этом тренажере вы возьмете на себя управление вычислительным кластером AlphaGo. 
+                У вас есть <strong>60 секунд</strong>, чтобы провести сеть через 10 фаз расчета хода. 
+                <strong>ЛЮБАЯ ОШИБКА</strong> или истечение времени приведет к критическому сбою и полному сбросу прогресса!
+            </p>
+            <button @click="startMission" class="btn btn-danger btn-lg rounded-0 mt-3 font-weight-bold">
+                [ ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ]
+            </button>
+        </div>
+
+        <!-- Игровой экран -->
+        <div v-if="state === 'playing'" class="row">
+            <!-- Панель статуса -->
+            <div class="col-12 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fs-4">ФАЗА: {{ phase }} / {{ maxPhases }}</span>
+                    <span class="fs-3 fw-bold" :class="{'text-warning': timeLeft < 20, 'text-danger': timeLeft >= 20}">
+                        Таймер: {{ timeLeft.toFixed(1) }} сек
+                    </span>
+                </div>
+                <!-- Прогресс-бар таймера -->
+                <div class="progress bg-dark rounded-0" style="height: 20px;">
+                    <div class="progress-bar bg-danger" role="progressbar" 
+                         :style="{ width: (timeLeft / 60 * 100) + '%' }" 
+                         style="transition: width 0.1s linear;"></div>
+                </div>
+            </div>
+
+            <!-- Зона задачи -->
+            <div class="col-12">
+                <div class="card bg-dark text-danger border-danger rounded-0 shadow-lg" style="min-height: 250px;">
+                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                        <h4 class="mb-4 text-uppercase">{{ currentTask.title }}</h4>
+                        <p class="text-white-50 mb-4">{{ currentTask.desc }}</p>
+
+                        <!-- Тип: Кнопки (Policy & MCTS) -->
+                        <div v-if="currentTask.type === 'buttons'" class="d-flex justify-content-center flex-wrap gap-3">
+                            <button v-for="(btn, idx) in currentTask.options" :key="idx" 
+                                    @click="checkAnswer(btn.isCorrect)"
+                                    class="btn btn-outline-danger btn-lg rounded-0 m-2" style="min-width: 150px;">
+                                {{ btn.label }}
+                            </button>
+                        </div>
+
+                        <!-- Тип: Ввод текста (Value & Move 37) -->
+                        <div v-if="currentTask.type === 'input'" class="d-flex justify-content-center">
+                            <div class="input-group rounded-0" style="max-width: 400px;">
+                                <span class="input-group-text bg-black text-danger border-danger rounded-0">
+                                    {{ currentTask.prefix }}
+                                </span>
+                                <input type="text" v-model="userInput" @keyup.enter="checkAnswer(userInput.trim() === currentTask.correctAnswer)" 
+                                       class="form-control bg-dark text-danger border-danger rounded-0 text-center fs-5" 
+                                       ref="taskInput" autofocus>
+                                <button @click="checkAnswer(userInput.trim() === currentTask.correctAnswer)" 
+                                        class="btn btn-danger rounded-0">ВВОД</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран успеха -->
+        <div v-if="state === 'success'" class="card bg-black text-success border-success rounded-0 mt-5 p-5 text-center shadow-lg">
+            <h1 class="display-4 font-weight-bold mb-4">ХОД 37 ВЫПОЛНЕН!</h1>
+            <p class="fs-4 text-light">
+                Машина совершила ход, который комментаторы назвали "инопланетным". 
+                Ли Седоль покинул комнату в шоке. Искусственный интеллект одержал победу в Матче Века!
+            </p>
+            <p class="mt-4 text-success">Телеметрия успешно отправлена. Аркада пройдена.</p>
+        </div>
+    </div>
+
+    <script>
+        const MISSION_NAME = 'Средства искусственного интеллекта :: Уровень 3';
+        const TOTAL_TIME = 60.0;
+        
+        const app = Vue.createApp({
+            data() {
+                return {
+                    state: 'intro', // intro, playing, success
+                    phase: 1,
+                    maxPhases: 10,
+                    timeLeft: TOTAL_TIME,
+                    timerInterval: null,
+                    currentTask: {},
+                    userInput: '',
+                    attempts: 0,
+                    startTime: 0
+                }
+            },
+            methods: {
+                sendTelemetry(actionType, success = false) {
+                    const timeSpent = this.startTime ? Math.floor((Date.now() - this.startTime) / 1000) : 0;
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: MISSION_NAME,
+                        action_type: actionType,
+                        status: success ? 'completed' : 'in_progress',
+                        start_time: new Date(this.startTime || Date.now()).toISOString(),
+                        time_spent_sec: timeSpent,
+                        attempts_count: this.attempts,
+                        success: success
+                    }, '*');
+                },
+                startMission() {
+                    this.state = 'playing';
+                    this.phase = 1;
+                    this.timeLeft = TOTAL_TIME;
+                    this.attempts = 0;
+                    this.startTime = Date.now();
+                    this.sendTelemetry('in_progress');
+                    this.generateTaskForPhase();
+                    
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.timerInterval = setInterval(() => {
+                        this.timeLeft -= 0.1;
+                        if (this.timeLeft <= 0) {
+                            this.timeLeft = 0;
+                            this.triggerHardcoreReset("Истекло время!");
+                        }
+                    }, 100);
+                },
+                triggerHardcoreReset(reason) {
+                    clearInterval(this.timerInterval);
+                    this.attempts++;
+                    this.sendTelemetry('hardcore_reset', false);
+                    
+                    // Эффект глитча (визуальный)
+                    document.body.style.backgroundColor = '#8b0000';
+                    setTimeout(() => {
+                        document.body.style.backgroundColor = '';
+                        alert(`СИСТЕМНЫЙ СБОЙ: ${reason}\nПроизошел сброс кластера.`);
+                        // Полный сброс
+                        this.state = 'intro';
+                    }, 100);
+                },
+                checkAnswer(isCorrect) {
+                    if (isCorrect) {
+                        if (this.phase === this.maxPhases) {
+                            // Победа
+                            clearInterval(this.timerInterval);
+                            this.state = 'success';
+                            this.sendTelemetry('level_complete', true);
+                        } else {
+                            // Следующая фаза
+                            this.phase++;
+                            this.generateTaskForPhase();
+                        }
+                    } else {
+                        // Ошибка -> Хардкор ресет
+                        this.triggerHardcoreReset("Неверный расчет данных!");
+                    }
+                },
+                generateTaskForPhase() {
+                    this.userInput = '';
+                    if (this.phase >= 1 && this.phase <= 3) {
+                        this.currentTask = this.createPolicyTask();
+                    } else if (this.phase >= 4 && this.phase <= 6) {
+                        this.currentTask = this.createValueTask();
+                    } else if (this.phase >= 7 && this.phase <= 9) {
+                        this.currentTask = this.createMCTSTask();
+                    } else if (this.phase === 10) {
+                        this.currentTask = this.createMove37Task();
+                    }
+                    
+                    // Focus input if text task
+                    if (this.currentTask.type === 'input') {
+                        this.$nextTick(() => {
+                            if (this.$refs.taskInput) this.$refs.taskInput.focus();
+                        });
+                    }
+                },
+                createPolicyTask() {
+                    // Генерируем 4 вероятности (одна самая высокая)
+                    let probs = [];
+                    for(let i=0; i<3; i++) {
+                        probs.push((Math.random() * 0.3).toFixed(3)); // низкие
+                    }
+                    const correctProb = (Math.random() * 0.4 + 0.5).toFixed(3); // 0.5 - 0.9
+                    probs.push(correctProb);
+                    
+                    // Перемешиваем
+                    probs.sort(() => Math.random() - 0.5);
+                    
+                    const options = probs.map(p => ({
+                        label: `P = ${p}`,
+                        isCorrect: p === correctProb
+                    }));
+
+                    return {
+                        title: 'Сеть Политики (Policy Network)',
+                        desc: 'ИИ отбрасывает слабые ходы. Выберите ветку с максимальной вероятностью!',
+                        type: 'buttons',
+                        options: options
+                    };
+                },
+                createValueTask() {
+                    const wins = Math.floor(Math.random() * 80) + 10;
+                    const losses = Math.floor(Math.random() * 20) + 1;
+                    const total = wins + losses;
+                    const winrate = Math.round((wins / total) * 100);
+                    
+                    return {
+                        title: 'Сеть Ценности (Value Network)',
+                        desc: `Оценка состояния доски. Сыграно партий: ${total}. Побед: ${wins}. Поражений: ${losses}. Вычислите процент побед (округлить до целого).`,
+                        type: 'input',
+                        prefix: 'Винрейт (%)',
+                        correctAnswer: winrate.toString()
+                    };
+                },
+                createMCTSTask() {
+                    // Q + U = Score
+                    let nodes = [];
+                    let maxScore = -1;
+                    for(let i=0; i<3; i++) {
+                        const Q = Math.floor(Math.random() * 10) + 1;
+                        const U = Math.floor(Math.random() * 10) + 1;
+                        const score = Q + U;
+                        nodes.push({ Q, U, score, label: `Узел ${i+1}: Q=${Q}, U=${U}` });
+                        if (score > maxScore) maxScore = score;
+                    }
+                    
+                    // Проверка на уникальность максимума (упрощенно добавим к первому если есть дубликаты, но шанс мал)
+                    
+                    const options = nodes.map(n => ({
+                        label: n.label,
+                        isCorrect: n.score === maxScore
+                    }));
+                    options.sort(() => Math.random() - 0.5);
+
+                    return {
+                        title: 'Поиск в Дереве (MCTS)',
+                        desc: 'Выберите узел для исследования с наибольшей суммой параметров Q (Ценность) и U (Бонус разведки).',
+                        type: 'buttons',
+                        options: options
+                    };
+                },
+                createMove37Task() {
+                    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                    const letter = letters[Math.floor(Math.random() * letters.length)];
+                    const num = Math.floor(Math.random() * 19) + 1;
+                    const coord = `${letter}${num}`;
+                    
+                    return {
+                        title: 'ЛЕГЕНДАРНЫЙ ХОД 37',
+                        desc: `Все сети сошлись на неочевидном решении. Вероятность хода, предсказанная человеческой логикой: 0.0001%. AlphaGo готов. Введите координаты хода: ${coord}`,
+                        type: 'input',
+                        prefix: 'Координаты',
+                        correctAnswer: coord
+                    };
+                }
+            }
+        });
+        
+        app.mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,405 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import coursesData from '../../../data/courses.json';
+import fs from 'fs';
+import path from 'path';
+import { marked } from 'marked';
+import markedAlert from 'marked-alert';
+
+marked.use(markedAlert());
+
+const { class: classSlug, id: lessonId } = Astro.params;
+
+const course = coursesData.find(c => c.slug === classSlug);
+const lesson = course?.lessons.find(l => l.id === lessonId);
+
+if (!course || !lesson) {
+  return Astro.redirect('/courses');
+}
+
+// Попытка загрузить теорию
+const theoryPath = path.join(process.cwd(), 'src', 'content', 'lessons', classSlug, lessonId, 'theory.md');
+let theoryHtml = '<p class="text-gray-500">Теоретический материал еще не добавлен.</p>';
+
+if (fs.existsSync(theoryPath)) {
+  const mdContent = fs.readFileSync(theoryPath, 'utf-8');
+  theoryHtml = marked.parse(mdContent);
+}
+
+// Check if monolithic legacy task.html exists
+const legacyTaskPath = path.join(process.cwd(), 'public', 'tasks', classSlug, lessonId, 'task.html');
+const hasLegacyTask = fs.existsSync(legacyTaskPath);
+
+// Пути к тренажерам (поддержка старых .html и новых Astro роутов)
+const getTaskUrl = (levelNum, cSlug, lId) => {
+  const publicPath = path.join(process.cwd(), 'public', 'tasks', cSlug, lId, `level${levelNum}.html`);
+  if (fs.existsSync(publicPath)) {
+    return `/tasks/${cSlug}/${lId}/level${levelNum}.html`; // legacy static
+  }
+  return `/tasks/${cSlug}/${lId}/level${levelNum}`; // new dynamic Astro route
+};
+
+const tasks = [
+  { level: 1, name: 'Уровень 1', url: getTaskUrl(1, classSlug, lessonId) },
+  { level: 2, name: 'Уровень 2', url: getTaskUrl(2, classSlug, lessonId) },
+  { level: 3, name: 'Уровень 3', url: getTaskUrl(3, classSlug, lessonId) }
+];
+---
+
+<Layout title={`${lesson.topic} | Урок ${lesson.id}`}>
+  <div class="flex h-screen flex-col">
+    
+    <!-- Header -->
+    <header class="bg-gray-800 text-white p-4 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-4">
+        <a href="/courses" class="border border-white px-3 py-1 hover:bg-gray-700 transition-colors">← Назад</a>
+        <h1 class="text-xl font-bold">Урок {lesson.id}: {lesson.topic}</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <button id="hardcore-toggle" class="border border-gray-600 bg-gray-700 px-3 py-1 flex items-center gap-2 hover:bg-red-900 transition-colors" title="Режим Хардкора">
+          <span class="text-xl opacity-50 transition-opacity" id="hardcore-icon">💀</span>
+          <span class="text-sm font-semibold uppercase tracking-wider">Хардкор</span>
+        </button>
+        <button id="logout-btn" class="border border-red-500 text-red-500 hover:bg-red-900 px-3 py-1 transition-colors text-sm font-semibold uppercase tracking-wider">Выйти</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+      <!-- Left: Theory -->
+      <section class="w-1/2 border-r border-gray-300 bg-white overflow-y-auto p-8 prose prose-slate max-w-none">
+        <div set:html={theoryHtml} />
+      </section>
+
+      <!-- Right: Interactive Tasks -->
+      <section class="w-1/2 bg-gray-50 flex flex-col relative">
+        <div id="lesson-content" class="absolute inset-0 flex flex-col">
+          {hasLegacyTask ? (
+            <div class="flex-1 relative bg-white">
+              <iframe 
+                src={`/tasks/${classSlug}/${lessonId}/task.html`}
+                class="w-full h-full absolute inset-0 border-0"
+                title="Interactive Task"
+              ></iframe>
+            </div>
+          ) : (
+            <>
+              <!-- Tabs -->
+              <div class="flex border-b border-gray-300 bg-gray-200 shrink-0">
+                {tasks.map((task, idx) => (
+                  <button 
+                    class={`tab-btn flex-1 py-3 font-semibold border-r border-gray-300 last:border-r-0 ${idx === 0 ? 'bg-white border-b-2 border-b-blue-600 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                    data-target={`iframe-${task.level}`}
+                  >
+                    {task.name}
+                  </button>
+                ))}
+              </div>
+              
+              <!-- Iframes Container -->
+              <div class="flex-1 relative bg-white">
+                {tasks.map((task, idx) => (
+                  <iframe 
+                    id={`iframe-${task.level}`} 
+                    src={task.url}
+                    class={`w-full h-full absolute inset-0 border-0 ${idx === 0 ? 'block' : 'hidden'}`}
+                    title={task.name}
+                  ></iframe>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <div id="completion-screen" class="hidden absolute inset-0 bg-white flex-col items-center justify-center p-8 text-center z-10">
+          <h2 class="text-4xl font-bold mb-4" id="completion-title">🎉 Урок пройден!</h2>
+          <p class="text-xl text-gray-600 mb-8" id="completion-subtitle">Вы успешно завершили все задания.</p>
+          <button id="reset-lesson-btn" class="px-6 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition-colors">Пройти заново</button>
+        </div>
+      </section>
+    </main>
+
+  </div>
+</Layout>
+
+<script>
+  const tabs = document.querySelectorAll('.tab-btn');
+  const iframes = document.querySelectorAll('iframe');
+
+  let isHardcore = localStorage.getItem('hardcore_mode') === 'true';
+  let currentUnlockedLevel = 1;
+  let isHardcoreCompleted = false;
+  let isNormalCompleted = false;
+
+  const fullTitle = document.querySelector('h1')?.textContent?.trim() || '';
+  const lessonPrefix = fullTitle.split(':')[0].trim(); // 'Урок X'
+  
+  // Set initial state to locked
+  tabs.forEach((tab, index) => {
+    if (index > 0) {
+      tab.classList.add('opacity-50', 'cursor-not-allowed');
+      if (!tab.innerHTML.includes('🔒')) tab.innerHTML += ' 🔒';
+    }
+  });
+
+  async function syncProgress() {
+    const fName = localStorage.getItem('student_firstName');
+    const lName = localStorage.getItem('student_lastName');
+    const cName = localStorage.getItem('student_class');
+
+    if (fName && lName && cName) {
+      try {
+        const res = await fetch(`/api/progress?firstName=${encodeURIComponent(fName)}&lastName=${encodeURIComponent(lName)}&className=${encodeURIComponent(cName)}&lessonPrefix=${encodeURIComponent(lessonPrefix)}`);
+        if (res.ok) {
+          const data = await res.json();
+          isNormalCompleted = data.isNormalCompleted;
+          isHardcoreCompleted = data.isHardcoreCompleted;
+          currentUnlockedLevel = isHardcore ? data.unlockedHardcore : data.unlockedNormal;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    updateTabsState();
+    if (currentUnlockedLevel <= 3) {
+      switchTab(`iframe-${currentUnlockedLevel}`);
+    }
+  }
+
+  function checkCompletion() {
+    const displayHardcore = isHardcoreCompleted || (isHardcore && isNormalCompleted);
+    
+    if (currentUnlockedLevel > 3 || isHardcoreCompleted || (isNormalCompleted && !isHardcore)) {
+      document.getElementById('lesson-content')?.classList.add('hidden');
+      const compScreen = document.getElementById('completion-screen');
+      compScreen?.classList.remove('hidden');
+      compScreen?.classList.add('flex');
+      
+      const title = document.getElementById('completion-title');
+      if (title) {
+        if (displayHardcore) {
+          title.innerHTML = '💀 Урок пройден в режиме Хардкор!';
+          title.classList.add('text-red-600');
+        } else {
+          title.innerHTML = '🎉 Урок пройден!';
+          title.classList.remove('text-red-600');
+        }
+      }
+      return true;
+    }
+    
+    document.getElementById('lesson-content')?.classList.remove('hidden');
+    const compScreen = document.getElementById('completion-screen');
+    compScreen?.classList.add('hidden');
+    compScreen?.classList.remove('flex');
+    return false;
+  }
+
+  function updateTabsState() {
+    if (checkCompletion()) return;
+
+    tabs.forEach((tab, index) => {
+      const level = index + 1;
+      const isLocked = level > currentUnlockedLevel;
+      
+      if (isLocked) {
+        tab.classList.add('opacity-50', 'cursor-not-allowed');
+        if (!tab.innerHTML.includes('🔒')) {
+          tab.innerHTML += ' 🔒';
+        }
+      } else {
+        tab.classList.remove('opacity-50', 'cursor-not-allowed');
+        tab.innerHTML = tab.innerHTML.replace(' 🔒', '');
+      }
+    });
+  }
+
+  syncProgress();
+
+  document.getElementById('reset-lesson-btn')?.addEventListener('click', () => {
+    const btn = document.getElementById('reset-lesson-btn');
+    if (btn) btn.innerHTML = 'Сброс...';
+    
+    fetch('/api/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_firstName: localStorage.getItem('student_firstName'),
+          student_lastName: localStorage.getItem('student_lastName'),
+          student_class: localStorage.getItem('student_class'),
+          is_hardcore: isHardcore,
+          action_type: isHardcore ? 'hardcore_reset' : 'normal_reset',
+          mission_name: fullTitle
+        })
+    }).then(() => {
+        window.location.reload();
+    });
+  });
+
+  function switchTab(targetId) {
+    const targetLevel = parseInt(targetId.replace('iframe-', ''), 10);
+    if (targetLevel > currentUnlockedLevel) return; // Locked
+
+    tabs.forEach(t => {
+      t.classList.remove('bg-white', 'border-b-2', 'border-b-blue-600', 'text-blue-600');
+      t.classList.add('text-gray-600', 'hover:bg-gray-100');
+    });
+    
+    const activeTab = Array.from(tabs).find(t => t.getAttribute('data-target') === targetId);
+    if (activeTab) {
+        activeTab.classList.add('bg-white', 'border-b-2', 'border-b-blue-600', 'text-blue-600');
+        activeTab.classList.remove('text-gray-600', 'hover:bg-gray-100');
+    }
+
+    iframes.forEach(iframe => {
+      if (iframe.id === targetId) {
+        iframe.classList.remove('hidden');
+        iframe.classList.add('block');
+      } else {
+        iframe.classList.remove('block');
+        iframe.classList.add('hidden');
+      }
+    });
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      const targetId = (e.currentTarget as HTMLElement).getAttribute('data-target');
+      if (targetId) {
+        switchTab(targetId);
+      }
+    });
+  });
+
+  const hardcoreBtn = document.getElementById('hardcore-toggle');
+  const hardcoreIcon = document.getElementById('hardcore-icon');
+  
+  function updateHardcoreUI() {
+    if (isHardcore) {
+      hardcoreIcon?.classList.remove('opacity-50');
+      hardcoreIcon?.classList.add('opacity-100');
+      hardcoreBtn?.classList.add('bg-red-900', 'border-red-500');
+      hardcoreBtn?.classList.remove('bg-gray-700', 'border-gray-600');
+    } else {
+      hardcoreIcon?.classList.remove('opacity-100');
+      hardcoreIcon?.classList.add('opacity-50');
+      hardcoreBtn?.classList.remove('bg-red-900', 'border-red-500');
+      hardcoreBtn?.classList.add('bg-gray-700', 'border-gray-600');
+    }
+  }
+  
+  updateHardcoreUI();
+  
+  hardcoreBtn?.addEventListener('click', () => {
+    isHardcore = !isHardcore;
+    localStorage.setItem('hardcore_mode', String(isHardcore));
+    updateHardcoreUI();
+    window.location.reload();
+  });
+
+  const platformTimers = {};
+
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (data && data.type === 'TELEMETRY_EVENT') {
+      console.log('Received telemetry:', data);
+      
+      if (!data.mission_name) {
+        const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
+        const lessonTitle = document.querySelector('h1')?.textContent || 'Неизвестный урок';
+        const taskTitle = sourceIframe ? (sourceIframe.title || sourceIframe.id) : 'Неизвестное задание';
+        data.mission_name = `${lessonTitle} :: ${taskTitle}`;
+      }
+
+      const mName = data.mission_name;
+      if (!platformTimers[mName]) {
+        platformTimers[mName] = Date.now();
+      }
+      data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
+
+      if (data.action_type === 'hardcore_reset' && isHardcore) {
+        alert('💀 ОШИБКА В РЕЖИМЕ ХАРДКОРА! Прогресс сброшен!');
+        currentUnlockedLevel = 1;
+        updateTabsState();
+        switchTab('iframe-1');
+
+        iframes.forEach(iframe => {
+          const src = iframe.src;
+          iframe.src = src; 
+        });
+      }
+
+      if (data.action_type === 'level_complete') {
+        const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
+        if (sourceIframe) {
+          const completedLevel = parseInt(sourceIframe.id.replace('iframe-', ''), 10);
+          if (completedLevel === currentUnlockedLevel) {
+            if (completedLevel < 3) {
+              currentUnlockedLevel++;
+              updateTabsState();
+              switchTab(`iframe-${currentUnlockedLevel}`);
+            } else if (completedLevel === 3) {
+              currentUnlockedLevel = 4;
+              if (isHardcore) isHardcoreCompleted = true;
+              else isNormalCompleted = true;
+              updateTabsState();
+            }
+          }
+        }
+      }
+
+      fetch('/api/telemetry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          student_firstName: localStorage.getItem('student_firstName'),
+          student_lastName: localStorage.getItem('student_lastName'),
+          student_class: localStorage.getItem('student_class'),
+          is_hardcore: isHardcore,
+          ...data
+        })
+      }).catch(err => console.error('Telemetry error:', err));
+    }
+  });
+
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('student_firstName');
+      localStorage.removeItem('student_lastName');
+      localStorage.removeItem('student_class');
+      window.location.href = '/';
+    });
+  }
+
+  // Глобальный запрет копирования и вставки на уровне всей системы LMS
+  // 1. Для родительского окна (блок теории) - чтобы нельзя было скопировать текст
+  document.addEventListener('copy', e => e.preventDefault());
+  document.addEventListener('paste', e => e.preventDefault());
+  
+  // 2. Для всех интерактивных заданий (iframe)
+  iframes.forEach(iframe => {
+    iframe.addEventListener('load', () => {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          // Запрет копирования/вставки в документе тренажера
+          doc.addEventListener('copy', e => e.preventDefault());
+          doc.addEventListener('paste', e => e.preventDefault());
+          
+          // Жесткая блокировка вставки и перетаскивания (drag-and-drop текста) для всех полей ввода
+          const inputs = doc.querySelectorAll('input, textarea');
+          inputs.forEach(input => {
+            input.addEventListener('paste', e => e.preventDefault());
+            input.addEventListener('drop', e => e.preventDefault());
+            input.onpaste = () => false;
+            input.ondrop = () => false;
+          });
+        }
+      } catch (e) {
+        console.warn('CORS не позволяет модифицировать iframe, но так как мы отдаем статику локально, этого быть не должно.', e);
+      }
+    });
+  });
+</script>

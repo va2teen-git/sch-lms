@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Уровень 3 - Аркада</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <script src="/static/vue.global.js"></script>
+    <style>
+        .glitch-text { text-shadow: 2px 2px 0px #ff0000, -2px -2px 0px #0000ff; }
+        .blink { animation: blink-anim 1s linear infinite; }
+        @keyframes blink-anim { 50% { opacity: 0; } }
+        .progress-bar-danger { background-color: #ff3333 !important; transition: width 0.1s linear; }
+        .frag-btn { cursor: pointer; transition: transform 0.1s; border-width: 2px !important; }
+        .frag-btn:hover { transform: scale(1.05); }
+        .slot-box { height: 50px; border: 2px dashed #ff3333; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .slot-filled { border-style: solid; background-color: #330000; }
+    </style>
+</head>
+<body class="bg-dark text-danger font-monospace p-3" id="app">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold m-0" :class="{'glitch-text': gameActive}">> ФАЙРВОЛ И МАРШРУТИЗАТОР // АРКАДА</h4>
+            <span class="badge bg-danger text-dark fs-5 rounded-0">СТАТУС: БОЕВОЙ</span>
+        </div>
+
+        <!-- СТАРТОВЫЙ ЭКРАН -->
+        <div v-if="gameState === 'start'" class="card bg-dark border border-danger rounded-0 text-danger p-5 text-center">
+            <h2 class="fw-bold mb-4 blink">ВНИМАНИЕ: ПЕРЕГРУЗКА ЯДРА</h2>
+            <p class="fs-5">Система автоматической маршрутизации вышла из строя. Вам придется вручную восстанавливать URL-адреса и фильтровать трафик с помощью логических врат.</p>
+            <div class="row mt-4 text-start text-white">
+                <div class="col-md-6 border-end border-danger">
+                    <h5 class="text-danger fw-bold">БЛОК 1: МАРШРУТИЗАЦИЯ (Фазы 1-5)</h5>
+                    <p>Соберите правильный URL-адрес из разбросанных фрагментов в строгом порядке, чтобы восстановить связь.</p>
+                </div>
+                <div class="col-md-6">
+                    <h5 class="text-danger fw-bold">БЛОК 2: ЛОГИЧЕСКИЙ ФИЛЬТР (Фазы 6-10)</h5>
+                    <p>Применяйте правила булевой логики (И / ИЛИ / НЕ) к входящим документам. Пропускайте только те, что строго соответствуют фильтру.</p>
+                </div>
+            </div>
+            <p class="fs-5 mt-4"><span class="text-danger fw-bold">ТАЙМЕР УБЫВАЕТ. ЛЮБАЯ ОШИБКА СБРАСЫВАЕТ ВЕСЬ ПРОГРЕСС.</span></p>
+            <button @click="startGame" class="btn btn-outline-danger rounded-0 btn-lg fw-bold mt-3">НАЧАТЬ РУЧНОЕ УПРАВЛЕНИЕ</button>
+        </div>
+
+        <!-- ИГРОВОЙ ЭКРАН -->
+        <div v-if="gameState === 'playing'" class="card bg-black border border-danger rounded-0 text-danger p-4 mb-3">
+            <div class="d-flex justify-content-between mb-3">
+                <h5 class="fw-bold">Фаза: {{ currentPhase }} / 10 ({{ phaseType === 'url' ? 'МАРШРУТИЗАЦИЯ' : 'ФАЙРВОЛ' }})</h5>
+                <h5 class="fw-bold" :class="{'blink': timeLeft <= 4}">ОТКАЗ ЧЕРЕЗ: {{ (timeLeft).toFixed(1) }} сек</h5>
+            </div>
+            
+            <div class="progress rounded-0 bg-dark mb-4" style="height: 10px;">
+                <div class="progress-bar progress-bar-danger" role="progressbar" :style="{width: timerPercentage + '%'}"></div>
+            </div>
+
+            <!-- МИНИ-ИГРА 1: СБОРКА URL -->
+            <div v-if="phaseType === 'url'" class="text-center">
+                <p class="fs-5 text-white mb-2">Цель: <span class="fw-bold text-danger">{{ urlTarget }}</span></p>
+                <p class="mb-4">Соберите адрес в правильном порядке:</p>
+                
+                <!-- Слоты -->
+                <div class="d-flex justify-content-center flex-wrap gap-2 mb-4">
+                    <div v-for="(slot, idx) in urlSlots" :key="'slot'+idx" 
+                         class="slot-box px-3 fs-4 fw-bold" 
+                         :class="{'slot-filled text-white': slot !== null}"
+                         @click="returnFragment(idx)">
+                        {{ slot !== null ? slot : '___' }}
+                    </div>
+                </div>
+
+                <!-- Фрагменты -->
+                <div class="d-flex justify-content-center flex-wrap gap-3 p-3 border border-secondary">
+                    <div v-for="(frag, idx) in urlFragments" :key="'frag'+idx" 
+                         class="border border-danger px-3 py-2 fs-4 fw-bold frag-btn text-white bg-dark"
+                         @click="placeFragment(frag, idx)">
+                        {{ frag }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- МИНИ-ИГРА 2: ЛОГИЧЕСКИЙ ФИЛЬТР -->
+            <div v-if="phaseType === 'logic'" class="text-center">
+                <p class="fs-5 text-white mb-2">Активное правило файрвола:</p>
+                <h3 class="fw-bold p-3 border border-danger d-inline-block bg-dark mb-4">
+                    {{ logicRuleText }}
+                </h3>
+                
+                <p class="fs-5 mb-2">Входящий пакет (Документ):</p>
+                <h4 class="text-white fw-bold mb-5 px-4 py-2 bg-secondary d-inline-block rounded-0">
+                    "{{ logicIncomingDoc }}"
+                </h4>
+
+                <div class="row g-4 mt-2">
+                    <div class="col-6">
+                        <button @click="makeLogicChoice(true)" class="btn btn-outline-success w-100 rounded-0 fw-bold py-4 fs-3">
+                            РАЗРЕШИТЬ
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button @click="makeLogicChoice(false)" class="btn btn-outline-danger w-100 rounded-0 fw-bold py-4 fs-3">
+                            БЛОКИРОВАТЬ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ЭКРАН ПОРАЖЕНИЯ -->
+        <div v-if="gameState === 'failed'" class="card bg-danger border border-white rounded-0 text-white p-5 text-center glitch-text">
+            <h1 class="fw-bold display-4">КРИТИЧЕСКИЙ СБОЙ</h1>
+            <h3 class="mt-3">Причина: {{ failReason }}</h3>
+            <p class="mt-4 fw-bold">Сброс систем до заводских настроек...</p>
+        </div>
+
+        <!-- УСПЕХ -->
+        <div v-if="gameState === 'won'" class="card bg-dark border border-success rounded-0 text-success p-5 text-center">
+            <h1 class="fw-bold display-4">> СИСТЕМА СТАБИЛИЗИРОВАНА</h1>
+            <p class="fs-4 mt-3">Маршрутизация восстановлена. Вы идеально освоили синтаксис адресов и булеву логику!</p>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const gameState = ref('start'); 
+                const currentPhase = ref(1);
+                const maxPhases = 10;
+                
+                const timeLeft = ref(0);
+                const maxTime = ref(15);
+                let timerInterval = null;
+                const failReason = ref('');
+                
+                // State for URL mini-game
+                const urlTarget = ref('');
+                const urlSlots = ref([]);
+                const urlFragments = ref([]);
+                const expectedUrlStr = ref('');
+
+                // State for Logic mini-game
+                const logicRuleText = ref('');
+                const logicIncomingDoc = ref('');
+                const logicShouldAllow = ref(false);
+
+                const phaseType = computed(() => currentPhase.value <= 5 ? 'url' : 'logic');
+                const gameActive = computed(() => gameState.value === 'playing');
+                const timerPercentage = computed(() => Math.max(0, (timeLeft.value / maxTime.value) * 100));
+
+                let sessionStartTime = 0;
+                let attempts = 1;
+
+                function sendTelemetry(status, success) {
+                    const timeSpentSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Глобальная сеть (9 класс) :: Уровень 3',
+                        action_type: status === 'completed' ? 'level_complete' : 'in_progress',
+                        status: status,
+                        start_time: new Date(sessionStartTime).toISOString(),
+                        time_spent_sec: timeSpentSec,
+                        attempts_count: attempts,
+                        success: success
+                    }, '*');
+                }
+
+                function triggerHardcoreReset(reason) {
+                    attempts++;
+                    failReason.value = reason;
+                    gameState.value = 'failed';
+                    
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        action_type: 'hardcore_reset'
+                    }, '*');
+                    sendTelemetry('in_progress', false);
+
+                    setTimeout(() => { gameState.value = 'start'; }, 2000);
+                }
+
+                // ГЕНЕРАТОР URL (Процедурный, сотни вариантов)
+                function generateUrlTask() {
+                    const scenarios = [
+                        {
+                            targets: ["Защищенный сервер госуслуг", "Безопасный портал ФНС", "Защищенный сайт министерства", "Онлайн-банкинг"],
+                            protocols: ["https"],
+                            domains: ["gosuslugi.ru", "nalog.gov.ru", "minobr.ru", "sberbank.ru", "bank.com"],
+                            paths: ["/docs", "/profile/login", "/services", "/auth/secure"]
+                        },
+                        {
+                            targets: ["Открытый форум программистов", "Старый сайт библиотеки", "Незащищенный блог", "Школьный портал (http)"],
+                            protocols: ["http"],
+                            domains: ["forum.net", "old-lib.ru", "blog.com", "school.edu.ru"],
+                            paths: ["/index.html", "/thread/123", "/about.php", "/news"]
+                        },
+                        {
+                            targets: ["Файловый сервер", "Облачное хранилище (FTP)", "Сервер резервных копий", "FTP-архив"],
+                            protocols: ["ftp"],
+                            domains: ["storage.edu", "backup.net", "cloud-srv.ru", "files.org"],
+                            paths: ["/archive.zip", "/backup.tar.gz", "/data.sql", "/images.rar"]
+                        }
+                    ];
+                    
+                    const sc = scenarios[Math.floor(Math.random() * scenarios.length)];
+                    const t = sc.targets[Math.floor(Math.random() * sc.targets.length)];
+                    const p = sc.protocols[Math.floor(Math.random() * sc.protocols.length)];
+                    const d = sc.domains[Math.floor(Math.random() * sc.domains.length)];
+                    const f = sc.paths[Math.floor(Math.random() * sc.paths.length)];
+                    
+                    urlTarget.value = t;
+                    const correctFrags = [p, "://", d, f];
+                    expectedUrlStr.value = correctFrags.join('');
+                    
+                    // Обманки (decoys) зависят от протокола
+                    const decoys = p === "https" ? ["http", "ftp"] : (p === "ftp" ? ["https", "http"] : ["https", "ftp"]);
+                    decoys.push(".com", "/", "www.");
+                    
+                    let allFrags = [...correctFrags, decoys[0], decoys[1]];
+                    allFrags.sort(() => Math.random() - 0.5); // Перемешиваем
+                    
+                    urlFragments.value = allFrags;
+                    urlSlots.value = Array(correctFrags.length).fill(null);
+                }
+
+                // ЛОГИКА СБОРКИ URL
+                function placeFragment(frag, index) {
+                    const emptyIdx = urlSlots.value.findIndex(s => s === null);
+                    if (emptyIdx !== -1) {
+                        urlSlots.value[emptyIdx] = frag;
+                        urlFragments.value.splice(index, 1);
+                        checkUrlCompletion();
+                    }
+                }
+
+                function returnFragment(index) {
+                    if (urlSlots.value[index] !== null) {
+                        urlFragments.value.push(urlSlots.value[index]);
+                        urlSlots.value[index] = null;
+                    }
+                }
+
+                function checkUrlCompletion() {
+                    if (!urlSlots.value.includes(null)) {
+                        const built = urlSlots.value.join('');
+                        if (built === expectedUrlStr.value) {
+                            clearInterval(timerInterval);
+                            setTimeout(nextPhase, 300);
+                        } else {
+                            clearInterval(timerInterval);
+                            triggerHardcoreReset("Неверный синтаксис URL");
+                        }
+                    }
+                }
+
+                // ГЕНЕРАТОР ЛОГИКИ ФАЙРВОЛА (Тысячи комбинаций множеств)
+                function generateLogicTask() {
+                    const themes = [
+                        { A: "Смартфон", B: "Планшет", C: "Чехол" },
+                        { A: "Вирус", B: "Троян", C: "Антивирус" },
+                        { A: "Физика", B: "Химия", C: "Решебник" },
+                        { A: "Пицца", B: "Суши", C: "Доставка" },
+                        { A: "Ноутбук", B: "ПК", C: "Ремонт" },
+                        { A: "Кошки", B: "Собаки", C: "Корм" }
+                    ];
+                    const theme = themes[Math.floor(Math.random() * themes.length)];
+                    
+                    // Рандомизируем наличие слов в документе (гарантируем, что хоть одно слово есть)
+                    let hasA = Math.random() > 0.4;
+                    let hasB = Math.random() > 0.4;
+                    let hasC = Math.random() > 0.4;
+                    if (!hasA && !hasB && !hasC) { hasA = true; } 
+                    
+                    // Генерируем название документа
+                    let docWords = [];
+                    if (hasA) docWords.push(theme.A);
+                    if (hasB) docWords.push(theme.B);
+                    if (hasC) docWords.push(theme.C);
+                    docWords.sort(() => Math.random() - 0.5); // Перемешиваем слова
+                    
+                    // Выбираем тип логического правила (6 шаблонов)
+                    const ruleTemplates = [
+                        { txt: `${theme.A} И ${theme.B}`, eval: hasA && hasB },
+                        { txt: `${theme.A} ИЛИ ${theme.B}`, eval: hasA || hasB },
+                        { txt: `${theme.A} И НЕ ${theme.C}`, eval: hasA && !hasC },
+                        { txt: `(${theme.A} ИЛИ ${theme.B}) И ${theme.C}`, eval: (hasA || hasB) && hasC },
+                        { txt: `(${theme.A} ИЛИ ${theme.B}) И НЕ ${theme.C}`, eval: (hasA || hasB) && !hasC },
+                        { txt: `${theme.A} И ${theme.B} И ${theme.C}`, eval: hasA && hasB && hasC }
+                    ];
+                    const rule = ruleTemplates[Math.floor(Math.random() * ruleTemplates.length)];
+                    
+                    logicRuleText.value = rule.txt;
+                    // Украшаем название документа для реалистичности
+                    const prefixes = ["Файл: ", "Запрос: ", "Документ: ", "Статья - "];
+                    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+                    logicIncomingDoc.value = prefix + docWords.join(" + ");
+                    logicShouldAllow.value = rule.eval;
+                }
+
+                function makeLogicChoice(isAllow) {
+                    clearInterval(timerInterval);
+                    if (isAllow === logicShouldAllow.value) {
+                        nextPhase();
+                    } else {
+                        triggerHardcoreReset("Документ отфильтрован неверно");
+                    }
+                }
+
+                // ОБЩЕЕ УПРАВЛЕНИЕ ИГРОЙ
+                function startGame() {
+                    sessionStartTime = Date.now();
+                    currentPhase.value = 0;
+                    gameState.value = 'playing';
+                    nextPhase();
+                }
+
+                function nextPhase() {
+                    currentPhase.value++;
+                    if (currentPhase.value > maxPhases) {
+                        clearInterval(timerInterval);
+                        gameState.value = 'won';
+                        sendTelemetry('completed', true);
+                        return;
+                    }
+
+                    if (phaseType.value === 'url') {
+                        generateUrlTask();
+                        maxTime.value = Math.max(8, 18 - (currentPhase.value * 1.5)); // Время для URL больше
+                    } else {
+                        generateLogicTask();
+                        maxTime.value = Math.max(4, 10 - ((currentPhase.value - 5) * 1)); // Время для Логики меньше
+                    }
+                    
+                    timeLeft.value = maxTime.value;
+                    startTimer();
+                }
+
+                function startTimer() {
+                    clearInterval(timerInterval);
+                    timerInterval = setInterval(() => {
+                        timeLeft.value -= 0.1;
+                        if (timeLeft.value <= 0) {
+                            clearInterval(timerInterval);
+                            triggerHardcoreReset("Превышен лимит времени");
+                        }
+                    }, 100);
+                }
+
+                // E2E Test Helper
+                window.getTestAnswers = () => ({
+                    type: phaseType.value,
+                    expectedUrlStr: expectedUrlStr.value,
+                    logicShouldAllow: logicShouldAllow.value
+                });
+
+                onUnmounted(() => { clearInterval(timerInterval); });
+
+                return {
+                    gameState, currentPhase, timeLeft, timerPercentage, failReason, gameActive, phaseType,
+                    startGame,
+                    // URL
+                    urlTarget, urlSlots, urlFragments, placeFragment, returnFragment,
+                    // Logic
+                    logicRuleText, logicIncomingDoc, makeLogicChoice
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

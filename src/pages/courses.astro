@@ -1,0 +1,81 @@
+---
+import Layout from '../layouts/Layout.astro';
+import coursesData from '../data/courses.json';
+---
+
+<Layout title="Курсы | Школьная Платформа">
+  <div class="max-w-4xl mx-auto py-8 px-4">
+    <div class="flex justify-between items-center mb-8 border-b border-gray-300 pb-4">
+      <h1 class="text-3xl font-bold">Список уроков</h1>
+      <div class="text-right flex items-center gap-4">
+        <div>
+          <p id="student-name" class="font-semibold text-lg"></p>
+          <p id="class-name" class="text-sm text-gray-600"></p>
+        </div>
+        <button id="logout-btn" class="border border-red-500 text-red-600 px-3 py-1 hover:bg-red-50 transition-colors text-sm font-semibold">Выйти</button>
+      </div>
+    </div>
+    
+    <div id="lessons-container" class="space-y-4">
+      <!-- Lessons will be rendered here via client-side script -->
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import coursesData from '../data/courses.json';
+  
+  const firstName = localStorage.getItem('student_firstName');
+  const lastName = localStorage.getItem('student_lastName');
+  const studentClass = localStorage.getItem('student_class');
+  
+  if (!firstName || !lastName || !studentClass) {
+    window.location.href = '/';
+  } else {
+    const studentNameEl = document.getElementById('student-name');
+    const classNameEl = document.getElementById('class-name');
+    
+    if (studentNameEl) studentNameEl.textContent = `${lastName} ${firstName}`;
+    
+    const course = coursesData.find(c => c.slug === studentClass);
+    if (course && classNameEl) {
+      classNameEl.textContent = course.name;
+      
+      const container = document.getElementById('lessons-container');
+      if (container) {
+        course.lessons.forEach(lesson => {
+          const lessonCard = document.createElement('a');
+          lessonCard.href = `/lesson/${course.slug}/${lesson.id}`;
+          lessonCard.className = "block bg-white border border-gray-300 p-4 hover:shadow-lg hover:border-blue-500 transition-all cursor-pointer flex items-center";
+          
+          const numBadge = document.createElement('div');
+          numBadge.className = "w-10 h-10 bg-blue-100 text-blue-800 font-bold flex items-center justify-center mr-4 border border-blue-200";
+          numBadge.textContent = lesson.id;
+          
+          const topic = document.createElement('h2');
+          topic.className = "text-lg font-semibold flex-1";
+          topic.textContent = lesson.topic;
+          
+          lessonCard.appendChild(numBadge);
+          lessonCard.appendChild(topic);
+          container.appendChild(lessonCard);
+        });
+      }
+    } else {
+      const container = document.getElementById('lessons-container');
+      if (container) {
+        container.innerHTML = `<p class="text-red-500">Класс не найден или темы еще не добавлены.</p>`;
+      }
+    }
+
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('student_firstName');
+        localStorage.removeItem('student_lastName');
+        localStorage.removeItem('student_class');
+        window.location.href = '/';
+      });
+    }
+  }
+</script>

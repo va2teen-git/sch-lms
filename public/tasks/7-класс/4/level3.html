@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3 - Аркада</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <script src="/static/vue.global.js"></script>
+    <style>
+        /* Анимация тревоги */
+        @keyframes flash {
+            0% { background-color: #000; }
+            50% { background-color: #5c0000; }
+            100% { background-color: #000; }
+        }
+        .flash-bg {
+            animation: flash 0.3s 2;
+        }
+        /* Утилиты поверх Bootstrap, если нужно, но по ТЗ избегаем <style>. 
+           Оставим только анимацию, так как это хардкор фича. */
+    </style>
+</head>
+<body class="bg-black text-danger font-monospace m-0 vh-100 p-0" id="app">
+    <div class="h-100 d-flex flex-column p-4" :class="{'flash-bg': errorFlash}">
+        
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-danger pb-2">
+            <h2 class="m-0 fw-bold">ТЕРМИНАЛ // УРОВЕНЬ 3 (АРКАДА)</h2>
+            <h3 class="m-0 text-white" v-if="started && !gameWon">
+                УГРОЗА: {{ formattedTime }}
+            </h3>
+        </div>
+
+        <!-- Main container -->
+        <div class="flex-grow-1 d-flex flex-column justify-content-center align-items-center">
+            
+            <div v-if="!started && !gameWon" class="text-center" style="max-width: 600px;">
+                <h1 class="text-danger fw-bold mb-4">ВНИМАНИЕ: ВИРУСНАЯ АТАКА</h1>
+                <p class="fs-4 text-white text-start">
+                    Файловая система атакована шифровальщиком. <br><br>
+                    У вас есть <b>60 секунд</b>, чтобы отразить <b>10 волн</b> атак, исправляя пути, расширения и операции.<br><br>
+                    <span class="text-danger fw-bold">ЛЮБАЯ ОШИБКА ИЛИ ИСТЕЧЕНИЕ ТАЙМЕРА ПРИВЕДЕТ К ТОТАЛЬНОМУ СБРОСУ ПРОГРЕССА В НАЧАЛО.</span>
+                </p>
+                <button class="btn btn-danger rounded-0 fs-3 fw-bold px-5 py-3 mt-4" @click="startGame">
+                    [ ИНИЦИАЛИЗАЦИЯ ЗАЩИТЫ ]
+                </button>
+            </div>
+
+            <div v-if="started && !gameWon" class="w-100" style="max-width: 800px;">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="fs-4 fw-bold">БЛОКИРОВКА АТАКИ: ФАЗА {{ phase }} / {{ maxPhases }}</span>
+                </div>
+                
+                <!-- Progress bar -->
+                <div class="progress rounded-0 bg-dark mb-4" style="height: 25px; border: 1px solid #dc3545;">
+                    <div class="progress-bar bg-danger progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         :style="{ width: (phase / maxPhases * 100) + '%' }"></div>
+                </div>
+
+                <!-- Question -->
+                <div class="border border-danger p-4 mb-4" style="background-color: rgba(220, 53, 69, 0.1);">
+                    <h4 class="text-white lh-base" v-html="currentQuestion.text"></h4>
+                </div>
+
+                <!-- Options -->
+                <div class="d-flex flex-column gap-3">
+                    <button 
+                        v-for="(opt, idx) in currentQuestion.options" 
+                        :key="idx"
+                        class="btn btn-outline-danger rounded-0 fs-4 fw-bold text-start p-3"
+                        @click="handleAnswer(opt)">
+                        >> {{ opt }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Victory screen -->
+            <div v-if="gameWon" class="text-center">
+                <div class="alert alert-danger rounded-0 border border-danger bg-danger text-black fw-bold fs-2 text-center py-5 px-5" style="box-shadow: 0 0 20px red;">
+                    СИСТЕМА ЗАЩИЩЕНА.<br>ВИРУС УНИЧТОЖЕН.<br>УРОК УСПЕШНО ЗАВЕРШЕН.
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    started: false,
+                    phase: 1,
+                    maxPhases: 10,
+                    timeLeft: 60,
+                    questions: [],
+                    attempts: 0,
+                    startTime: null,
+                    actionLog: [],
+                    gameWon: false,
+                    errorFlash: false
+                }
+            },
+            computed: {
+                currentQuestion() {
+                    return this.questions[this.phase - 1];
+                },
+                formattedTime() {
+                    let m = Math.floor(this.timeLeft / 60).toString().padStart(2, '0');
+                    let s = (this.timeLeft % 60).toString().padStart(2, '0');
+                    return `${m}:${s}`;
+                }
+            },
+            methods: {
+                generateQuestions(count) {
+                    const qs = [];
+                    const exts = [
+                        {type: "Текстовый документ", valid: [".txt", ".doc", ".docx"]},
+                        {type: "Графика", valid: [".jpg", ".png", ".bmp"]},
+                        {type: "Аудио", valid: [".mp3", ".wav"]},
+                        {type: "Программа", valid: [".exe"]}
+                    ];
+                    
+                    for (let i = 0; i < count; i++) {
+                        let r = Math.random();
+                        if (r < 0.4) {
+                            let target = exts[Math.floor(Math.random() * exts.length)];
+                            let correct = target.valid[Math.floor(Math.random() * target.valid.length)];
+                            let options = [correct];
+                            while(options.length < 4) {
+                                let rndT = exts[Math.floor(Math.random() * exts.length)];
+                                if (rndT !== target) {
+                                    let wrong = rndT.valid[Math.floor(Math.random() * rndT.valid.length)];
+                                    if (!options.includes(wrong)) options.push(wrong);
+                                }
+                            }
+                            options.sort(() => Math.random() - 0.5);
+                            qs.push({
+                                text: `ПОВРЕЖДЕНО РАСШИРЕНИЕ! Тип файла: <span class="fw-bold text-danger">[ ${target.type} ]</span>. Укажите корректный формат:`,
+                                options: options,
+                                answer: correct
+                            });
+                        } else if (r < 0.7) {
+                            let isCorrect = Math.random() > 0.5;
+                            let path = isCorrect ? `C:\\Windows\\System32\\driver.sys` : `C:/Windows/System32/driver.sys`;
+                            qs.push({
+                                text: `АНАЛИЗ ПУТИ: <span class="font-monospace text-warning">${path}</span><br><br>Синтаксис корректен (для Windows)?`,
+                                options: ["ДА (Синтаксис верен)", "НЕТ (Ошибка в слэшах)"],
+                                answer: isCorrect ? "ДА (Синтаксис верен)" : "НЕТ (Ошибка в слэшах)"
+                            });
+                        } else {
+                            let isMove = Math.random() > 0.5;
+                            qs.push({
+                                text: isMove 
+                                    ? `ЛОГ: Файл исчез из исходной папки и появился в новой. Какая операция зафиксирована?`
+                                    : `ЛОГ: Обнаружен дубликат файла в новой директории. Оригинал остался на месте. Какая операция?`,
+                                options: ["ПЕРЕМЕЩЕНИЕ", "КОПИРОВАНИЕ", "ПЕРЕИМЕНОВАНИЕ"],
+                                answer: isMove ? "ПЕРЕМЕЩЕНИЕ" : "КОПИРОВАНИЕ"
+                            });
+                        }
+                    }
+                    return qs;
+                },
+                startGame() {
+                    this.started = true;
+                    this.gameWon = false;
+                    this.phase = 1;
+                    this.timeLeft = 60;
+                    this.questions = this.generateQuestions(this.maxPhases);
+                    
+                    if (!this.startTime) {
+                        this.startTime = Date.now();
+                        this.sendTelemetry('in_progress', 'in_progress', false);
+                    }
+                    
+                    this.startTimer();
+                },
+                startTimer() {
+                    clearTimeout(this._timerTimeout);
+                    this.tick();
+                },
+                tick() {
+                    if (!this.started || this.gameWon) return;
+                    this.timeLeft -= 1;
+                    if (this.timeLeft <= 0) {
+                        this.triggerHardReset("Таймер истек!");
+                    } else {
+                        this._timerTimeout = setTimeout(() => {
+                            this.tick();
+                        }, 1000);
+                    }
+                },
+                handleAnswer(ans) {
+                    this.actionLog.push({time: new Date().toISOString(), action: `ans_${ans}`});
+                    
+                    if (ans === this.currentQuestion.answer) {
+                        this.phase++;
+                        if (this.phase > this.maxPhases) {
+                            this.winGame();
+                        }
+                    } else {
+                        this.triggerHardReset("Неверный ответ!");
+                    }
+                },
+                triggerHardReset(reason) {
+                    clearTimeout(this._timerTimeout);
+                    this.attempts++;
+                    this.errorFlash = true;
+                    setTimeout(() => { this.errorFlash = false; }, 600);
+                    
+                    this.actionLog.push({time: new Date().toISOString(), action: `reset_${reason}`});
+                    
+                    // Отправка телеметрии о сбросе
+                    this.sendTelemetry('hardcore_reset', 'in_progress', false);
+                    
+                    // Тотальный сброс прогресса
+                    this.started = false; 
+                },
+                winGame() {
+                    clearTimeout(this._timerTimeout);
+                    this.gameWon = true;
+                    this.sendTelemetry('level_complete', 'completed', true);
+                },
+                sendTelemetry(action_type, status, success) {
+                    const timeSpent = this.startTime ? Math.floor((Date.now() - this.startTime) / 1000) : 0;
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: '7 класс :: Урок 4 :: Уровень 3',
+                        action_type: action_type,
+                        status: status,
+                        start_time: this.startTime ? new Date(this.startTime).toISOString() : new Date().toISOString(),
+                        time_spent_sec: timeSpent,
+                        attempts_count: this.attempts,
+                        success: success,
+                        action_log: JSON.parse(JSON.stringify(this.actionLog))
+                    }, '*');
+                }
+            },
+            beforeUnmount() {
+                clearTimeout(this._timerTimeout);
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

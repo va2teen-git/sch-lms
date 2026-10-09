@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3: Кибер-Судья</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <style>
+        * { border-radius: 0 !important; }
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+            overflow: hidden;
+        }
+        .protocol-box {
+            border: 2px solid #30363d;
+            background-color: #161b22;
+            padding: 25px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            border-left: 5px solid #d2a8ff;
+        }
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            color: #8b949e;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .protocol-text {
+            font-size: 1.2em;
+            color: #e6edf3;
+            line-height: 1.5;
+            min-height: 120px;
+            margin-bottom: 30px;
+            background-color: #010409;
+            padding: 15px;
+            border: 1px dashed #484f58;
+        }
+        .stamp {
+            color: #f85149;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            letter-spacing: 2px;
+        }
+        
+        .timer-bar-container {
+            width: 100%;
+            height: 10px;
+            background-color: #21262d;
+            margin-bottom: 20px;
+            border: 1px solid #30363d;
+        }
+        .timer-bar {
+            height: 100%;
+            background-color: #d2a8ff;
+            width: 100%;
+            transition: width 0.1s linear, background-color 0.3s;
+        }
+        
+        .btn-guilty {
+            background-color: #21262d;
+            color: #f85149;
+            border: 2px solid #f85149;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.1em;
+            width: 100%;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-guilty:hover { background-color: #f85149; color: #fff; }
+        
+        .btn-innocent {
+            background-color: #21262d;
+            color: #3fb950;
+            border: 2px solid #3fb950;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.1em;
+            width: 100%;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-innocent:hover { background-color: #3fb950; color: #fff; }
+
+        .progress-indicators {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .progress-dot {
+            flex-grow: 1;
+            height: 5px;
+            background-color: #30363d;
+        }
+        .progress-dot.active { background-color: #d2a8ff; }
+        .progress-dot.passed { background-color: #3fb950; }
+
+        .fail-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(248, 81, 73, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-transform: uppercase;
+        }
+        .fail-overlay h1 { font-size: 3em; font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="startScreen" class="protocol-box" style="text-align: center; max-width: 600px; margin: 40px auto; border-left: 5px solid #d29922;">
+        <h2 style="color: #e6edf3; margin-bottom: 20px; font-weight: bold;">СИСТЕМА «КИБЕР-СУДЬЯ v2.0»</h2>
+        <div style="text-align: left; color: #8b949e; line-height: 1.6; margin-bottom: 30px; font-size: 1.1em;">
+            <p>Вы назначены дежурным арбитром по делам о преступлениях в сфере компьютерной информации и нарушению авторских прав.</p>
+            <p>Вам предстоит оперативно рассмотреть <strong>10 протоколов</strong> от следователей и определить, является ли описанное действие преступлением (ВИНОВЕН) или законным поступком (ОПРАВДАН).</p>
+            <p style="color: #f85149; font-weight: bold;">⚠️ ВНИМАНИЕ: На вынесение каждого вердикта у вас есть ровно 12 секунд. Любая ошибка или промедление приведет к отстранению от должности и полному сбросу прогресса.</p>
+        </div>
+        <button class="btn-guilty" style="background-color: #21262d; border-color: #d2a8ff; color: #d2a8ff;" onclick="initGame()" onmouseover="this.style.backgroundColor='#d2a8ff'; this.style.color='#fff';" onmouseout="this.style.backgroundColor='#21262d'; this.style.color='#d2a8ff';">
+            [ АВТОРИЗОВАТЬСЯ И НАЧАТЬ СМЕНУ ]
+        </button>
+    </div>
+
+    <div class="progress-indicators" id="progressDots" style="display: none;"></div>
+
+    <div class="protocol-box" id="gameArea" style="display: none;">
+        <div class="header-info">
+            <span id="protocolId">ДЕЛОВЫЕ СЛУШАНИЯ #0000</span>
+            <span id="phaseCounter">ДЕЛО 1 ИЗ 10</span>
+        </div>
+        
+        <div class="stamp">МАТЕРИАЛЫ СЛЕДСТВИЯ:</div>
+        
+        <div class="protocol-text" id="protocolText">
+            Инициализация данных...
+        </div>
+
+        <div class="timer-bar-container">
+            <div class="timer-bar" id="timerBar"></div>
+        </div>
+
+        <div class="row">
+            <div class="col-6">
+                <button class="btn-guilty" onclick="judge(true)">ВИНОВЕН (Нарушение)</button>
+            </div>
+            <div class="col-6">
+                <button class="btn-innocent" onclick="judge(false)">ОПРАВДАН (Законно)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="successArea" style="display: none; text-align: center; padding: 50px 0;">
+        <div style="color: #3fb950; font-size: 2em; margin-bottom: 20px; text-transform: uppercase; font-weight: bold;">ЗАСЕДАНИЕ ЗАКРЫТО</div>
+        <div style="color: #8b949e; font-size: 1.2em;">Все вердикты вынесены верно. Судебная система благодарит за службу.</div>
+    </div>
+
+    <div class="fail-overlay" id="failOverlay">
+        <h1>КРИТИЧЕСКАЯ СУДЕБНАЯ ОШИБКА</h1>
+        <p>Сброс данных. Перезапуск слушаний...</p>
+    </div>
+
+<script>
+    // System Telemetry
+    const MISSION_NAME = 'Законодательство РФ :: Уровень 3';
+    let sessionStartTime = Date.now();
+    let attemptsCount = 0;
+    let actionLog = [];
+
+    function sendTelemetry(actionType, success = false) {
+        const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const event = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: actionType,
+            start_time: new Date(sessionStartTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success,
+            action_log: actionLog
+        };
+        window.parent.postMessage(event, '*');
+    }
+
+    sendTelemetry('start');
+
+    // Data Bank
+    const bankGuilty = [
+        "Обвиняемый скачал с торрент-трекера взломанную версию программы 1С:Предприятие и установил на рабочие ПК.",
+        "Гражданин передал другу флешку, содержащую троян для кражи паролей от криптокошельков.",
+        "Обвиняемый подобрал пароль администратора школьного портала и изменил оценки в электронном журнале.",
+        "Сисадмин больницы забыл обновить антивирусные базы, из-за чего вирус зашифровал картотеку пациентов.",
+        "Обвиняемая скачала бесплатную программу с закрытым кодом (freeware) и начала продавать её от своего имени.",
+        "Сотрудник IT-отдела тайно установил программу-кейлоггер на компьютеры коллег для сбора их паролей.",
+        "Студент установил Shareware-версию WinRAR, по истечении 40 дней взломал её активатором.",
+        "Группа лиц осуществила DDoS-атаку на сервер государственного портала Госуслуги (объект КИИ).",
+        "Гражданин купил лицензионный диск с игрой и выложил его образ в открытый доступ на форуме.",
+        "Программист создал скрипт для автоматического взлома Wi-Fi сетей и продал его в интернете.",
+        "Обвиняемый распространил программу, которая без ведома пользователя удаляет системные файлы Windows."
+    ];
+
+    const bankInnocent = [
+        "Обвиняемый установил ОС Linux Ubuntu на 50 компьютеров в офисе компании, не заплатив ни рубля.",
+        "Гражданин скачал бесплатный браузер Google Chrome и установил его на все компьютеры в компьютерном классе.",
+        "Программист скачал исходный код программы под лицензией GNU GPL, добавил новые функции и выложил в интернет бесплатно.",
+        "Студент пользовался Shareware-программой 30 дней бесплатно, а когда она заблокировалась — удалил её.",
+        "Обвиняемый купил лицензионную версию Microsoft Office и установил её на свой единственный домашний ПК.",
+        "Программист создал свою собственную программу и раздает её всем желающим бесплатно, не открывая исходный код.",
+        "Системный администратор настроил резервное копирование, и при сбое оборудования успешно восстановил данные.",
+        "Обвиняемый нашел уязвимость на сайте банка, ничего не стал взламывать, а написал отчет в службу безопасности банка.",
+        "Компания закупила 10 лицензий антивируса и установила их ровно на 10 рабочих станций.",
+        "Студент написал скрипт для удаления пустых папок на своём личном компьютере.",
+        "Гражданин модифицировал исходный код Open Source программы исключительно для личного использования."
+    ];
+
+    const TOTAL_PHASES = 10;
+    const TIME_LIMIT_MS = 12000; // 12 seconds per case
+
+    let currentPhase = 0;
+    let currentCase = null;
+    let timerInterval = null;
+    let timeRemaining = TIME_LIMIT_MS;
+    
+    let activeQueue = [];
+
+    function generateQueue() {
+        activeQueue = [];
+        // Need 10 cases total. Pick 5 guilty, 5 innocent randomly.
+        let g = [...bankGuilty].sort(() => 0.5 - Math.random()).slice(0, 5);
+        let i = [...bankInnocent].sort(() => 0.5 - Math.random()).slice(0, 5);
+        
+        g.forEach(text => activeQueue.push({ text: text, isGuilty: true }));
+        i.forEach(text => activeQueue.push({ text: text, isGuilty: false }));
+        
+        activeQueue.sort(() => 0.5 - Math.random());
+    }
+
+    function initDots() {
+        const dotsContainer = document.getElementById('progressDots');
+        dotsContainer.innerHTML = '';
+        for(let i=0; i<TOTAL_PHASES; i++) {
+            let dot = document.createElement('div');
+            dot.className = 'progress-dot';
+            dot.id = 'dot-' + i;
+            dotsContainer.appendChild(dot);
+        }
+    }
+
+    function updateDots() {
+        for(let i=0; i<TOTAL_PHASES; i++) {
+            let dot = document.getElementById('dot-' + i);
+            if(i < currentPhase) {
+                dot.className = 'progress-dot passed';
+            } else if (i === currentPhase) {
+                dot.className = 'progress-dot active';
+            } else {
+                dot.className = 'progress-dot';
+            }
+        }
+    }
+
+    function startLevel() {
+        generateQueue();
+        currentPhase = 0;
+        initDots();
+        startPhase();
+    }
+
+    function startPhase() {
+        updateDots();
+        currentCase = activeQueue[currentPhase];
+        
+        document.getElementById('phaseCounter').innerText = `ДЕЛО ${currentPhase + 1} ИЗ ${TOTAL_PHASES}`;
+        document.getElementById('protocolId').innerText = `ПРОТОКОЛ #${Math.floor(Math.random()*9000)+1000}-ФСБ`;
+        document.getElementById('protocolText').innerText = currentCase.text;
+        
+        timeRemaining = TIME_LIMIT_MS;
+        document.getElementById('timerBar').style.width = '100%';
+        document.getElementById('timerBar').style.backgroundColor = '#d2a8ff';
+        
+        clearInterval(timerInterval);
+        
+        let lastTime = Date.now();
+        timerInterval = setInterval(() => {
+            let now = Date.now();
+            let delta = now - lastTime;
+            lastTime = now;
+            timeRemaining -= delta;
+            
+            if (timeRemaining <= 0) {
+                clearInterval(timerInterval);
+                failLevel("ВРЕМЯ ИСТЕКЛО");
+                return;
+            }
+            
+            let percent = (timeRemaining / TIME_LIMIT_MS) * 100;
+            document.getElementById('timerBar').style.width = percent + '%';
+            
+            if (percent < 30) {
+                document.getElementById('timerBar').style.backgroundColor = '#f85149';
+            } else if (percent < 60) {
+                document.getElementById('timerBar').style.backgroundColor = '#d29922';
+            }
+        }, 50);
+        
+        actionLog.push(`Phase ${currentPhase + 1} started`);
+    }
+
+    function judge(userChoiceGuilty) {
+        clearInterval(timerInterval);
+        attemptsCount++;
+        
+        if (userChoiceGuilty === currentCase.isGuilty) {
+            actionLog.push(`Phase ${currentPhase + 1} passed (Time left: ${timeRemaining}ms)`);
+            currentPhase++;
+            
+            if (currentPhase < TOTAL_PHASES) {
+                startPhase();
+            } else {
+                document.getElementById('gameArea').style.display = 'none';
+                document.getElementById('progressDots').style.display = 'none';
+                document.getElementById('successArea').style.display = 'block';
+                sendTelemetry('level_complete', true);
+            }
+        } else {
+            failLevel("НЕВЕРНЫЙ ВЕРДИКТ");
+        }
+    }
+
+    function initGame() {
+        document.getElementById('startScreen').style.display = 'none';
+        document.getElementById('gameArea').style.display = 'block';
+        document.getElementById('progressDots').style.display = 'flex';
+        startLevel();
+    }
+
+    function failLevel(reason) {
+        actionLog.push(`Level failed at phase ${currentPhase + 1}. Reason: ${reason}`);
+        
+        const overlay = document.getElementById('failOverlay');
+        overlay.style.display = 'flex';
+        
+        // Critical: Must trigger hardcore reset telemetry per Guidelines
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            action_type: 'hardcore_reset'
+        }, '*');
+
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            // Return to start screen instead of instant restart
+            document.getElementById('gameArea').style.display = 'none';
+            document.getElementById('progressDots').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'block';
+        }, 2000);
+    }
+</script>
+</body>
+</html>

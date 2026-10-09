@@ -1,0 +1,297 @@
+---
+const missionName = 'Обобщение: Безопасность в сети :: Уровень 3';
+---
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Уровень 3 - Аркада (SQL Terminal)</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <script src="/static/vue.global.js" is:inline></script>
+    <script src="/static/sql-wasm.js" is:inline></script>
+</head>
+<body class="bg-black text-danger m-0 p-0 overflow-hidden font-monospace">
+
+<div id="app" class="min-vh-100 d-flex flex-column justify-content-center py-4">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+                <div class="border border-danger border-2 p-4 rounded-0 shadow-lg" style="background-color: #110000;">
+                    
+                    <h1 class="text-center text-uppercase fw-bold mb-4 border-bottom border-danger pb-2">
+                        === DATABASE ACCESS TERMINAL ===
+                    </h1>
+                    
+                    <!-- Loading DB Screen -->
+                    <div v-if="!dbLoaded" class="text-center py-5">
+                        <p class="fs-4">Инициализация SQL-движка...</p>
+                        <div class="spinner-border text-danger" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                    </div>
+
+                    <!-- Start Screen -->
+                    <div v-else-if="phaseIndex === -1" class="text-center">
+                        <p class="fs-4 fw-bold">ВНИМАНИЕ: Обнаружена подозрительная активность в сети.</p>
+                        <p class="fs-5">Вам предоставлен доступ к логам сервера. Вы должны отфильтровать данные с помощью SQL-запросов (блок WHERE), используя логические операторы (AND, OR, NOT).</p>
+                        <p class="fs-5 text-uppercase fw-bold mt-4 border border-danger p-2 bg-dark text-white">ЛЮБАЯ ОШИБКА ПРИВЕДЕТ К СБРОСУ ДОСТУПА!</p>
+                        <button @click="startGame" class="btn btn-outline-danger btn-lg rounded-0 fw-bold mt-4 px-5 py-3 w-100 text-uppercase">
+                            Инициализировать соединение
+                        </button>
+                    </div>
+
+                    <!-- Active Phase Screen -->
+                    <div v-else-if="phaseIndex >= 0 && phaseIndex < PHASES.length" class="w-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3 border border-danger p-2 rounded-0 bg-dark">
+                            <div class="fw-bold fs-5">УГРОЗА: <span v-text="phaseIndex + 1"></span> / <span v-text="PHASES.length"></span></div>
+                            <div class="fw-bold fs-5" :class="{'text-white bg-danger px-2': timer <= 10}">ТАЙМЕР: <span v-text="timer"></span> сек</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <p class="fs-5 fw-bold" v-text="PHASES[phaseIndex].instruction"></p>
+                            <p class="small text-muted mb-0">Таблица: logs (id INTEGER, protocol TEXT, status INTEGER, domain TEXT, suspicious INTEGER)</p>
+                        </div>
+
+                        <div class="input-group mb-3 border border-danger p-2 bg-black rounded-0 align-items-center">
+                            <span class="text-danger font-monospace pe-2 fw-bold fs-5">SELECT * FROM logs WHERE</span>
+                            <input v-model="queryInput" @keyup.enter="executeQuery" type="text" class="form-control bg-transparent text-white border-0 rounded-0 font-monospace shadow-none fs-5 py-0" placeholder="..." autofocus>
+                        </div>
+
+                        <button @click="executeQuery" class="btn btn-danger w-100 rounded-0 fw-bold fs-5 py-2 mb-4 text-uppercase">
+                            Выполнить запрос [Enter]
+                        </button>
+
+                        <div class="border border-danger p-2 bg-dark">
+                            <p class="fw-bold mb-1 border-bottom border-danger pb-1">ДОСТУПНЫЕ ДАННЫЕ (первые 5 строк):</p>
+                            <div class="small mt-2" style="max-height: 180px; overflow-y: auto;">
+                                <div v-for="row in data.slice(0,5)" :key="row.id" class="text-muted">
+                                    > id: <span class="text-white" v-text="row.id"></span> | protocol: '<span class="text-white" v-text="row.protocol"></span>' | status: <span class="text-white" v-text="row.status"></span> | domain: '<span class="text-white" v-text="row.domain"></span>' | suspicious: <span class="text-white" v-text="row.suspicious"></span>
+                                </div>
+                                <div class="text-muted mt-1">... еще <span v-text="data.length - 5"></span> записей ...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Screen -->
+                    <div v-else-if="phaseIndex === -2" class="text-center py-5">
+                        <h1 class="display-3 fw-bold text-uppercase">ACCESS DENIED</h1>
+                        <p class="fs-4 mt-3 bg-danger text-white p-2" v-text="errorMessage"></p>
+                        <p class="mt-4 fs-5">Протокол безопасности инициировал перезагрузку терминала...</p>
+                    </div>
+
+                    <!-- Success Screen -->
+                    <div v-else-if="phaseIndex === PHASES.length" class="text-center py-5">
+                        <h1 class="display-4 fw-bold text-uppercase">УГРОЗА УСТРАНЕНА</h1>
+                        <p class="fs-4 mt-3">Вы успешно отфильтровали все логи и предотвратили утечку данных.</p>
+                        <p class="mt-4 text-white bg-success p-2 fw-bold fs-4">ЗАДАНИЕ ВЫПОЛНЕНО</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script is:inline>
+const { createApp, ref, onMounted, onUnmounted } = Vue;
+
+const PHASES = [
+  {
+    instruction: "Фаза 1: Найдите все логи, использующие протокол 'HTTP'.",
+    check: (r) => r.protocol === 'HTTP',
+    time: 40
+  },
+  {
+    instruction: "Фаза 2: Найдите подозрительные логи (suspicious = 1).",
+    check: (r) => r.suspicious === 1,
+    time: 40
+  },
+  {
+    instruction: "Фаза 3: Логи, где статус ошибки равен 404 ИЛИ 403 (используйте OR).",
+    check: (r) => r.status === 404 || r.status === 403,
+    time: 50
+  },
+  {
+    instruction: "Фаза 4: Логи с протоколом 'FTP', которые являются подозрительными (используйте AND).",
+    check: (r) => r.protocol === 'FTP' && r.suspicious === 1,
+    time: 50
+  },
+  {
+    instruction: "Фаза 5: Все логи, КРОМЕ протокола 'HTTPS' (используйте NOT).",
+    check: (r) => r.protocol !== 'HTTPS',
+    time: 60
+  },
+  {
+    instruction: "Фаза 6: Подозрительные логи, где протокол 'HTTP', а статус НЕ равен 200.",
+    check: (r) => r.suspicious === 1 && r.protocol === 'HTTP' && r.status !== 200,
+    time: 70
+  },
+  {
+    instruction: "Фаза 7: Логи с доменом 'vk.com', где статус 403 ИЛИ 404 (используйте скобки для группировки).",
+    check: (r) => r.domain === 'vk.com' && (r.status === 403 || r.status === 404),
+    time: 70
+  },
+  {
+    instruction: "Фаза 8 (ФИНАЛ): Не 'HTTPS' логи, где статус 200 ИЛИ 404, и они подозрительные.",
+    check: (r) => r.protocol !== 'HTTPS' && (r.status === 200 || r.status === 404) && r.suspicious === 1,
+    time: 80
+  }
+];
+
+function generateData() {
+    const data = [];
+    const protocols = ['HTTP', 'HTTPS', 'FTP'];
+    const statuses = [200, 403, 404, 500];
+    const domains = ['vk.com', 'ya.ru', 'mail.ru', 'gosuslugi.ru'];
+    
+    // Generate 30 random rows
+    for(let i = 1; i <= 30; i++) {
+        data.push({
+            id: i,
+            protocol: protocols[Math.floor(Math.random() * protocols.length)],
+            status: statuses[Math.floor(Math.random() * statuses.length)],
+            domain: domains[Math.floor(Math.random() * domains.length)],
+            suspicious: Math.random() > 0.7 ? 1 : 0
+        });
+    }
+    
+    // Guarantee some specific rows to ensure phases are never empty
+    data.push({id: 31, protocol: 'FTP', status: 200, domain: 'ya.ru', suspicious: 1});
+    data.push({id: 32, protocol: 'HTTPS', status: 403, domain: 'vk.com', suspicious: 0});
+    data.push({id: 33, protocol: 'HTTP', status: 404, domain: 'vk.com', suspicious: 1});
+    data.push({id: 34, protocol: 'HTTP', status: 200, domain: 'mail.ru', suspicious: 1});
+    data.push({id: 35, protocol: 'FTP', status: 404, domain: 'ya.ru', suspicious: 1});
+    data.push({id: 36, protocol: 'HTTP', status: 500, domain: 'gosuslugi.ru', suspicious: 1});
+    
+    return data;
+}
+
+createApp({
+    setup() {
+        const dbLoaded = ref(false);
+        const data = ref([]);
+        const phaseIndex = ref(-1); 
+        const queryInput = ref('');
+        const timer = ref(0);
+        const errorMessage = ref('');
+        
+        let timerInterval = null;
+        let startTime = 0;
+        let dbInstance = null;
+
+        const initDB = async () => {
+            try {
+                const SQL = await initSqlJs({ locateFile: file => `/static/${file}` });
+                dbInstance = new SQL.Database();
+                dbInstance.run(`CREATE TABLE logs (id INTEGER, protocol TEXT, status INTEGER, domain TEXT, suspicious INTEGER)`);
+                
+                const generatedData = generateData();
+                data.value = generatedData;
+                
+                const insertStmt = dbInstance.prepare(`INSERT INTO logs VALUES (?, ?, ?, ?, ?)`);
+                generatedData.forEach(row => {
+                    insertStmt.run([row.id, row.protocol, row.status, row.domain, row.suspicious]);
+                });
+                insertStmt.free();
+                dbLoaded.value = true;
+            } catch (err) {
+                console.error("Ошибка загрузки sql.js", err);
+                errorMessage.value = "Ошибка загрузки базы данных.";
+                phaseIndex.value = -2;
+            }
+        };
+
+        const startGame = () => {
+            phaseIndex.value = 0;
+            startTime = Date.now();
+            sendTelemetry('in_progress');
+            startPhase();
+        };
+
+        const startPhase = () => {
+            queryInput.value = '';
+            timer.value = PHASES[phaseIndex.value].time;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timer.value--;
+                if (timer.value <= 0) {
+                    failPhase("ВРЕМЯ ИСТЕКЛО!");
+                }
+            }, 1000);
+        };
+
+        const executeQuery = () => {
+            if (!queryInput.value.trim()) return;
+            try {
+                const result = dbInstance.exec(`SELECT id FROM logs WHERE ${queryInput.value}`);
+                let userIds = [];
+                if (result.length > 0) {
+                    userIds = result[0].values.map(r => r[0]).sort((a,b)=>a-b);
+                }
+                
+                const expectedIds = data.value.filter(PHASES[phaseIndex.value].check).map(r => r.id).sort((a,b)=>a-b);
+                
+                if (JSON.stringify(userIds) === JSON.stringify(expectedIds)) {
+                    phaseIndex.value++;
+                    if (phaseIndex.value >= PHASES.length) {
+                        completeLevel();
+                    } else {
+                        startPhase();
+                    }
+                } else {
+                    failPhase("Неверный результат. Данные не совпадают с ожидаемыми!");
+                }
+            } catch (err) {
+                failPhase(`Синтаксическая ошибка SQL: ${err.message}`);
+            }
+        };
+
+        const failPhase = (reason) => {
+            clearInterval(timerInterval);
+            errorMessage.value = reason;
+            phaseIndex.value = -2;
+            sendTelemetry('hardcore_reset');
+            
+            setTimeout(() => {
+                errorMessage.value = "";
+                startGame();
+            }, 3000);
+        };
+
+        const completeLevel = () => {
+            clearInterval(timerInterval);
+            sendTelemetry('level_complete');
+        };
+
+        const sendTelemetry = (actionType) => {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Обобщение: Безопасность в сети :: Уровень 3',
+                action_type: actionType,
+                status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime || Date.now()).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: 1,
+                success: actionType === 'level_complete'
+            }, '*');
+        };
+
+        onMounted(() => {
+            initDB();
+        });
+
+        onUnmounted(() => {
+            clearInterval(timerInterval);
+            if (dbInstance) {
+                dbInstance.close();
+            }
+        });
+
+        return { dbLoaded, phaseIndex, queryInput, timer, errorMessage, startGame, executeQuery, PHASES, data };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>

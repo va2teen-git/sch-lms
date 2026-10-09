@@ -1,0 +1,331 @@
+---
+// src/components/Terminal.astro
+export interface PhaseConfig {
+  setup: string; // stringified function (vfs) => void
+  onCommand: string; // stringified function (cmd, args) => { success: boolean, message?: string }
+}
+
+export interface Props {
+  missionName: string;
+  phases: string; // JSON string of phases configuration
+  requireStart?: boolean;
+  theme?: 'green' | 'orange' | 'red';
+  hardcoreReset?: boolean;
+}
+
+const { missionName, phases, requireStart = false, theme = 'green', hardcoreReset = false } = Astro.props;
+const themeClass = theme === 'orange' ? 'text-warning' : theme === 'red' ? 'text-danger' : 'text-success';
+---
+
+{requireStart && (
+<div id="start-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-black" style="z-index: 1050;">
+    <h1 class="text-danger mb-4 fw-bold">ВНИМАНИЕ: HARDCORE РЕЖИМ</h1>
+    <p class="text-white mb-4 text-center fs-5" style="max-width: 600px;">
+        У вас будет ограниченное время на реакцию в каждой фазе.<br>
+        Таймер первой фазы запустится сразу после нажатия кнопки.
+    </p>
+    <button id="start-btn" class="btn btn-outline-danger btn-lg px-5 fw-bold">НАЧАТЬ СИМУЛЯЦИЮ</button>
+</div>
+)}
+
+<div id="terminal-output" class="flex-grow-1 overflow-auto bg-black p-3 rounded-0 font-monospace" style="font-size: 1.1rem; line-height: 1.4; color: #f8f9fa; white-space: pre-wrap;">
+    <div class="text-white">Ubuntu 24.04.1 LTS sys-server tty1</div>
+    <br>
+    <div class="text-white">sys-server login: root</div>
+    <div class="text-white">Password: </div>
+    <div class="text-white">Last login: Wed Oct  7 09:12:45 2026 from 192.168.1.10</div>
+    <br>
+    <div class="text-white">Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 6.8.0-45-generic x86_64)</div>
+    <br>
+</div>
+
+<div class="input-group bg-black">
+    <span class={`input-group-text bg-black ${themeClass} border-0 rounded-0 font-monospace pe-2`} id="prompt-path" style="font-size: 1.1rem;">root@sys-server:/#</span>
+    <input type="text" id="cmd-input" class="form-control bg-black text-white border-0 rounded-0 shadow-none font-monospace px-0" autocomplete="off" autofocus style="font-size: 1.1rem; box-shadow: none !important; outline: none !important;">
+</div>
+
+<script define:vars={{ missionName, phasesJson: phases, requireStart, themeClass, hardcoreReset }}>
+    const phases = JSON.parse(phasesJson).map(p => ({
+        timeLimit: p.timeLimit,
+        setup: new Function('vfs', 'rnd', 'getBroadcastTime', p.setup),
+        onCommand: new Function('cmd', 'args', 'vfs', 'currentPath', 'getBroadcastTime', p.onCommand)
+    }));
+
+    let startTime = Date.now();
+    let attempts = 0;
+    let currentPhase = 0;
+    let isLocked = false;
+    let currentPath = '/';
+    let vfs = { '/': { 'var': { 'log': {} }, 'etc': {}, 'home': {} } };
+
+    const outputDiv = document.getElementById('terminal-output');
+    const inputField = document.getElementById('cmd-input');
+    const promptPath = document.getElementById('prompt-path');
+
+    function sendTelemetry(actionType, status, success = false) {
+        const msg = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attempts,
+            success: success
+        };
+        window.parent.postMessage(msg, '*');
+    }
+
+    sendTelemetry('in_progress', 'in_progress');
+
+    function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    function getBroadcastTime() {
+        const now = new Date();
+        return `(${now.toDateString()} ${now.toTimeString().split(' ')[0]})`;
+    }
+
+    function printLine(text, colorClass = 'text-white') {
+        const div = document.createElement('div');
+        div.className = colorClass;
+        div.innerHTML = text.replace(/\n/g, '<br>');
+        outputDiv.appendChild(div);
+        outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    function updatePrompt() {
+        let displayPath = currentPath;
+        if (displayPath !== '/') displayPath = displayPath.replace(/\/$/, '');
+        promptPath.innerText = `root@sys-server:${displayPath}#`;
+    }
+
+    function failPhase(msg) {
+        if (window.phaseTimer) clearTimeout(window.phaseTimer);
+        sendTelemetry('hardcore_reset', 'in_progress');
+        isLocked = true;
+        setTimeout(() => {
+            printLine(msg, 'text-info fw-bold');
+            setTimeout(() => {
+                if (hardcoreReset) {
+                    currentPhase = 0;
+                    vfs = { '/': { 'var': { 'log': {} }, 'etc': {}, 'home': {} } };
+                    printLine(`\n--- INITIATING SYSTEM ROLLBACK TO PRE-INCIDENT STATE ---\n`, 'text-danger fw-bold');
+                }
+                const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
+                if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+                isLocked = false;
+                inputField.focus();
+                
+                if (phases[currentPhase].timeLimit) {
+                    window.phaseTimer = setTimeout(() => {
+                        if (!isLocked) failPhase(`\nBroadcast message from ossec@sys-server (tty1) ${getBroadcastTime()}:\n\nCRITICAL TIMEOUT: The attacker completed their objective before you could respond!`);
+                    }, phases[currentPhase].timeLimit * 1000);
+                }
+            }, 1500);
+        }, 1000);
+    }
+
+    function completePhase() {
+        if (window.phaseTimer) clearTimeout(window.phaseTimer);
+        sendTelemetry('in_progress', 'in_progress');
+        currentPhase++;
+        isLocked = true;
+        
+        if (currentPhase >= phases.length) {
+            setTimeout(() => {
+                printLine(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nSYSTEM RECOVERY COMPLETE. All threats neutralized.\nDisconnecting...`, 'text-success fw-bold');
+                sendTelemetry('level_complete', 'completed', true);
+                inputField.disabled = true;
+            }, 1500);
+        } else {
+            setTimeout(() => {
+                const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
+                if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+                isLocked = false;
+                inputField.focus();
+                
+                if (phases[currentPhase].timeLimit) {
+                    window.phaseTimer = setTimeout(() => {
+                        if (!isLocked) failPhase(`\nBroadcast message from ossec@sys-server (tty1) ${getBroadcastTime()}:\n\nCRITICAL TIMEOUT: The attacker completed their objective before you could respond!`);
+                    }, phases[currentPhase].timeLimit * 1000);
+                }
+            }, 2000);
+        }
+    }
+
+    inputField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const cmdText = inputField.value.trim().replace(/\s+/g, ' ');
+            inputField.value = '';
+            if (cmdText) {
+                printLine(`<span class="${themeClass}">${promptPath.innerText}</span> <span class="text-white">${cmdText}</span>`, 'text-white');
+                processCommand(cmdText);
+            }
+        }
+    });
+
+    document.body.addEventListener('click', () => { if (!isLocked) inputField.focus(); });
+
+    function getFileContent(pathString) {
+        if (!pathString.startsWith('/')) {
+            pathString = currentPath === '/' ? '/' + pathString : currentPath + '/' + pathString;
+        }
+        const parts = pathString.split('/').filter(p => p);
+        let curr = vfs['/'];
+        for (let i = 0; i < parts.length - 1; i++) {
+            if (curr[parts[i]] && typeof curr[parts[i]] === 'object') curr = curr[parts[i]];
+            else return null;
+        }
+        const fileName = parts[parts.length - 1];
+        return curr[fileName] !== undefined ? curr[fileName] : null;
+    }
+
+    function processCommand(cmdLine) {
+        if (isLocked) return;
+        const args = cmdLine.split(' ');
+        const cmd = args[0].toLowerCase();
+        attempts++;
+
+        // First check phase specific logic
+        const phaseLogic = phases[currentPhase].onCommand(cmd, args.slice(1), vfs, currentPath, getBroadcastTime);
+        if (phaseLogic && phaseLogic.handled !== false) {
+            if (phaseLogic.message) printLine(phaseLogic.message, 'text-white');
+            if (phaseLogic.success === true) completePhase();
+            else if (phaseLogic.success === false) failPhase(phaseLogic.failMessage || "Внимание: неверное действие.");
+            return;
+        }
+
+        switch(cmd) {
+            case 'help':
+            case '--help': 
+                printLine(`<span class="text-info fw-bold">Доступные команды симуляции:</span>
+  <span class="text-warning">cd [dir]</span>             - Изменить текущую директорию
+  <span class="text-warning">ls [dir]</span>             - Вывести содержимое директории
+  <span class="text-warning">pwd</span>                  - Вывести полный путь текущей директории
+  <span class="text-warning">cat [file]</span>           - Прочитать и вывести содержимое файла
+  <span class="text-warning">grep [pattern] [f]</span>   - Поиск текста (pattern) внутри файла
+  <span class="text-warning">ps</span>                   - Показать список текущих процессов (snapshot)
+  <span class="text-warning">clear</span>                - Очистить экран терминала
+  <span class="text-warning">whoami</span>               - Показать текущего пользователя
+  <span class="text-warning">ping [host]</span>          - Проверить сетевое соединение с узлом
+  <span class="text-warning">ip / ifconfig</span>        - Показать сетевые интерфейсы и IP-адреса
+  <span class="text-warning">netstat</span>              - Вывести активные сетевые соединения
+  <span class="text-warning">nmap [target]</span>        - Сканировать порты целевого узла
+  <span class="text-warning">ssh [user@host]</span>      - Подключиться к удаленному узлу
+  <span class="text-warning">echo [text]</span>          - Вывести текст на экран
+  
+  <span class="text-secondary">Утилиты управления (ограничены): ufw, kill, passwd, chmod, chown, rm, crontab, mkdir, touch</span>`); 
+                break;
+            case 'clear': outputDiv.innerHTML = ''; break;
+            case 'pwd': printLine(currentPath); break;
+            case 'whoami': printLine('root'); break;
+            case 'echo': printLine(args.slice(1).join(' ')); break;
+            case 'ping':
+                if (args.length < 2) printLine('Usage: ping [destination]');
+                else printLine(`PING ${args[1]} 56(84) bytes of data.\n64 bytes from ${args[1]}: icmp_seq=1 ttl=64 time=0.042 ms\n64 bytes from ${args[1]}: icmp_seq=2 ttl=64 time=0.040 ms`);
+                break;
+            case 'ip':
+            case 'ifconfig':
+                printLine(`eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n        inet 192.168.1.10  netmask 255.255.255.0  broadcast 192.168.1.255\n        inet6 fe80::a00:27ff:fe4e:66a1  prefixlen 64  scopeid 0x20<link>\n        ether 08:00:27:4e:66:a1  txqueuelen 1000  (Ethernet)`);
+                break;
+            case 'netstat':
+                printLine(`Active Internet connections (w/o servers)\nProto Recv-Q Send-Q Local Address           Foreign Address         State\ntcp        0      0 192.168.1.10:22         192.168.1.20:54321      ESTABLISHED`);
+                break;
+            case 'nmap':
+                if (args.length < 2) printLine('Usage: nmap [target]');
+                else printLine(`Starting Nmap 7.93 ( https://nmap.org ) at ${getBroadcastTime()}\nNmap scan report for ${args[1]}\nHost is up (0.00012s latency).\nNot shown: 997 closed tcp ports\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http`);
+                break;
+            case 'ssh':
+                if (args.length < 2) printLine('usage: ssh [-46AaCfGgKkMNnqsTtVvXxYy] [user@]hostname');
+                else printLine(`ssh: connect to host ${args[1].split('@').pop()} port 22: Connection refused`);
+                break;
+            case 'rm':
+            case 'chmod':
+            case 'chown':
+            case 'passwd':
+            case 'kill':
+            case 'ufw':
+            case 'crontab':
+            case 'mkdir':
+            case 'touch':
+                printLine(`${cmd}: operation requires escalated privileges or is restricted in this environment`, 'text-danger');
+                break;
+            case 'ls':
+                let targetDir = args[1] || currentPath;
+                if (targetDir === '/') printLine('<span class="text-primary fw-bold">var etc home</span>');
+                else if (targetDir === '/var') printLine('<span class="text-primary fw-bold">log</span>');
+                else if (targetDir === '/var/log') printLine(Object.keys(vfs['/']['var']['log']).join(' '));
+                else printLine('');
+                break;
+            case 'cd':
+                let t = args[1];
+                if (!t || t === '~' || t === '/') currentPath = '/';
+                else if (currentPath === '/' && vfs['/'][t]) currentPath = '/' + t;
+                else if (t.startsWith('/') && t.split('/').filter(p=>p).every((p,i,arr) => i===0 ? vfs['/'][p] : true)) currentPath = t; // basic support
+                else if (t === '..') {
+                    if (currentPath !== '/') currentPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+                } else printLine(`bash: cd: ${t}: No such file or directory`);
+                updatePrompt();
+                break;
+            case 'cat':
+                const content = getFileContent(args[1]);
+                if (typeof content === 'string') printLine(content);
+                else printLine(`cat: ${args[1] || ''}: No such file or directory`);
+                break;
+            case 'grep':
+                if (args.length < 3) {
+                    printLine('Usage: grep [PATTERN] [FILE]');
+                } else {
+                    const c2 = getFileContent(args[2]);
+                    if (typeof c2 === 'string') {
+                        const lines = c2.split('\\n').filter(l => l.includes(args[1]));
+                        if (lines.length > 0) printLine(lines.join('\\n').replace(new RegExp(args[1], 'g'), `<span class="text-danger fw-bold">${args[1]}</span>`));
+                    } else printLine(`grep: ${args[2]}: No such file or directory`);
+                }
+                break;
+            case 'ps':
+                printLine(`USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\nroot           1  0.0  0.1 168988 11624 ?        Ss   Oct06   0:05 /sbin/init`);
+                break;
+            default:
+                printLine(`bash: ${cmd}: command not found`);
+        }
+    }
+
+    function startSimulation() {
+        setTimeout(() => {
+            const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
+            if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+            if (phases[currentPhase].timeLimit) {
+                window.phaseTimer = setTimeout(() => {
+                    if (!isLocked) failPhase(`\nBroadcast message from ossec@sys-server (tty1) ${getBroadcastTime()}:\n\nCRITICAL TIMEOUT: The attacker completed their objective before you could respond!`);
+                }, phases[currentPhase].timeLimit * 1000);
+            }
+        }, 1500);
+    }
+
+    if (requireStart) {
+        console.log("requireStart is true");
+        const overlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        console.log("overlay:", overlay, "startBtn:", startBtn);
+        if (overlay && startBtn) {
+            isLocked = true;
+            startBtn.addEventListener('click', () => {
+                console.log("Start button clicked!");
+                overlay.classList.remove('d-flex');
+                overlay.classList.add('d-none');
+                isLocked = false;
+                inputField.focus();
+                startTime = Date.now();
+                startSimulation();
+            });
+        } else {
+            console.log("Elements not found!");
+            startSimulation();
+        }
+    } else {
+        console.log("requireStart is false");
+        startSimulation();
+    }
+
+</script>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 2: Анализ Дерева Игры</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <style>
+        * { border-radius: 0 !important; }
+        body { background: #0a0a0f; color: #b0b0d0; font-family: 'Courier New', Courier, monospace; padding: 20px; margin: 0; overflow-x: hidden; }
+        h4, h5 { color: #fff; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        p { font-size: 1.1rem; }
+        .terminal-box { border: 1px solid #3b82f6; background: #0f172a; padding: 20px; margin-bottom: 20px; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.1); }
+        input[type="text"] { background: #000; border: 1px solid #555; color: #fff; padding: 5px 10px; font-family: 'Courier New', Courier, monospace; width: 120px; text-align: center; text-transform: uppercase; transition: all 0.3s; }
+        input[type="text"]:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+        input.error-shake { border-color: #ef4444 !important; color: #ef4444; animation: shake 0.4s; }
+        .btn-cyber { background: transparent; border: 1px solid #3b82f6; color: #3b82f6; padding: 10px 20px; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+        .btn-cyber:hover { background: #3b82f6; color: #000; }
+        .progress-container { margin-bottom: 20px; border: 1px solid #333; height: 10px; background: #000; }
+        .progress-bar { height: 100%; background: #3b82f6; width: 0%; transition: width 0.3s; }
+        .phase { display: none; animation: fadeIn 0.5s forwards; }
+        .phase.active { display: block; }
+        .tree-diagram { font-family: monospace; background: #000; color: #00ffcc; padding: 15px; border: 1px dashed #3b82f6; white-space: pre; margin-bottom: 15px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
+        .hardcore-flash { animation: flashRed 0.5s; }
+        @keyframes flashRed { 0% { background: #ef4444; } 100% { background: #0a0a0f; } }
+    </style>
+</head>
+<body>
+
+    <h4>Дерево Игры: Матричный Анализ</h4>
+    <p>Прогресс: <span id="progress-text">0 / 5</span></p>
+    <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+    <div id="phases-container"></div>
+
+    <script>
+        const MISSION_NAME = 'Основы теории игр :: Уровень 2';
+        let currentPhase = 1;
+        const totalPhases = 5;
+        let startTime = Date.now();
+        let errorsCount = 0;
+
+        function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+        
+        // Random Node Names
+        const letters = shuffle(['A','B','C','D','E','F','G','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z']);
+        const l1 = letters[0], l2 = letters[1], l3 = letters[2]; // leaves
+        const nV = letters[3]; // Node that leads to leaves (is V)
+        const nP = letters[4]; // Node that leads to two V nodes (is P)
+        const root = letters[5]; // Root
+
+        // Randomize branch layout for root
+        const isLeftWin = Math.random() > 0.5;
+        const rootLeft = isLeftWin ? nP : nV;
+        const rootRight = isLeftWin ? nV : nP;
+        const winningMove = isLeftWin ? rootLeft : rootRight;
+
+        document.getElementById('phases-container').innerHTML = `
+            <!-- PHASE 1 -->
+            <div id="phase-1" class="phase active terminal-box">
+                <h5>Фаза 1: Оценка финальных листьев</h5>
+                <p>У нас есть конечные узлы (листья) ${l1}, ${l2} и ${l3}, в которых игра уже завершилась. Игрок, который должен сейчас ходить из этой позиции, обнаруживает, что игра окончена, и он проиграл.</p>
+                <div class="mt-3">
+                    <label>Являются ли эти листья Выигрышными или Проигрышными позициями для того, чей сейчас ход? (В или П)</label><br>
+                    <input type="text" id="p1-q1" maxlength="1" placeholder="_">
+                </div>
+                <button class="btn-cyber mt-3" onclick="checkPhase(1)">Анализировать</button>
+            </div>
+
+            <!-- PHASE 2 -->
+            <div id="phase-2" class="phase terminal-box">
+                <h5>Фаза 2: Оценка узла, ведущего к победе</h5>
+                <div class="tree-diagram">      [Узел ${nV}]
+      /      \\
+    ход 1   ход 2
+    /          \\
+ [Лист ${l1}]   [Лист ${l2}]
+  (П)          (П)</div>
+                <p>Вы находитесь в <b>Узле ${nV}</b>. Любой ваш ход переведет игру в Лист ${l1} или Лист ${l2} (П-позиции).</p>
+                <div class="mt-3">
+                    <label>Каков статус Узла ${nV}? (В или П):</label>
+                    <input type="text" id="p2-q1" maxlength="1" placeholder="_">
+                </div>
+                <button class="btn-cyber mt-3" onclick="checkPhase(2)">Анализировать</button>
+            </div>
+
+            <!-- PHASE 3 -->
+            <div id="phase-3" class="phase terminal-box">
+                <h5>Фаза 3: Оценка безвыходного узла</h5>
+                <div class="tree-diagram">      [Узел ${nP}]
+      /      \\
+    ход 1   ход 2
+    /          \\
+ [Узел ${l3}]   [Узел ${nV}]
+  (В)          (В)</div>
+                <p>Вы находитесь в <b>Узле ${nP}</b>. Оба возможных хода приведут вас в позиции, которые являются Выигрышными (В) для вашего соперника.</p>
+                <div class="mt-3">
+                    <label>Каков статус Узла ${nP}? (В или П):</label>
+                    <input type="text" id="p3-q1" maxlength="1" placeholder="_">
+                </div>
+                <button class="btn-cyber mt-3" onclick="checkPhase(3)">Анализировать</button>
+            </div>
+
+            <!-- PHASE 4 -->
+            <div id="phase-4" class="phase terminal-box">
+                <h5>Фаза 4: Поиск победного пути</h5>
+                <div class="tree-diagram">      [Старт ${root}]
+      /       \\
+    ход 1    ход 2
+    /           \\
+ [Узел ${rootLeft}]    [Узел ${rootRight}]
+  (${rootLeft === nP ? 'П' : 'В'})           (${rootRight === nP ? 'П' : 'В'})</div>
+                <p>Игра начинается со стартовой позиции <b>${root}</b>. Ваш ход первый. Чтобы победить, вам нужно передать сопернику такую позицию, из которой он проиграет.</p>
+                <div class="mt-3">
+                    <label>В какой узел вам нужно походить? (Введите букву узла):</label>
+                    <input type="text" id="p4-q1" maxlength="1" placeholder="_">
+                </div>
+                <button class="btn-cyber mt-3" onclick="checkPhase(4)">Анализировать</button>
+            </div>
+
+            <!-- PHASE 5 -->
+            <div id="phase-5" class="phase terminal-box">
+                <h5>Фаза 5: Финальный вердикт</h5>
+                <p>Из стартовой позиции <b>${root}</b> можно сделать ход в П-позицию (узел ${winningMove}).</p>
+                <div class="mt-3 mb-2">
+                    <label>Значит, статус стартовой позиции ${root} — это:</label>
+                    <input type="text" id="p5-q1" maxlength="1" placeholder="В или П">
+                </div>
+                <div class="mt-3">
+                    <label>Кто выиграет при идеальной игре обеих сторон?</label>
+                    <input type="text" id="p5-q2" placeholder="первый / второй" style="width: 200px;">
+                </div>
+                <button class="btn-cyber mt-3" onclick="checkPhase(5)">Завершить анализ</button>
+            </div>
+
+            <div id="phase-success" class="phase terminal-box" style="text-align: center; border-color: #3b82f6;">
+                <h2 style="color: #3b82f6;">[ ГРАФ РАСШИФРОВАН ]</h2>
+                <p>Уровень 2 успешно пройден.</p>
+            </div>
+        `;
+
+        function updateUI() {
+            document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+            if (currentPhase <= totalPhases) {
+                document.getElementById(`phase-${currentPhase}`).classList.add('active');
+                document.getElementById('progress-text').innerText = `${currentPhase - 1} / ${totalPhases}`;
+                document.getElementById('progress-bar').style.width = `${((currentPhase - 1) / totalPhases) * 100}%`;
+            } else {
+                document.getElementById('phase-success').classList.add('active');
+                document.getElementById('progress-text').innerText = `${totalPhases} / ${totalPhases}`;
+                document.getElementById('progress-bar').style.width = `100%`;
+                
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: MISSION_NAME,
+                    action_type: 'level_complete',
+                    start_time: new Date(startTime).toISOString(),
+                    time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+                    attempts_count: 1,
+                    success: true,
+                    action_log: [`Completed Level 2 with ${errorsCount} errors`]
+                }, '*');
+            }
+        }
+
+        function triggerError(inputElements) {
+            errorsCount++;
+            document.body.classList.add('hardcore-flash');
+            setTimeout(() => document.body.classList.remove('hardcore-flash'), 500);
+            inputElements.forEach(el => {
+                el.classList.add('error-shake');
+                setTimeout(() => el.classList.remove('error-shake'), 500);
+            });
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: 'hardcore_reset'
+            }, '*');
+        }
+
+        window.checkPhase = function(phase) {
+            if (phase === 1) {
+                const q = document.getElementById('p1-q1');
+                if (q.value.trim().toLowerCase() === 'п') { currentPhase++; updateUI(); } else triggerError([q]);
+            } else if (phase === 2) {
+                const q = document.getElementById('p2-q1');
+                if (q.value.trim().toLowerCase() === 'в') { currentPhase++; updateUI(); } else triggerError([q]);
+            } else if (phase === 3) {
+                const q = document.getElementById('p3-q1');
+                if (q.value.trim().toLowerCase() === 'п') { currentPhase++; updateUI(); } else triggerError([q]);
+            } else if (phase === 4) {
+                const q = document.getElementById('p4-q1');
+                if (q.value.trim().toLowerCase() === winningMove.toLowerCase()) { currentPhase++; updateUI(); } else triggerError([q]);
+            } else if (phase === 5) {
+                const q1 = document.getElementById('p5-q1');
+                const q2 = document.getElementById('p5-q2');
+                if (q1.value.trim().toLowerCase() === 'в' && q2.value.trim().toLowerCase() === 'первый') { currentPhase++; updateUI(); } else triggerError([q1, q2]);
+            }
+        }
+    </script>
+</body>
+</html>

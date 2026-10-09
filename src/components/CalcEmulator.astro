@@ -1,0 +1,111 @@
+---
+export interface Props {
+  missionName: string;
+  initialData?: any[]; // Формат данных Luckysheet
+  hardcoreReset?: boolean;
+}
+
+const { 
+  missionName, 
+  initialData = [{ name: 'Лист 1', status: 1 }], 
+  hardcoreReset = false 
+} = Astro.props;
+---
+<div class="d-flex flex-column h-100 bg-black p-2 rounded-0">
+    <div class="text-success fw-bold mb-2">LibreOffice Calc [Эмулятор Luckysheet]</div>
+    
+    <div class="flex-grow-1 position-relative bg-white rounded-0 border border-secondary">
+        <div id="luckysheet-container" class="position-absolute top-0 start-0 w-100 h-100 m-0 p-0"></div>
+    </div>
+    
+    <div class="mt-2 d-flex justify-content-between">
+        <button id="check-btn" class="btn btn-outline-success btn-sm rounded-0 fw-bold">ОТПРАВИТЬ НА ПРОВЕРКУ</button>
+        <span id="calc-status" class="text-warning small align-self-center fw-bold"></span>
+    </div>
+</div>
+
+<!-- Luckysheet Dependencies -->
+<link rel="stylesheet" href="/static/luckysheet/plugins/css/pluginsCss.css" />
+<link rel="stylesheet" href="/static/luckysheet/plugins/plugins.css" />
+<link rel="stylesheet" href="/static/luckysheet/css/luckysheet.css" />
+<link rel="stylesheet" href="/static/luckysheet/assets/iconfont/iconfont.css" />
+<script src="/static/luckysheet/plugins/js/plugin.js" is:inline></script>
+<script src="/static/luckysheet/luckysheet.umd.js" is:inline></script>
+
+<script define:vars={{ missionName, hardcoreReset, initialData }}>
+    let attempts = 0;
+    let startTime = Date.now();
+
+    function sendTelemetry(actionType, status, success = false) {
+        const msg = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attempts,
+            success: success
+        };
+        window.parent.postMessage(msg, '*');
+    }
+
+    sendTelemetry('in_progress', 'in_progress');
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // @ts-ignore
+        luckysheet.create({
+            container: 'luckysheet-container',
+            data: initialData,
+            lang: 'ru',
+            showinfobar: false,
+            enableAddRow: false,
+            enableAddBackTop: false,
+            allowUpdate: true
+        });
+    });
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        attempts++;
+        // @ts-ignore
+        const sheetData = luckysheet.getSheetData(); 
+        const statusEl = document.getElementById('calc-status');
+        
+        const event = new CustomEvent('calc-check', { 
+            detail: { 
+                data: sheetData,
+                // @ts-ignore
+                api: luckysheet,
+                resolve: (success, msg) => {
+                    if(success) {
+                        statusEl.className = 'text-success small align-self-center fw-bold';
+                        statusEl.innerText = msg || '✅ Проверено. Расчеты верны!';
+                        sendTelemetry('level_complete', 'completed', true);
+                    } else {
+                        statusEl.className = 'text-danger small align-self-center fw-bold';
+                        statusEl.innerText = msg || '❌ Ошибка в формулах или данных!';
+                        sendTelemetry('hardcore_reset', 'in_progress', false);
+                        
+                        if(hardcoreReset) {
+                            // @ts-ignore
+                            luckysheet.destroy();
+                            // @ts-ignore
+                            luckysheet.create({
+                                container: 'luckysheet-container',
+                                data: initialData,
+                                lang: 'ru',
+                                showinfobar: false
+                            });
+                        }
+                    }
+                }
+            }
+        });
+        document.dispatchEvent(event);
+    });
+</script>
+
+<style is:global>
+    /* Отключение скруглений для соблюдения стиля */
+    #luckysheet-container { border-radius: 0 !important; }
+</style>

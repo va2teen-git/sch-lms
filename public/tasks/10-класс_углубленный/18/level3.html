@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3: Диспетчер СМЭВ (Аркада)</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <style>
+        * { border-radius: 0 !important; }
+        body { background: #000; color: #fff; font-family: 'Courier New', Courier, monospace; padding: 20px; margin: 0; user-select: none; overflow: hidden; }
+        
+        .dashboard { border: 2px solid #333; padding: 20px; position: relative; height: calc(100vh - 40px); display: flex; flex-direction: column; }
+        .header-panel { border-bottom: 2px solid #555; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .phase-indicator { font-size: 1.5rem; font-weight: bold; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
+        
+        .timer-bar-container { height: 30px; background: #111; border: 2px solid #fff; position: relative; margin-bottom: 30px; width: 100%; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+        .timer-fill { height: 100%; width: 100%; background: #00ff00; transition: width 0.05s linear, background-color 0.3s; }
+        .timer-fill.danger { background: #ff0000; box-shadow: 0 0 15px #ff0000; }
+        
+        .request-card { background: #111; border: 2px dashed #00ffff; padding: 30px; text-align: center; margin-bottom: 40px; box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1); }
+        .request-text { font-size: 1.8rem; font-weight: bold; color: #fff; }
+        
+        .nodes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1; }
+        .node-btn { background: #0a0a0a; border: 2px solid #555; color: #ccc; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.1s; display: flex; align-items: center; justify-content: center; text-transform: uppercase; padding: 20px;}
+        .node-btn:hover { border-color: #00ffff; color: #00ffff; background: #001a1a; box-shadow: 0 0 15px rgba(0, 255, 255, 0.4); }
+        .node-btn:active { transform: scale(0.98); }
+        
+        .error-flash { animation: flashError 0.4s; }
+        @keyframes flashError { 0% { background: #ff0000; } 100% { background: #000; } }
+
+        .start-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .start-btn { font-size: 2rem; padding: 20px 40px; background: transparent; color: #00ff00; border: 3px solid #00ff00; cursor: pointer; text-transform: uppercase; font-family: inherit; font-weight: bold; }
+        .start-btn:hover { background: #00ff00; color: #000; box-shadow: 0 0 30px #00ff00; }
+        
+        .game-over-text { color: #ff0000; font-size: 3rem; font-weight: bold; text-shadow: 0 0 20px #ff0000; margin-bottom: 20px; display: none; text-align: center; }
+        
+        #success-screen { display: none; flex-direction: column; justify-content: center; align-items: center; height: 100%; border: 3px solid #00ff00; box-shadow: inset 0 0 50px rgba(0,255,0,0.2); }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        <!-- Стартовый экран / Экран проигрыша -->
+        <div class="start-overlay" id="overlay">
+            <div class="game-over-text" id="game-over-msg">СОЕДИНЕНИЕ ПОТЕРЯНО</div>
+            <p class="text-center mb-4 text-info" style="max-width: 600px; font-size: 1.2rem;">
+                <strong>Шлюз СМЭВ: Режим маршрутизации пакетов.</strong><br><br>
+                Вам будут поступать запросы пользователей. Ваша задача — мгновенно направить запрос в нужное ведомство или сервис. Время на ответ убывает с каждым пройденным этапом.
+                <br><br><span class="text-warning">Одна ошибка или истечение таймера — сброс до нуля! Требуется 12 успешных маршрутизаций подряд.</span>
+            </p>
+            <button class="start-btn" onclick="startGame()">ЗАПУСТИТЬ ШЛЮЗ</button>
+        </div>
+
+        <!-- Игровой экран -->
+        <div id="game-area" style="display: none; height: 100%; flex-direction: column;">
+            <div class="header-panel">
+                <div class="text-secondary font-weight-bold">СМЭВ DISPATCHER v2.0</div>
+                <div class="phase-indicator">ПАКЕТ: <span id="phase-counter">1 / 12</span></div>
+            </div>
+            
+            <div class="text-center text-secondary mb-1">TIME TO LIVE (TTL): <span id="timer-text" class="text-warning font-weight-bold">5.00s</span></div>
+            <div class="timer-bar-container">
+                <div class="timer-fill" id="timer-bar"></div>
+            </div>
+            
+            <div class="request-card">
+                <div class="text-info mb-2">ПОСТУПИЛ ЗАПРОС:</div>
+                <div class="request-text" id="request-text">...</div>
+            </div>
+            
+            <div class="text-center text-secondary mb-2">ВЫБЕРИТЕ УЗЕЛ НАЗНАЧЕНИЯ:</div>
+            <div class="nodes-grid" id="nodes-grid">
+                <!-- Кнопки генерируются динамически -->
+            </div>
+        </div>
+
+        <!-- Экран победы -->
+        <div id="success-screen">
+            <h1 class="text-success mb-3" style="text-shadow: 0 0 20px #00ff00;">СИСТЕМА СТАБИЛЬНА</h1>
+            <p class="text-light fs-4">Все 12 пакетов успешно маршрутизированы.</p>
+        </div>
+    </div>
+
+<script>
+    const MISSION_NAME = 'Сервисы Интернета :: Уровень 3 (Аркада СМЭВ)';
+    const TOTAL_PHASES = 12;
+    
+    // База запросов и их ведомств (расширенная)
+    const routingDatabase = [
+        { intent: 'Оформление загранпаспорта нового образца', target: 'МВД России', distractors: ['Минздрав', 'ФНС', 'Росреестр', 'СФР'] },
+        { intent: 'Оплата транспортного налога', target: 'Федеральная налоговая служба', distractors: ['МВД России', 'Пенсионный фонд', 'Минтранс', 'ГИБДД'] },
+        { intent: 'Запись на прием к стоматологу', target: 'Минздрав (ЕМИАС/Горздрав)', distractors: ['Роспотребнадзор', 'ФНС', 'СФР', 'МЧС'] },
+        { intent: 'Регистрация права собственности на квартиру', target: 'Росреестр', distractors: ['БТИ', 'МВД России', 'Минстрой', 'Госуслуги ЖКХ'] },
+        { intent: 'Оформление выписки о материнском капитале', target: 'Социальный фонд (СФР)', distractors: ['ФНС', 'Росреестр', 'Минтруд', 'ЗАГС'] },
+        { intent: 'Оплата штрафа за превышение скорости', target: 'ГИБДД', distractors: ['ФНС', 'Ространснадзор', 'Минобороны', 'Росреестр'] },
+        { intent: 'Покупка авиабилета Москва - Владивосток', target: 'Аэрофлот (Коммерция)', distractors: ['Росавиация', 'Минтранс', 'РЖД', 'Госуслуги'] },
+        { intent: 'Проверка оценок за четверть', target: 'Электронный дневник', distractors: ['Минобрнауки', 'Рособрнадзор', 'ВУЗ-Онлайн', 'Сферум'] },
+        { intent: 'Регистрация статуса Индивидуального Предпринимателя', target: 'Федеральная налоговая служба', distractors: ['Минэкономразвития', 'Роструд', 'МВД России', 'СФР'] },
+        { intent: 'Подача заявления о заключении брака', target: 'Органы ЗАГС', distractors: ['МВД России', 'Росреестр', 'СФР', 'Минюст'] },
+        { intent: 'Покупка подарка с доставкой', target: 'Маркетплейс (Ozon/WB)', distractors: ['Госуслуги', 'Почта России', 'Минпромторг', 'ФТС'] },
+        { intent: 'Просмотр сериала по подписке', target: 'Онлайн-кинотеатр', distractors: ['Роскомнадзор', 'ВГТРК', 'Минкультуры', 'Rutube'] },
+        { intent: 'Оформление электронной цифровой подписи (ЭЦП)', target: 'Удостоверяющий центр', distractors: ['Минцифры', 'ФСБ', 'Роскомнадзор', 'Госуслуги'] },
+        { intent: 'Проверка кредитной истории', target: 'БКИ (Бюро кредитных историй)', distractors: ['Центробанк', 'Сбербанк', 'Госуслуги', 'ФНС'] },
+        { intent: 'Оплата квитанции за электроэнергию', target: 'ГИС ЖКХ', distractors: ['Росреестр', 'ФНС', 'Минэнерго', 'Мосэнергосбыт'] },
+        { intent: 'Оформление ОСАГО', target: 'Страховая компания', distractors: ['РСА', 'ГИБДД', 'МВД России', 'Росгосстрах'] },
+        { intent: 'Перевод денег по номеру телефона (СБП)', target: 'Онлайн-банкинг', distractors: ['ЦБ РФ', 'Минфин', 'Почта России', 'WebMoney'] },
+        { intent: 'Покупка билета на скоростной поезд "Сапсан"', target: 'РЖД', distractors: ['Минтранс', 'Госуслуги', 'Авиасейлс', 'Ространснадзор'] },
+        { intent: 'Получение справки об отсутствии судимости', target: 'МВД России', distractors: ['ФСБ', 'Росгвардия', 'Минюст', 'Прокуратура'] },
+        { intent: 'Запись ребенка в детский сад', target: 'Госуслуги (Минобрнауки)', distractors: ['Роспотребнадзор', 'Минтруд', 'Соцзащита', 'ЗАГС'] },
+        { intent: 'Поиск работы и размещение резюме', target: 'Работа в России (ТрудВВсем) / hh.ru', distractors: ['Роструд', 'Минэкономразвития', 'СФР', 'Госуслуги'] }
+    ];
+
+    let currentPhase = 0;
+    let currentScenario = null;
+    let startTime = 0;
+    let attempts = 0;
+    let actionLog = [];
+    
+    // Пул уникальных сценариев для текущей игры
+    let availableScenarios = [];
+    
+    // Таймер
+    let timerInterval = null;
+    let timeLeft = 0;
+    let maxTime = 0;
+
+    function sendTelemetry(actionType, successStatus) {
+        const payload = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: actionType,
+            start_time: new Date(startTime || Date.now()).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - (startTime || Date.now())) / 1000),
+            attempts_count: attempts,
+            success: successStatus,
+            status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+            action_log: actionLog
+        };
+        window.parent.postMessage(payload, '*');
+    }
+    
+    // Надежная тасовка массива (Fisher-Yates)
+    function shuffleArray(array) {
+        let currentIndex = array.length, randomIndex;
+        while (currentIndex !== 0) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+        }
+        return array;
+    }
+
+    function startGame() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('game-area').style.display = 'flex';
+        currentPhase = 0;
+        attempts = 0;
+        startTime = Date.now();
+        actionLog = [];
+        availableScenarios = [...routingDatabase]; // Сброс пула вопросов
+        sendTelemetry('mission_started', false);
+        initPhase();
+    }
+
+    function gameOver(reason) {
+        clearInterval(timerInterval);
+        actionLog.push(`Game Over: ${reason}`);
+        
+        document.body.classList.add('error-flash');
+        setTimeout(() => document.body.classList.remove('error-flash'), 400);
+        
+        // Хардкор сброс телеметрии
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            action_type: 'hardcore_reset'
+        }, '*');
+        
+        // Показываем оверлей
+        document.getElementById('game-area').style.display = 'none';
+        document.getElementById('overlay').style.display = 'flex';
+        const msg = document.getElementById('game-over-msg');
+        msg.style.display = 'block';
+        msg.innerText = reason === 'timeout' ? 'TTL ИСТЕК! СБРОС СИСТЕМЫ' : 'ОШИБКА МАРШРУТИЗАЦИИ! СБРОС';
+    }
+
+    function updateTimer() {
+        timeLeft -= 0.05;
+        const bar = document.getElementById('timer-bar');
+        const percent = (timeLeft / maxTime) * 100;
+        
+        bar.style.width = `${Math.max(0, percent)}%`;
+        document.getElementById('timer-text').innerText = `${Math.max(0, timeLeft).toFixed(2)}s`;
+        
+        if (percent < 30) {
+            bar.classList.add('danger');
+            document.getElementById('timer-text').classList.replace('text-warning', 'text-danger');
+        } else {
+            bar.classList.remove('danger');
+            document.getElementById('timer-text').classList.replace('text-danger', 'text-warning');
+        }
+
+        if (timeLeft <= 0) {
+            gameOver('timeout');
+        }
+    }
+
+    function initPhase() {
+        if (currentPhase >= TOTAL_PHASES) {
+            clearInterval(timerInterval);
+            document.getElementById('game-area').style.display = 'none';
+            document.getElementById('success-screen').style.display = 'flex';
+            sendTelemetry('level_complete', true);
+            return;
+        }
+
+        document.getElementById('phase-counter').innerText = `${currentPhase + 1} / ${TOTAL_PHASES}`;
+
+        // Усложнение: время уменьшается с каждой фазой
+        // Фаза 1: 5.00 сек, Фаза 12: 1.92 сек (шаг 0.28)
+        maxTime = 5.0 - (currentPhase * 0.28);
+        timeLeft = maxTime;
+        
+        clearInterval(timerInterval);
+        document.getElementById('timer-bar').style.width = '100%';
+        document.getElementById('timer-bar').classList.remove('danger');
+        
+        // Запуск тика таймера каждые 50мс
+        timerInterval = setInterval(updateTimer, 50);
+
+        // Выбор случайного уникального сценария
+        const scenarioIndex = Math.floor(Math.random() * availableScenarios.length);
+        currentScenario = availableScenarios[scenarioIndex];
+        // Удаляем выбранный сценарий из пула, чтобы он не повторился
+        availableScenarios.splice(scenarioIndex, 1);
+        
+        document.getElementById('request-text').innerText = currentScenario.intent;
+        
+        // Подготовка кнопок: 1 правильная + 3 неправильные
+        let options = [];
+        options.push({ text: currentScenario.target, isCorrect: true });
+        
+        // Перемешиваем дистракторы и берем 3
+        let shuffledDistractors = shuffleArray([...currentScenario.distractors]);
+        for(let i = 0; i < 3; i++) {
+            if (shuffledDistractors[i]) {
+                options.push({ text: shuffledDistractors[i], isCorrect: false });
+            }
+        }
+        
+        // Надежно перемешиваем финальные опции (кнопки)
+        options = shuffleArray(options);
+        
+        const grid = document.getElementById('nodes-grid');
+        grid.innerHTML = '';
+        
+        options.forEach(opt => {
+            const btn = document.createElement('div');
+            btn.className = 'node-btn';
+            btn.innerText = opt.text;
+            btn.onclick = () => checkAnswer(opt.isCorrect, opt.text);
+            grid.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(isCorrect, textClicked) {
+        attempts++;
+        if (isCorrect) {
+            actionLog.push(`Phase ${currentPhase+1} Correct: ${textClicked}`);
+            currentPhase++;
+            initPhase();
+        } else {
+            actionLog.push(`Phase ${currentPhase+1} Error: Selected ${textClicked}`);
+            gameOver('wrong_node');
+        }
+    }
+</script>
+</body>
+</html>

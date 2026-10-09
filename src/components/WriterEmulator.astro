@@ -1,0 +1,180 @@
+---
+export interface Props {
+  missionName: string;
+  initialHTML?: string;
+  hardcoreReset?: boolean;
+}
+
+const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.props;
+---
+<div class="d-flex flex-column h-100 bg-black p-2 rounded-0">
+    <div class="d-flex justify-content-between mb-2">
+        <span class="text-success fw-bold">LibreOffice Writer [Эмулятор Jodit]</span>
+        <button id="check-btn" class="btn btn-outline-success btn-sm rounded-0 fw-bold px-4">ПРОВЕРИТЬ ДОКУМЕНТ</button>
+    </div>
+    
+    <div class="flex-grow-1 bg-light text-dark rounded-0 overflow-hidden d-flex flex-column border border-secondary" id="editor-container" style="background-color: #f0f0f0 !important;">
+        <!-- Фейковое меню LibreOffice -->
+        <div class="d-flex px-2 py-1" style="background-color: #f0f0f0; border-bottom: 1px solid #ccc; font-size: 13px; color: #333;">
+            <div class="pe-3 cursor-pointer hover-bg-light">Файл</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Правка</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Вид</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Вставка</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Формат</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Стили</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Таблица</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Форма</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Сервис</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Окно</div>
+            <div class="pe-3 cursor-pointer hover-bg-light">Справка</div>
+        </div>
+        
+        <textarea id="writer-editor">{initialHTML}</textarea>
+    </div>
+    
+    <div class="mt-2 text-end">
+        <span id="writer-status" class="text-warning small fw-bold"></span>
+    </div>
+</div>
+
+<link rel="stylesheet" href="/static/jodit/jodit.min.css" />
+<script src="/static/jodit/jodit.min.js" is:inline></script>
+
+<script define:vars={{ missionName, hardcoreReset }}>
+    let attempts = 0;
+    let startTime = Date.now();
+
+    function sendTelemetry(actionType, status, success = false) {
+        const msg = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attempts,
+            success: success
+        };
+        window.parent.postMessage(msg, '*');
+    }
+
+    sendTelemetry('in_progress', 'in_progress');
+
+    let editor = null;
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // Мы используем Jodit, но настраиваем его так, чтобы он был похож на десктопный Word/Writer
+        editor = Jodit.make('#writer-editor', {
+            theme: 'default',
+            toolbarSticky: false,
+            showCharsCounter: true,
+            showWordsCounter: true,
+            showXPathInStatusbar: false,
+            height: '100%',
+            language: 'ru',
+            // Набор кнопок, разбитый на группы (имитация тулбара LibreOffice)
+            buttons: [
+                'undo', 'redo', '|',
+                'font', 'fontsize', 'brush', 'paragraph', '|',
+                'bold', 'italic', 'underline', 'strikethrough', '|',
+                'align', 'ul', 'ol', '|',
+                'outdent', 'indent', '|',
+                'table', 'link', 'image', 'hr', '|',
+                'eraser', 'fullsize'
+            ],
+            // Убираем лишние попапы
+            toolbarAdaptive: false
+        });
+    });
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        if (!editor) return;
+        attempts++;
+        const content = editor.value;
+        const statusEl = document.getElementById('writer-status');
+        
+        const event = new CustomEvent('writer-check', { 
+            detail: { 
+                html: content, 
+                resolve: (success, msg) => {
+                    if(success) {
+                        statusEl.className = 'text-success small fw-bold';
+                        statusEl.innerText = msg || '✅ Проверено. Задание выполнено!';
+                        sendTelemetry('level_complete', 'completed', true);
+                    } else {
+                        statusEl.className = 'text-danger small fw-bold';
+                        statusEl.innerText = msg || '❌ Ошибка форматирования!';
+                        sendTelemetry('hardcore_reset', 'in_progress', false);
+                        if(hardcoreReset) {
+                            editor.value = ''; 
+                        }
+                    }
+                }
+            }
+        });
+        
+        const eventFired = document.dispatchEvent(event);
+        if(!event.defaultPrevented) console.log("Контент отправлен:", content);
+    });
+</script>
+
+<style is:global>
+    /* ПРИБЛИЖАЕМ СТИЛИ К LIBREOFFICE (COLIBRE THEME) */
+
+    /* Убираем скругления */
+    .jodit-toolbar__box, .jodit-workplace, .jodit-container { 
+        border-radius: 0 !important; 
+        border: none !important;
+    }
+    
+    /* Тулбар LibreOffice: серый фон, без рамок */
+    .jodit-toolbar__box {
+        background-color: #f0f0f0 !important;
+        border-bottom: 1px solid #ccc !important;
+        padding: 4px 8px !important;
+    }
+
+    /* Кнопки LibreOffice (квадратные, плоские, голубой hover) */
+    .jodit-toolbar-button__button {
+        border-radius: 2px !important;
+        margin: 0 1px !important;
+        min-height: 28px !important;
+    }
+    .jodit-toolbar-button__button:hover {
+        background-color: #d6e2ff !important;
+        border-color: #a4b9e0 !important;
+    }
+
+    /* Внешний фон (Серый стол, на котором лежит белый лист) */
+    .jodit-workplace {
+        background-color: #e0e0e0 !important;
+        padding: 20px 0 !important;
+        overflow-y: auto !important;
+    }
+
+    /* Сам лист формата А4 */
+    .jodit-wysiwyg {
+        background-color: #ffffff !important;
+        max-width: 800px !important;
+        min-height: 1131px !important; /* Пропорция A4 */
+        margin: 0 auto !important;
+        padding: 40px !important; /* Поля документа */
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+        border: 1px solid #bbb !important;
+        outline: none !important;
+    }
+
+    /* Статус-бар внизу */
+    .jodit-status-bar {
+        background-color: #f0f0f0 !important;
+        border-top: 1px solid #ccc !important;
+        color: #333 !important;
+        font-family: sans-serif;
+    }
+
+    /* Мелкие вспомогательные классы */
+    .hover-bg-light:hover {
+        background-color: #d6e2ff;
+        cursor: pointer;
+    }
+</style>

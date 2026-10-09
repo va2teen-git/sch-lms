@@ -1,0 +1,334 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Database from 'better-sqlite3';
+import path from 'path';
+
+const dbPath = path.join(process.cwd(), 'telemetry.db');
+let db;
+let rows: any[] = [];
+
+try {
+  db = new Database(dbPath, { readonly: true });
+  rows = db.prepare(`SELECT * FROM telemetry ORDER BY timestamp ASC`).all();
+} catch (e) {
+  console.error(e);
+} finally {
+  if (db) db.close();
+}
+
+interface LevelStats {
+  timeSpentSec: number;
+  errors: number;
+  completed: boolean;
+  lastUpdated: Date | null;
+}
+
+interface LessonStats {
+  firstStartNormal: Date | null;
+  lastCompleteNormal: Date | null;
+  firstStartHardcore: Date | null;
+  lastCompleteHardcore: Date | null;
+  completedNormal: boolean;
+  completedHardcore: boolean;
+  levelsNormal: Set<string>;
+  levelsHardcore: Set<string>;
+  normalTime: number;
+  hardcoreTime: number;
+}
+
+interface StudentStats {
+  key: string;
+  firstName: string;
+  lastName: string;
+  className: string;
+  firstLogin: Date | null;
+  lastAction: Date | null;
+  levels: Record<string, LevelStats>;
+  lessons: Record<string, LessonStats>;
+  totalErrors: number;
+  totalTimeSec: number;
+  totalHardcoreTimeSec: number;
+  isHardcoreLegend: boolean;
+  hardcoreTracker: Record<string, Set<string>>;
+}
+
+const students: Record<string, StudentStats> = {};
+
+rows.forEach(row => {
+  const key = `${row.class_name}_${row.first_name}_${row.last_name}`;
+  if (!students[key]) {
+    students[key] = {
+      key,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      className: row.class_name,
+      firstLogin: null,
+      lastAction: null,
+      levels: {},
+      lessons: {},
+      totalErrors: 0,
+      totalTimeSec: 0,
+      totalHardcoreTimeSec: 0,
+      isHardcoreLegend: false,
+      hardcoreTracker: {}
+    };
+  }
+
+  const s = students[key];
+  const tDate = new Date(row.timestamp + 'Z');
+  
+  if (!s.firstLogin || tDate < s.firstLogin) s.firstLogin = tDate;
+  if (!s.lastAction || tDate > s.lastAction) s.lastAction = tDate;
+
+  const mission = row.mission_name || 'Общее';
+  const lessonPrefix = mission.split('::')[0].trim();
+  
+  if (!s.levels[mission]) {
+    s.levels[mission] = { timeSpentSec: 0, errors: 0, completed: false, lastUpdated: null };
+  }
+  if (!s.lessons[lessonPrefix]) {
+    s.lessons[lessonPrefix] = {
+      firstStartNormal: null, lastCompleteNormal: null,
+      firstStartHardcore: null, lastCompleteHardcore: null,
+      completedNormal: false, completedHardcore: false,
+      levelsNormal: new Set(), levelsHardcore: new Set(),
+      normalTime: 0, hardcoreTime: 0
+    };
+  }
+
+  const l = s.levels[mission];
+  const ls = s.lessons[lessonPrefix];
+  
+  if (!l.lastUpdated || tDate > l.lastUpdated) {
+    l.lastUpdated = tDate;
+  }
+  
+  if (!s.hardcoreTracker[lessonPrefix]) s.hardcoreTracker[lessonPrefix] = new Set();
+
+  if (row.action_type === 'hardcore_reset' || (row.action_log && row.action_log.includes('Error'))) {
+    l.errors++;
+    s.totalErrors++;
+  }
+  
+  if (row.action_type === 'hardcore_reset' && row.is_hardcore === 1) {
+    s.hardcoreTracker[lessonPrefix].clear();
+    ls.firstStartHardcore = null;
+    ls.levelsHardcore.clear();
+  }
+
+  if (row.is_hardcore === 1) {
+    if (!ls.firstStartHardcore || tDate < ls.firstStartHardcore) ls.firstStartHardcore = tDate;
+  } else {
+    if (!ls.firstStartNormal || tDate < ls.firstStartNormal) ls.firstStartNormal = tDate;
+  }
+
+  if (row.action_type === 'level_complete') {
+    l.completed = true;
+    if (row.time_spent_sec > l.timeSpentSec) {
+        l.timeSpentSec = row.time_spent_sec;
+    }
+    
+    if (row.is_hardcore === 1) {
+        s.hardcoreTracker[lessonPrefix].add(mission);
+        ls.levelsHardcore.add(mission);
+        if (s.hardcoreTracker[lessonPrefix].size >= 3) {
+            s.isHardcoreLegend = true;
+        }
+        if (ls.levelsHardcore.size >= 3 && !ls.completedHardcore) {
+            ls.completedHardcore = true;
+            ls.lastCompleteHardcore = tDate;
+        }
+    } else {
+        ls.levelsNormal.add(mission);
+        if (ls.levelsNormal.size >= 3 && !ls.completedNormal) {
+            ls.completedNormal = true;
+            ls.lastCompleteNormal = tDate;
+        }
+    }
+  } else if (row.action_type === 'phase_started' || row.status === 'in_progress') {
+     if (!l.completed && row.time_spent_sec > l.timeSpentSec) {
+         l.timeSpentSec = row.time_spent_sec;
+     }
+  }
+});
+
+// Calculate total time per lesson
+Object.values(students).forEach(s => {
+  let totalNorm = 0;
+  let totalHard = 0;
+  Object.values(s.lessons).forEach(ls => {
+    if (ls.completedNormal && ls.firstStartNormal && ls.lastCompleteNormal) {
+      ls.normalTime = Math.max(0, Math.floor((ls.lastCompleteNormal.getTime() - ls.firstStartNormal.getTime()) / 1000));
+      totalNorm += ls.normalTime;
+    }
+    if (ls.completedHardcore && ls.firstStartHardcore && ls.lastCompleteHardcore) {
+      ls.hardcoreTime = Math.max(0, Math.floor((ls.lastCompleteHardcore.getTime() - ls.firstStartHardcore.getTime()) / 1000));
+      totalHard += ls.hardcoreTime;
+    }
+  });
+  s.totalTimeSec = totalNorm;
+  s.totalHardcoreTimeSec = totalHard;
+});
+
+const studentArray = Object.values(students).sort((a, b) => (b.lastAction?.getTime() || 0) - (a.lastAction?.getTime() || 0));
+---
+
+<Layout title="Панель учителя | Статистика">
+  <div class="max-w-7xl mx-auto p-8">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-3xl font-bold text-gray-800">Панель управления учителя</h1>
+      <a href="/" class="bg-gray-600 text-white px-4 py-2 hover:bg-gray-700 transition">Выход</a>
+    </div>
+
+    <div class="bg-white shadow-md border border-gray-200 overflow-hidden">
+      <table class="w-full text-left border-collapse" id="stats-table">
+        <thead>
+          <tr class="bg-gray-100 text-gray-700 text-sm border-b border-gray-200 select-none">
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition" onclick="sortTable('name', event)">Ученик ↕</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition" onclick="sortTable('class', event)">Класс ↕</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition text-center" title="Пройден ли финальный уровень на хардкоре">Хардкор</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition text-center" onclick="sortTable('hardcoretime', event)">Время (Хардкор) ↕</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition" onclick="sortTable('login', event)">Время входа ↕</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition" onclick="sortTable('last', event)">Завершение ↕</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition text-center" onclick="sortTable('time', event)">Общее время ↕</th>
+            <th class="p-4 cursor-pointer hover:bg-gray-200 transition text-center" onclick="sortTable('errors', event)">Ошибки ↕</th>
+            <th class="p-4">Детализация по заданиям</th>
+          </tr>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="p-2"><input type="text" id="filter-name" class="w-full border border-gray-300 p-1 text-sm rounded font-normal" placeholder="Поиск..." oninput="filterTable()"></th>
+            <th class="p-2"><input type="text" id="filter-class" class="w-full border border-gray-300 p-1 text-sm rounded font-normal" placeholder="Поиск..." oninput="filterTable()"></th>
+            <th class="p-2 text-center">
+               <select id="filter-hardcore" class="w-full border border-gray-300 p-1 text-sm rounded font-normal bg-white" onchange="filterTable()">
+                  <option value="">Все</option>
+                  <option value="yes">Да</option>
+                  <option value="no">Нет</option>
+               </select>
+            </th>
+            <th class="p-2"></th>
+            <th class="p-2"></th>
+            <th class="p-2"></th>
+            <th class="p-2"></th>
+            <th class="p-2"></th>
+            <th class="p-2"></th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          {studentArray.length === 0 && (
+            <tr><td colspan="9" class="p-8 text-center text-gray-500">Нет данных телеметрии</td></tr>
+          )}
+          {studentArray.map(s => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50 align-top student-row"
+                data-name={`${s.lastName} ${s.firstName}`}
+                data-class={s.className}
+                data-hardcore={s.isHardcoreLegend ? 'yes' : 'no'}
+                data-hardcoretime={s.totalHardcoreTimeSec}
+                data-login={s.firstLogin?.getTime() || 0}
+                data-last={s.lastAction?.getTime() || 0}
+                data-time={s.totalTimeSec}
+                data-errors={s.totalErrors}>
+              <td class="p-4 font-semibold text-gray-800">{s.lastName} {s.firstName}</td>
+              <td class="p-4 text-gray-600">{s.className}</td>
+              <td class="p-4 text-center text-2xl">{s.isHardcoreLegend ? '💀' : ''}</td>
+              <td class="p-4 text-center font-mono text-red-700">{s.totalHardcoreTimeSec > 0 ? `${Math.floor(s.totalHardcoreTimeSec / 60)}м ${s.totalHardcoreTimeSec % 60}с` : '-'}</td>
+              <td class="p-4 text-sm text-gray-500">{s.firstLogin?.toLocaleString('ru-RU')}</td>
+              <td class="p-4 text-sm text-gray-500">{s.lastAction?.toLocaleString('ru-RU')}</td>
+              <td class="p-4 text-center font-mono">{Math.floor(s.totalTimeSec / 60)}м {s.totalTimeSec % 60}с</td>
+              <td class="p-4 text-center">
+                <span class={`px-2 py-1 text-sm font-bold rounded ${s.totalErrors > 5 ? 'bg-red-100 text-red-700' : s.totalErrors > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                  {s.totalErrors}
+                </span>
+              </td>
+              <td class="p-4 text-sm">
+                <div class="flex flex-col gap-2">
+                  {Object.entries(s.levels).map(([mName, stats]) => (
+                    <div class="bg-gray-100 p-2 border border-gray-200 flex justify-between items-center">
+                      <div class="flex flex-col">
+                        <span class="truncate w-64 font-medium" title={mName}>{mName}</span>
+                        <span class="text-xs text-gray-500">{stats.lastUpdated ? stats.lastUpdated.toLocaleString('ru-RU') : ''}</span>
+                      </div>
+                      <div class="flex gap-4 items-center">
+                        <span class="text-gray-600" title="Время выполнения">⏱ {stats.timeSpentSec}с</span>
+                        <span class="text-red-500" title="Ошибки (сбросы)">❌ {stats.errors}</span>
+                        <span>{stats.completed ? '✅' : '⏳'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Layout>
+
+<script is:inline>
+  let sortCriteria = []; // Array of { col, asc }
+
+  function sortTable(col, event) {
+    const tbody = document.getElementById('table-body');
+    const rows = Array.from(tbody.querySelectorAll('tr.student-row'));
+    
+    const existingIndex = sortCriteria.findIndex(c => c.col === col);
+
+    if (event && event.shiftKey) {
+      if (existingIndex !== -1) {
+        sortCriteria[existingIndex].asc = !sortCriteria[existingIndex].asc;
+      } else {
+        sortCriteria.push({ col, asc: true });
+      }
+    } else {
+      if (existingIndex !== -1 && sortCriteria.length === 1) {
+        sortCriteria[0].asc = !sortCriteria[0].asc;
+      } else {
+        sortCriteria = [{ col, asc: true }];
+      }
+    }
+
+    rows.sort((a, b) => {
+      for (const criteria of sortCriteria) {
+        let valA = a.getAttribute(`data-${criteria.col}`);
+        let valB = b.getAttribute(`data-${criteria.col}`);
+        
+        if (['login', 'last', 'time', 'errors', 'hardcoretime'].includes(criteria.col)) {
+          valA = parseFloat(valA) || 0;
+          valB = parseFloat(valB) || 0;
+        } else {
+          valA = (valA || '').toLowerCase();
+          valB = (valB || '').toLowerCase();
+        }
+
+        if (valA < valB) return criteria.asc ? -1 : 1;
+        if (valA > valB) return criteria.asc ? 1 : -1;
+      }
+      return 0;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  function filterTable() {
+    const nameFilter = document.getElementById('filter-name').value.toLowerCase();
+    const classFilter = document.getElementById('filter-class').value.toLowerCase();
+    const hardcoreFilter = document.getElementById('filter-hardcore').value;
+    
+    const rows = document.querySelectorAll('tr.student-row');
+    
+    rows.forEach(row => {
+      const name = (row.getAttribute('data-name') || '').toLowerCase();
+      const cls = (row.getAttribute('data-class') || '').toLowerCase();
+      const hc = row.getAttribute('data-hardcore') || '';
+      
+      const matchName = name.includes(nameFilter);
+      const matchClass = cls.includes(classFilter);
+      const matchHardcore = hardcoreFilter === '' || hc === hardcoreFilter;
+      
+      if (matchName && matchClass && matchHardcore) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+</script>

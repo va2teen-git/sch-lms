@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренажер: Сетевое администрирование</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <script src="/static/bootstrap.bundle.min.js"></script>
+    <style>
+        * { border-radius: 0 !important; }
+        body { background: #16213e; color: #eee; font-family: 'Courier New', Courier, monospace; margin: 0; padding: 20px; width: 100vw; height: 100vh; overflow: hidden; box-sizing: border-box; }
+        .cyber-card { height: 100%; display: flex; flex-direction: column; }
+        
+        .nav-tabs .nav-link { color: #aaa; background: #111; border: 1px solid #0f3460; }
+        .nav-tabs .nav-link.active { color: #00ffcc; background: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: bold; }
+        
+        .progress-bar-custom { height: 20px; background: #111; margin-bottom: 20px; border: 1px solid #0f3460; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #00ffcc, #0099ff); width: 0%; transition: width 0.3s; }
+        
+        .tab-content { flex: 1; overflow-y: auto; padding-top: 20px; }
+        .btn-custom { background: #0f3460; color: white; border: 1px solid #00ffcc; padding: 10px 20px; margin: 5px; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .btn-custom:hover { background: #00ffcc; color: #000; }
+        .console-box { background: #000; color: #00ff00; padding: 15px; border: 1px solid #333; margin-bottom: 15px; font-size: 1.1em; }
+        
+        .arcade-box { border: 2px dashed #ff4444; padding: 15px; background: #220000; }
+        .error-msg { color: #ff4444; font-weight: bold; margin-bottom: 10px; height: 20px; }
+    </style>
+</head>
+<body>
+    <div class="cyber-card">
+        <ul class="nav nav-tabs" id="taskTabs" role="tablist">
+            <li class="nav-item"><button class="nav-link active" id="tab1" data-bs-toggle="tab" data-bs-target="#lvl1" type="button">Ур. 1: Маршрутизация</button></li>
+            <li class="nav-item"><button class="nav-link" id="tab2" data-bs-toggle="tab" data-bs-target="#lvl2" type="button">Ур. 2: Файрвол</button></li>
+            <li class="nav-item"><button class="nav-link" id="tab3" data-bs-toggle="tab" data-bs-target="#lvl3" type="button">Ур. 3: Subnets (Arcade)</button></li>
+        </ul>
+        
+        <div class="tab-content">
+            <!-- УРОВЕНЬ 1 -->
+            <div class="tab-pane fade show active" id="lvl1">
+                <h4>Куда отправить пакет? (Осталось: <span id="l1-remain">3</span>)</h4>
+                <div class="progress-bar-custom"><div class="progress-fill" id="l1-progress" style="width: 0%;"></div></div>
+                <div class="error-msg" id="l1-error"></div>
+                <div id="l1-container">
+                    <p><i>Легенда: Вы — маршрутизатор. Пришел пакет с адресом назначения. Выберите правильный интерфейс по таблице маршрутизации.</i></p>
+                    <div class="console-box" id="l1-console"></div>
+                    <div id="l1-buttons"></div>
+                </div>
+                <div id="l1-done" style="display: none; color: #00ffcc;">
+                    <h3>Уровень пройден!</h3>
+                    <button class="btn-custom" onclick="nextLevel(2)">Перейти на уровень 2</button>
+                </div>
+            </div>
+            
+            <!-- УРОВЕНЬ 2 -->
+            <div class="tab-pane fade" id="lvl2">
+                <h4>Настройка Файрвола (Осталось: <span id="l2-remain">5</span>)</h4>
+                <div class="progress-bar-custom"><div class="progress-fill" id="l2-progress" style="width: 0%;"></div></div>
+                <div class="error-msg" id="l2-error"></div>
+                <div id="l2-container">
+                    <p><i>Легенда: Вы настраиваете брандмауэр. Проанализируйте пакет и скажите, пропустит ли его файрвол по правилам (сверху вниз).</i></p>
+                    <div class="console-box" id="l2-console"></div>
+                    <button class="btn-custom" onclick="checkL2('ALLOW')">РАЗРЕШИТЬ (ALLOW)</button>
+                    <button class="btn-custom" style="border-color: #ff4444;" onclick="checkL2('DENY')">ЗАПРЕТИТЬ (DENY)</button>
+                </div>
+                <div id="l2-done" style="display: none; color: #00ffcc;">
+                    <h3>Уровень пройден!</h3>
+                    <button class="btn-custom" onclick="nextLevel(3)">Перейти на уровень 3</button>
+                </div>
+            </div>
+            
+            <!-- УРОВЕНЬ 3 -->
+            <div class="tab-pane fade" id="lvl3">
+                <div class="arcade-box">
+                    <h4 style="color: #ff4444;">Терминал Экстренного Реагирования 💀 Arcade (Осталось: <span id="l3-remain">8</span>)</h4>
+                    <p><i>Легенда: Хакерская атака! У вас есть считанные секунды на выполнение каждой команды. Любая ошибка или истечение времени полностью обнуляют прогресс!</i></p>
+                    
+                    <div style="height: 10px; background: #333; margin-bottom: 10px; border: 1px solid #555;">
+                        <div id="l3-timer-bar" style="height: 100%; width: 100%; background: #ff4444; transition: width 0.1s linear;"></div>
+                    </div>
+                    
+                    <div class="progress-bar-custom"><div class="progress-fill" id="l3-progress" style="width: 0%; background: #ffaa00;"></div></div>
+                    <div class="error-msg" id="l3-error"></div>
+                    
+                    <div id="l3-container">
+                        <div class="console-box" id="l3-console" style="min-height: 120px; font-family: monospace;"></div>
+                        <div style="display: flex; align-items: center; background: #000; border: 1px solid #333; padding: 10px;">
+                            <span style="color: #00ff00; margin-right: 10px; font-weight: bold;">root@server:~#</span>
+                            <input type="text" id="l3-input" style="background: transparent; color: #00ff00; border: none; outline: none; width: 100%; font-family: monospace; font-size: 1.2em;" autocomplete="off" spellcheck="false">
+                        </div>
+                    </div>
+                    <div id="l3-done" style="display: none; color: #00ffcc;">
+                        <h3>ПОЗДРАВЛЯЕМ! СЕРВЕР СПАСЕН! 🏆</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const LESSON_ID = 'g10_adv_16';
+        let state = {
+            l1: { remain: 3, total: 3, currentAnswer: null, started: false },
+            l2: { remain: 5, total: 5, currentAnswer: null, started: false },
+            l3: { remain: 8, total: 8, currentAnswer: null, started: false }
+        };
+
+        let missionStartTime = Date.now();
+        let attemptsCount = 0;
+        let actionLog = [];
+
+        function sendTelemetry(level, status, isError = false) {
+            const timeSpent = Math.round((Date.now() - missionStartTime) / 1000);
+            
+            let actionType = status === 'completed' ? 'task_completed' : 'in_progress';
+            if (isError) actionType = 'task_failed';
+
+            const payload = {
+                type: 'TELEMETRY_EVENT',
+                lesson_id: LESSON_ID,
+                task_level: level,
+                action_type: actionType,
+                payload: {
+                    mission_name: `Сетевое администрирование :: Уровень ${level}`,
+                    start_time: missionStartTime,
+                    time_spent_sec: timeSpent,
+                    attempts_count: attemptsCount,
+                    success: status === 'completed',
+                    action_log: actionLog,
+                    status: status
+                }
+            };
+            window.parent.postMessage(payload, '*');
+            
+            if (isError) {
+                // Всегда шлем hardcore_reset при ошибке для глобального хардкор режима
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    lesson_id: LESSON_ID,
+                    task_level: level,
+                    action_type: 'hardcore_reset',
+                    payload: {}
+                }, '*');
+            }
+        }
+
+        function updateProgress(lvlId, remain, total) {
+            document.getElementById(`${lvlId}-remain`).innerText = remain;
+            const pct = ((total - remain) / total) * 100;
+            document.getElementById(`${lvlId}-progress`).style.width = pct + '%';
+        }
+
+        function nextLevel(lvl) {
+            const tabBtn = document.getElementById(`tab${lvl}`);
+            tabBtn.classList.remove('disabled');
+            const bsTab = new bootstrap.Tab(tabBtn);
+            bsTab.show();
+            missionStartTime = Date.now();
+            attemptsCount = 0;
+            actionLog = [];
+            if(lvl === 2 && !state.l2.started) generateL2();
+            if(lvl === 3 && !state.l3.started) generateL3();
+        }
+
+        function showError(lvlId, msg) {
+            const el = document.getElementById(`${lvlId}-error`);
+            el.innerText = msg;
+            setTimeout(() => el.innerText = '', 3000);
+        }
+
+        // --- УРОВЕНЬ 1 ---
+        function generateL1() {
+            state.l1.started = true;
+            const subnets = [
+                { cidr: "192.168.1.0/24", intf: "eth0", match: "192.168.1." },
+                { cidr: "10.0.0.0/8", intf: "eth1", match: "10." },
+                { cidr: "172.16.0.0/16", intf: "eth2", match: "172.16." }
+            ];
+            const defRoute = "0.0.0.0/0";
+            const defIntf = "eth3";
+            
+            const isDefault = Math.random() > 0.5;
+            let targetIP = "";
+            let correctIntf = "";
+            
+            if (isDefault) {
+                targetIP = `8.8.8.${Math.floor(Math.random()*254)+1}`;
+                correctIntf = defIntf;
+            } else {
+                const s = subnets[Math.floor(Math.random() * subnets.length)];
+                if(s.match === "192.168.1.") targetIP = s.match + (Math.floor(Math.random()*253)+1);
+                else if(s.match === "10.") targetIP = s.match + "5.5." + (Math.floor(Math.random()*253)+1);
+                else targetIP = s.match + "20." + (Math.floor(Math.random()*253)+1);
+                correctIntf = s.intf;
+            }
+            
+            state.l1.currentAnswer = correctIntf;
+            
+            document.getElementById('l1-console').innerHTML = `
+                <div><b>Destination IP:</b> ${targetIP}</div>
+                <hr style="border-color:#333;">
+                <div><b>Routing Table:</b></div>
+                <div>192.168.1.0/24 -> eth0</div>
+                <div>10.0.0.0/8 -> eth1</div>
+                <div>172.16.0.0/16 -> eth2</div>
+                <div>0.0.0.0/0 (Default Gateway) -> eth3</div>
+            `;
+            
+            const btns = document.getElementById('l1-buttons');
+            btns.innerHTML = '';
+            ['eth0', 'eth1', 'eth2', 'eth3'].forEach(i => {
+                btns.innerHTML += `<button class="btn-custom" onclick="checkL1('${i}')">Отправить в ${i}</button>`;
+            });
+            sendTelemetry(1, 'in_progress');
+        }
+
+        function checkL1(ans) {
+            attemptsCount++;
+            if (ans === state.l1.currentAnswer) {
+                state.l1.remain--;
+                actionLog.push(`Успех: ${ans}`);
+                updateProgress('l1', state.l1.remain, state.l1.total);
+                if (state.l1.remain === 0) {
+                    document.getElementById('l1-container').style.display = 'none';
+                    document.getElementById('l1-done').style.display = 'block';
+                    sendTelemetry(1, 'completed');
+                } else {
+                    generateL1();
+                }
+            } else {
+                actionLog.push(`Ошибка: ${ans} (ожидалось ${state.l1.currentAnswer})`);
+                showError('l1', 'Неверный интерфейс! Пакет потерян.');
+                sendTelemetry(1, 'in_progress', true);
+                generateL1();
+            }
+        }
+
+        // --- УРОВЕНЬ 2 ---
+        function generateL2() {
+            state.l2.started = true;
+            const cases = [
+                { task: "Разрешить незащищенный веб-трафик (HTTP)", ans: "ALLOW TCP 80" },
+                { task: "Запретить удаленное управление сервером (SSH)", ans: "DENY TCP 22" },
+                { task: "Разрешить запросы к системе доменных имен (DNS)", ans: "ALLOW UDP 53" },
+                { task: "Разрешить защищенный веб-трафик (HTTPS)", ans: "ALLOW TCP 443" },
+                { task: "Запретить передачу файлов (FTP)", ans: "DENY TCP 21" },
+                { task: "Блокировать абсолютно все пакеты (правило по умолчанию)", ans: "DENY ALL" },
+                { task: "Разрешить подключение к удаленному рабочему столу (RDP)", ans: "ALLOW TCP 3389" },
+                { task: "Запретить отправку электронной почты (SMTP)", ans: "DENY TCP 25" },
+                { task: "Разрешить получение электронной почты (POP3)", ans: "ALLOW TCP 110" },
+                { task: "Запретить небезопасный доступ через терминал (Telnet)", ans: "DENY TCP 23" },
+                { task: "Разрешить синхронизацию сетевого времени (NTP)", ans: "ALLOW UDP 123" },
+                { task: "Разрешить подключение к базе данных MySQL", ans: "ALLOW TCP 3306" },
+                { task: "Запретить подключение к базе данных PostgreSQL", ans: "DENY TCP 5432" },
+                { task: "Разрешить защищенное получение почты (IMAP)", ans: "ALLOW TCP 143" },
+                { task: "Разрешить передачу файлов по протоколу TFTP", ans: "ALLOW UDP 69" }
+            ];
+            const c = cases[Math.floor(Math.random() * cases.length)];
+            state.l2.currentAnswer = c.ans;
+            
+            document.getElementById('l2-container').innerHTML = `
+                <p><i>Легенда: Вы настраиваете брандмауэр. Напишите точное правило для решения задачи. (Формат: ACTION PROTOCOL PORT, например 'ALLOW TCP 80' или 'DENY ALL').</i></p>
+                <div class="console-box" id="l2-console">
+                    <div style="color: #00ffcc;"><b>ЗАДАЧА:</b> ${c.task}</div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <input type="text" id="l2-input" style="background: #111; color: #00ffcc; border: 1px solid #0f3460; padding: 10px; width: 60%; outline: none;" placeholder="Введите правило..." autocomplete="off">
+                    <button class="btn-custom" id="l2-btn" onclick="checkL2()">ПРИМЕНИТЬ</button>
+                </div>
+            `;
+            
+            // Allow pressing Enter
+            document.getElementById('l2-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') checkL2();
+            });
+
+            sendTelemetry(2, 'in_progress');
+        }
+
+        function checkL2() {
+            const inputEl = document.getElementById('l2-input');
+            const btnEl = document.getElementById('l2-btn');
+            if(!inputEl) return;
+            const ans = inputEl.value.trim().toUpperCase();
+            
+            if (ans === "") return;
+            
+            attemptsCount++;
+            if (ans === state.l2.currentAnswer) {
+                state.l2.remain--;
+                actionLog.push(`Успех: ${ans}`);
+                updateProgress('l2', state.l2.remain, state.l2.total);
+                if (state.l2.remain === 0) {
+                    document.getElementById('l2-container').style.display = 'none';
+                    document.getElementById('l2-done').style.display = 'block';
+                    sendTelemetry(2, 'completed');
+                } else {
+                    generateL2();
+                }
+            } else {
+                actionLog.push(`Ошибка: ${ans} (ожидалось ${state.l2.currentAnswer})`);
+                
+                // Пауза (Блокировка интерфейса)
+                inputEl.disabled = true;
+                btnEl.disabled = true;
+                let timeLeft = 3;
+                showError('l2', `Ошибка синтаксиса! Блокировка консоли: ${timeLeft} сек...`);
+                
+                const timer = setInterval(() => {
+                    timeLeft--;
+                    if(timeLeft > 0) {
+                        showError('l2', `Ошибка синтаксиса! Блокировка консоли: ${timeLeft} сек...`);
+                    } else {
+                        clearInterval(timer);
+                        showError('l2', '');
+                        generateL2(); // Генерируем новое задание (прогресс НЕ обнуляется)
+                        // Вернуть фокус ввода
+                        setTimeout(() => document.getElementById('l2-input')?.focus(), 50);
+                    }
+                }, 1000);
+                
+                sendTelemetry(2, 'in_progress', true);
+            }
+        }
+
+        // --- УРОВЕНЬ 3 (Arcade) ---
+        let l3TimerInterval;
+        let l3TimeLeft = 25.0;
+        
+        function startL3Timer() {
+            clearInterval(l3TimerInterval);
+            l3TimeLeft = 25.0; // 25 seconds per task
+            document.getElementById('l3-timer-bar').style.width = '100%';
+            
+            l3TimerInterval = setInterval(() => {
+                l3TimeLeft -= 0.1;
+                let pct = (l3TimeLeft / 25.0) * 100;
+                if (pct < 0) pct = 0;
+                document.getElementById('l3-timer-bar').style.width = pct + '%';
+                
+                if (l3TimeLeft <= 0) {
+                    clearInterval(l3TimerInterval);
+                    checkL3(null, true);
+                }
+            }, 100);
+        }
+
+        function generateL3() {
+            state.l3.started = true;
+            
+            const domains = ["vk.com", "yandex.ru", "google.com", "github.com", "habr.com", "server.local"];
+            const rndIP = `${Math.floor(Math.random()*220)+1}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*254)+1}`;
+            const rndDomain = domains[Math.floor(Math.random()*domains.length)];
+            
+            const cases = [
+                { desc: `Проверьте доступность узла (ping) по IP: ${rndIP}`, ans: [`ping ${rndIP}`] },
+                { desc: `Проверьте доступность домена: ${rndDomain}`, ans: [`ping ${rndDomain}`] },
+                { desc: `Сделайте трассировку маршрута до домена: ${rndDomain} (Windows)`, ans: [`tracert ${rndDomain}`] },
+                { desc: `Сделайте трассировку маршрута до IP: ${rndIP} (Linux)`, ans: [`traceroute ${rndIP}`] },
+                { desc: `Узнайте IP-адрес по доменному имени: ${rndDomain}`, ans: [`nslookup ${rndDomain}`] },
+                { desc: `Выведите список всех активных сетевых соединений и портов (с ключом -an)`, ans: [`netstat -an`] },
+                { desc: `Посмотрите текущие сетевые настройки (Windows)`, ans: [`ipconfig`] },
+                { desc: `Посмотрите текущие сетевые настройки (Linux)`, ans: [`ifconfig`, `ip a`, `ip addr`] },
+                { desc: `Сделайте трассировку до IP: ${rndIP} (Windows)`, ans: [`tracert ${rndIP}`] },
+                { desc: `Сделайте трассировку до домена: ${rndDomain} (Linux)`, ans: [`traceroute ${rndDomain}`] },
+                { desc: `Очистите кэш DNS (Windows)`, ans: [`ipconfig /flushdns`] },
+                { desc: `Запустите бесконечный пинг (с ключом -t) до домена: ${rndDomain}`, ans: [`ping -t ${rndDomain}`] },
+                { desc: `Отправьте ровно 5 пакетов (с ключом -n 5) до IP: ${rndIP}`, ans: [`ping -n 5 ${rndIP}`] },
+                { desc: `Покажите таблицу маршрутизации (Windows: команда route print)`, ans: [`route print`] },
+                { desc: `Покажите таблицу маршрутизации (Linux: команда route -n)`, ans: [`route -n`] },
+                { desc: `Сделайте запрос к DNS-серверу для домена ${rndDomain} с типом записи MX (-type=mx)`, ans: [`nslookup -type=mx ${rndDomain}`] },
+                { desc: `Покажите ARP-кэш (ключ -a)`, ans: [`arp -a`] },
+                { desc: `Сделайте трассировку маршрута до ${rndIP} без резолва доменных имен (с ключом -d, ОС: Windows)`, ans: [`tracert -d ${rndIP}`] },
+                { desc: `Покажите детальную сетевую конфигурацию со всеми адаптерами (Windows: ключ /all)`, ans: [`ipconfig /all`] },
+                { desc: `Запустите ping до узла ${rndIP} с размером пакета 1500 байт (ключ -l 1500)`, ans: [`ping -l 1500 ${rndIP}`] }
+            ];
+            
+            const c = cases[Math.floor(Math.random() * cases.length)];
+            state.l3.currentAnswers = c.ans;
+            
+            document.getElementById('l3-console').innerHTML = `
+                <div style="color: #ff4444; margin-bottom: 10px;"><b>[СИСТЕМА]</b> Обнаружена аномалия! Требуется немедленное вмешательство!</div>
+                <div style="color: #fff;"><b>ЗАДАЧА:</b> ${c.desc}</div>
+                <div style="color: #888; font-size: 0.9em; margin-top: 10px;">Введите нужную команду в консоли ниже и нажмите Enter. Времени мало!</div>
+            `;
+            
+            const inp = document.getElementById('l3-input');
+            inp.value = '';
+            inp.disabled = false;
+            inp.focus();
+            
+            // Удаляем старые листнеры, чтобы не множить их
+            inp.replaceWith(inp.cloneNode(true));
+            const newInp = document.getElementById('l3-input');
+            newInp.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') checkL3(this.value.trim().toLowerCase());
+            });
+            newInp.focus();
+            
+            startL3Timer();
+            sendTelemetry(3, 'in_progress');
+        }
+
+        function checkL3(ans, isTimeout=false) {
+            clearInterval(l3TimerInterval);
+            attemptsCount++;
+            
+            let isCorrect = false;
+            if (!isTimeout) {
+                // Приводим все к нижнему регистру и удаляем лишние пробелы для проверки
+                const normalizedAns = ans.replace(/\s+/g, ' ');
+                isCorrect = state.l3.currentAnswers.some(a => a.toLowerCase() === normalizedAns);
+            }
+            
+            if (isCorrect) {
+                state.l3.remain--;
+                actionLog.push(`Успех: ${ans}`);
+                updateProgress('l3', state.l3.remain, state.l3.total);
+                if (state.l3.remain === 0) {
+                    document.getElementById('l3-container').style.display = 'none';
+                    document.getElementById('l3-timer-bar').parentElement.style.display = 'none';
+                    document.getElementById('l3-done').style.display = 'block';
+                    sendTelemetry(3, 'completed');
+                } else {
+                    generateL3();
+                }
+            } else {
+                const errorType = isTimeout ? "ИСТЕКЛО ВРЕМЯ!" : "НЕВЕРНАЯ КОМАНДА!";
+                actionLog.push(`Ошибка: ${isTimeout ? 'Timeout' : ans}`);
+                showError('l3', `ФАТАЛЬНАЯ ОШИБКА: ${errorType} ПРОГРЕСС СБРОШЕН ДО 0!`);
+                
+                state.l3.remain = state.l3.total; // HARD RESET
+                updateProgress('l3', state.l3.remain, state.l3.total);
+                
+                const inp = document.getElementById('l3-input');
+                if(inp) inp.disabled = true;
+                
+                sendTelemetry(3, 'in_progress', true);
+                
+                // Пауза перед новым раундом
+                setTimeout(() => {
+                    generateL3();
+                }, 2000);
+            }
+        }
+
+        // Start all levels
+        window.onload = () => {
+            generateL1();
+            generateL2();
+            generateL3();
+        };
+    </script>
+</body>
+</html>

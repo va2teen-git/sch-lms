@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 2 - Конструктор URL</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-dark text-warning vh-100 overflow-hidden d-flex flex-column rounded-0" style="font-family: monospace;">
+    <header class="p-3 border-bottom border-warning d-flex justify-content-between align-items-center">
+        <h5 class="m-0 text-warning">Уровень 2</h5>
+        <h5 class="m-0 text-warning">Шаг: <span id="phase-indicator">1 / 5</span></h5>
+        <div class="text-warning">Ошибки: <span id="errors-indicator">0</span></div>
+    </header>
+
+    <main class="flex-grow-1 d-flex justify-content-center align-items-center p-4">
+        <div class="container" style="max-width: 900px;">
+            <div class="card bg-transparent border-warning rounded-0 shadow h-100">
+                <div class="card-header border-warning text-warning fw-bold">
+                    Конструктор URL-адресов
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <p class="text-light mb-4 fs-5" style="line-height: 1.6;">
+                        Составьте полный и корректный URL-адрес, используя все предоставленные компоненты. Соблюдайте синтаксис: <code>протокол://домен:порт/путь?параметры</code>
+                    </p>
+                    
+                    <div class="border border-warning p-4 mb-4 bg-black">
+                        <h6 class="text-warning mb-3 border-bottom border-secondary pb-2">Параметры адреса:</h6>
+                        <ul id="task-text" class="text-light fs-5 list-unstyled mb-0" style="font-family: monospace;">
+                            <!-- Генерация параметров -->
+                        </ul>
+                    </div>
+                    
+                    <div class="mt-auto">
+                        <label class="text-warning mb-2">Ввод URL:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent border-warning text-warning rounded-0">URL:</span>
+                            <input type="text" id="answer-input" class="form-control bg-dark text-warning border-warning rounded-0 shadow-none fs-5 py-3" placeholder="scheme://..." autocomplete="off" spellcheck="false" style="font-family: monospace;">
+                            <button class="btn btn-warning rounded-0 text-dark px-5 fw-bold fs-5" id="submit-btn">Ввод</button>
+                        </div>
+                        <div id="error-msg" class="text-danger mt-3 d-none fw-bold fs-6">Ошибка: введен неверный URL. Загрузка нового варианта...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        const tlds = ['ru', 'com', 'org', 'net', 'edu', 'gov', 'su'];
+        const domains = ['portal', 'school', 'shop', 'bank', 'forum', 'news', 'games', 'cloud'];
+        const subdomains = ['lk', 'mail', 'admin', 'test', 'api', 'cdn', 'vpn'];
+        const dirs = ['assets', 'users', 'docs', 'media', 'files', 'catalog', 'bin'];
+        const files = ['index.html', 'login.php', 'data.json', 'style.css', 'script.js'];
+
+        const generators = [
+            // Фаза 1: Базовый URL
+            () => {
+                const d = domains[Math.floor(Math.random()*domains.length)];
+                const t = tlds[Math.floor(Math.random()*tlds.length)];
+                const isSecure = Math.random() > 0.5;
+                const protoReq = isSecure ? "защищенный веб-протокол" : "базовый веб-протокол (без шифрования)";
+                const protoAns = isSecure ? "https" : "http";
+                
+                let reqs = [
+                    `<span class="text-warning">-</span> Домен 2-го уровня: <span class="text-white">${d}</span>`,
+                    `<span class="text-warning">-</span> Домен верхнего уровня (зона): <span class="text-white">${t}</span>`,
+                    `<span class="text-warning">-</span> Протокол: <span class="text-white">${protoReq}</span>`
+                ];
+                
+                return {
+                    text: shuffle(reqs).map(r => `<li class="mb-3">${r}</li>`).join(''),
+                    answer: `${protoAns}://${d}.${t}`
+                };
+            },
+            // Фаза 2: С поддоменом
+            () => {
+                const d = domains[Math.floor(Math.random()*domains.length)];
+                const t = tlds[Math.floor(Math.random()*tlds.length)];
+                const sub = subdomains[Math.floor(Math.random()*subdomains.length)];
+                const isSecure = Math.random() > 0.5;
+                const protoReq = isSecure ? "защищенный веб-протокол" : "базовый веб-протокол (без шифрования)";
+                const protoAns = isSecure ? "https" : "http";
+                
+                let reqs = [
+                    `<span class="text-warning">-</span> Основной домен: <span class="text-white">${d}.${t}</span>`,
+                    `<span class="text-warning">-</span> Домен 3-го уровня (имя хоста): <span class="text-white">${sub}</span>`,
+                    `<span class="text-warning">-</span> Протокол: <span class="text-white">${protoReq}</span>`
+                ];
+                
+                return {
+                    text: shuffle(reqs).map(r => `<li class="mb-3">${r}</li>`).join(''),
+                    answer: `${protoAns}://${sub}.${d}.${t}`
+                };
+            },
+            // Фаза 3: С портом и каталогом
+            () => {
+                const d = domains[Math.floor(Math.random()*domains.length)];
+                const t = tlds[Math.floor(Math.random()*tlds.length)];
+                const port = Math.floor(Math.random()*5000 + 8000);
+                const dir = dirs[Math.floor(Math.random()*dirs.length)];
+                
+                let reqs = [
+                    `<span class="text-warning">-</span> Сервер: <span class="text-white">${d}.${t}</span>`,
+                    `<span class="text-warning">-</span> Нестандартный порт: <span class="text-white">${port}</span>`,
+                    `<span class="text-warning">-</span> Вложенный каталог: <span class="text-white">${dir}</span>`,
+                    `<span class="text-warning">-</span> Протокол: <span class="text-white">базовый веб-протокол</span>`
+                ];
+                
+                return {
+                    text: shuffle(reqs).map(r => `<li class="mb-3">${r}</li>`).join(''),
+                    answer: `http://${d}.${t}:${port}/${dir}`
+                };
+            },
+            // Фаза 4: С файлом и GET-запросом
+            () => {
+                const d = domains[Math.floor(Math.random()*domains.length)];
+                const t = tlds[Math.floor(Math.random()*tlds.length)];
+                const file = files[Math.floor(Math.random()*files.length)];
+                const paramId = Math.floor(Math.random()*990 + 10);
+                
+                let reqs = [
+                    `<span class="text-warning">-</span> Хост: <span class="text-white">${d}.${t}</span>`,
+                    `<span class="text-warning">-</span> Запрашиваемый файл: <span class="text-white">${file}</span>`,
+                    `<span class="text-warning">-</span> GET-параметр: переменная <span class="text-white text-decoration-underline">id</span> со значением <span class="text-white fw-bold">${paramId}</span>`,
+                    `<span class="text-warning">-</span> Протокол: <span class="text-white">защищенный веб-протокол</span>`
+                ];
+                
+                return {
+                    text: shuffle(reqs).map(r => `<li class="mb-3">${r}</li>`).join(''),
+                    answer: `https://${d}.${t}/${file}?id=${paramId}`
+                };
+            },
+            // Фаза 5: FTP и глубокий путь
+            () => {
+                const d = domains[Math.floor(Math.random()*domains.length)];
+                const t = tlds[Math.floor(Math.random()*tlds.length)];
+                const dir1 = dirs[Math.floor(Math.random()*dirs.length)];
+                let dir2 = dirs[Math.floor(Math.random()*dirs.length)];
+                while(dir2 === dir1) dir2 = dirs[Math.floor(Math.random()*dirs.length)]; // Защита от дублей
+                
+                let reqs = [
+                    `<span class="text-warning">-</span> Доменное имя: <span class="text-white">${d}.${t}</span>`,
+                    `<span class="text-warning">-</span> Родительский каталог: <span class="text-white">${dir1}</span>`,
+                    `<span class="text-warning">-</span> Вложенный подкаталог: <span class="text-white">${dir2}</span>`,
+                    `<span class="text-warning">-</span> Протокол: <span class="text-white">протокол передачи файлов (FTP)</span>`
+                ];
+                
+                return {
+                    text: shuffle(reqs).map(r => `<li class="mb-3">${r}</li>`).join(''),
+                    answer: `ftp://${d}.${t}/${dir1}/${dir2}`
+                };
+            }
+        ];
+
+        let currentPhase = 1;
+        const totalPhases = 5;
+        let errorsCount = 0;
+        let startTime = Date.now();
+        let currentAnswer = '';
+
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function sendTelemetry(actionType, status, isSuccess = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Контрольная работа: Глобальная сеть :: Конструктор URL (Ур 2)',
+                action_type: actionType,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: errorsCount,
+                success: isSuccess
+            }, '*');
+        }
+
+        function generatePhase() {
+            document.getElementById('error-msg').classList.add('d-none');
+            const inputEl = document.getElementById('answer-input');
+            inputEl.value = '';
+            inputEl.classList.remove('border-danger', 'text-danger', 'bg-danger');
+            inputEl.classList.add('border-warning', 'text-warning');
+            
+            inputEl.disabled = false;
+            document.getElementById('submit-btn').disabled = false;
+            
+            setTimeout(() => inputEl.focus(), 100);
+            
+            document.getElementById('phase-indicator').innerText = `${currentPhase} / ${totalPhases}`;
+            
+            const generator = generators[currentPhase - 1];
+            const taskData = generator();
+            
+            document.getElementById('task-text').innerHTML = taskData.text;
+            currentAnswer = taskData.answer.toString().toLowerCase();
+        }
+
+        function checkAnswer() {
+            const inputEl = document.getElementById('answer-input');
+            let userAns = inputEl.value.trim().toLowerCase();
+            let correctAns = currentAnswer;
+            
+            userAns = userAns.replace(/\/+$/, '');
+            correctAns = correctAns.replace(/\/+$/, '');
+            
+            if (userAns === correctAns) {
+                currentPhase++;
+                if (currentPhase > totalPhases) {
+                    document.querySelector('.card-body').innerHTML = '<div class="text-center py-5"><h2 class="text-warning mb-4">Задание выполнено</h2><p class="text-light fs-5">Все URL-адреса составлены верно.</p></div>';
+                    sendTelemetry('level_complete', 'completed', true);
+                } else {
+                    generatePhase();
+                }
+            } else {
+                errorsCount++;
+                document.getElementById('errors-indicator').innerText = errorsCount;
+                
+                const errorMsg = document.getElementById('error-msg');
+                errorMsg.classList.remove('d-none');
+                
+                inputEl.classList.remove('border-warning', 'text-warning');
+                inputEl.classList.add('border-danger', 'text-light', 'bg-danger');
+                
+                inputEl.disabled = true;
+                document.getElementById('submit-btn').disabled = true;
+                
+                sendTelemetry('hardcore_reset', 'in_progress', false);
+                
+                setTimeout(() => {
+                    generatePhase();
+                }, 1500);
+            }
+        }
+
+        document.getElementById('submit-btn').addEventListener('click', checkAnswer);
+        document.getElementById('answer-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkAnswer();
+        });
+
+        window.onload = () => {
+            generatePhase();
+            sendTelemetry('in_progress', 'in_progress', false);
+        };
+    </script>
+</body>
+</html>

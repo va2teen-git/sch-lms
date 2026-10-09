@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 1 - Файлы и Папки</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-black text-success font-monospace vh-100 p-4 m-0 d-flex flex-column" onload="init()">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-success pb-2">
+        <h2 class="m-0 fw-bold">ТЕРМИНАЛ // УРОВЕНЬ 1</h2>
+        <h3 class="m-0 text-white" id="phase-title">ФАЗА 1 / 3</h3>
+    </div>
+
+    <div id="task-container" class="flex-grow-1 d-flex flex-column justify-content-center">
+        <!-- Контент фаз будет генерироваться здесь -->
+    </div>
+
+    <script>
+        // Восстанавливаем состояние из sessionStorage или задаем начальное
+        let currentPhase = parseInt(sessionStorage.getItem('lvl1_phase')) || 1;
+        let attempts = parseInt(sessionStorage.getItem('lvl1_attempts')) || 0;
+        let startTime = parseInt(sessionStorage.getItem('lvl1_start')) || Date.now();
+        let actionLog = JSON.parse(sessionStorage.getItem('lvl1_log')) || [];
+
+        function saveState() {
+            sessionStorage.setItem('lvl1_phase', currentPhase);
+            sessionStorage.setItem('lvl1_attempts', attempts);
+            sessionStorage.setItem('lvl1_start', startTime);
+            sessionStorage.setItem('lvl1_log', JSON.stringify(actionLog));
+        }
+
+        function sendTelemetry(action_type, status, success) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: '7 класс :: Урок 4 :: Уровень 1',
+                action_type: action_type,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success,
+                action_log: actionLog
+            }, '*');
+        }
+
+        function logAction(action) {
+            actionLog.push({time: new Date().toISOString(), action: action});
+            saveState();
+        }
+
+        function init() {
+            if (!sessionStorage.getItem('lvl1_start')) {
+                saveState();
+            }
+            sendTelemetry('in_progress', 'in_progress', false);
+            loadPhase(currentPhase);
+        }
+
+        function loadPhase(phase) {
+            currentPhase = phase;
+            saveState();
+            document.getElementById('phase-title').innerText = `ФАЗА ${phase} / 3`;
+            const container = document.getElementById('task-container');
+            container.innerHTML = ''; 
+
+            if (phase === 1) generatePhase1(container);
+            if (phase === 2) generatePhase2(container);
+            if (phase === 3) generatePhase3(container);
+            if (phase > 3) finishLevel(); // На случай перезагрузки после завершения
+        }
+
+        function triggerError(phase, container, correct_msg = '') {
+            attempts++;
+            saveState();
+            logAction('error_phase_' + phase);
+            sendTelemetry('hardcore_reset', 'in_progress', false);
+            
+            const msg = correct_msg ? ` ${correct_msg}` : '';
+            container.innerHTML = `
+                <div class="alert alert-danger rounded-0 border-0 bg-danger text-black fw-bold fs-5">
+                    [!] ОШИБКА ДОСТУПА.${msg}<br>Перестройка алгоритма...
+                </div>
+            `;
+            setTimeout(() => {
+                loadPhase(phase);
+            }, 1500);
+        }
+
+        // --- ФАЗА 1: Расширения ---
+        function generatePhase1(container) {
+            const types = [
+                {name: "Текстовый документ", ext: [".txt", ".doc", ".docx", ".rtf"]},
+                {name: "Графический файл", ext: [".bmp", ".jpg", ".png", ".gif"]},
+                {name: "Звуковой файл", ext: [".wav", ".mp3"]},
+                {name: "Видеофайл", ext: [".avi", ".mp4"]},
+                {name: "Исполняемый файл (программа)", ext: [".exe"]}
+            ];
+            
+            const target = types[Math.floor(Math.random() * types.length)];
+            const correctExt = target.ext[Math.floor(Math.random() * target.ext.length)];
+            
+            let options = [correctExt];
+            while(options.length < 4) {
+                const rndType = types[Math.floor(Math.random() * types.length)];
+                if (rndType !== target) {
+                    const wrongExt = rndType.ext[Math.floor(Math.random() * rndType.ext.length)];
+                    if (!options.includes(wrongExt)) options.push(wrongExt);
+                }
+            }
+            options.sort(() => Math.random() - 0.5);
+            
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Идентификация типа данных</h4>
+                <p class="fs-5">Укажите расширение, которое обычно имеет <span class="text-white fw-bold">"${target.name}"</span>:</p>
+                <div class="d-flex flex-wrap gap-3 mt-4" id="buttons-container"></div>
+            `;
+            
+            const btns = document.getElementById('buttons-container');
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "btn btn-outline-success rounded-0 fs-4 px-4 py-2 fw-bold";
+                btn.innerText = opt;
+                btn.onclick = () => {
+                    logAction('phase1_click_' + opt);
+                    if (opt === correctExt) {
+                        loadPhase(2);
+                    } else {
+                        triggerError(1, container, `Требовалось расширение для типа "${target.name}".`);
+                    }
+                };
+                btns.appendChild(btn);
+            });
+        }
+
+        // --- ФАЗА 2: Полное имя файла ---
+        function generatePhase2(container) {
+            const disks = ['C', 'D', 'E', 'F'];
+            const disk = disks[Math.floor(Math.random() * disks.length)];
+            
+            const folderLists = [
+                ['Users', 'Student', 'Documents'],
+                ['Games', 'Steam', 'apps'],
+                ['Windows', 'System32'],
+                ['Photos', '2023', 'Summer'],
+                ['Work', 'Projects', 'School']
+            ];
+            const folders = folderLists[Math.floor(Math.random() * folderLists.length)];
+            
+            const files = ['report.docx', 'game.exe', 'config.sys', 'vacation.jpg', 'homework.txt'];
+            const file = files[Math.floor(Math.random() * files.length)];
+            
+            const correctAnswer = `${disk}:\\${folders.join('\\')}\\${file}`;
+            
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Восстановление пути</h4>
+                <p class="fs-5">Файл <span class="text-white fw-bold">${file}</span> находится в каталоге <span class="text-white fw-bold">${folders[folders.length-1]}</span>.</p>
+                <p class="fs-5">Иерархия каталогов: 
+                    <span class="text-warning">Диск ${disk}: -> ${folders.join(' -> ')}</span>
+                </p>
+                <p class="fs-5">Соберите полное имя файла (включая путь), используя обратный слэш "\\":</p>
+                <div class="input-group mt-4" style="max-width: 600px;">
+                    <input type="text" id="path-input" class="form-control rounded-0 bg-dark text-success border-success fs-5 font-monospace" autocomplete="off" spellcheck="false" placeholder="${disk}:\\...">
+                    <button class="btn btn-success rounded-0 fw-bold px-4 fs-5" id="check-btn">ПРОВЕРИТЬ</button>
+                </div>
+            `;
+            
+            document.getElementById('check-btn').onclick = () => {
+                const val = document.getElementById('path-input').value.trim();
+                logAction('phase2_input_' + val);
+                if (val.toLowerCase() === correctAnswer.toLowerCase()) {
+                    loadPhase(3);
+                } else {
+                    triggerError(2, container, `Ожидалось: ${correctAnswer}`);
+                }
+            };
+
+            // Enter key support
+            document.getElementById('path-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('check-btn').click();
+                }
+            });
+        }
+
+        // --- ФАЗА 3: Операции с файлами ---
+        function generatePhase3(container) {
+            const ops = [
+                {op: "Создание", desc: "создание нового пустого файла или папки на диске"},
+                {op: "Переименование", desc: "изменение имени файла или папки без изменения его местоположения"},
+                {op: "Копирование", desc: "создание точной копии файла в другом месте (исходный файл остается на старом месте)"},
+                {op: "Перемещение", desc: "перенос файла в другое место (из старого места он исчезает)"},
+                {op: "Удаление", desc: "уничтожение файла или папки (перемещение в Корзину)"}
+            ];
+            
+            const target = ops[Math.floor(Math.random() * ops.length)];
+            let options = ops.map(o => o.op);
+            options.sort(() => Math.random() - 0.5);
+            
+            container.innerHTML = `
+                <h4 class="mb-4 text-uppercase">>> Анализ файловых операций</h4>
+                <p class="fs-5">Система зафиксировала следующее действие:<br>
+                <span class="text-white bg-dark p-2 d-inline-block mt-2 border border-secondary fst-italic">"${target.desc}"</span></p>
+                <p class="fs-5 mt-3">Классифицируйте эту операцию:</p>
+                <div class="d-flex flex-column gap-3 mt-4" id="ops-container" style="max-width: 400px;"></div>
+            `;
+            
+            const btns = document.getElementById('ops-container');
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "btn btn-outline-success rounded-0 fs-5 py-2 fw-bold text-start";
+                btn.innerText = "> " + opt.toUpperCase();
+                btn.onclick = () => {
+                    logAction('phase3_click_' + opt);
+                    if (opt === target.op) {
+                        finishLevel();
+                    } else {
+                        triggerError(3, container, 'Это была операция: ' + target.op);
+                    }
+                };
+                btns.appendChild(btn);
+            });
+        }
+
+        function finishLevel() {
+            currentPhase = 4;
+            saveState();
+            sendTelemetry('level_complete', 'completed', true);
+            const container = document.getElementById('task-container');
+            container.innerHTML = `
+                <div class="alert alert-success rounded-0 border-0 bg-success text-black fw-bold fs-3 text-center py-5">
+                    ВЗЛОМ УСПЕШЕН.<br>СИСТЕМА ФАЙЛОВ И ПАПОК ОСВОЕНА.
+                </div>
+            `;
+        }
+    </script>
+    <script src="/static/bootstrap.bundle.min.js"></script>
+</body>
+</html>

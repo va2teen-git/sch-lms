@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренажер: Деревья и Игры</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 20px; font-family: 'Courier New', Courier, monospace; background-color: #121212; color: #fff; overflow-x: hidden; }
+        * { border-radius: 0 !important; }
+        .cyber-card { background-color: #1e1e1e; border: 1px solid #333; padding: 20px; margin-bottom: 20px; }
+        .text-warning { color: #ffcc00 !important; }
+        .nav-tabs .nav-link { border: 1px solid #555 !important; background-color: #222 !important; color: #aaa !important; margin-right: 5px; cursor: pointer; }
+        .nav-tabs .nav-link.active { border-bottom-color: transparent !important; background-color: #1e1e1e !important; color: #fff !important; font-weight: bold; }
+        .progress-bar-custom { background: #333; height: 10px; width: 100%; margin: 10px 0; border: 1px solid #555; }
+        .progress-fill { background: #00ff00; height: 100%; width: 0%; transition: width 0.3s; }
+        .level-complete { display: none; color: #00ff00; font-weight: bold; text-align: center; padding: 20px; border: 1px dashed #00ff00; }
+        .hint-box { background: rgba(255, 68, 68, 0.2); border-left: 4px solid #ff4444; padding: 15px; margin-bottom: 20px; display: none; }
+        
+        .graph-canvas { background: #2a2a2a; border: 1px solid #555; width: 100%; height: 350px; position: relative; overflow: hidden; }
+        .node { position: absolute; width: 30px; height: 30px; background: #444; border: 2px solid #00ff00; color: #fff; text-align: center; line-height: 26px; font-weight: bold; z-index: 10; font-size: 14px; }
+        
+        .btn-option { display: block; width: 100%; text-align: left; background: #1a1a1a; border: 1px solid #444; color: #ccc; padding: 10px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
+        .btn-option:hover { background: #2a2a2a; border-color: #00ff00; color: #00ff00; }
+        
+        #l3-timer { font-size: 2rem; font-weight: bold; color: #ff4444; }
+        .pulse { animation: pulseAnim 0.5s infinite alternate; }
+        @keyframes pulseAnim { from { transform: scale(1); } to { transform: scale(1.1); } }
+    </style>
+</head>
+<body>
+    <div class="cyber-card">
+        <ul class="nav nav-tabs mb-4" id="taskTabs">
+            <li class="nav-item"><a class="nav-link active" onclick="switchTab('lvl1', this)">Уровень 1: Свойства</a></li>
+            <li class="nav-item"><a class="nav-link" onclick="switchTab('lvl2', this)">Уровень 2: Выражения</a></li>
+            <li class="nav-item"><a class="nav-link" onclick="switchTab('lvl3', this)">Уровень 3: Минимакс (Аркада)</a></li>
+        </ul>
+        
+        <div id="global-hint" class="hint-box"></div>
+
+        <!-- УРОВЕНЬ 1 -->
+        <div id="lvl1" class="tab-pane">
+            <div id="l1-intro" class="text-center">
+                <h4 class="text-warning">Восстановление данных (Свойства деревьев)</h4>
+                <p class="text-muted"><strong>Легенда:</strong> База данных иерархии сотрудников корпорации повреждена. Вам предоставлен фрагмент графа (дерева). Необходимо ответить на запросы руководства.</p>
+                <p>Выполнить запросов: <strong>3</strong> (При ошибке прогресс не сбрасывается)</p>
+                <button class="btn btn-outline-warning mt-3" onclick="startTask('lvl1')">НАЧАТЬ</button>
+            </div>
+            <div id="l1-workspace" style="display: none;">
+                <h4>Осталось: <span id="l1-remain">3</span></h4>
+                <div class="progress-bar-custom"><div class="progress-fill" id="l1-progress"></div></div>
+                <div id="l1-content">
+                    <p id="l1-question" class="fs-5 text-info text-center"></p>
+                    <div id="l1-graph" class="graph-canvas mb-3 p-3"></div>
+                    <div id="l1-answers" class="d-flex justify-content-center flex-wrap gap-2"></div>
+                </div>
+                <div id="l1-done" class="level-complete">Уровень 1 Пройден! Иерархия восстановлена.</div>
+            </div>
+        </div>
+
+        <!-- УРОВЕНЬ 2 -->
+        <div id="lvl2" class="tab-pane" style="display: none;">
+            <div id="l2-intro" class="text-center">
+                <h4 class="text-warning">Компилятор (Деревья выражений)</h4>
+                <p class="text-muted"><strong>Легенда:</strong> Вы — инженер компиляторов. Вам необходимо перевести заданное арифметическое выражение в дерево, либо вычислить корень готового дерева.</p>
+                <p>Обработать выражений: <strong>5</strong> (При ошибке прогресс не сбрасывается)</p>
+                <button class="btn btn-outline-warning mt-2" onclick="startTask('lvl2')">НАЧАТЬ</button>
+            </div>
+            <div id="l2-workspace" style="display: none;">
+                <h4>Осталось: <span id="l2-remain">5</span></h4>
+                <div class="progress-bar-custom"><div class="progress-fill" id="l2-progress"></div></div>
+                <div id="l2-content">
+                    <p id="l2-question" class="text-center fs-5 text-info"></p>
+                    <div id="l2-graph" class="graph-canvas mb-3"></div>
+                    <div id="l2-answers" class="d-flex justify-content-center gap-2"></div>
+                </div>
+                <div id="l2-done" class="level-complete">Уровень 2 Пройден! Парсер работает без сбоев.</div>
+            </div>
+        </div>
+
+        <!-- УРОВЕНЬ 3 -->
+        <div id="lvl3" class="tab-pane" style="display: none;">
+            <div id="l3-intro" class="text-center">
+                <h4 class="text-warning">Кибер-турнир: Дерево Игры (Минимакс)</h4>
+                <p class="text-muted"><strong>Легенда:</strong> Вы участвуете в турнире ИИ по дискретным играм. ИИ-противник принимает решения мгновенно. Вам предоставлено дерево игры (глубина 3).</p>
+                <p>Квадратные узлы — ваш ход (MAX). Круглые узлы — ход противника (MIN). Выберите, приведет ли игра к вашей победе (+1) или поражению (-1) при идеальной игре обоих.</p>
+                <p class="text-danger fw-bold">У вас всего 10 секунд на каждый анализ! Любая ошибка обнулит серию побед!</p>
+                <p>Выиграть партий подряд: <strong>8</strong> (ОШИБКА СБРАСЫВАЕТ ПРОГРЕСС)</p>
+                <button class="btn btn-outline-danger mt-3 fw-bold" onclick="startTask('lvl3')">ВОЙТИ В ИГРУ</button>
+            </div>
+            <div id="l3-workspace" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4>Серия: <span id="l3-streak">0</span>/8</h4>
+                    <div id="l3-timer">10.0</div>
+                </div>
+                <div class="progress-bar-custom"><div class="progress-fill" id="l3-progress"></div></div>
+                <div id="l3-content">
+                    <p class="text-center mb-1 text-warning">Определите значение корня (цифра от 1 до 9)</p>
+                    <div id="l3-graph" class="graph-canvas mb-3"></div>
+                    <div class="d-flex justify-content-center flex-wrap gap-2" style="max-width: 400px; margin: 0 auto;">
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(1)">1</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(2)">2</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(3)">3</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(4)">4</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(5)">5</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(6)">6</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(7)">7</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(8)">8</button>
+                        <button class="btn btn-outline-info btn-lg fw-bold" style="width:60px" onclick="checkL3(9)">9</button>
+                    </div>
+                </div>
+                <div id="l3-done" class="level-complete">Уровень 3 Пройден! 🏆 Вы - гроссмейстер!</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const LESSON_ID = "g11_adv_14";
+        let isProcessing = false;
+        
+        // --- SEEDED PRNG ENGINE ---
+        function cyrb128(str) {
+            let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+            for (let i = 0, k; i < str.length; i++) {
+                k = str.charCodeAt(i);
+                h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+                h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+                h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+                h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+            }
+            h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+            h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+            h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+            h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+            return [(h1^h2^h3^h4) >>> 0, (h2^h1) >>> 0, (h3^h1) >>> 0, (h4^h1) >>> 0];
+        }
+        function sfc32(a, b, c, d) {
+            return function() {
+              a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0; 
+              var t = (a + b) | 0;
+              a = b ^ b >>> 9; b = c + (c << 3) | 0; c = (c << 21 | c >>> 11);
+              d = d + 1 | 0; t = t + d | 0; c = c + t | 0;
+              return (t >>> 0) / 4294967296;
+            }
+        }
+        let customRandom = Math.random;
+        function seedGenerator(lvl) {
+            let p = localStorage.getItem('student_profile');
+            let student = p ? p : "unknown";
+            let seqIndex = state[lvl].total - state[lvl].remain; 
+            let retries = parseInt(localStorage.getItem(`retries_${LESSON_ID}_${lvl}`) || "0");
+            let seedStr = `${student}_${LESSON_ID}_${lvl}_${seqIndex}_${retries}`;
+            let seed = cyrb128(seedStr);
+            customRandom = sfc32(seed[0], seed[1], seed[2], seed[3]);
+        }
+        function incrementRetries(lvl) {
+            let retries = parseInt(localStorage.getItem(`retries_${LESSON_ID}_${lvl}`) || "0");
+            localStorage.setItem(`retries_${LESSON_ID}_${lvl}`, retries + 1);
+        }
+        
+        let state = {
+            lvl1: { remain: 3, total: 3, answer: null, startTime: null, attempts: 0 },
+            lvl2: { remain: 5, total: 5, answer: null, startTime: null, attempts: 0 },
+            lvl3: { remain: 8, total: 8, answer: null, startTime: null, attempts: 0, timer: null, timeLeft: 100 }
+        };
+
+        function saveState() {
+            let saveData = {
+                lvl1: { remain: state.lvl1.remain },
+                lvl2: { remain: state.lvl2.remain },
+                lvl3: { remain: state.lvl3.remain }
+            };
+            localStorage.setItem(`progress_${LESSON_ID}`, JSON.stringify(saveData));
+        }
+
+        function loadState() {
+            let data = localStorage.getItem(`progress_${LESSON_ID}`);
+            if (data) {
+                try {
+                    let parsed = JSON.parse(data);
+                    if (parsed.lvl1) state.lvl1.remain = parsed.lvl1.remain;
+                    if (parsed.lvl2) state.lvl2.remain = parsed.lvl2.remain;
+                    if (parsed.lvl3) state.lvl3.remain = parsed.lvl3.remain;
+                } catch(e) {}
+            }
+        }
+        
+        function applyLoadedState() {
+            ['lvl1', 'lvl2', 'lvl3'].forEach(lvl => {
+                if (state[lvl].remain <= 0) {
+                    let pfx = lvl.replace('lvl', 'l');
+                    let btn = document.querySelector(`#${pfx}-intro button`);
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerText = "ЗАДАНИЕ ВЫПОЛНЕНО";
+                        btn.classList.add('btn-success');
+                    }
+                }
+            });
+        }
+        loadState();
+        document.addEventListener('DOMContentLoaded', applyLoadedState);
+
+        function switchTab(tabId, el) {
+            if (tabId !== 'lvl3' && state.lvl3.timer !== null) {
+                clearInterval(state.lvl3.timer);
+                state.lvl3.timer = null;
+                handleError('lvl3', "Вы покинули турнир! Прогресс серии сброшен.", true);
+                document.getElementById('l3-workspace').style.display = 'none';
+                document.getElementById('l3-intro').style.display = 'block';
+            }
+            document.querySelectorAll('.tab-pane').forEach(t => t.style.display = 'none');
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            el.classList.add('active');
+        }
+
+        function sendTelemetry(levelStr, action, payload = {}) {
+            let levelNum = parseInt(levelStr.replace('lvl', ''));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                lesson_id: LESSON_ID,
+                task_level: levelNum,
+                action_type: action,
+                payload: payload
+            }, '*');
+        }
+
+        function handleError(lvl, msg, resetStreakNormal = false) {
+            sendTelemetry(lvl, 'hardcore_reset', { msg: msg });
+            const hint = document.getElementById('global-hint');
+            hint.innerHTML = "<strong>ОШИБКА:</strong> " + msg;
+            hint.style.display = 'block';
+            setTimeout(() => hint.style.display = 'none', 5000);
+            
+            if (resetStreakNormal) {
+                state[lvl].remain = state[lvl].total;
+                updateProgress(lvl);
+            }
+            incrementRetries(lvl);
+        }
+
+        function startTask(lvl) {
+            let pfx = lvl.replace('lvl', 'l');
+            document.getElementById(pfx + '-intro').style.display = 'none';
+            document.getElementById(pfx + '-workspace').style.display = 'block';
+            updateProgress(lvl);
+            if (state[lvl].remain <= 0) { finishTask(lvl); return; }
+            state[lvl].startTime = new Date();
+            state[lvl].attempts = 0;
+            sendTelemetry(lvl, 'started');
+            if (lvl === 'lvl1') generateL1();
+            if (lvl === 'lvl2') generateL2();
+            if (lvl === 'lvl3') generateL3();
+        }
+
+        // ================= LEVEL 1 =================
+        function generateL1(salt = 0) {
+            seedGenerator("lvl1", salt);
+            const canvas = document.getElementById('l1-graph');
+            const nodes = ['A','B','C','D','E','F','G'];
+            // Generate random tree
+            let edges = [];
+            let parentMap = { 'A': null };
+            let depthMap = { 'A': 0 };
+            
+            let inTree = ['A'];
+            let notIn = ['B','C','D','E','F','G'];
+            while(notIn.length > 0) {
+                let p = inTree[Math.floor(customRandom()*inTree.length)];
+                let c = notIn.pop();
+                edges.push([p, c]);
+                inTree.push(c);
+                parentMap[c] = p;
+                depthMap[c] = depthMap[p] + 1;
+            }
+            
+            // Draw
+            let svgHtml = `<svg width="100%" height="100%">
+            <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#00ffff" />
+                </marker>
+            </defs>`;
+            
+            let coords = {};
+            // Very simple fixed tree layout for A-G
+            let levels = [[], [], [], [], []];
+            for(let n of nodes) levels[depthMap[n]].push(n);
+            
+            for(let d=0; d<levels.length; d++) {
+                if (levels[d].length === 0) continue;
+                let y = 30 + d * 60;
+                let spacing = canvas.offsetWidth / (levels[d].length + 1);
+                for(let i=0; i<levels[d].length; i++) {
+                    let n = levels[d][i];
+                    coords[n] = { x: spacing * (i+1), y: y };
+                }
+            }
+            
+            for(let e of edges) {
+                let n1 = coords[e[0]], n2 = coords[e[1]];
+                svgHtml += `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="#00ffff" stroke-width="2" marker-end="url(#arrow)" />`;
+            }
+            svgHtml += `</svg>`;
+            
+            let htmlNodes = '';
+            for(let n of nodes) {
+                htmlNodes += `<div class="node" style="left:${coords[n].x-15}px; top:${coords[n].y-15}px;">${n}</div>`;
+            }
+            canvas.innerHTML = svgHtml + htmlNodes;
+            
+            // Question
+            let qType = Math.floor(customRandom() * 4);
+            let ans = "";
+            let opts = [];
+            let qText = "";
+            
+            if (qType === 0) {
+                qText = "Укажите все листья данного дерева (через запятую):";
+                let leaves = nodes.filter(n => !edges.some(e => e[0] === n)).sort();
+                ans = leaves.join(',');
+                opts = [ans, nodes.filter(n => edges.some(e => e[0] === n)).sort().join(','), 'A', leaves.slice(0,-1).join(',')].sort(()=>customRandom()-0.5);
+            } else if (qType === 1) {
+                let target = nodes[1 + Math.floor(customRandom()*(nodes.length-1))];
+                qText = `Какова глубина узла ${target}? (Корень A имеет глубину 0)`;
+                ans = depthMap[target].toString();
+                opts = [ans, (depthMap[target]-1).toString(), (depthMap[target]+1).toString(), "0"].sort(()=>customRandom()-0.5);
+            } else if (qType === 2) {
+                let target = nodes[Math.floor(customRandom()*nodes.length)];
+                qText = `Кто является непосредственным предком (родителем) узла ${target}?`;
+                ans = parentMap[target] ? parentMap[target] : "Нет (Корень)";
+                opts = [ans, "A", target === "A" ? "B" : "Нет (Корень)", edges.filter(e=>e[0]===target).map(e=>e[1]).join(',') || "Нет"].filter(x=>x).sort(()=>customRandom()-0.5);
+            } else {
+                qText = "Укажите корень данного графа-дерева:";
+                ans = "A";
+                opts = ["A", "G", "C", "Нет корня"].sort(()=>customRandom()-0.5);
+            }
+            
+            document.getElementById('l1-question').innerText = qText;
+            state.lvl1.answer = ans;
+            
+            let btns = '';
+            let uniqueOpts = [...new Set(opts)];
+            for(let o of uniqueOpts) {
+                btns += `<button class="btn btn-outline-info" onclick="checkL1('${o}')">${o}</button>`;
+            }
+            
+            if (qText === state.lvl1.lastQText && salt < 10) {
+                return generateL1(salt + 1);
+            }
+            state.lvl1.lastQText = qText;
+            document.getElementById('l1-answers').innerHTML = btns;
+        }
+
+        function checkL1(ans) {
+            if(isProcessing) return;
+            isProcessing = true;
+            state.lvl1.attempts++;
+            if (ans === state.lvl1.answer) {
+                state.lvl1.remain--;
+                updateProgress('lvl1');
+                if (state.lvl1.remain <= 0) finishTask('lvl1');
+                else generateL1();
+            } else {
+                handleError('lvl1', `Неверно! Правильный ответ был: ${state.lvl1.answer}`, false);
+                generateL1(); // Do NOT reset remain
+            }
+            sendTelemetry('lvl1', 'attempt', { correct: ans === state.lvl1.answer });
+            setTimeout(() => { isProcessing = false; }, 200);
+        }
+
+        // ================= LEVEL 2 =================
+        function generateL2(salt = 0) {
+            seedGenerator("lvl2", salt);
+            const canvas = document.getElementById('l2-graph');
+            
+            let exprs = [
+                { t: "(A + B) * C", root: "*", l: "+", r: "C", ll: "A", lr: "B" },
+                { t: "A * (B - C)", root: "*", l: "A", r: "-", rl: "B", rr: "C" },
+                { t: "(X / Y) + Z", root: "+", l: "/", r: "Z", ll: "X", lr: "Y" },
+                { t: "A - (B + C)", root: "-", l: "A", r: "+", rl: "B", rr: "C" },
+                { t: "(M * N) - K", root: "-", l: "*", r: "K", ll: "M", lr: "N" },
+                { t: "P + (Q / R)", root: "+", l: "P", r: "/", rl: "Q", rr: "R" },
+                { t: "(A - B) / C", root: "/", l: "-", r: "C", ll: "A", lr: "B" },
+                { t: "X * (Y + Z)", root: "*", l: "X", r: "+", rl: "Y", rr: "Z" },
+                { t: "(K + L) - M", root: "-", l: "+", r: "M", ll: "K", lr: "L" },
+                { t: "S / (T - U)", root: "/", l: "S", r: "-", rl: "T", rr: "U" }
+            ];
+            
+            let ex = exprs[Math.floor(customRandom()*exprs.length)];
+            
+            // Draw tree
+            let svgHtml = `<svg width="100%" height="100%">`;
+            // Coordinates
+            let coords = {
+                root: {x: 200, y: 30, v: ex.root},
+                l: {x: 100, y: 100, v: ex.l},
+                r: {x: 300, y: 100, v: ex.r},
+                ll: ex.ll ? {x: 50, y: 170, v: ex.ll} : null,
+                lr: ex.lr ? {x: 150, y: 170, v: ex.lr} : null,
+                rl: ex.rl ? {x: 250, y: 170, v: ex.rl} : null,
+                rr: ex.rr ? {x: 350, y: 170, v: ex.rr} : null
+            };
+            
+            let links = [
+                ['root', 'l'], ['root', 'r'],
+                ['l', 'll'], ['l', 'lr'],
+                ['r', 'rl'], ['r', 'rr']
+            ];
+            
+            for(let l of links) {
+                if (coords[l[0]] && coords[l[1]]) {
+                    svgHtml += `<line x1="${coords[l[0]].x}" y1="${coords[l[0]].y}" x2="${coords[l[1]].x}" y2="${coords[l[1]].y}" stroke="#888" stroke-width="2" />`;
+                }
+            }
+            svgHtml += `</svg>`;
+            
+            let htmlNodes = '';
+            for(let k in coords) {
+                if (coords[k]) {
+                    htmlNodes += `<div class="node" style="left:${coords[k].x-15}px; top:${coords[k].y-15}px;">${coords[k].v}</div>`;
+                }
+            }
+            canvas.innerHTML = svgHtml + htmlNodes;
+            
+            document.getElementById('l2-question').innerText = `Какое арифметическое выражение представлено на дереве?`;
+            state.lvl2.answer = ex.t;
+            
+            
+            if (ex.t === state.lvl2.lastT && salt < 10) {
+                return generateL2(salt + 1);
+            }
+            state.lvl2.lastT = ex.t;
+            
+            let allExprs = exprs.map(e => e.t).filter(t => t !== ex.t).sort(()=>customRandom()-0.5).slice(0, 3);
+            allExprs.push(ex.t);
+            allExprs.sort(()=>customRandom()-0.5);
+            
+            let btns = '';
+            for(let o of allExprs) {
+                btns += `<button class="btn btn-outline-info" onclick="checkL2('${o}')">${o}</button>`;
+            }
+            document.getElementById('l2-answers').innerHTML = btns;
+        }
+
+        function checkL2(ans) {
+            if(isProcessing) return;
+            isProcessing = true;
+            state.lvl2.attempts++;
+            if (ans === state.lvl2.answer) {
+                state.lvl2.remain--;
+                updateProgress('lvl2');
+                if (state.lvl2.remain <= 0) finishTask('lvl2');
+                else generateL2();
+            } else {
+                handleError('lvl2', `Неверно! Это дерево для: ${state.lvl2.answer}`, false);
+                generateL2();
+            }
+            sendTelemetry('lvl2', 'attempt', { correct: ans === state.lvl2.answer });
+            setTimeout(() => { isProcessing = false; }, 200);
+        }
+
+        // ================= LEVEL 3 =================
+        function generateL3(salt = 0) {
+            seedGenerator("lvl3", salt);
+            clearInterval(state.lvl3.timer);
+            state.lvl3.timeLeft = 150; // 15.0 seconds
+            document.getElementById('l3-timer').innerText = "15.0";
+            document.getElementById('l3-timer').classList.remove('pulse');
+            
+            // Depth 3 tree: Root(MAX) -> 2x MIN -> 4x MAX -> 8x Leaves
+            // Leaves are random 1-9
+            let leaves = [];
+            for(let i=0; i<8; i++) {
+                leaves.push(Math.floor(customRandom() * 9) + 1);
+            }
+            
+            // Calculate bottom-up
+            let max1 = Math.max(leaves[0], leaves[1]);
+            let max2 = Math.max(leaves[2], leaves[3]);
+            let max3 = Math.max(leaves[4], leaves[5]);
+            let max4 = Math.max(leaves[6], leaves[7]);
+            
+            let min1 = Math.min(max1, max2);
+            let min2 = Math.min(max3, max4);
+            
+            let rootVal = Math.max(min1, min2);
+            
+            if (leaves.join(',') === state.lvl3.lastLeaves && salt < 10) {
+                return generateL3(salt + 1);
+            }
+            state.lvl3.lastLeaves = leaves.join(',');
+            state.lvl3.answer = rootVal;
+            
+            let canvas = document.getElementById('l3-graph');
+            let svgHtml = `<svg width="100%" height="100%">`;
+            let w = canvas.offsetWidth || 700;
+            if (w < 700) w = 700; // ensure minimum width for 8 leaves
+            
+            // Coords
+            let coords = {
+                'R': {x: w/2, y: 20, type: 'MAX'},
+                'L': {x: w/4, y: 80, type: 'MIN'},
+                'R1': {x: 3*w/4, y: 80, type: 'MIN'},
+                'LL': {x: w/8, y: 150, type: 'MAX'},
+                'LR': {x: 3*w/8, y: 150, type: 'MAX'},
+                'RL': {x: 5*w/8, y: 150, type: 'MAX'},
+                'RR': {x: 7*w/8, y: 150, type: 'MAX'}
+            };
+            
+            let leafKeys = ['LLL','LLR','LRL','LRR','RLL','RLR','RRL','RRR'];
+            for(let i=0; i<8; i++) {
+                coords[leafKeys[i]] = {x: w/16 + i*(w/8), y: 220, val: leaves[i]};
+            }
+            
+            let edges = [ 
+                ['R','L'], ['R','R1'], 
+                ['L','LL'], ['L','LR'], ['R1','RL'], ['R1','RR'],
+                ['LL','LLL'], ['LL','LLR'], ['LR','LRL'], ['LR','LRR'],
+                ['RL','RLL'], ['RL','RLR'], ['RR','RRL'], ['RR','RRR']
+            ];
+            
+            for(let e of edges) {
+                let n1 = coords[e[0]], n2 = coords[e[1]];
+                svgHtml += `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="#ffcc00" stroke-width="2" />`;
+            }
+            svgHtml += `</svg>`;
+            
+            let htmlNodes = '';
+            for(let k in coords) {
+                let n = coords[k];
+                if (n.type === 'MAX') {
+                    htmlNodes += `<div class="node" style="left:${n.x-20}px; top:${n.y-20}px; width:40px; height:40px; background:#005500; border-radius:0 !important; font-size:12px;">MAX</div>`;
+                } else if (n.type === 'MIN') {
+                    htmlNodes += `<div class="node" style="left:${n.x-20}px; top:${n.y-20}px; width:40px; height:40px; background:#550000; border-radius:50% !important; font-size:12px;">MIN</div>`;
+                } else {
+                    htmlNodes += `<div class="node" style="left:${n.x-20}px; top:${n.y-20}px; width:40px; height:40px; color: #00ffff; border-color: #00ffff; font-size:18px;">${n.val}</div>`;
+                }
+            }
+            canvas.innerHTML = svgHtml + htmlNodes;
+            
+            state.lvl3.timer = setInterval(() => {
+                state.lvl3.timeLeft--;
+                let sec = (state.lvl3.timeLeft / 10).toFixed(1);
+                document.getElementById('l3-timer').innerText = sec;
+                if (state.lvl3.timeLeft <= 50) document.getElementById('l3-timer').classList.add('pulse');
+                if (state.lvl3.timeLeft <= 0) {
+                    if(isProcessing) return;
+                    isProcessing = true;
+                    clearInterval(state.lvl3.timer);
+                    handleError('lvl3', "ВРЕМЯ ВЫШЛО! Дерево не просчитано.", true);
+                    generateL3();
+                    setTimeout(() => { isProcessing = false; }, 200);
+                }
+            }, 100);
+            
+            document.getElementById('l3-streak').innerText = state.lvl3.total - state.lvl3.remain;
+        }
+
+        function checkL3(ans) {
+            if(isProcessing) return;
+            isProcessing = true;
+            clearInterval(state.lvl3.timer);
+            state.lvl3.attempts++;
+            
+            if (ans === state.lvl3.answer) {
+                state.lvl3.remain--;
+                updateProgress('lvl3');
+                if (state.lvl3.remain <= 0) {
+                    finishTask('lvl3');
+                } else {
+                    generateL3();
+                }
+            } else {
+                handleError('lvl3', `НЕВЕРНО! ИИ просчитал вашу ошибку. Прогресс обнулен!`, true);
+                generateL3();
+            }
+            sendTelemetry('lvl3', 'attempt', { correct: ans === state.lvl3.answer });
+            setTimeout(() => { isProcessing = false; }, 200);
+        }
+
+        // ================= UTILS =================
+        function updateProgress(lvl) {
+            let s = state[lvl];
+            let pfx = lvl.replace('lvl', 'l');
+            let remainEl = document.getElementById(`${pfx}-remain`);
+            if (remainEl) remainEl.innerText = s.remain;
+            let progressEl = document.getElementById(`${pfx}-progress`);
+            if (progressEl) progressEl.style.width = ((s.total - s.remain) / s.total * 100) + '%';
+            saveState();
+        }
+
+        function finishTask(lvl) {
+            let pfx = lvl.replace('lvl', 'l');
+            document.getElementById(`${pfx}-content`).style.display = 'none';
+            document.getElementById(`${pfx}-done`).style.display = 'block';
+            if (lvl === 'lvl3') document.getElementById('l3-timer').style.display = 'none';
+            let timeSpent = Math.floor((new Date() - state[lvl].startTime) / 1000);
+            sendTelemetry(lvl, 'completed', { attempts: state[lvl].attempts, time_sec: timeSpent });
+        }
+    </script>
+</body>
+</html>

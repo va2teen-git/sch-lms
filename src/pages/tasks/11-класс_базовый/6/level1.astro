@@ -1,0 +1,85 @@
+---
+import Terminal from '../../../../components/Terminal.astro';
+
+const phases = [
+  {
+    setup: `
+      window.attackerIP = \`\${rnd(11,250)}.\${rnd(0,255)}.\${rnd(0,255)}.\${rnd(1,254)}\`;
+      vfs['/']['var']['log']['auth.log'] = \`Oct 7 10:15:22 sshd[1410]: Accepted publickey\\nOct 7 10:18:22 sshd[1422]: Failed password for root from \${window.attackerIP} port 45192\\nOct 7 10:18:24 sshd[1424]: Failed password for root from \${window.attackerIP} port 45194\`;
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Multiple failed SSH login attempts detected.\\nAction required: Find the attacking IP in /var/log/auth.log and block it.\`;
+    `,
+    onCommand: `
+      if (cmd === 'ufw') {
+        if (args[0] === 'status') {
+          return { success: null, message: 'Status: active\\n\\nTo                         Action      From\\n--                         ------      ----\\n22/tcp                     ALLOW       Anywhere' };
+        }
+        if (args[0] === 'deny' && args[1] === 'from' && args[2]) {
+          if (args[2] === window.attackerIP) return { success: true, message: 'Rule added' };
+          return { success: false, message: 'Rule added', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: SSH brute force continues! Attacker rotated IP address.\` };
+        }
+        return { success: false, message: 'ERROR: Invalid syntax or rule', failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: SSH brute force continues! Attacker rotated IP address.\` };
+      }
+      return { handled: false };
+    `
+  },
+  {
+    setup: `
+      window.malwarePID = rnd(1000, 9999).toString();
+      window.malwareName = 'crypto_miner.sh';
+      return \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nnetdata ALARM: system.cpu (cpu) CPU usage at 99.9% for 5 minutes.\\nAction required: Identify and terminate the malicious process.\`;
+    `,
+    onCommand: `
+      if (cmd === 'ps') {
+        let out = 'USER       PID %CPU COMMAND\\nroot         1  0.0 /sbin/init\\nroot        42  0.0 sshd';
+        out += \`\\nwww-data  \${window.malwarePID} 99.9 ./\${window.malwareName}\`;
+        return { success: null, message: out }; 
+      }
+      if (cmd === 'kill') {
+        if (args[0] === '-9' && args[1]) {
+          if (args[1] === window.malwarePID) return { success: true, message: '' }; 
+          if (args[1] === '1' || args[1] === '42') return { success: false, message: \`bash: kill: (\${args[1]}) - Operation not permitted\`, failMessage: \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nnetdata ALARM: You attempted to kill a critical system process! The malware continues to run.\` };
+          return { success: false, message: \`bash: kill: (\${args[1]}) - No such process\`, failMessage: \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nnetdata ALARM: The malicious process evaded termination and changed PID!\` };
+        } else if (args[0] && args[0] !== '-9') {
+          let targetPid = args[0];
+          if (targetPid === window.malwarePID) return { success: null, message: \`bash: kill: (\${targetPid}) - Operation not permitted (Process ignoring SIGTERM, use SIGKILL)\` };
+          return { success: false, message: \`bash: kill: (\${targetPid}) - No such process\`, failMessage: \`Broadcast message from netdata@sys-server (tty1) \${getBroadcastTime()}:\\n\\nnetdata ALARM: The malicious process evaded termination and changed PID!\` };
+        }
+      }
+      return { handled: false };
+    `
+  },
+  {
+    setup: `
+      window.compromisedUser = 'service_' + rnd(100,999);
+      return \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Suspicious outbound traffic detected from user account '\${window.compromisedUser}'.\\nAction required: Lock the compromised account immediately.\`;
+    `,
+    onCommand: `
+      if (cmd === 'passwd') {
+        if (args[0] === '-l' && args[1]) {
+          if (args[1] === window.compromisedUser) return { success: true, message: 'passwd: password expiry information changed.' };
+          return { success: false, message: \`passwd: user '\${args[1]}' does not exist\`, failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Breach continues! Account was not locked.\` };
+        } else if (args[0] === '-u' && args[1]) {
+          return { success: false, message: \`passwd: password expiry information changed.\`, failMessage: \`Broadcast message from ossec@sys-server (tty1) \${getBroadcastTime()}:\\n\\nOSSEC HIDS Alert: Breach continues! You unlocked the account instead of locking it.\` };
+        } else if (args[0] && !args[0].startsWith('-')) {
+          return { success: null, message: \`passwd: Authentication token manipulation error\` };
+        }
+      }
+      return { handled: false };
+    `
+  }
+];
+---
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 1: Отражение атак</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+</head>
+<body class="bg-black vh-100 overflow-hidden d-flex flex-column m-0">
+    <Terminal missionName="11-класс_базовый :: 6 :: Уровень 1" phases={JSON.stringify(phases)} theme="green" />
+</body>
+</html>
+

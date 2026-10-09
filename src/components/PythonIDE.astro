@@ -1,0 +1,122 @@
+---
+export interface Props {
+  missionName: string;
+  initialCode?: string;
+  theme?: 'green' | 'orange' | 'red';
+  hardcoreReset?: boolean;
+}
+
+const { missionName, initialCode = '# Напишите свой код здесь\n', theme = 'green', hardcoreReset = false } = Astro.props;
+const themeClass = theme === 'orange' ? 'text-warning' : theme === 'red' ? 'text-danger' : 'text-success';
+const btnClass = theme === 'orange' ? 'btn-outline-warning' : theme === 'red' ? 'btn-outline-danger' : 'btn-outline-success';
+---
+<div class="d-flex flex-column h-100 bg-black p-3 rounded-0" style="font-family: monospace;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class={`fw-bold ${themeClass}`}>PYTHON IDE [Pyodide Engine]</span>
+        <button id="run-btn" class={`btn ${btnClass} btn-sm rounded-0 fw-bold px-3`} disabled>ЗАГРУЗКА ЯДРА...</button>
+    </div>
+
+    <!-- Редактор кода -->
+    <textarea id="code-editor" class="form-control bg-dark text-white border-secondary rounded-0 shadow-none mb-3 flex-grow-1" style="font-family: monospace; resize: none; min-height: 200px;" spellcheck="false">{initialCode}</textarea>
+
+    <!-- Терминал вывода -->
+    <div class={`fw-bold ${themeClass} mb-1`}>ТЕРМИНАЛ:</div>
+    <div id="output" class="bg-dark text-light border-secondary border p-2 rounded-0 overflow-auto" style="min-height: 120px; white-space: pre-wrap; word-wrap: break-word;"></div>
+</div>
+
+<script src="/static/pyodide/pyodide.js" is:inline></script>
+<script define:vars={{ missionName, hardcoreReset, themeClass }}>
+    let pyodideInstance = null;
+    const runBtn = document.getElementById('run-btn');
+    const editor = document.getElementById('code-editor');
+    const outputDiv = document.getElementById('output');
+    
+    let attempts = 0;
+    let startTime = Date.now();
+
+    function sendTelemetry(actionType, status, success = false) {
+        const msg = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attempts,
+            success: success
+        };
+        window.parent.postMessage(msg, '*');
+    }
+
+    sendTelemetry('in_progress', 'in_progress');
+
+    function printOutput(text, isError = false) {
+        const span = document.createElement('span');
+        span.className = isError ? 'text-danger' : 'text-light';
+        span.textContent = text + '\n';
+        outputDiv.appendChild(span);
+        outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    async function initPyodide() {
+        try {
+            // @ts-ignore
+            pyodideInstance = await loadPyodide({
+                indexURL: "/static/pyodide/"
+            });
+            
+            pyodideInstance.setStdout({ batched: (msg) => printOutput(msg) });
+            pyodideInstance.setStderr({ batched: (msg) => printOutput(msg, true) });
+
+            runBtn.disabled = false;
+            runBtn.innerText = "ЗАПУСТИТЬ КОД [F5]";
+            printOutput("--- Ядро Python успешно загружено ---");
+        } catch (err) {
+            printOutput("Ошибка инициализации Pyodide: " + err.message, true);
+        }
+    }
+
+    initPyodide();
+
+    runBtn.addEventListener('click', async () => {
+        if (!pyodideInstance) return;
+        
+        attempts++;
+        outputDiv.innerHTML = ''; 
+        printOutput(`>>> Выполнение скрипта...\n`);
+        
+        const code = editor.value;
+        runBtn.disabled = true;
+        
+        try {
+            await pyodideInstance.runPythonAsync(code);
+            printOutput(`\n[Успешно завершено]`);
+            // Здесь можно добавить логику проверки результатов для заданий
+            sendTelemetry('in_progress', 'in_progress'); 
+        } catch (err) {
+            printOutput(`\n[Ошибка выполнения]\n${err.message}`, true);
+            sendTelemetry('hardcore_reset', 'in_progress', false); // По ТЗ: любая ошибка генерирует hardcore_reset
+            
+            if (hardcoreReset) {
+                // Если включен режим сброса в самом задании
+                editor.value = '';
+            }
+        } finally {
+            runBtn.disabled = false;
+        }
+    });
+
+    editor.addEventListener('keydown', (e) => {
+        if (e.key === 'F5') {
+            e.preventDefault();
+            runBtn.click();
+        }
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + "    " + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 4;
+        }
+    });
+</script>
