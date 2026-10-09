@@ -74,11 +74,11 @@ test.describe('Lesson 8-6 Level 1: Number Systems', () => {
     await frame.locator('#p1-input').fill('999999');
     
     // Listen to alert on main page
-    const alertPromise = page.waitForEvent('dialog');
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toContain('ОШИБКА В РЕЖИМЕ ХАРДКОРА');
+      await dialog.accept();
+    });
     await frame.locator('#p1-btn').click();
-    const dialog = await alertPromise;
-    expect(dialog.message()).toContain('ОШИБКА В РЕЖИМЕ ХАРДКОРА');
-    await dialog.accept();
     
     // Wait for the iframe to reload and phase 1 to be visible again
     await expect(frame.locator('#phase1')).toBeVisible();

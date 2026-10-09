@@ -115,14 +115,14 @@ test.describe('Lesson 8-6 Level 2: Low-Level Debugger', () => {
     await frame.locator('#p1-input').fill('WRONG');
     
     // Listen to alert on main page
-    const alertPromise = page.waitForEvent('dialog');
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toContain('ОШИБКА В РЕЖИМЕ ХАРДКОРА');
+      await dialog.accept();
+    });
     await frame.locator('#p1-btn').click();
-    const dialog = await alertPromise;
-    expect(dialog.message()).toContain('ОШИБКА В РЕЖИМЕ ХАРДКОРА');
-    await dialog.accept();
     
     // Check DB for hardcore_reset event
-    await page.waitForTimeout(500); 
+    await page.waitForTimeout(1000); 
     const db = new sqlite3('telemetry.db');
     const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' AND mission_name LIKE '%Уровень 2%' ORDER BY id DESC LIMIT 1`).get();
     expect(row).toBeDefined();
