@@ -9,31 +9,46 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
 ---
 <div class="d-flex flex-column h-100 bg-black p-2 rounded-0">
     <div class="d-flex justify-content-between mb-2">
-        <span class="text-success fw-bold">LibreOffice Writer [Эмулятор Jodit]</span>
+        <span class="text-success fw-bold">LibreOffice Writer [Эмулятор]</span>
         <button id="check-btn" class="btn btn-outline-success btn-sm rounded-0 fw-bold px-4">ПРОВЕРИТЬ ДОКУМЕНТ</button>
     </div>
     
     <div class="flex-grow-1 bg-light text-dark rounded-0 overflow-hidden d-flex flex-column border border-secondary" id="editor-container" style="background-color: #f0f0f0 !important;">
+        
         <!-- Фейковое меню LibreOffice -->
-        <div class="d-flex px-2 py-1" style="background-color: #f0f0f0; border-bottom: 1px solid #ccc; font-size: 13px; color: #333;">
-            <div class="pe-3 cursor-pointer hover-bg-light">Файл</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Правка</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Вид</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Вставка</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Формат</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Стили</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Таблица</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Форма</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Сервис</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Окно</div>
-            <div class="pe-3 cursor-pointer hover-bg-light">Справка</div>
+        <div class="d-flex px-2 py-1 user-select-none" style="background-color: #f0f0f0; border-bottom: 1px solid #ccc; font-size: 12px; color: #333; font-family: 'Segoe UI', sans-serif;">
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Файл</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Правка</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Вид</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Вставка</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Формат</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Стили</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Таблица</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Форма</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Сервис</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Окно</div>
+            <div class="px-2 py-1 cursor-pointer hover-bg-light rounded-1">Справка</div>
         </div>
         
+        <!-- Jodit Editor -->
         <textarea id="writer-editor">{initialHTML}</textarea>
-    </div>
-    
-    <div class="mt-2 text-end">
-        <span id="writer-status" class="text-warning small fw-bold"></span>
+        
+        <!-- Фейковый статус-бар LibreOffice -->
+        <div class="d-flex align-items-center px-2 py-1 user-select-none" style="background-color: #f0f0f0; border-top: 1px solid #ccc; font-size: 11px; color: #555; font-family: 'Segoe UI', sans-serif; gap: 15px;">
+            <div class="border-end pe-3 border-secondary" style="min-width: 90px;">Страница 1 из 1</div>
+            <div class="border-end pe-3 border-secondary" id="statusbar-words" style="min-width: 130px;">0 слов, 0 символов</div>
+            <div class="border-end pe-3 border-secondary">Базовый</div>
+            <div class="border-end pe-3 border-secondary">Русский (Россия)</div>
+            <div class="border-end pe-3 border-secondary flex-grow-1">
+                <span id="writer-status" class="fw-bold px-2"></span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span>−</span>
+                <input type="range" class="form-range" style="width: 80px; height: 0.5rem;" min="50" max="200" value="100" />
+                <span>+</span>
+                <span>100%</span>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -63,29 +78,54 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
     let editor = null;
     
     document.addEventListener('DOMContentLoaded', () => {
-        // Мы используем Jodit, но настраиваем его так, чтобы он был похож на десктопный Word/Writer
         editor = Jodit.make('#writer-editor', {
             theme: 'default',
             toolbarSticky: false,
-            showCharsCounter: true,
-            showWordsCounter: true,
+            showCharsCounter: false,
+            showWordsCounter: false,
             showXPathInStatusbar: false,
             height: '100%',
             language: 'ru',
-            // Набор кнопок, разбитый на группы (имитация тулбара LibreOffice)
+            // Имитация панели инструментов LibreOffice Writer (Стандартная + Форматирование)
             buttons: [
                 'undo', 'redo', '|',
-                'font', 'fontsize', 'brush', 'paragraph', '|',
+                'cut', 'copy', 'paste', '|',
+                'find', 'source', '|',
+                '\n', // Перенос на вторую строку тулбара
+                'paragraph', 'font', 'fontsize', '|',
                 'bold', 'italic', 'underline', 'strikethrough', '|',
+                'superscript', 'subscript', '|',
+                'brush', 'eraser', '|',
                 'align', 'ul', 'ol', '|',
                 'outdent', 'indent', '|',
-                'table', 'link', 'image', 'hr', '|',
-                'eraser', 'fullsize'
+                'table', 'link', 'image', 'hr'
             ],
-            // Убираем лишние попапы
-            toolbarAdaptive: false
+            toolbarAdaptive: false,
+            events: {
+                change: () => updateStatusbarWords()
+            }
         });
+        
+        // Скрываем родной статусбар Jodit, так как мы сделали свой кастомный LibreOffice
+        const joditStatusbar = document.querySelector('.jodit-status-bar');
+        if (joditStatusbar) {
+            joditStatusbar.style.display = 'none';
+        }
+        
+        // Инициализация счетчика слов
+        setTimeout(updateStatusbarWords, 100);
     });
+    
+    function updateStatusbarWords() {
+        if(!editor) return;
+        const text = editor.text;
+        const chars = text.replace(/\s/g, '').length;
+        const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+        const sbWords = document.getElementById('statusbar-words');
+        if(sbWords) {
+            sbWords.innerText = `${words} слов, ${chars} символов`;
+        }
+    }
 
     document.getElementById('check-btn').addEventListener('click', () => {
         if (!editor) return;
@@ -98,13 +138,13 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                 html: content, 
                 resolve: (success, msg, isFinal = true) => {
                     if(success) {
-                        statusEl.className = 'text-success small fw-bold';
+                        statusEl.className = 'text-success fw-bold px-2';
                         statusEl.innerText = msg || '✅ Проверено. Задание выполнено!';
                         if (isFinal) {
                             sendTelemetry('level_complete', 'completed', true);
                         }
                     } else {
-                        statusEl.className = 'text-danger small fw-bold';
+                        statusEl.className = 'text-danger fw-bold px-2';
                         statusEl.innerText = msg || '❌ Ошибка форматирования!';
                         sendTelemetry('hardcore_reset', 'in_progress', false);
                         if(hardcoreReset) {
@@ -112,7 +152,7 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                         }
                     }
                 },
-                editor: editor // Прокидываем editor для очистки в промежуточных фазах
+                editor: editor
             }
         });
         
@@ -122,7 +162,7 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
 </script>
 
 <style is:global>
-    /* ПРИБЛИЖАЕМ СТИЛИ К LIBREOFFICE (COLIBRE THEME) */
+    /* ПРИБЛИЖАЕМ СТИЛИ К LIBREOFFICE WRITER (COLIBRE THEME) */
 
     /* Убираем скругления */
     .jodit-toolbar__box, .jodit-workplace, .jodit-container { 
@@ -134,25 +174,35 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
     .jodit-toolbar__box {
         background-color: #f0f0f0 !important;
         border-bottom: 1px solid #ccc !important;
-        padding: 4px 8px !important;
+        padding: 4px 6px !important;
     }
 
     /* Кнопки LibreOffice (квадратные, плоские, голубой hover) */
     .jodit-toolbar-button__button {
         border-radius: 2px !important;
         margin: 0 1px !important;
-        min-height: 28px !important;
+        min-height: 26px !important;
+        min-width: 26px !important;
     }
+    
     .jodit-toolbar-button__button:hover {
         background-color: #d6e2ff !important;
         border-color: #a4b9e0 !important;
     }
+    
+    /* Разделители тулбара */
+    .jodit-toolbar-button_separator {
+        border-left: 1px solid #ccc !important;
+        margin: 0 4px !important;
+    }
 
     /* Внешний фон (Серый стол, на котором лежит белый лист) */
     .jodit-workplace {
-        background-color: #e0e0e0 !important;
+        background-color: #e4e4e4 !important;
         padding: 20px 0 !important;
         overflow-y: auto !important;
+        /* Тень внутри рабочего пространства как в LibreOffice */
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.05) !important;
     }
 
     /* Сам лист формата А4 */
@@ -161,23 +211,30 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         max-width: 800px !important;
         min-height: 1131px !important; /* Пропорция A4 */
         margin: 0 auto !important;
-        padding: 40px !important; /* Поля документа */
-        box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-        border: 1px solid #bbb !important;
+        padding: 60px 80px !important; /* Поля документа по ГОСТу примерно */
+        box-shadow: 1px 2px 5px rgba(0,0,0,0.3) !important;
+        border: 1px solid #c0c0c0 !important;
         outline: none !important;
-    }
-
-    /* Статус-бар внизу */
-    .jodit-status-bar {
-        background-color: #f0f0f0 !important;
-        border-top: 1px solid #ccc !important;
-        color: #333 !important;
-        font-family: sans-serif;
+        font-family: 'Times New Roman', serif !important; /* Шрифт по умолчанию */
+        font-size: 14pt !important;
+        line-height: 1.5 !important;
     }
 
     /* Мелкие вспомогательные классы */
     .hover-bg-light:hover {
         background-color: #d6e2ff;
         cursor: pointer;
+    }
+    
+    .cursor-pointer {
+        cursor: default; /* В нативных приложениях курсор обычный, не поинтер на меню */
+    }
+    
+    /* Стилизация ползунка масштаба (zoom) в статусбаре */
+    .form-range::-webkit-slider-thumb {
+        background: #0d6efd;
+    }
+    .form-range::-webkit-slider-runnable-track {
+        background: #dee2e6;
     }
 </style>
