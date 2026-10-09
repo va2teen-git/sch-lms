@@ -1,0 +1,170 @@
+---
+// Уровень 2: 7 класс, Урок 5 - Архивация (Использование программ-архиваторов)
+// Механика: Эмулятор настройки параметров архивации (только ручной текстовый ввод).
+// 5 фаз, процедурная генерация параметров. Ошибка = хардкор_сброс и генерация нового ТЗ.
+---
+
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Архивация: Настройка параметров</title>
+</head>
+<body class="bg-dark text-warning p-4 font-monospace rounded-0">
+    <div class="container-fluid">
+        <h2 class="mb-4 text-uppercase border-bottom border-warning pb-2">Модуль 2: Конфигурация архиватора</h2>
+        
+        <div id="game-container">
+            <div class="card bg-black border-warning rounded-0 mb-4">
+                <div class="card-header border-warning text-uppercase">
+                    Фаза <span id="current-phase">1</span> из 5 :: Входящее задание
+                </div>
+                <div class="card-body">
+                    <p id="task-description" class="fs-5 mb-0"></p>
+                </div>
+            </div>
+
+            <div class="card bg-black border-secondary rounded-0">
+                <div class="card-body">
+                    <h5 class="mb-3 text-secondary">Параметры архивации (введите значения вручную)</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted">Имя архива (с расширением):</label>
+                            <input type="text" id="input-archive-name" class="form-control bg-dark text-warning border-secondary rounded-0" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted">Формат сжатия (zip/rar/7z):</label>
+                            <input type="text" id="input-format" class="form-control bg-dark text-warning border-secondary rounded-0" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted">Пароль (если нет, оставьте пустым):</label>
+                            <input type="text" id="input-password" class="form-control bg-dark text-warning border-secondary rounded-0" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted">Размер тома (МБ, только число, если не нужно - пустая строка):</label>
+                            <input type="text" id="input-volume" class="form-control bg-dark text-warning border-secondary rounded-0" autocomplete="off" spellcheck="false">
+                        </div>
+                    </div>
+                    <div class="mt-4 text-end">
+                        <button id="btn-submit" class="btn btn-outline-warning rounded-0 fw-bold px-4">ПРИМЕНИТЬ НАСТРОЙКИ</button>
+                    </div>
+                    <div id="error-msg" class="text-danger mt-3 d-none fw-bold">ОШИБКА КОНФИГУРАЦИИ! СБРОС И ГЕНЕРАЦИЯ НОВОЙ ЗАДАЧИ...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="success-container" class="d-none text-center py-5">
+            <h1 class="text-success text-uppercase mb-3">КОНФИГУРАЦИЯ УСПЕШНА</h1>
+            <p class="fs-4 text-light">Вы успешно настроили архиватор 5 раз.</p>
+        </div>
+    </div>
+
+    <script>
+        const MISSION_NAME = '7 класс Урок 5 :: Архивация (Уровень 2)';
+        const TOTAL_PHASES = 5;
+        let currentPhase = 1;
+        let startTime = Date.now();
+        let attemptsCount = 0;
+        let currentTask = {};
+
+        // Базы для процедурной генерации
+        const fileBases = ['reports', 'photos', 'backup', 'system_logs', 'homework', 'project_x', 'db_dump'];
+        const exts = ['zip', 'rar', '7z'];
+        const passwords = ['12345', 'qwerty', 'admin', 'Pa$$w0rd', 'secret', '']; // '' means no password
+        const volumes = ['', '10', '50', '100', '500', '1000']; // '' means no split
+
+        function sendTelemetry(action, success = false) {
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: action,
+                status: success ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+                attempts_count: attemptsCount,
+                success: success
+            }, '*');
+        }
+
+        function generateTask() {
+            const base = fileBases[Math.floor(Math.random() * fileBases.length)];
+            const date = Math.floor(Math.random() * 30) + 1;
+            const ext = exts[Math.floor(Math.random() * exts.length)];
+            const archiveName = `${base}_${date}.${ext}`;
+            const pwd = passwords[Math.floor(Math.random() * passwords.length)];
+            const vol = volumes[Math.floor(Math.random() * volumes.length)];
+
+            currentTask = {
+                archiveName: archiveName,
+                format: ext,
+                password: pwd,
+                volumeSize: vol
+            };
+
+            let text = `Необходимо создать архив с именем <strong>${archiveName}</strong>. `;
+            text += `Используйте формат сжатия <strong>${ext}</strong>. `;
+            if (pwd) text += `Установите пароль защиты: <strong>${pwd}</strong>. `;
+            else text += `Пароль устанавливать <strong>не нужно</strong>. `;
+            
+            if (vol) text += `Разбейте архив на тома размером <strong>${vol}</strong> МБ.`;
+            else text += `Разбиение на тома <strong>не требуется</strong>.`;
+
+            document.getElementById('task-description').innerHTML = text;
+            
+            // Очистка полей
+            document.getElementById('input-archive-name').value = '';
+            document.getElementById('input-format').value = '';
+            document.getElementById('input-password').value = '';
+            document.getElementById('input-volume').value = '';
+        }
+
+        function initPhase() {
+            document.getElementById('current-phase').textContent = currentPhase;
+            document.getElementById('error-msg').classList.add('d-none');
+            generateTask();
+        }
+
+        document.getElementById('btn-submit').addEventListener('click', () => {
+            const nameVal = document.getElementById('input-archive-name').value.trim();
+            const formatVal = document.getElementById('input-format').value.trim().toLowerCase();
+            const pwdVal = document.getElementById('input-password').value.trim();
+            const volVal = document.getElementById('input-volume').value.trim();
+
+            const isCorrect = (
+                nameVal === currentTask.archiveName &&
+                formatVal === currentTask.format &&
+                pwdVal === currentTask.password &&
+                volVal === currentTask.volumeSize
+            );
+
+            attemptsCount++;
+
+            if (isCorrect) {
+                if (currentPhase >= TOTAL_PHASES) {
+                    // Успех всего задания
+                    sendTelemetry('level_complete', true);
+                    document.getElementById('game-container').classList.add('d-none');
+                    document.getElementById('success-container').classList.remove('d-none');
+                } else {
+                    currentPhase++;
+                    initPhase();
+                    sendTelemetry('in_progress');
+                }
+            } else {
+                // Ошибка -> хардкор сброс и новая генерация текущей фазы
+                document.getElementById('error-msg').classList.remove('d-none');
+                sendTelemetry('hardcore_reset');
+                
+                // Задержка перед генерацией новой задачи, чтобы ученик успел увидеть ошибку
+                setTimeout(() => {
+                    initPhase();
+                }, 1500);
+            }
+        });
+
+        // Начальный старт
+        sendTelemetry('in_progress');
+        initPhase();
+    </script>
+</body>
+</html>
