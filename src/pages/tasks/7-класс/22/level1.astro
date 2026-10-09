@@ -1,0 +1,88 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+import WriterEmulator from '../../../../components/WriterEmulator.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid p-3">
+        <div class="card bg-dark border-success rounded-0 mb-3">
+            <div class="card-body">
+                <h5 class="card-title text-success">Задание 1: Форматирование текста</h5>
+                <p class="card-text" id="task-description">Загрузка задания...</p>
+            </div>
+        </div>
+
+        <div style="height: 600px;">
+            <WriterEmulator missionName="Урок 22 :: Форматирование текста" hardcoreReset={true} />
+        </div>
+    </div>
+
+    <script>
+        // Процедурная генерация задания
+        const subjects = ['Процессор', 'Монитор', 'Принтер', 'Жесткий диск', 'Клавиатура'];
+        const actions = ['жирным', 'курсивом', 'подчеркнутым'];
+        const tags = {
+            'жирным': ['<strong>', '<b>'],
+            'курсивом': ['<em>', '<i>'],
+            'подчеркнутым': ['<u>']
+        };
+
+        let currentSubject = '';
+        let currentAction = '';
+        let validTags = [];
+
+        function generateTask() {
+            let nextSubject = subjects[Math.floor(Math.random() * subjects.length)];
+            let nextAction = actions[Math.floor(Math.random() * actions.length)];
+            
+            // Защита от случайного повтора (не даем 100% ту же задачу)
+            while (nextSubject === currentSubject && nextAction === currentAction) {
+                nextSubject = subjects[Math.floor(Math.random() * subjects.length)];
+                nextAction = actions[Math.floor(Math.random() * actions.length)];
+            }
+            
+            currentSubject = nextSubject;
+            currentAction = nextAction;
+            validTags = tags[currentAction];
+            
+            document.getElementById('task-description').innerHTML = 
+                `Напишите предложение, содержащее слово <code>${currentSubject}</code>, и выделите это слово <strong>${currentAction}</strong> шрифтом.`;
+        }
+
+        // Инициализация первой фазы
+        document.addEventListener('DOMContentLoaded', () => {
+            generateTask();
+        });
+
+        // Обработка проверки из WriterEmulator
+        document.addEventListener('writer-check', (e: any) => {
+            const html = e.detail.html;
+            
+            // Парсим HTML, чтобы проверить наличие нужного тега вокруг нужного слова
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            let isCorrect = false;
+            
+            // Ищем все элементы с нужными тегами
+            for (const tag of validTags) {
+                const elements = doc.querySelectorAll(tag.replace(/<|>/g, ''));
+                for (const el of elements) {
+                    if (el.textContent?.toLowerCase().includes(currentSubject.toLowerCase())) {
+                        isCorrect = true;
+                        break;
+                    }
+                }
+                if (isCorrect) break;
+            }
+
+            if (isCorrect) {
+                e.detail.resolve(true, "Отлично! Текст отформатирован верно.");
+            } else {
+                e.detail.resolve(false, `Слово "${currentSubject}" не найдено или не выделено ${currentAction}!`);
+                // При ошибке генерируем новое задание
+                setTimeout(generateTask, 1500);
+            }
+        });
+    </script>
+</TaskLayout>
