@@ -1,0 +1,305 @@
+---
+// Уровень 3 (Аркада)
+// Тема: Архивация данных (7 класс)
+---
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уровень 3</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <script src="/static/vue.global.js" is:inline></script>
+</head>
+<body class="bg-black text-danger font-monospace m-0 p-0" style="overflow-x: hidden;">
+<div id="app" class="container-fluid min-vh-100 p-4 rounded-0">
+    <div v-if="!started && !completed" class="text-center mt-5">
+        <h1 class="text-danger border border-danger p-3 d-inline-block rounded-0">CYBER COURIER // ЭКСТРАКЦИЯ ДАННЫХ</h1>
+        <p class="mt-4 lead">Вы проникли на сервер для извлечения резервной копии базы данных.</p>
+        <p>Для успешного выполнения миссии вам потребуются знания принципов архивации и извлечения файлов.</p>
+        <div class="alert alert-danger bg-black border-danger rounded-0 mt-4 d-inline-block text-start">
+            <strong>ВНИМАНИЕ:</strong>
+            <ul class="mb-0 mt-2">
+                <li>У вас всего <span class="text-white" v-text="totalTime"></span> секунд на всю операцию.</li>
+                <li>Любая ошибка приведет к обрыву связи и <strong>сбросу миссии</strong>.</li>
+            </ul>
+        </div>
+        <br>
+        <button @click="startGame" class="btn btn-outline-danger btn-lg rounded-0 mt-4 fw-bold">НАЧАТЬ ВЗЛОМ [ENTER]</button>
+    </div>
+
+    <div v-else-if="completed" class="text-center mt-5">
+        <h2 class="text-success border border-success p-3 d-inline-block rounded-0">ДАННЫЕ УСПЕШНО ПЕРЕДАНЫ</h2>
+        <p class="mt-4 text-success">Миссия выполнена. Соединение разорвано.</p>
+        <p class="text-light">Телеметрия отправлена.</p>
+    </div>
+
+    <div v-else>
+        <!-- Header with Progress and Timer -->
+        <div class="row border-bottom border-danger pb-3 mb-4">
+            <div class="col-md-6 text-start">
+                <h4 class="mb-0">ФАЗА: <span v-text="currentPhaseIndex + 1"></span> / <span v-text="phases.length"></span></h4>
+                <div class="progress bg-dark rounded-0 mt-2" style="height: 10px;">
+                    <div class="progress-bar bg-danger" :style="{ width: progressPercent + '%' }"></div>
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <h2 :class="{'text-danger': true, 'text-warning': timeLeft <= 15}" class="mb-0">
+                    TRACE: <span v-text="formattedTime"></span>
+                </h2>
+            </div>
+        </div>
+
+        <!-- Terminal Output -->
+        <div class="card bg-dark border-danger rounded-0 mb-4">
+            <div class="card-body">
+                <p v-for="(log, i) in actionLog" :key="i" class="text-light mb-1">> <span v-text="log"></span></p>
+                <p class="text-white mb-0 mt-3">> <span v-text="currentPhase.question"></span></p>
+            </div>
+        </div>
+
+        <!-- Interaction Area -->
+        <div class="row">
+            <div class="col-12">
+                
+                <!-- Choice Type -->
+                <div v-if="currentPhase.type === 'choice'" class="d-grid gap-3">
+                    <button 
+                        v-for="(opt, idx) in currentPhase.options" 
+                        :key="idx"
+                        @click="submitChoice(idx)"
+                        class="btn btn-outline-danger btn-lg rounded-0 text-start">
+                        [<span v-text="idx + 1"></span>] <span v-text="opt"></span>
+                    </button>
+                </div>
+
+                <!-- Input Type -->
+                <div v-if="currentPhase.type === 'input'">
+                    <div class="input-group input-group-lg rounded-0">
+                        <span class="input-group-text bg-dark text-danger border-danger rounded-0">PWD></span>
+                        <input 
+                            type="text" 
+                            v-model="inputValue"
+                            @keyup.enter="submitInput"
+                            ref="inputField"
+                            class="form-control bg-black text-white border-danger rounded-0 shadow-none" 
+                            autocomplete="off">
+                        <button @click="submitInput" class="btn btn-danger rounded-0">ВВОД</button>
+                    </div>
+                </div>
+
+                <!-- Action Type -->
+                <div v-if="currentPhase.type === 'action'" class="text-center">
+                    <button 
+                        @click="submitAction"
+                        class="btn btn-danger btn-lg rounded-0 py-4 px-5 fw-bold fs-2"
+                        v-text="currentPhase.button">
+                    </button>
+                    <p class="mt-3 text-warning">СЕКРЕТНЫЙ КАНАЛ ОТКРЫТ! НАЖМИТЕ КНОПКУ НЕМЕДЛЕННО!</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script is:inline>
+    const { createApp, ref, computed, nextTick, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const started = ref(false);
+            const completed = ref(false);
+            const startTime = ref(null);
+            
+            const totalTime = 60; // 60 seconds
+            const timeLeft = ref(totalTime);
+            let timerInterval = null;
+
+            const actionLog = ref([]);
+            const inputValue = ref("");
+            const inputField = ref(null);
+
+            const initialPhases = [
+                {
+                    type: 'choice',
+                    question: 'Обнаружен архив backup.zip. Какое действие применить для извлечения данных?',
+                    options: ['MOUNT (Монтировать)', 'EXTRACT (Извлечь/Распаковать)', 'COMPILE (Скомпилировать)'],
+                    answer: 1
+                },
+                {
+                    type: 'choice',
+                    question: 'Внутри найден многотомный архив: data.part1.rar, data.part2.rar, data.part3.rar. Какой файл открыть для старта распаковки?',
+                    options: ['data.part1.rar', 'data.part3.rar', 'Выделить все три и нажать "Извлечь"'],
+                    answer: 0
+                },
+                {
+                    type: 'input',
+                    question: 'Архив защищен паролем. Подсказка: 2 в степени 4. Введите пароль для дешифровки:',
+                    answer: '16'
+                },
+                {
+                    type: 'choice',
+                    question: 'Данные (TXT файлы, 500 МБ) извлечены. Выберите алгоритм для МАКСИМАЛЬНОГО сжатия перед отправкой на базу:',
+                    options: ['ZIP (Store - Без сжатия)', 'RAR (Fast - Быстрое сжатие)', '7z (LZMA2 - Ультра сжатие)'],
+                    answer: 2
+                },
+                {
+                    type: 'choice',
+                    question: 'Канал связи ограничивает размер одного файла в 10 МБ. Как передать наш архив размером 35 МБ без потери данных?',
+                    options: ['Создать многотомный архив (тома по 10 МБ)', 'Сжать архив еще раз (ZIP в ZIP)', 'Отправить как есть, сервер обрежет сам'],
+                    answer: 0
+                },
+                {
+                    type: 'choice',
+                    question: 'В папке также найдены секретные фото (JPEG). Сильно ли они сожмутся при архивации?',
+                    options: ['Да, примерно на 50%', 'Нет, формат JPEG уже является сжатым', 'Да, на 90% как текстовые файлы'],
+                    answer: 1
+                },
+                {
+                    type: 'choice',
+                    question: 'Чтобы обойти простой сканер на выходе, нужно скрыть факт использования 7z. Какой базовый метод применить?',
+                    options: ['Изменить расширение с .7z на .txt (обфускация)', 'Сделать файл "Только для чтения"', 'Добавить ярлык (.lnk) на архив'],
+                    answer: 0
+                },
+                {
+                    type: 'action',
+                    question: 'Синхронизация завершена! Ожидание ручного подтверждения передачи.',
+                    button: 'ОТПРАВИТЬ ДАННЫЕ'
+                }
+            ];
+
+            const phases = ref([...initialPhases]);
+            const currentPhaseIndex = ref(0);
+
+            const currentPhase = computed(() => phases.value[currentPhaseIndex.value]);
+            const progressPercent = computed(() => (currentPhaseIndex.value / phases.value.length) * 100);
+            const formattedTime = computed(() => {
+                const ms = timeLeft.value;
+                const secs = Math.floor(ms);
+                return `00:${secs.toString().padStart(2, '0')}`;
+            });
+
+            const sendTelemetry = (action_type, status, success = false) => {
+                const timeSpent = startTime.value ? Math.floor((Date.now() - startTime.value) / 1000) : 0;
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Архивация :: Уровень 3',
+                    action_type: action_type,
+                    status: status,
+                    start_time: startTime.value ? new Date(startTime.value).toISOString() : new Date().toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: 1,
+                    success: success
+                }, '*');
+            };
+
+            const hardcoreReset = (reason) => {
+                clearInterval(timerInterval);
+                sendTelemetry('hardcore_reset', 'in_progress', false);
+                alert(`КРИТИЧЕСКАЯ ОШИБКА: ${reason}\n\nСВЯЗЬ ПОТЕРЯНА. ИНИЦИАЛИЗАЦИЯ ПОЛНОГО СБРОСА.`);
+                
+                // Reset state
+                started.value = false;
+                completed.value = false;
+                currentPhaseIndex.value = 0;
+                timeLeft.value = totalTime;
+                actionLog.value = [];
+                inputValue.value = "";
+            };
+
+            const startGame = () => {
+                started.value = true;
+                completed.value = false;
+                currentPhaseIndex.value = 0;
+                timeLeft.value = totalTime;
+                actionLog.value = ["УСТАНОВЛЕНО СОЕДИНЕНИЕ", "СИСТЕМА АРХИВАЦИИ АКТИВНА"];
+                startTime.value = Date.now();
+
+                sendTelemetry('in_progress', 'in_progress', false);
+
+                timerInterval = setInterval(() => {
+                    timeLeft.value -= 1;
+                    if (timeLeft.value <= 0) {
+                        hardcoreReset('ВРЕМЯ ВЫШЛО. ВАС ОБНАРУЖИЛИ.');
+                    }
+                }, 1000);
+                
+                focusInputIfNeeded();
+            };
+
+            const focusInputIfNeeded = () => {
+                if (currentPhase.value.type === 'input') {
+                    nextTick(() => {
+                        if (inputField.value) inputField.value.focus();
+                    });
+                }
+            };
+
+            const nextPhase = (logMessage) => {
+                actionLog.value.push(logMessage);
+                if (actionLog.value.length > 3) actionLog.value.shift(); // Keep last 3 logs
+                
+                currentPhaseIndex.value++;
+                inputValue.value = "";
+
+                if (currentPhaseIndex.value >= phases.value.length) {
+                    // Victory
+                    clearInterval(timerInterval);
+                    completed.value = true;
+                    sendTelemetry('level_complete', 'completed', true);
+                } else {
+                    focusInputIfNeeded();
+                }
+            };
+
+            const submitChoice = (idx) => {
+                if (idx === currentPhase.value.answer) {
+                    nextPhase(`ВЫБРАН ПАРАМЕТР [${currentPhase.value.options[idx]}] - УСПЕХ`);
+                } else {
+                    hardcoreReset('ВЫБРАНО НЕВЕРНОЕ ДЕЙСТВИЕ.');
+                }
+            };
+
+            const submitInput = () => {
+                const ans = inputValue.value.trim().toLowerCase();
+                const correct = currentPhase.value.answer.toLowerCase();
+                
+                if (ans === correct) {
+                    nextPhase('ДОСТУП РАЗРЕШЕН. ПАРОЛЬ ВЕРЕН.');
+                } else {
+                    hardcoreReset('НЕВЕРНЫЙ ПАРОЛЬ.');
+                }
+            };
+
+            const submitAction = () => {
+                nextPhase('ДАННЫЕ ОТПРАВЛЕНЫ.');
+            };
+
+            onUnmounted(() => {
+                if (timerInterval) clearInterval(timerInterval);
+            });
+
+            return {
+                started,
+                completed,
+                timeLeft,
+                formattedTime,
+                phases,
+                currentPhaseIndex,
+                currentPhase,
+                progressPercent,
+                actionLog,
+                inputValue,
+                inputField,
+                totalTime,
+                startGame,
+                submitChoice,
+                submitInput,
+                submitAction
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
