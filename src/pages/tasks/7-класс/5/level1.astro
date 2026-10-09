@@ -1,0 +1,244 @@
+---
+// Уровень 1 (Базовый)
+// Тема: Архивация данных
+---
+<div class="container-fluid bg-black text-success font-monospace min-vh-100 p-4 rounded-0">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="text-success border-bottom border-success pb-2 mb-4 rounded-0">ТЕРМИНАЛ АДМИНИСТРАТОРА // ОПТИМИЗАЦИЯ СЕРВЕРА</h2>
+            
+            <!-- Окно ошибок -->
+            <div id="error-box" class="alert alert-danger bg-dark text-danger border border-danger rounded-0 d-none mb-4">
+                [СИСТЕМНАЯ ОШИБКА] <span id="error-message"></span>
+            </div>
+
+            <!-- ФАЗА 1 -->
+            <div id="phase1" class="card bg-dark border-success rounded-0 mb-4">
+                <div class="card-header border-success rounded-0">ФАЗА 1: Анализ сжимаемости</div>
+                <div class="card-body">
+                    <p>На сервере заканчивается свободное место. Вам поручено заархивировать файлы. Однако, некоторые форматы уже сжаты, и их повторная архивация только потратит ресурсы процессора, не уменьшив размер.</p>
+                    <p class="text-warning">Задача: Отметьте галочками ТОЛЬКО те файлы, которые хорошо сжимаются архиватором (текстовые данные, несжатые форматы).</p>
+                    
+                    <div id="phase1-files" class="mb-3 ps-3 border-start border-success">
+                        <!-- Чекбоксы генерируются JS -->
+                    </div>
+                    
+                    <button id="btn-phase1" class="btn btn-outline-success rounded-0">Выполнить сжатие выбранных</button>
+                </div>
+            </div>
+
+            <!-- ФАЗА 2 -->
+            <div id="phase2" class="card bg-dark border-success rounded-0 mb-4 d-none">
+                <div class="card-header border-success rounded-0">ФАЗА 2: Прогнозирование размера</div>
+                <div class="card-body">
+                    <p>Выбраны файлы логов сервера (чистый текст).</p>
+                    <p id="phase2-question" class="text-warning">
+                        <!-- Вопрос генерируется JS -->
+                    </p>
+                    
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="input-phase2" class="form-control bg-black text-success border-success rounded-0" placeholder="Введите число...">
+                        <span class="input-group-text bg-dark text-success border-success rounded-0">МБ</span>
+                    </div>
+                    
+                    <button id="btn-phase2" class="btn btn-outline-success rounded-0">Подтвердить размер</button>
+                </div>
+            </div>
+
+            <!-- ФАЗА 3 -->
+            <div id="phase3" class="card bg-dark border-success rounded-0 mb-4 d-none">
+                <div class="card-header border-success rounded-0">ФАЗА 3: Выбор инструмента</div>
+                <div class="card-body">
+                    <p id="phase3-question" class="text-warning">
+                        <!-- Сценарий генерируется JS -->
+                    </p>
+                    
+                    <div class="d-flex gap-3">
+                        <button class="btn btn-outline-success rounded-0 p3-btn" data-answer="ZIP">Формат .ZIP</button>
+                        <button class="btn btn-outline-success rounded-0 p3-btn" data-answer="TAR">Утилита TAR</button>
+                        <button class="btn btn-outline-success rounded-0 p3-btn" data-answer="7Z">Формат .7Z</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ЭКРАН УСПЕХА -->
+            <div id="success-screen" class="card bg-success text-black border-success rounded-0 mb-4 d-none">
+                <div class="card-body text-center py-5">
+                    <h1 class="display-4 fw-bold">ОПТИМИЗАЦИЯ УСПЕШНО ЗАВЕРШЕНА</h1>
+                    <p class="lead">Данные заархивированы, место на сервере освобождено.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // Телеметрия
+    const startTime = new Date();
+    let attempts = 0;
+    const missionName = 'Урок 5 :: Архивация данных (Базовый)';
+
+    function sendTelemetry(action_type, status, success) {
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: action_type,
+            status: status,
+            start_time: startTime.toISOString(),
+            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
+            attempts_count: attempts,
+            success: success
+        }, '*');
+    }
+
+    // Отправка начала
+    sendTelemetry('in_progress', 'in_progress', false);
+
+    function showError(msg) {
+        attempts++;
+        const errBox = document.getElementById('error-box');
+        const errMsg = document.getElementById('error-message');
+        errMsg.textContent = msg;
+        errBox.classList.remove('d-none');
+        
+        // По правилам Уровня 1 - отправляем hardcore_reset, но сбрасываем только текущую фазу локально
+        sendTelemetry('hardcore_reset', 'in_progress', false);
+        
+        setTimeout(() => {
+            errBox.classList.add('d-none');
+        }, 3000);
+    }
+
+    // ================= ФАЗА 1 =================
+    const compressibleExts = ['.txt', '.log', '.csv', '.sql', '.json'];
+    const incompressibleExts = ['.mp4', '.jpg', '.zip', '.rar', '.mp3'];
+    const fileNames = ['server', 'backup', 'database', 'users', 'report', 'media', 'promo', 'archive'];
+
+    let p1CorrectIndexes = [];
+
+    function generatePhase1() {
+        const container = document.getElementById('phase1-files');
+        container.innerHTML = '';
+        p1CorrectIndexes = [];
+        
+        const count = 5;
+        for (let i = 0; i < count; i++) {
+            const isCompressible = Math.random() > 0.5;
+            const name = fileNames[Math.floor(Math.random() * fileNames.length)];
+            const ext = isCompressible 
+                ? compressibleExts[Math.floor(Math.random() * compressibleExts.length)]
+                : incompressibleExts[Math.floor(Math.random() * incompressibleExts.length)];
+                
+            if (isCompressible) p1CorrectIndexes.push(i);
+
+            const size = Math.floor(Math.random() * 500) + 10;
+            
+            const div = document.createElement('div');
+            div.className = 'form-check mb-2';
+            div.innerHTML = `
+                <input class="form-check-input bg-dark border-success rounded-0 p1-checkbox" type="checkbox" id="file${i}" data-index="${i}">
+                <label class="form-check-label" for="file${i}">
+                    ${name}${ext} (${size} MB)
+                </label>
+            `;
+            container.appendChild(div);
+        }
+        
+        // Гарантируем, что есть хотя бы один правильный и один неправильный ответ
+        if (p1CorrectIndexes.length === 0 || p1CorrectIndexes.length === count) {
+            generatePhase1();
+        }
+    }
+
+    document.getElementById('btn-phase1').addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('.p1-checkbox');
+        let selectedIndexes = [];
+        checkboxes.forEach(cb => {
+            if (cb.checked) selectedIndexes.push(parseInt(cb.dataset.index));
+        });
+
+        // Проверка: должны быть выбраны все правильные и ни одного неправильного
+        const isCorrect = selectedIndexes.length === p1CorrectIndexes.length && 
+                          selectedIndexes.every(val => p1CorrectIndexes.includes(val));
+
+        if (isCorrect) {
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+        } else {
+            showError('Выбраны файлы, не подлежащие сжатию (или пропущены подходящие). Генерация нового списка...');
+            setTimeout(generatePhase1, 1000);
+        }
+    });
+
+    // ================= ФАЗА 2 =================
+    let p2CorrectAnswer = 0;
+
+    function generatePhase2() {
+        const ratios = [2, 4, 5, 10, 20];
+        const ratio = ratios[Math.floor(Math.random() * ratios.length)];
+        const compressed = Math.floor(Math.random() * 50) + 5; // от 5 до 55
+        const original = compressed * ratio;
+        
+        p2CorrectAnswer = compressed;
+
+        document.getElementById('phase2-question').textContent = 
+            `Размер исходной папки с логами сервера составляет ${original} МБ. Алгоритм сжал ее в ${ratio} раз. Какой итоговый размер архива в мегабайтах?`;
+        document.getElementById('input-phase2').value = '';
+    }
+
+    document.getElementById('btn-phase2').addEventListener('click', () => {
+        const val = parseInt(document.getElementById('input-phase2').value);
+        if (val === p2CorrectAnswer) {
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+        } else {
+            showError('Неверный расчет размера архива. Повторите вычисление с новыми данными.');
+            setTimeout(generatePhase2, 1000);
+        }
+    });
+
+    // ================= ФАЗА 3 =================
+    const scenarios = [
+        {
+            text: "Вам нужно отправить папку с отчетами по электронной почте рядовому сотруднику. На его компьютере (ОС Windows) нет прав администратора и не установлены сторонние архиваторы. Какой формат выбрать?",
+            answer: "ZIP"
+        },
+        {
+            text: "Вам нужно собрать множество файлов логов сервера (ОС Linux) в один единый пакет (файл) для последующей отправки в хранилище. Само сжатие при этом обеспечит отдельная утилита gzip. Что вы используете для сбора файлов?",
+            answer: "TAR"
+        },
+        {
+            text: "На сервере очень мало места. Вам нужно максимально сильно сжать базу данных перед отправкой. Время создания архива не имеет значения, целевая система поддерживает любые форматы. Какой формат обеспечит лучшее сжатие?",
+            answer: "7Z"
+        }
+    ];
+
+    let p3CorrectAnswer = "";
+
+    function generatePhase3() {
+        const sc = scenarios[Math.floor(Math.random() * scenarios.length)];
+        p3CorrectAnswer = sc.answer;
+        document.getElementById('phase3-question').textContent = sc.text;
+    }
+
+    document.querySelectorAll('.p3-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const ans = e.target.dataset.answer;
+            if (ans === p3CorrectAnswer) {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+                sendTelemetry('level_complete', 'completed', true);
+            } else {
+                showError('Выбран неверный инструмент. Возник конфликт совместимости. Генерируется новая задача...');
+                setTimeout(generatePhase3, 1000);
+            }
+        });
+    });
+
+    // Инициализация
+    generatePhase1();
+    generatePhase2();
+    generatePhase3();
+
+</script>
