@@ -5,7 +5,7 @@ test.describe('Архивация данных (Уровень 1)', () => {
 
   test('Успешное прохождение уровня', async ({ page }) => {
     // 1. Переход на страницу урока
-    await page.goto('http://localhost:4321/lesson/7-класс/5');
+    await page.goto('http://localhost:4321/lesson/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/5');
     // В зависимости от структуры, нужный нам iframe может быть iframe-1
     const frame = page.frameLocator('#iframe-1');
     
@@ -65,21 +65,20 @@ test.describe('Архивация данных (Уровень 1)', () => {
   });
 
   test('Обработка ошибок в хардкор-режиме', async ({ page }) => {
+    // Автоматически принимаем все алерты
+    page.on('dialog', async dialog => {
+      await dialog.accept();
+    });
+
     // 1. Переход на страницу и включение хардкора
-    await page.goto('http://localhost:4321/lesson/7-класс/5');
+    await page.goto('http://localhost:4321/lesson/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/5');
     await page.evaluate(() => { localStorage.setItem('hardcore_mode', 'true'); });
     await page.reload();
     
     const frame = page.frameLocator('#iframe-1');
     await expect(frame.locator('#phase1')).toBeVisible();
     
-    const alertPromise = page.waitForEvent('dialog', { timeout: 3000 }).catch(() => null);
     await frame.locator('#btn-phase1').click();
-    
-    const dialog = await alertPromise;
-    if (dialog) {
-        await dialog.accept();
-    }
     
     // В задании на Vanilla JS сброс локальный для 1 уровня, но телеметрия hardcore_reset должна быть отправлена
     // Проверка БД на запись hardcore_reset

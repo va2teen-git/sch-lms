@@ -5,7 +5,7 @@ test.describe('Урок 7 класс - Архивация (Уровень 3)', (
 
   test('Успешное прохождение аркады (Level 3)', async ({ page }) => {
     // 1. Переход на страницу урока
-    await page.goto('http://localhost:4321/lesson/7-класс/5');
+    await page.goto('http://localhost:4321/lesson/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/5');
     
     // Принудительно показываем iframe-3 для теста
     await page.evaluate(() => {
@@ -81,7 +81,7 @@ test.describe('Урок 7 класс - Архивация (Уровень 3)', (
     });
 
     // 1. Переход на страницу и включение хардкора
-    await page.goto('http://localhost:4321/lesson/7-класс/5');
+    await page.goto('http://localhost:4321/lesson/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/5');
     await page.evaluate(() => { localStorage.setItem('hardcore_mode', 'true'); });
     await page.reload();
     
