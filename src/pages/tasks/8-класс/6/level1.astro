@@ -1,0 +1,161 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container mt-4">
+        <h2 class="mb-4">Миссия: Восстановление сервера</h2>
+        <div id="game-container" class="card bg-dark border-success">
+            <div class="card-body">
+                <!-- Фаза 1 -->
+                <div id="phase1" class="phase-container">
+                    <h4 class="text-success">Шаг 1: Сетевая ошибка</h4>
+                    <p>Сервер выдал ошибку маршрутизатора в двоичном коде: <span id="p1-value" class="fw-bold font-monospace fs-4"></span><sub>2</sub></p>
+                    <p>Введите код в десятичной системе, чтобы найти его в справочнике:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p1-input" class="form-control bg-dark text-success border-success rounded-0" autocomplete="off" placeholder="Например: 42">
+                        <button id="p1-btn" class="btn btn-outline-success rounded-0">Ввод</button>
+                    </div>
+                    <div id="p1-feedback" class="text-danger fw-bold d-none">Ошибка доступа! Перекалибровка...</div>
+                </div>
+
+                <!-- Фаза 2 -->
+                <div id="phase2" class="phase-container d-none">
+                    <h4 class="text-success">Шаг 2: Права доступа</h4>
+                    <p>Требуемый уровень прав (десятичный): <span id="p2-value" class="fw-bold font-monospace fs-4"></span><sub>10</sub></p>
+                    <p>Для команды `chmod` введите права в восьмеричной системе:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p2-input" class="form-control bg-dark text-success border-success rounded-0" autocomplete="off" placeholder="Например: 755">
+                        <button id="p2-btn" class="btn btn-outline-success rounded-0">Ввод</button>
+                    </div>
+                    <div id="p2-feedback" class="text-danger fw-bold d-none">Неверные права! Генерация нового ключа...</div>
+                </div>
+
+                <!-- Фаза 3 -->
+                <div id="phase3" class="phase-container d-none">
+                    <h4 class="text-success">Шаг 3: Восстановление MAC-адреса</h4>
+                    <p>Поврежденный байт памяти: <span id="p3-value" class="fw-bold font-monospace fs-4"></span><sub>2</sub></p>
+                    <p>Разбейте байт на тетрады и введите значение в шестнадцатеричной системе (2 символа):</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p3-input" class="form-control bg-dark text-success border-success rounded-0" autocomplete="off" placeholder="Например: B6">
+                        <button id="p3-btn" class="btn btn-outline-success rounded-0">Ввод</button>
+                    </div>
+                    <div id="p3-feedback" class="text-danger fw-bold d-none">Сбой контрольной суммы! Выделение нового сектора...</div>
+                </div>
+
+                <!-- Успех -->
+                <div id="success-screen" class="phase-container d-none text-center py-4">
+                    <h3 class="text-success mb-3">СЕРВЕР УСПЕШНО ВОССТАНОВЛЕН</h3>
+                    <p>Сетевые модули запущены. Связь установлена.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const missionName = 'Урок 6 :: Уровень 1 (Системы счисления)';
+        let startTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        // Фаза 1: 2 -> 10
+        let p1Correct = '';
+        function initPhase1() {
+            // Генерируем число от 15 до 63
+            const dec = Math.floor(Math.random() * (63 - 15 + 1)) + 15;
+            p1Correct = dec.toString();
+            document.getElementById('p1-value').textContent = dec.toString(2);
+            document.getElementById('p1-input').value = '';
+        }
+
+        // Фаза 2: 10 -> 8
+        let p2Correct = '';
+        function initPhase2() {
+            // Генерируем число от 64 до 511, чтобы в восьмеричной было от 100 до 777
+            const dec = Math.floor(Math.random() * (511 - 64 + 1)) + 64;
+            p2Correct = dec.toString(8);
+            document.getElementById('p2-value').textContent = dec.toString();
+            document.getElementById('p2-input').value = '';
+        }
+
+        // Фаза 3: 2 -> 16
+        let p3Correct = '';
+        function initPhase3() {
+            // Генерируем число от 16 до 255, чтобы в шестнадцатеричной было от 10 до FF
+            const dec = Math.floor(Math.random() * (255 - 16 + 1)) + 16;
+            p3Correct = dec.toString(16).toUpperCase();
+            document.getElementById('p3-value').textContent = dec.toString(2).padStart(8, '0');
+            document.getElementById('p3-input').value = '';
+        }
+
+        function checkPhase(phaseNum, inputId, btnId, feedbackId, correctVal, nextPhaseId, initFn) {
+            const inputEl = document.getElementById(inputId);
+            const btnEl = document.getElementById(btnId);
+            const feedbackEl = document.getElementById(feedbackId);
+            
+            let userVal = inputEl.value.trim().toUpperCase();
+            
+            if (userVal === correctVal) {
+                document.getElementById(`phase${phaseNum}`).classList.add('d-none');
+                const nextEl = document.getElementById(nextPhaseId);
+                nextEl.classList.remove('d-none');
+                
+                if (nextPhaseId === 'success-screen') {
+                    sendTelemetry('level_complete', true);
+                } else {
+                    sendTelemetry('in_progress');
+                }
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                
+                inputEl.disabled = true;
+                btnEl.disabled = true;
+                feedbackEl.classList.remove('d-none');
+                
+                setTimeout(() => {
+                    initFn();
+                    inputEl.disabled = false;
+                    btnEl.disabled = false;
+                    feedbackEl.classList.add('d-none');
+                    inputEl.focus();
+                }, 1200);
+            }
+        }
+
+        document.getElementById('p1-btn').addEventListener('click', () => {
+            checkPhase(1, 'p1-input', 'p1-btn', 'p1-feedback', p1Correct, 'phase2', initPhase1);
+        });
+        document.getElementById('p2-btn').addEventListener('click', () => {
+            checkPhase(2, 'p2-input', 'p2-btn', 'p2-feedback', p2Correct, 'phase3', initPhase2);
+        });
+        document.getElementById('p3-btn').addEventListener('click', () => {
+            checkPhase(3, 'p3-input', 'p3-btn', 'p3-feedback', p3Correct, 'success-screen', initPhase3);
+        });
+
+        ['p1', 'p2', 'p3'].forEach(p => {
+            document.getElementById(`${p}-input`).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') document.getElementById(`${p}-btn`).click();
+            });
+        });
+
+        // Инициализация при старте
+        sendTelemetry('in_progress');
+        initPhase1();
+        initPhase2();
+        initPhase3();
+    </script>
+</TaskLayout>

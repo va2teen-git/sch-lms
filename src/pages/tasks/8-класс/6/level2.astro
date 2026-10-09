@@ -1,0 +1,216 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container mt-4">
+        <h2 class="mb-4 text-warning">Миссия: Низкоуровневый отладчик</h2>
+        <div id="game-container" class="card bg-dark border-warning">
+            <div class="card-body">
+                <!-- Фаза 1 -->
+                <div id="phase1" class="phase-container">
+                    <h4 class="text-warning">Шаг 1: Адрес инструкции</h4>
+                    <p>Указатель инструкции процессора остановился на адресе: <span id="p1-value" class="fw-bold font-monospace fs-4 text-white"></span><sub>2</sub></p>
+                    <p>Введите этот адрес в шестнадцатеричной системе (2 символа):</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p1-input" class="form-control bg-dark text-warning border-warning rounded-0" autocomplete="off" placeholder="Например: A5">
+                        <button id="p1-btn" class="btn btn-outline-warning rounded-0">Ввод</button>
+                    </div>
+                    <div id="p1-feedback" class="text-danger fw-bold d-none">Ошибка адресации! Перезапуск регистра...</div>
+                </div>
+
+                <!-- Фаза 2 -->
+                <div id="phase2" class="phase-container d-none">
+                    <h4 class="text-warning">Шаг 2: Байт конфигурации</h4>
+                    <p>Система ожидает 8-битный флаг конфигурации. В технической документации указан код: <span id="p2-value" class="fw-bold font-monospace fs-4 text-white"></span><sub>16</sub></p>
+                    <p>Вручную введите строку из 8 бит (нулей и единиц):</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p2-input" class="form-control bg-dark text-warning border-warning rounded-0" autocomplete="off" placeholder="Например: 11000011">
+                        <button id="p2-btn" class="btn btn-outline-warning rounded-0">Ввод</button>
+                    </div>
+                    <div id="p2-feedback" class="text-danger fw-bold d-none">Неверный флаг! Сброс конфигурации...</div>
+                </div>
+
+                <!-- Фаза 3 -->
+                <div id="phase3" class="phase-container d-none">
+                    <h4 class="text-warning">Шаг 3: Кросс-перевод данных</h4>
+                    <p>Значение в регистре «A» равно <span id="p3-value" class="fw-bold font-monospace fs-4 text-white"></span><sub>16</sub></p>
+                    <p>Старый модуль отладчика принимает команды только в восьмеричной системе. Переведите значение (Hex -> Bin -> Oct) и введите ответ:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p3-input" class="form-control bg-dark text-warning border-warning rounded-0" autocomplete="off" placeholder="Например: 175">
+                        <button id="p3-btn" class="btn btn-outline-warning rounded-0">Ввод</button>
+                    </div>
+                    <div id="p3-feedback" class="text-danger fw-bold d-none">Сбой совместимости! Регенерация байта...</div>
+                </div>
+
+                <!-- Фаза 4 -->
+                <div id="phase4" class="phase-container d-none">
+                    <h4 class="text-warning">Шаг 4: Вычитание шума</h4>
+                    <p>Получено искаженное десятичное значение: <span id="p4-val1" class="fw-bold font-monospace fs-4 text-white"></span><sub>10</sub></p>
+                    <p>Известно, что уровень аппаратного шума равен <span id="p4-val2" class="fw-bold font-monospace fs-4 text-white"></span><sub>2</sub></p>
+                    <p>Вычтите шум из десятичного значения и введите чистое десятичное число:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p4-input" class="form-control bg-dark text-warning border-warning rounded-0" autocomplete="off" placeholder="Ответ в 10-й системе">
+                        <button id="p4-btn" class="btn btn-outline-warning rounded-0">Ввод</button>
+                    </div>
+                    <div id="p4-feedback" class="text-danger fw-bold d-none">Математическая ошибка! Повторный захват сигнала...</div>
+                </div>
+
+                <!-- Фаза 5 -->
+                <div id="phase5" class="phase-container d-none">
+                    <h4 class="text-warning">Шаг 5: Проверка четности</h4>
+                    <p>Для разблокировки загрузчика необходимо сложить три контрольных числа, заданных в восьмеричной системе:</p>
+                    <p class="fs-4 text-white"><span id="p5-val1" class="fw-bold font-monospace"></span><sub>8</sub> + <span id="p5-val2" class="fw-bold font-monospace"></span><sub>8</sub> + <span id="p5-val3" class="fw-bold font-monospace"></span><sub>8</sub></p>
+                    <p>Вычислите сумму и введите ответ в десятичной системе:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" id="p5-input" class="form-control bg-dark text-warning border-warning rounded-0" autocomplete="off" placeholder="Сумма в 10-й системе">
+                        <button id="p5-btn" class="btn btn-outline-warning rounded-0">Ввод</button>
+                    </div>
+                    <div id="p5-feedback" class="text-danger fw-bold d-none">Контрольная сумма не совпадает! Блокировка...</div>
+                </div>
+
+                <!-- Успех -->
+                <div id="success-screen" class="phase-container d-none text-center py-4">
+                    <h3 class="text-warning mb-3">ПРОШИВКА ВОССТАНОВЛЕНА</h3>
+                    <p>Все модули инициализированы. Доступ к системе открыт.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const missionName = 'Урок 6 :: Уровень 2 (Системы счисления)';
+        let startTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        // Фаза 1: Bin -> Hex
+        let p1Correct = '';
+        function initPhase1() {
+            const dec = Math.floor(Math.random() * (255 - 16 + 1)) + 16;
+            p1Correct = dec.toString(16).toUpperCase();
+            document.getElementById('p1-value').textContent = dec.toString(2).padStart(8, '0');
+            document.getElementById('p1-input').value = '';
+        }
+
+        // Фаза 2: Hex -> Bin
+        let p2Correct = '';
+        function initPhase2() {
+            const dec = Math.floor(Math.random() * (255 - 16 + 1)) + 16;
+            p2Correct = dec.toString(2).padStart(8, '0');
+            document.getElementById('p2-value').textContent = dec.toString(16).toUpperCase();
+            document.getElementById('p2-input').value = '';
+        }
+
+        // Фаза 3: Hex -> Oct
+        let p3Correct = '';
+        function initPhase3() {
+            const dec = Math.floor(Math.random() * (255 - 32 + 1)) + 32;
+            p3Correct = dec.toString(8);
+            document.getElementById('p3-value').textContent = dec.toString(16).toUpperCase();
+            document.getElementById('p3-input').value = '';
+        }
+
+        // Фаза 4: Dec - Bin = Dec
+        let p4Correct = '';
+        function initPhase4() {
+            const subDec = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+            const mainDec = Math.floor(Math.random() * (100 - 30 + 1)) + 30;
+            p4Correct = (mainDec - subDec).toString();
+            document.getElementById('p4-val1').textContent = mainDec.toString();
+            document.getElementById('p4-val2').textContent = subDec.toString(2);
+            document.getElementById('p4-input').value = '';
+        }
+
+        // Фаза 5: Oct + Oct + Oct = Dec
+        let p5Correct = '';
+        function initPhase5() {
+            const o1 = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+            const o2 = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+            const o3 = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+            p5Correct = (o1 + o2 + o3).toString();
+            document.getElementById('p5-val1').textContent = o1.toString(8);
+            document.getElementById('p5-val2').textContent = o2.toString(8);
+            document.getElementById('p5-val3').textContent = o3.toString(8);
+            document.getElementById('p5-input').value = '';
+        }
+
+        function checkPhase(phaseNum, inputId, btnId, feedbackId, correctVal, nextPhaseId, initFn) {
+            const inputEl = document.getElementById(inputId);
+            const btnEl = document.getElementById(btnId);
+            const feedbackEl = document.getElementById(feedbackId);
+            
+            let userVal = inputEl.value.trim().toUpperCase();
+            
+            if (userVal === correctVal) {
+                document.getElementById(`phase${phaseNum}`).classList.add('d-none');
+                const nextEl = document.getElementById(nextPhaseId);
+                nextEl.classList.remove('d-none');
+                
+                if (nextPhaseId === 'success-screen') {
+                    sendTelemetry('level_complete', true);
+                } else {
+                    sendTelemetry('in_progress');
+                }
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                
+                inputEl.disabled = true;
+                btnEl.disabled = true;
+                feedbackEl.classList.remove('d-none');
+                
+                setTimeout(() => {
+                    initFn();
+                    inputEl.disabled = false;
+                    btnEl.disabled = false;
+                    feedbackEl.classList.add('d-none');
+                    inputEl.focus();
+                }, 1200);
+            }
+        }
+
+        document.getElementById('p1-btn').addEventListener('click', () => {
+            checkPhase(1, 'p1-input', 'p1-btn', 'p1-feedback', p1Correct, 'phase2', initPhase1);
+        });
+        document.getElementById('p2-btn').addEventListener('click', () => {
+            checkPhase(2, 'p2-input', 'p2-btn', 'p2-feedback', p2Correct, 'phase3', initPhase2);
+        });
+        document.getElementById('p3-btn').addEventListener('click', () => {
+            checkPhase(3, 'p3-input', 'p3-btn', 'p3-feedback', p3Correct, 'phase4', initPhase3);
+        });
+        document.getElementById('p4-btn').addEventListener('click', () => {
+            checkPhase(4, 'p4-input', 'p4-btn', 'p4-feedback', p4Correct, 'phase5', initPhase4);
+        });
+        document.getElementById('p5-btn').addEventListener('click', () => {
+            checkPhase(5, 'p5-input', 'p5-btn', 'p5-feedback', p5Correct, 'success-screen', initPhase5);
+        });
+
+        ['p1', 'p2', 'p3', 'p4', 'p5'].forEach(p => {
+            document.getElementById(`${p}-input`).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') document.getElementById(`${p}-btn`).click();
+            });
+        });
+
+        // Инициализация при старте
+        sendTelemetry('in_progress');
+        initPhase1();
+        initPhase2();
+        initPhase3();
+        initPhase4();
+        initPhase5();
+    </script>
+</TaskLayout>
