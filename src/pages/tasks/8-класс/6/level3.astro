@@ -1,0 +1,236 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container mt-4" v-cloak>
+        <div v-if="gameState === 'intro'" class="text-center py-5">
+            <h2 class="text-danger mb-4">ВНИМАНИЕ: КРИТИЧЕСКИЙ СБОЙ RAID-МАССИВА</h2>
+            <p class="fs-5 text-white mb-4">Файловая система разрушается. Вам необходимо восстановить 10 секторов памяти до полного отказа системы (45 секунд).</p>
+            <p class="text-warning fw-bold mb-4">Любая ошибка при выборе сектора или истечение времени приведет к полной потере данных!</p>
+            <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3">НАЧАТЬ ДЕФРАГМЕНТАЦИЮ</button>
+        </div>
+
+        <div v-else-if="gameState === 'playing'" class="game-board">
+            <div class="row mb-3">
+                <div class="col-6">
+                    <h4 class="text-white">Секторов восстановлено: <span id="score" class="text-success"><span v-text="score"></span>/10</span></h4>
+                </div>
+                <div class="col-6 text-end">
+                    <h4 class="text-white">Угроза распада: <span id="timer" :class="timeLeft <= 10 ? 'text-danger' : 'text-warning'">00:<span v-text="formattedTime"></span></span></h4>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="progress mb-4 bg-dark border border-secondary" style="height: 10px;">
+                <div class="progress-bar" :class="timeLeft <= 10 ? 'bg-danger' : 'bg-warning'" role="progressbar" :style="'width: ' + ((timeLeft / 45) * 100) + '%'"></div>
+            </div>
+
+            <!-- Target Value -->
+            <div class="text-center mb-4 border border-info bg-dark bg-opacity-50 py-3">
+                <p class="text-info mb-1 fs-5">Искомый блок данных (Dec):</p>
+                <h1 class="display-3 fw-bold text-white m-0 font-monospace"><span id="target-value" v-text="targetDecimal"></span><sub>10</sub></h1>
+            </div>
+
+            <!-- Grid -->
+            <div class="row g-3 justify-content-center">
+                <div class="col-4" v-for="(cell, index) in cells" :key="index">
+                    <button @click="handleCellClick(cell)" 
+                            :data-sys="cell.sys"
+                            :data-value="cell.value"
+                            :data-is-correct="cell.isCorrect"
+                            class="btn btn-outline-secondary w-100 py-4 h-100 d-flex flex-column align-items-center justify-content-center rounded-0 cell-btn">
+                        <span class="fs-3 fw-bold font-monospace" :class="getSystemColor(cell.sys)">
+                            <span v-text="cell.rawValue"></span><sub><span v-text="cell.sys === 2 ? '2' : (cell.sys === 8 ? '8' : '16')"></span></sub>
+                        </span>
+                        <span class="small text-muted mt-2">SYS-<span v-text="cell.sys"></span></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-else-if="gameState === 'failed'" class="text-center py-5">
+            <h1 class="text-danger display-1 mb-4" id="fail-title">FATAL ERROR</h1>
+            <h3 class="text-white mb-4">МАССИВ РАЗРУШЕН</h3>
+            <p class="text-muted" v-text="failReason"></p>
+            <p class="text-warning mt-4"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Перезагрузка системы...</p>
+        </div>
+
+        <div v-else-if="gameState === 'success'" class="text-center py-5">
+            <h1 class="text-success display-3 mb-4" id="success-title">СИСТЕМА СТАБИЛЬНА</h1>
+            <h3 class="text-white mb-4">RAID-массив успешно дефрагментирован.</h3>
+            <p class="text-muted">Все данные спасены. Доступ восстановлен.</p>
+        </div>
+    </div>
+
+    <style>
+        [v-cloak] { display: none; }
+        .cell-btn {
+            background-color: #1a1d20;
+            transition: all 0.15s ease-in-out;
+            min-height: 120px;
+        }
+        .cell-btn:hover {
+            transform: scale(1.05);
+            background-color: #2b3035;
+            border-color: #0dcaf0;
+            z-index: 2;
+        }
+        .cell-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const missionName = 'Урок 6 :: Уровень 3 (Системы счисления)';
+        let sessionStartTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(sessionStartTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const gameState = ref('intro'); // intro, playing, failed, success
+                const score = ref(0);
+                const timeLeft = ref(45);
+                const targetDecimal = ref(0);
+                const cells = ref([]);
+                const failReason = ref('');
+                let timerInterval = null;
+
+                onMounted(() => {
+                    sendTelemetry('in_progress');
+                });
+
+                const startGame = () => {
+                    gameState.value = 'playing';
+                    score.value = 0;
+                    timeLeft.value = 45;
+                    generateLevel();
+                    
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerInterval = setInterval(() => {
+                        timeLeft.value--;
+                        if (timeLeft.value <= 0) {
+                            failGame('Истекло время дефрагментации.');
+                        }
+                    }, 1000);
+                };
+
+                const generateLevel = () => {
+                    // Target decimal from 30 to 200
+                    const target = Math.floor(Math.random() * (200 - 30 + 1)) + 30;
+                    targetDecimal.value = target;
+
+                    // Choose random correct system
+                    const systems = [2, 8, 16];
+                    const correctSys = systems[Math.floor(Math.random() * systems.length)];
+                    
+                    const newCells = [];
+                    newCells.push(createCellObj(target, correctSys, true));
+
+                    // Generate 8 incorrect cells
+                    for(let i = 0; i < 8; i++) {
+                        let sys = systems[Math.floor(Math.random() * systems.length)];
+                        let offset = 0;
+                        do {
+                            // offset from -15 to +15, but not 0
+                            offset = Math.floor(Math.random() * 31) - 15;
+                        } while (offset === 0 || target + offset <= 0);
+                        
+                        newCells.push(createCellObj(target + offset, sys, false));
+                    }
+
+                    // Shuffle cells
+                    cells.value = newCells.sort(() => Math.random() - 0.5);
+                };
+
+                const createCellObj = (value, base, isCorrect) => {
+                    let rawValue = '';
+                    if (base === 2) rawValue = value.toString(2);
+                    else if (base === 8) rawValue = value.toString(8);
+                    else if (base === 16) rawValue = value.toString(16).toUpperCase();
+                    
+                    return {
+                        value,
+                        sys: base,
+                        rawValue,
+                        isCorrect
+                    };
+                };
+
+                const getSystemColor = (sys) => {
+                    if (sys === 2) return 'text-success';
+                    if (sys === 8) return 'text-warning';
+                    if (sys === 16) return 'text-danger';
+                    return 'text-white';
+                };
+
+                const handleCellClick = (cell) => {
+                    if (gameState.value !== 'playing') return;
+
+                    if (cell.isCorrect) {
+                        score.value++;
+                        if (score.value >= 10) {
+                            winGame();
+                        } else {
+                            generateLevel();
+                        }
+                    } else {
+                        failGame('Обнаружен битый сектор (неверное значение).');
+                    }
+                };
+
+                const failGame = (reason) => {
+                    clearInterval(timerInterval);
+                    gameState.value = 'failed';
+                    failReason.value = reason;
+                    attempts++;
+                    sendTelemetry('hardcore_reset');
+                };
+
+                const winGame = () => {
+                    clearInterval(timerInterval);
+                    gameState.value = 'success';
+                    sendTelemetry('level_complete', true);
+                };
+
+                onUnmounted(() => {
+                    if (timerInterval) clearInterval(timerInterval);
+                });
+
+                const formattedTime = computed(() => {
+                    return timeLeft.value.toString().padStart(2, '0');
+                });
+
+                return {
+                    gameState,
+                    score,
+                    timeLeft,
+                    formattedTime,
+                    targetDecimal,
+                    cells,
+                    failReason,
+                    startGame,
+                    handleCellClick,
+                    getSystemColor
+                };
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>
