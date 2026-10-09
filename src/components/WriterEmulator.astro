@@ -96,11 +96,13 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         const event = new CustomEvent('writer-check', { 
             detail: { 
                 html: content, 
-                resolve: (success, msg) => {
+                resolve: (success, msg, isFinal = true) => {
                     if(success) {
                         statusEl.className = 'text-success small fw-bold';
                         statusEl.innerText = msg || '✅ Проверено. Задание выполнено!';
-                        sendTelemetry('level_complete', 'completed', true);
+                        if (isFinal) {
+                            sendTelemetry('level_complete', 'completed', true);
+                        }
                     } else {
                         statusEl.className = 'text-danger small fw-bold';
                         statusEl.innerText = msg || '❌ Ошибка форматирования!';
@@ -109,7 +111,8 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                             editor.value = ''; 
                         }
                     }
-                }
+                },
+                editor: editor // Прокидываем editor для очистки в промежуточных фазах
             }
         });
         

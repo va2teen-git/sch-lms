@@ -30,6 +30,8 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
         let currentSubject = '';
         let currentAction = '';
         let validTags = [];
+        let currentPhase = 1;
+        const TOTAL_PHASES = 3;
 
         function generateTask() {
             let nextSubject = subjects[Math.floor(Math.random() * subjects.length)];
@@ -45,6 +47,7 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
             currentAction = nextAction;
             validTags = tags[currentAction];
             
+            document.querySelector('.card-title').innerText = `Задание 1: Форматирование текста (Фаза ${currentPhase}/${TOTAL_PHASES})`;
             document.getElementById('task-description').innerHTML = 
                 `Напишите предложение, содержащее слово <code>${currentSubject}</code>, и выделите это слово <strong>${currentAction}</strong> шрифтом.`;
         }
@@ -77,10 +80,20 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
             }
 
             if (isCorrect) {
-                e.detail.resolve(true, "Отлично! Текст отформатирован верно.");
+                if (currentPhase < TOTAL_PHASES) {
+                    currentPhase++;
+                    e.detail.resolve(true, `Фаза ${currentPhase - 1} пройдена! Переход к следующей...`, false);
+                    setTimeout(() => {
+                        e.detail.editor.value = ''; // Очищаем редактор
+                        generateTask();
+                        document.getElementById('writer-status').innerText = ''; // Очищаем статус
+                    }, 1500);
+                } else {
+                    e.detail.resolve(true, "Отлично! Уровень полностью пройден.", true);
+                }
             } else {
                 e.detail.resolve(false, `Слово "${currentSubject}" не найдено или не выделено ${currentAction}!`);
-                // При ошибке генерируем новое задание
+                // При ошибке генерируем новое задание, но остаемся на той же фазе
                 setTimeout(generateTask, 1500);
             }
         });
