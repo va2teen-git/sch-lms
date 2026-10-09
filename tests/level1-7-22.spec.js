@@ -14,8 +14,8 @@ test.describe('7 класс - Урок 22', () => {
       
       const text = await taskDescription.innerText();
       // Пример текста: "Напишите предложение, содержащее слово Процессор, и выделите это слово жирным шрифтом."
-      const wordMatch = text.match(/слово\s+([А-Яа-яA-Za-z]+),/);
-      const actionMatch = text.match(/выделите это слово\s+([А-Яа-яA-Za-z]+)\s+шрифтом/);
+      const wordMatch = text.match(/слово\s+(.+?),/);
+      const actionMatch = text.match(/выделите это слово\s+(.+?)\s+шрифтом/);
       
       const targetWord = wordMatch ? wordMatch[1] : 'Процессор';
       const action = actionMatch ? actionMatch[1] : 'жирным';
@@ -25,9 +25,9 @@ test.describe('7 класс - Урок 22', () => {
       if (phase === 1) await editor.click();
       
       let html = `Вот мой ${targetWord} и он работает фаза ${phase}`;
-      if (action === 'жирным') html = `Вот мой <strong>${targetWord}</strong> и он работает фаза ${phase}`;
-      else if (action === 'курсивом') html = `Вот мой <em>${targetWord}</em> и он работает фаза ${phase}`;
-      else if (action === 'подчеркнутым') html = `Вот мой <u>${targetWord}</u> и он работает фаза ${phase}`;
+      if (action.includes('жирным')) html = `Вот мой <strong>${targetWord}</strong> и он работает фаза ${phase}`;
+      else if (action.includes('курсивом')) html = `Вот мой <em>${targetWord}</em> и он работает фаза ${phase}`;
+      else if (action.includes('подчеркнутым')) html = `Вот мой <u>${targetWord}</u> и он работает фаза ${phase}`;
       
       // Устанавливаем HTML напрямую через evaluate
       await page.evaluate((htmlContent) => {
