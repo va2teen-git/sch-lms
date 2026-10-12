@@ -1,0 +1,383 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <div class="display-3 text-danger font-monospace mb-3">⚠️ КРИТИЧЕСКИЙ СБОЙ КОНВЕЙЕРА ⚠️</div>
+            <h2 class="text-light font-monospace mb-3">POST DEFENDER: CONVEYOR DEFUSE</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                Символьный сопроцессор Поста подвергся рассинхронизации тактов. На конвейер поступают аварийные команды и циклические ловушки.
+                Вам необходимо нейтрализовать угрозы и пройти <span class="text-danger fw-bold">8 нарастающих волн перехвата</span>.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 600px;">
+                <div class="text-danger fw-bold mb-2">[ПРАВИЛА БОЯ В ХАРДКОР-РЕЖИМЕ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning">Жесткий таймер:</span> На каждую волну отводится <span class="text-danger fw-bold">10 секунд</span>.</div>
+                <div class="text-light mb-1">• <span class="text-warning">Тотальный сброс:</span> Любая ошибка или истечение таймера мгновенно сбрасывают весь прогресс на Волну 1!</div>
+                <div class="text-light mb-1">• <span class="text-warning">Аварии Поста:</span> Попытка поставить <code class="text-danger">V</code> в ячейку с меткой или стереть <code class="text-danger">.</code> в пустой — фатальный сбой!</div>
+                <div class="text-light">• <span class="text-warning">8 рубежей:</span> Перехват аварий, маршрутизация ветвлений, наладка ячеек ленты и деактивация бесконечных циклов.</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ПЕРЕХВАТЧИК КОНВЕЙЕРА
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4">
+            
+            <!-- Хедер со статусом и таймером -->
+            <div class="d-flex justify-content-between align-items-center mb-2 font-monospace">
+                <div>
+                    <span class="text-secondary small d-block">РУБЕЖ БЕЗОПАСНОСТИ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentPhase"></span> ИЗ 8</span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО СБОЯ КОНВЕЙЕРА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.5 ? 'text-danger' : 'text-warning'">
+                        <span v-text="formattedTime"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Полоса локального таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.5 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / maxPhaseTime) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Карточка раунда -->
+            <div class="card bg-dark border-danger rounded-0 p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <span class="badge bg-danger text-black rounded-0 font-monospace fw-bold px-3 py-1" v-text="currentTask.badge"></span>
+                    <span class="text-secondary small font-monospace">
+                        Тип рубежа: <span v-text="currentTask.typeTitle"></span>
+                    </span>
+                </div>
+
+                <h4 class="text-light font-monospace fs-5 mb-3" v-text="currentTask.question"></h4>
+
+                <!-- Отображение ленты -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3 text-center">
+                    <div class="text-secondary small font-monospace mb-2">СОСТОЯНИЕ ЛЕНТЫ И ПОЛОЖЕНИЕ КАРЕТКИ:</div>
+                    <div class="d-flex justify-content-center align-items-center gap-1 font-monospace fs-4">
+                        <div v-for="(cell, cIdx) in currentTask.tape" :key="cIdx" class="d-flex flex-column align-items-center">
+                            <div class="border px-3 py-2" :class="cIdx === currentTask.headIdx ? 'border-danger text-danger fw-bold bg-dark' : 'border-secondary text-light'" v-text="cell"></div>
+                            <div class="small mt-1 font-monospace" :class="cIdx === currentTask.headIdx ? 'text-danger fw-bold' : 'text-transparent'">
+                                ▲
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Отображение команды или листинга -->
+                <div v-if="currentTask.commandStr" class="card bg-black border-danger rounded-0 p-3 mb-3 text-center">
+                    <span class="text-secondary small font-monospace d-block mb-1">ПОСТУПИВШАЯ КОМАНДА:</span>
+                    <span class="font-monospace fs-3 text-danger fw-bold" v-text="currentTask.commandStr"></span>
+                </div>
+
+                <div v-if="currentTask.programLines" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <span class="text-secondary small d-block mb-1">МИКРОПРОГРАММА НА КОНВЕЙЕРЕ:</span>
+                    <div v-for="(line, lIdx) in currentTask.programLines" :key="lIdx" class="text-light py-1" v-text="line"></div>
+                </div>
+            </div>
+
+            <!-- Интерактивные кнопки действия -->
+            <div class="row g-3">
+                <div v-for="(action, aIdx) in currentTask.actions" :key="aIdx" class="col-md-6">
+                    <button @click="handleAction(aIdx)"
+                            :id="'action-btn-' + (aIdx + 1)"
+                            :data-is-correct="action.isCorrect"
+                            class="btn btn-outline-danger w-100 py-3 text-start font-monospace rounded-0 fs-6 h-100 d-flex align-items-center">
+                        <span class="badge border border-danger text-danger me-2">#<span v-text="aIdx + 1"></span></span>
+                        <span class="text-light fw-bold" v-text="action.text"></span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Экран сбоя (Fatal Error) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <h1 id="fail-title" class="display-2 text-danger font-monospace fw-bold mb-3">⚠️ АВАРИЙНЫЙ ОСТАНОВ ⚠️</h1>
+            <h3 class="text-light font-monospace mb-3">Сбой конвейера Поста</h3>
+            <p class="text-secondary fs-5 mb-4" v-text="failMessage"></p>
+            <div class="badge bg-danger text-black p-3 font-monospace fs-6 rounded-0 mb-4">
+                Сработал тотальный сброс на Волну 1. Перекалибровка регистров...
+            </div>
+        </div>
+
+        <!-- Экран победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-5 text-center">
+            <div id="success-title" class="display-3 text-success font-monospace mb-3">★ КОНВЕЙЕР СТАБИЛИЗИРОВАН ★</div>
+            <h2 class="text-light font-monospace mb-3">ПРОТОКОЛ МАШИНЫ ПОСТА ПОЛНОСТЬЮ ЗАЩИЩЕН</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                Все 8 критических секторов успешно отражены. Вы продемонстрировали мгновенную реакцию, безошибочный анализ аварийных ситуаций и совершенное владение исполнительной моделью Поста.
+            </p>
+            <div class="badge border border-success text-success bg-dark p-3 font-monospace fs-6 rounded-0">
+                Урок 22 полностью пройден! Все 3 уровня освоены.
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    missionName: 'Урок 22 :: Машина Поста (Уровень 3)',
+                    startTime: Date.now(),
+                    attempts: 0,
+                    gameState: 'intro', // 'intro', 'playing', 'failed', 'success'
+                    currentPhase: 1,
+                    totalPhases: 8,
+                    phaseTimeLeft: 10.0,
+                    maxPhaseTime: 10.0,
+                    timerInterval: null,
+                    failMessage: '',
+                    currentTask: {}
+                };
+            },
+            computed: {
+                formattedTime() {
+                    return Math.max(0, this.phaseTimeLeft).toFixed(1);
+                }
+            },
+            methods: {
+                sendTelemetry(action_type, success = false) {
+                    const timeSpent = Math.floor((Date.now() - this.startTime) / 1000);
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: this.missionName,
+                        action_type: action_type,
+                        status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                        start_time: new Date(this.startTime).toISOString(),
+                        time_spent_sec: timeSpent,
+                        attempts_count: this.attempts,
+                        success: success
+                    }, '*');
+                },
+                rnd(min, max) {
+                    return Math.floor(Math.random() * (max - min + 1)) + min;
+                },
+                shuffle(arr) {
+                    const a = [...arr];
+                    for (let i = a.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [a[i], a[j]] = [a[j], a[i]];
+                    }
+                    return a;
+                },
+                startGame() {
+                    this.attempts = 0;
+                    this.currentPhase = 1;
+                    this.gameState = 'playing';
+                    this.sendTelemetry('in_progress');
+                    this.startPhase(1);
+                },
+                startPhase(phaseNum) {
+                    this.currentPhase = phaseNum;
+                    this.phaseTimeLeft = this.maxPhaseTime;
+                    this.currentTask = this.generateTask(phaseNum);
+
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft -= 0.1;
+                        if (this.phaseTimeLeft <= 0) {
+                            this.triggerFailure('Время вышло! Такт упущен, конвейер заблокирован.');
+                        }
+                    }, 100);
+                },
+                triggerFailure(reason) {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.attempts++;
+                    this.sendTelemetry('hardcore_reset');
+                    this.failMessage = reason;
+                    this.gameState = 'failed';
+
+                    setTimeout(() => {
+                        this.gameState = 'playing';
+                        this.startPhase(1);
+                    }, 1500);
+                },
+                handleAction(actionIdx) {
+                    const action = this.currentTask.actions[actionIdx];
+                    if (action.isCorrect) {
+                        if (this.currentPhase < this.totalPhases) {
+                            this.startPhase(this.currentPhase + 1);
+                        } else {
+                            if (this.timerInterval) clearInterval(this.timerInterval);
+                            this.gameState = 'success';
+                            this.sendTelemetry('level_complete', true);
+                        }
+                    } else {
+                        this.triggerFailure(action.failFeedback || 'Неверное действие! Произошла критическая ошибка.');
+                    }
+                },
+                generateTask(phase) {
+                    // 8 волн:
+                    // Волны 1-2: Перехват аварийной команды (V на V или . на .)
+                    // Волны 3-4: Быстрая маршрутизация ветвления ? j, k
+                    // Волны 5-6: Быстрое прогнозирование шага каретки ← / →
+                    // Волны 7-8: Детектирование ловушки зацикливания (LOOP) vs штатного останова (OK)
+
+                    const tape = ['.', '.', '.', '.', '.'];
+                    const headIdx = this.rnd(1, 3);
+
+                    if (phase <= 2) {
+                        // Волны 1-2: Bug Sniping (Crash Detection)
+                        const isCrash = Math.random() > 0.5;
+                        const cellVal = isCrash ? (Math.random() > 0.5 ? 'V' : '.') : (Math.random() > 0.5 ? '.' : 'V');
+                        tape[headIdx] = cellVal;
+
+                        // Если isCrash = true: для 'V' делаем команду 'V', для '.' делаем команду '.'
+                        let cmd = '';
+                        if (isCrash) {
+                            cmd = cellVal === 'V' ? `1. V 2` : `1. . 2`;
+                        } else {
+                            cmd = cellVal === '.' ? `1. V 2` : `1. . 2`;
+                        }
+
+                        const actions = [
+                            {
+                                text: '⛔ НЕЙТРАЛИЗОВАТЬ: Аварийный конфликт ячейки (CRASH)',
+                                isCorrect: isCrash,
+                                failFeedback: isCrash ? '' : 'Ложная тревога! Команда была полностью безопасной.'
+                            },
+                            {
+                                text: '▶ РАЗРЕШИТЬ ИСПОЛНЕНИЕ: Команда корректна',
+                                isCorrect: !isCrash,
+                                failFeedback: isCrash ? 'Пропуск аварии! Попытка недопустимой операции на ленте.' : ''
+                            }
+                        ];
+
+                        return {
+                            badge: `ВОЛНА ${phase}`,
+                            typeTitle: 'Детектор аварийных конфликтов',
+                            question: `Каретка стоит над ячейкой '${cellVal}'. Поступает команда '${cmd}'. Определите безопасность такта:`,
+                            tape: tape,
+                            headIdx: headIdx,
+                            commandStr: cmd,
+                            actions: this.shuffle(actions)
+                        };
+
+                    } else if (phase <= 4) {
+                        // Волны 3-4: Branch Routing (? j, k)
+                        const cellVal = Math.random() > 0.5 ? 'V' : '.';
+                        tape[headIdx] = cellVal;
+
+                        const nextIfV = this.rnd(2, 4);
+                        const nextIfEmpty = nextIfV === 4 ? 1 : nextIfV + 1;
+                        const cmd = `1. ? ${nextIfV}, ${nextIfEmpty}`;
+
+                        const correctNext = cellVal === 'V' ? nextIfV : nextIfEmpty;
+                        const wrongNext = cellVal === 'V' ? nextIfEmpty : nextIfV;
+
+                        const actions = [
+                            {
+                                text: `ПЕРЕЙТИ К КОМАНДЕ №${correctNext}`,
+                                isCorrect: true
+                            },
+                            {
+                                text: `ПЕРЕЙТИ К КОМАНДЕ №${wrongNext}`,
+                                isCorrect: false,
+                                failFeedback: `Ошибка ветвления! В ячейке '${cellVal}', переход должен быть на команду ${correctNext}.`
+                            }
+                        ];
+
+                        return {
+                            badge: `ВОЛНА ${phase}`,
+                            typeTitle: 'Синхронная маршрутизация ветвления',
+                            question: `Команда ветвления: '${cmd}'. Ячейка содержит '${cellVal}'. На какую команду перейдет управление?`,
+                            tape: tape,
+                            headIdx: headIdx,
+                            commandStr: cmd,
+                            actions: this.shuffle(actions)
+                        };
+
+                    } else if (phase <= 6) {
+                        // Волны 5-6: Быстрое прогнозирование движения каретки
+                        const dir = Math.random() > 0.5 ? '→' : '←';
+                        const dirName = dir === '→' ? 'вправо' : 'влево';
+                        const targetCellIdx = dir === '→' ? headIdx + 1 : headIdx - 1;
+                        const cmd = `1. ${dir} 2`;
+
+                        tape[headIdx] = Math.random() > 0.5 ? 'V' : '.';
+
+                        const actions = [
+                            {
+                                text: `Сдвиг ${dirName} (новая позиция каретки: ячейка #${targetCellIdx + 1})`,
+                                isCorrect: true
+                            },
+                            {
+                                text: `Сдвиг ${dir === '→' ? 'влево' : 'вправо'} (новая позиция каретки: ячейка #${(dir === '→' ? headIdx - 1 : headIdx + 1) + 1})`,
+                                isCorrect: false,
+                                failFeedback: 'Ошибка направления! Неверная интерпретация команды сдвига.'
+                            }
+                        ];
+
+                        return {
+                            badge: `ВОЛНА ${phase}`,
+                            typeTitle: 'Векторная навигация каретки',
+                            question: `Каретка находится на позиции #${headIdx + 1}. Поступает команда '${cmd}'. Куда переместится каретка?`,
+                            tape: tape,
+                            headIdx: headIdx,
+                            commandStr: cmd,
+                            actions: this.shuffle(actions)
+                        };
+
+                    } else {
+                        // Волны 7-8: Детектирование ловушек зацикливания (LOOP vs OK)
+                        const isLoop = Math.random() > 0.5;
+                        tape[headIdx] = 'V';
+
+                        let programLines = [];
+                        if (isLoop) {
+                            if (Math.random() > 0.5) {
+                                programLines = ['1. → 2', '2. ← 1'];
+                            } else {
+                                programLines = ['1. ? 2, 1', '2. → 1'];
+                            }
+                        } else {
+                            programLines = ['1. → 2', '2. ? 3, 3', '3. !'];
+                        }
+
+                        const actions = [
+                            {
+                                text: isLoop ? '🔁 ЛОВУШКА: Зацикливание программы (LOOP)' : '✓ ШТАТНО: Программа завершится остановом (OK)',
+                                isCorrect: true
+                            },
+                            {
+                                text: isLoop ? '✓ ШТАТНО: Программа завершится остановом (OK)' : '🔁 ЛОВУШКА: Зацикливание программы (LOOP)',
+                                isCorrect: false,
+                                failFeedback: isLoop ? 'Пропуск петли! Программа вошла в бесконечный цикл.' : 'Ложный диагноз! Программа благополучно доходит до команды !.'
+                            }
+                        ];
+
+                        return {
+                            badge: `ФИНАЛ: ВОЛНА ${phase}`,
+                            typeTitle: 'Анализ проблемы остановки',
+                            question: 'Проанализируйте микропрограмму на ленте. Завершится ли она штатным остановом или войдет в цикл?',
+                            tape: tape,
+                            headIdx: headIdx,
+                            programLines: programLines,
+                            actions: this.shuffle(actions)
+                        };
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>

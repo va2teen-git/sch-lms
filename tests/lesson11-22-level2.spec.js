@@ -79,6 +79,9 @@ test.describe('Lesson 11-22 Level 2: Post Machine Advanced Manual Input Suite', 
     await expect(page.locator('#phase1')).toBeHidden();
     await expect(page.locator('#phase2')).toBeVisible();
 
+    await expect(page.locator('#p2-prog-lines div')).not.toHaveCount(0);
+    await expect(page.locator('#p2-tape-display .border')).not.toHaveCount(0);
+
     const p2Lines = await page.locator('#p2-prog-lines div').allInnerTexts();
     const p2InitCells = page.locator('#p2-tape-display .border');
     const p2Count = await p2InitCells.count();
@@ -97,20 +100,47 @@ test.describe('Lesson 11-22 Level 2: Post Machine Advanced Manual Input Suite', 
       }
     }
 
-    // Simulate lines
+    // Simulate Post machine program
+    const progMap = {};
     for (const rawLine of p2Lines) {
       const line = rawLine.trim();
-      const parts = line.split('. ');
-      const cmd = (parts[1] || '').trim();
-      if (cmd.startsWith('←')) {
+      const match = line.match(/^(\d+)\.\s*(.*)$/);
+      if (match) {
+        progMap[parseInt(match[1], 10)] = match[2].trim();
+      }
+    }
+
+    let ip = 1;
+    let steps = 0;
+    while (progMap[ip] && steps < 100) {
+      steps++;
+      const instr = progMap[ip];
+      if (instr.startsWith('!')) {
+        break;
+      } else if (instr.startsWith('←')) {
         p2Head = Math.max(0, p2Head - 1);
-      } else if (cmd.startsWith('→')) {
+        const nextIp = parseInt(instr.replace('←', '').trim(), 10);
+        ip = isNaN(nextIp) ? ip + 1 : nextIp;
+      } else if (instr.startsWith('→')) {
         p2Head = Math.min(p2Tape.length - 1, p2Head + 1);
-      } else if (cmd.startsWith('V')) {
+        const nextIp = parseInt(instr.replace('→', '').trim(), 10);
+        ip = isNaN(nextIp) ? ip + 1 : nextIp;
+      } else if (instr.startsWith('V')) {
         p2Tape[p2Head] = 'V';
-      } else if (cmd.startsWith('.')) {
+        const nextIp = parseInt(instr.replace('V', '').trim(), 10);
+        ip = isNaN(nextIp) ? ip + 1 : nextIp;
+      } else if (instr.startsWith('.')) {
         p2Tape[p2Head] = '.';
-      } else if (cmd.startsWith('!')) {
+        const nextIp = parseInt(instr.replace('.', '').trim(), 10);
+        ip = isNaN(nextIp) ? ip + 1 : nextIp;
+      } else if (instr.startsWith('?')) {
+        const parts = instr.replace('?', '').trim().split(',').map(s => parseInt(s.trim(), 10));
+        if (p2Tape[p2Head] === 'V') {
+          ip = parts[0];
+        } else {
+          ip = parts[1];
+        }
+      } else {
         break;
       }
     }

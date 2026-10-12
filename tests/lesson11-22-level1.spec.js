@@ -83,10 +83,13 @@ test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () 
 
     // ================= Phase 1 Solver =================
     await expect(page.locator('#phase1')).toBeVisible();
+    await expect(page.locator('#p1-initial-tape .border')).not.toHaveCount(0);
+    await expect(page.locator('#p1-work-tape .border')).not.toHaveCount(0);
+    await expect(page.locator('#p1-head-index')).not.toBeEmpty();
 
     const cmdText = (await page.locator('#p1-command-display').innerText()).trim();
-    const parts = cmdText.split('. ');
-    const opPart = parts[1] || '';
+    const cmdMatch = cmdText.match(/^(\d+)\.\s*(.*)$/);
+    const opPart = cmdMatch ? cmdMatch[2].trim() : '';
     const op = opPart.split(' ')[0];
 
     const initCells = page.locator('#p1-initial-tape .border');
@@ -121,7 +124,7 @@ test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () 
     await expect(page.locator('#phase2')).toBeVisible();
 
     await expect(page.locator('#p2-slots-container')).toBeVisible();
-    await expect(page.locator('#p2-tokens-palette')).toBeVisible();
+    await expect(page.locator('#p2-tokens-palette button')).not.toHaveCount(0);
 
     const desc = await page.locator('#p2-task-desc').innerText();
     let tokensNeeded = [];
@@ -162,8 +165,10 @@ test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () 
     await expect(page.locator('#phase2')).toBeHidden();
     await expect(page.locator('#phase3')).toBeVisible();
 
-    await expect(page.locator('#p3-program-listing')).toBeVisible();
-    await expect(page.locator('#p3-work-tape')).toBeVisible();
+    await expect(page.locator('#p3-program-listing div')).not.toHaveCount(0);
+    await expect(page.locator('#p3-initial-tape .border')).not.toHaveCount(0);
+    await expect(page.locator('#p3-work-tape .border')).not.toHaveCount(0);
+    await expect(page.locator('#p3-head-index')).not.toBeEmpty();
 
     const programLines = await page.locator('#p3-program-listing div').allInnerTexts();
     const p3InitCells = page.locator('#p3-initial-tape .border');
@@ -172,12 +177,20 @@ test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () 
     for (let i = 0; i < p3Count; i++) {
       p3Tape.push((await p3InitCells.nth(i).innerText()).trim());
     }
-    let p3Head = parseInt(await page.locator('#p3-head-index').innerText()) - 1;
+
+    let p3Head = 0;
+    const p3Pointers = page.locator('#p3-initial-tape .font-monospace.small');
+    for (let i = 0; i < await p3Pointers.count(); i++) {
+      if ((await p3Pointers.nth(i).innerText()).includes('▲')) {
+        p3Head = i;
+        break;
+      }
+    }
 
     for (const rawLine of programLines) {
       const line = rawLine.trim();
-      const parts = line.split('. ');
-      const cmd = (parts[1] || '').trim();
+      const match = line.match(/^(\d+)\.\s*(.*)$/);
+      const cmd = match ? match[2].trim() : '';
       if (cmd.startsWith('←')) {
         p3Head = Math.max(0, p3Head - 1);
       } else if (cmd.startsWith('→')) {
@@ -192,23 +205,22 @@ test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () 
     }
 
     // Configure work tape cells
-    const p3WorkCells = page.locator('#p3-work-tape .border');
     for (let i = 0; i < p3Count; i++) {
-      const currentVal = (await p3WorkCells.nth(i).innerText()).trim();
+      const currentVal = (await page.locator('#p3-work-tape .border').nth(i).innerText()).trim();
       if (currentVal !== p3Tape[i]) {
-        await p3WorkCells.nth(i).click();
+        await page.locator('#p3-work-tape .border').nth(i).click();
       }
     }
 
     // Move work head to match final head
-    let currentWorkHead = parseInt(await page.locator('#p3-head-index').innerText()) - 1;
+    let currentWorkHead = parseInt((await page.locator('#p3-head-index').innerText()).trim(), 10) - 1;
     while (currentWorkHead < p3Head) {
       await page.locator('#p3-shift-right').click();
-      currentWorkHead++;
+      currentWorkHead = parseInt((await page.locator('#p3-head-index').innerText()).trim(), 10) - 1;
     }
     while (currentWorkHead > p3Head) {
       await page.locator('#p3-shift-left').click();
-      currentWorkHead--;
+      currentWorkHead = parseInt((await page.locator('#p3-head-index').innerText()).trim(), 10) - 1;
     }
 
     await page.locator('#p3-submit-btn').click();
