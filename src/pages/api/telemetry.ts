@@ -32,6 +32,16 @@ try {
   // Column might already exist, ignore
 }
 
+try {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_telemetry_student ON telemetry (class_name, last_name, first_name);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_timestamp ON telemetry (timestamp);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_mission ON telemetry (mission_name);
+  `);
+} catch(e) {
+  // Indexes might already exist, ignore
+}
+
 export const POST: APIRoute = async ({ request }) => {
   if (request.headers.get('Content-Type') === 'application/json') {
     try {
@@ -46,19 +56,32 @@ export const POST: APIRoute = async ({ request }) => {
         )
       `);
       
+      const fName = String(body.student_firstName || 'Unknown').trim();
+      const lName = String(body.student_lastName || 'Unknown').trim();
+      const cName = String(body.student_class || 'Unknown').trim();
+      const mName = String(body.mission_name || '').trim();
+      const aType = String(body.action_type || '').trim();
+      const sTime = String(body.start_time || '');
+      const tSpent = Math.max(0, Math.min(86400, parseInt(body.time_spent_sec, 10) || 0));
+      const aCount = Math.max(0, parseInt(body.attempts_count, 10) || 0);
+      const isSuccess = body.success ? 1 : 0;
+      const curStatus = String(body.status || '');
+      const aLog = typeof body.action_log === 'string' ? body.action_log : JSON.stringify(body.action_log || []);
+      const isHc = body.is_hardcore ? 1 : 0;
+
       insert.run(
-        body.student_firstName || 'Unknown',
-        body.student_lastName || 'Unknown',
-        body.student_class || 'Unknown',
-        body.mission_name || '',
-        body.action_type || '',
-        body.start_time || '',
-        body.time_spent_sec || 0,
-        body.attempts_count || 0,
-        body.success ? 1 : 0,
-        body.status || '',
-        JSON.stringify(body.action_log || []),
-        body.is_hardcore ? 1 : 0
+        fName,
+        lName,
+        cName,
+        mName,
+        aType,
+        sTime,
+        tSpent,
+        aCount,
+        isSuccess,
+        curStatus,
+        aLog,
+        isHc
       );
       
       return new Response(JSON.stringify({ success: true }), {

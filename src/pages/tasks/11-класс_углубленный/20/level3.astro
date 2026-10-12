@@ -1,0 +1,404 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <div class="display-3 text-danger font-monospace mb-3">⚠️ КРИТИЧЕСКИЙ СБОЙ ЯДРА ⚠️</div>
+            <h2 class="text-light font-monospace mb-3">TURING PROTOCOL: KERNEL DEFENSE</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                В символьный сопроцессор проник самомодифицирующийся вредоносный код, вызывающий каскадное зацикливание машин Тьюринга.
+                Вам необходимо отразить <span class="text-danger fw-bold">8 волн алгоритмических атак</span>.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 600px;">
+                <div class="text-danger fw-bold mb-2">[ПРАВИЛА БОЯ В ХАРДКОР-РЕЖИМЕ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning">Локальный таймер:</span> На каждый сектор отводится ровно <span class="text-danger fw-bold">10 секунд</span>.</div>
+                <div class="text-light mb-1">• <span class="text-warning">Тотальный сброс:</span> Любая ошибка или истечение таймера сбрасывают весь прогресс на Фазу 1!</div>
+                <div class="text-light">• <span class="text-warning">Задача:</span> Быстро классифицировать останов, направление каретки и устранять парадоксы.</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ЗАЩИТУ ЯДРА
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4">
+            
+            <!-- Хедер со статусом и таймером -->
+            <div class="d-flex justify-content-between align-items-center mb-2 font-monospace">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР БЕЗОПАСНОСТИ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentPhase"></span> ИЗ 8</span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО КОЛЛАПСА ЯДРА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.5 ? 'text-danger' : 'text-warning'">
+                        <span v-text="formattedTime"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Полоса локального таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.5 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / maxPhaseTime) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Игровая панель раунда -->
+            <div class="card bg-dark border-danger rounded-0 p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <span class="badge bg-danger text-black rounded-0 font-monospace fw-bold px-3 py-1" v-text="currentTask.badge"></span>
+                    <span class="text-secondary small font-monospace">
+                        Тип задачи: <span v-text="currentTask.typeTitle"></span>
+                    </span>
+                </div>
+
+                <h4 class="text-light font-monospace fs-5 mb-3" v-text="currentTask.question"></h4>
+
+                <!-- Блок отображения ленты / команды / таблицы -->
+                <div v-if="currentTask.tape" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-center">
+                    <div class="text-secondary small font-monospace mb-2">СОСТОЯНИЕ ЛЕНТЫ:</div>
+                    <div class="d-flex justify-content-center align-items-center gap-1 font-monospace fs-4">
+                        <div v-for="(cell, cIdx) in currentTask.tape" :key="cIdx" class="d-flex flex-column align-items-center">
+                            <div class="border px-3 py-2" :class="cIdx === currentTask.activeTapeIdx ? 'border-danger text-danger fw-bold bg-dark' : 'border-secondary text-light'" v-text="cell"></div>
+                            <div class="small mt-1 font-monospace" :class="cIdx === currentTask.activeTapeIdx ? 'text-danger fw-bold' : 'text-transparent'">
+                                ▲ [<span v-text="currentTask.state"></span>]
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Блок микро-таблицы программы -->
+                <div v-if="currentTask.table" class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                    <div class="text-secondary small font-monospace mb-2">МАТРИЦА КОМАНД АВТОМАТА:</div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm table-bordered border-secondary text-center font-monospace mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="bg-black text-secondary">Q</th>
+                                    <th v-for="col in currentTask.table.cols" :key="col" v-text="col"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in currentTask.table.rows" :key="row.q">
+                                    <td class="text-danger fw-bold" v-text="row.q"></td>
+                                    <td v-for="(val, vIdx) in row.vals" :key="vIdx" v-text="val"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Блок единичной команды -->
+                <div v-if="currentTask.commandStr" class="card bg-black border-danger rounded-0 p-3 mb-3 text-center">
+                    <span class="text-secondary small font-monospace d-block mb-1">ПРЕДПИСАННОЕ ПРАВИЛО:</span>
+                    <span class="font-monospace fs-3 text-danger fw-bold" v-text="currentTask.commandStr"></span>
+                </div>
+            </div>
+
+            <!-- Интерактивные кнопки выбора -->
+            <div class="row g-3">
+                <div v-for="(opt, optIdx) in currentTask.options" :key="optIdx" class="col-md-6">
+                    <button @click="handleOptionClick(optIdx)"
+                            :id="'opt-btn-' + optIdx"
+                            :data-is-correct="opt.isCorrect"
+                            class="btn btn-outline-danger w-100 py-3 text-start font-monospace rounded-0 fs-6 h-100 d-flex align-items-center">
+                        <span class="badge border border-danger text-danger me-2">#<span v-text="optIdx + 1"></span></span>
+                        <span class="text-light" v-text="opt.text"></span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Экран сбоя (Fatal Error) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <h1 id="fail-title" class="display-2 text-danger font-monospace fw-bold mb-3">⚠️ КОЛЛАПС ЯДРА ⚠️</h1>
+            <h3 class="text-light font-monospace mb-3">Аварийный останов сопроцессора</h3>
+            <p class="text-secondary fs-5 mb-4" v-text="failMessage"></p>
+            <div class="badge bg-danger text-black p-3 font-monospace fs-6 rounded-0 mb-4">
+                Прогресс сброшен на Фазу 1. Перекалибровка квантового состояния...
+            </div>
+        </div>
+
+        <!-- Экран триумфальной победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-5 text-center">
+            <div id="success-title" class="display-3 text-success font-monospace mb-3">★ ЯДРО СТАБИЛИЗИРОВАНО ★</div>
+            <h2 class="text-light font-monospace mb-3">ПРОТОКОЛ ТЬЮРИНГА ПОЛНОСТЬЮ СПАСЕН</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                Все 8 критических секторов успешно дешифрованы. Вы продемонстрировали исключительную скорость алгоритмического анализа и понимание универсальных вычислений.
+            </p>
+            <div class="badge border border-success text-success bg-dark p-3 font-monospace fs-6 rounded-0">
+                Урок 20 полностью пройден! Все 3 уровня освоены.
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const { createApp } = Vue;
+        const missionName = 'Урок 20 :: Машина Тьюринга (Уровень 3)';
+        let sessionStartTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(sessionStartTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        createApp({
+            data() {
+                return {
+                    gameState: 'intro', // 'intro', 'playing', 'failed', 'success'
+                    currentPhase: 1,
+                    totalPhases: 8,
+                    phaseTimeLeft: 10.0,
+                    maxPhaseTime: 10.0,
+                    timerInterval: null,
+                    failMessage: '',
+                    currentTask: {}
+                };
+            },
+            computed: {
+                formattedTime() {
+                    return this.phaseTimeLeft.toFixed(1);
+                }
+            },
+            methods: {
+                startGame() {
+                    sessionStartTime = Date.now();
+                    attempts = 0;
+                    this.currentPhase = 1;
+                    this.gameState = 'playing';
+                    sendTelemetry('in_progress');
+                    this.loadPhase(1);
+                },
+
+                loadPhase(phaseNum) {
+                    this.currentPhase = phaseNum;
+                    this.phaseTimeLeft = 10.0;
+                    this.maxPhaseTime = 10.0;
+                    clearInterval(this.timerInterval);
+
+                    this.generateTaskForPhase(phaseNum);
+
+                    // Запуск локального убывающего таймера
+                    const tickRate = 100; // каждые 100мс
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft = Math.max(0, this.phaseTimeLeft - 0.1);
+                        if (this.phaseTimeLeft <= 0.05) {
+                            clearInterval(this.timerInterval);
+                            this.triggerFail('Время сектора истекло! Логическое ядро перегрелось и вошло в бесконечный цикл.');
+                        }
+                    }, tickRate);
+                },
+
+                generateTaskForPhase(p) {
+                    if (p === 1) {
+                        // Раунд 1: Одношаговый детектор остановки
+                        const isHalt = Math.random() > 0.5;
+                        const cmd = isHalt ? 'q1 1 → 1 R q0' : 'q1 1 → 1 S q1';
+                        this.currentTask = {
+                            badge: 'РАУНД 1: СИМПЛЕКС-ДЕТЕКТОР',
+                            typeTitle: 'Анализ остановки',
+                            question: 'Каретка находится над символом "1" в состоянии q1. Завершит ли автомат работу на данном такте?',
+                            commandStr: cmd,
+                            options: shuffle([
+                                { text: 'ДА (HALT): произойдет переход в терминальное состояние q0', isCorrect: isHalt },
+                                { text: 'НЕТ (LOOP): машина зациклится в состоянии q1 на месте', isCorrect: !isHalt }
+                            ])
+                        };
+                    } else if (p === 2) {
+                        // Раунд 2: Направление каретки
+                        const dirs = ['L', 'R', 'S'];
+                        const dirNames = { 'L': 'Влево (L)', 'R': 'Вправо (R)', 'S': 'Останется на месте (S)' };
+                        const chosenDir = dirs[rnd(0, 2)];
+                        const newSym = rnd(0, 1).toString();
+                        const nextQ = ['q0', 'q1', 'q2'][rnd(0, 2)];
+
+                        this.currentTask = {
+                            badge: 'РАУНД 2: ВЕКТОР ТРАНСЛЯЦИИ',
+                            typeTitle: 'Смещение каретки',
+                            question: 'Куда переместится считывающая каретка в результате выполнения следующей микрокоманды?',
+                            commandStr: `q1 0 → ${newSym} ${chosenDir} ${nextQ}`,
+                            options: shuffle([
+                                { text: dirNames[chosenDir], isCorrect: true },
+                                ...dirs.filter(d => d !== chosenDir).map(d => ({ text: dirNames[d], isCorrect: false }))
+                            ])
+                        };
+                    } else if (p === 3) {
+                        // Раунд 3: 2-шаговый цикл автомата
+                        const isLoop = Math.random() > 0.5;
+                        const row2 = isLoop ? '1 L q1' : '1 S q0';
+                        this.currentTask = {
+                            badge: 'РАУНД 3: ПИНГ-ПОНГ ПЕРЕХОДОВ',
+                            typeTitle: 'Детектор взаимного цикла',
+                            question: 'Каретка стоит на единственной единице (окруженной λ) в q1. Остановится ли машина или войдет в цикл?',
+                            table: {
+                                cols: ['λ', '1'],
+                                rows: [
+                                    { q: 'q1', vals: ['λ S q0', '1 S q2'] },
+                                    { q: 'q2', vals: ['λ S q0', row2] }
+                                ]
+                            },
+                            options: shuffle([
+                                { text: 'Зациклится в бесконечном переключении q1 ↔ q2', isCorrect: isLoop },
+                                { text: 'Успешно остановится в q0', isCorrect: !isLoop }
+                            ])
+                        };
+                    } else if (p === 4) {
+                        // Раунд 4: Мгновенная битовая инверсия
+                        const b1 = rnd(0, 1).toString();
+                        const b2 = rnd(0, 1).toString();
+                        const word = b1 + b2;
+                        const invWord = (b1 === '1' ? '0' : '1') + (b2 === '1' ? '0' : '1');
+                        
+                        this.currentTask = {
+                            badge: 'РАУНД 4: КВАНТОВЫЙ ИНВЕРТОР',
+                            typeTitle: 'Инверсия ленты',
+                            question: `Машина инвертирует двоичное слово до символа λ. Исходное слово на ленте: [ ${word} ]. Что останется на ленте?`,
+                            options: shuffle([
+                                { text: `Слово: ${invWord}`, isCorrect: true },
+                                { text: `Слово: ${word}`, isCorrect: false },
+                                { text: `Слово: ${b1 + b1}`, isCorrect: false },
+                                { text: `Слово: ${b2 + b2}`, isCorrect: false }
+                            ])
+                        };
+                    } else if (p === 5) {
+                        // Раунд 5: Бег по пустой ленте
+                        const isEndlessRun = Math.random() > 0.5;
+                        const lambdaCmd = isEndlessRun ? 'λ R q1' : 'λ S q0';
+                        this.currentTask = {
+                            badge: 'РАУНД 5: ПУСТОЙ ГОРИЗОНТ',
+                            typeTitle: 'Детектор бесконечного сдвига',
+                            question: 'Машина дошла до пустой ячейки λ. Определите исход выполнения такта:',
+                            commandStr: `q1 λ → ${lambdaCmd}`,
+                            options: shuffle([
+                                { text: 'Бесконечный бег вправо по пустой ленте (LOOP)', isCorrect: isEndlessRun },
+                                { text: 'Штатный останов вычислений (HALT в q0)', isCorrect: !isEndlessRun }
+                            ])
+                        };
+                    } else if (p === 6) {
+                        // Раунд 6: Быстрый двоичный инкремент
+                        const val = rnd(1, 3); // 1='01', 2='10', 3='11'
+                        const bin = val === 1 ? '01' : (val === 2 ? '10' : '11');
+                        const res = (val + 1).toString(2);
+                        const wrong1 = (val + 2).toString(2);
+                        const wrong2 = val.toString(2);
+
+                        this.currentTask = {
+                            badge: 'РАУНД 6: СУММАТОР ЯДРА',
+                            typeTitle: 'Двоичный инкремент (+1)',
+                            question: `Алгоритм инкремента выполняется над числом ${bin}₂. Выберите правильный результат:`,
+                            options: shuffle([
+                                { text: `Результат: ${res}₂`, isCorrect: true },
+                                { text: `Результат: ${wrong1}₂`, isCorrect: false },
+                                { text: `Результат: ${wrong2}₂`, isCorrect: false }
+                            ])
+                        };
+                    } else if (p === 7) {
+                        // Раунд 7: Парадокс проблемы остановки Тьюринга
+                        this.currentTask = {
+                            badge: 'РАУНД 7: ТЕОРЕМА О ПАРАДОКСЕ',
+                            typeTitle: 'Тезис неразрешимости',
+                            question: 'Анализатор H(P, P) предсказал, что программа P(P) успешно завершится (HALT). Какое действие функции D(P) доказывает невозможность существования H?',
+                            options: shuffle([
+                                { text: 'Принудительно войти в бесконечный цикл: while True: pass', isCorrect: true },
+                                { text: 'Немедленно выполнить оператор return и остановиться', isCorrect: false },
+                                { text: 'Вызвать функцию H еще раз с новыми аргументами', isCorrect: false },
+                                { text: 'Стереть исходный код программы с ленты', isCorrect: false }
+                            ])
+                        };
+                    } else if (p === 8) {
+                        // Раунд 8: ФИНАЛЬНЫЙ БОСС - Анализ матрицы останова
+                        const isSolvable = Math.random() > 0.5;
+                        const row1 = isSolvable ? 'λ S q0' : 'λ R q2';
+                        const row2 = isSolvable ? 'λ S q0' : 'λ L q1';
+
+                        this.currentTask = {
+                            badge: 'ФИНАЛ: СТАБИЛИЗАТОР СИНГУЛЯРНОСТИ',
+                            typeTitle: 'Полная верификация ядра',
+                            question: 'Внимание! Финальная проверка автомата: существует ли хотя бы один путь достижения q0 из матрицы?',
+                            table: {
+                                cols: ['λ', '0', '1'],
+                                rows: [
+                                    { q: 'q1', vals: [row1, '1 R q2', '0 R q1'] },
+                                    { q: 'q2', vals: [row2, '0 L q1', '1 L q2'] }
+                                ]
+                            },
+                            options: shuffle([
+                                { text: 'ПУТЬ В q0 СУЩЕСТВУЕТ: Ядро способно завершиться!', isCorrect: isSolvable },
+                                { text: 'ЗАМКНУТАЯ ЛОВУШКА: Выхода в q0 нет, ядро гарантированно зациклено!', isCorrect: !isSolvable }
+                            ])
+                        };
+                    }
+                },
+
+                handleOptionClick(optIdx) {
+                    const selected = this.currentTask.options[optIdx];
+                    if (selected.isCorrect) {
+                        clearInterval(this.timerInterval);
+                        if (this.currentPhase >= this.totalPhases) {
+                            // Победа!
+                            this.gameState = 'success';
+                            sendTelemetry('level_complete', true);
+                        } else {
+                            sendTelemetry('in_progress');
+                            this.loadPhase(this.currentPhase + 1);
+                        }
+                    } else {
+                        clearInterval(this.timerInterval);
+                        this.triggerFail('Неверное решение! Вредоносный код вызвал фатальный сбой адресации.');
+                    }
+                },
+
+                triggerFail(reason) {
+                    attempts++;
+                    this.failMessage = reason;
+                    this.gameState = 'failed';
+                    sendTelemetry('hardcore_reset');
+
+                    // Через 2 секунды сброс на фазу 1 (тотальный сброс для Уровня 3)
+                    setTimeout(() => {
+                        this.currentPhase = 1;
+                        this.gameState = 'playing';
+                        this.loadPhase(1);
+                    }, 2000);
+                }
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>

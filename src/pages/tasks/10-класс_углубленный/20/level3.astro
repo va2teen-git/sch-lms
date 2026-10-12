@@ -1,0 +1,597 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <div class="display-3 text-danger font-monospace mb-3">⚠️ ЧРЕЗВЫЧАЙНАЯ СИТУАЦИЯ SOC ⚠️</div>
+            <h2 class="text-light font-monospace mb-3">CYBER DEFENSE OPS: ОПЕРАЦИЯ «АНТИДОТ»</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                В инфраструктуру проник мультивекторный киберинцидент нулевого дня (Zero-Day). Активирован гибридный червь-вымогатель с элементами руткита.
+                Вам поручено экстренное отражение <span class="text-danger fw-bold">8 волн кибератаки</span> на терминале аварийного реагирования.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 600px;">
+                <div class="text-danger fw-bold mb-2">[ПРОТОКОЛ ХАРДКОР-РЕАГИРОВАНИЯ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning">Локальный таймер:</span> На нейтрализацию каждой угрозы отводится ровно <span class="text-danger fw-bold">10 секунд</span>.</div>
+                <div class="text-light mb-1">• <span class="text-warning">Тотальный сброс:</span> Любая ошибка или тайм-аут вызывают тотальный коллапс системы и сброс на <span class="text-danger fw-bold">Волну 1</span>!</div>
+                <div class="text-light">• <span class="text-warning">Задача:</span> Принимать быстрые аналитические решения по таксономии и методам защиты Полякова.</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ТЕРМИНАЛ ЗАЩИТЫ
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4">
+            
+            <!-- Хедер со статусом и таймером -->
+            <div class="d-flex justify-content-between align-items-center mb-2 font-monospace">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР ОБОРОНЫ СИСТЕМЫ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentPhase"></span> ИЗ 8</span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО ДЕТОНАЦИИ:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.5 ? 'text-danger' : 'text-warning'">
+                        <span v-text="formattedTime"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Полоса локального таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.5 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / maxPhaseTime) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Консоль оперативного инцидента -->
+            <div class="card bg-dark border-danger rounded-0 p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <span class="badge bg-danger text-black rounded-0 font-monospace fw-bold px-3 py-1" v-text="currentTask.badge"></span>
+                    <span class="text-secondary small font-monospace">
+                        Угроза: <span class="text-warning" v-text="currentTask.threatName"></span>
+                    </span>
+                </div>
+
+                <h4 class="text-light font-monospace fs-5 mb-3" v-text="currentTask.title"></h4>
+                <p class="text-secondary font-monospace small mb-3" v-text="currentTask.description"></p>
+
+                <!-- Специализированные визуализаторы фаз -->
+                
+                <!-- Виджет 1: Сетевая матрица портов -->
+                <div v-if="currentTask.viewType === 'ports'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ПЕРЕХВАЧЕННЫЙ СЕТЕВОЙ ПАКЕТ SYN-SCAN:</div>
+                    <div class="text-warning fs-6 mb-2">
+                        Атакующий хост: <span class="text-danger fw-bold" v-text="currentTask.meta.attackerIp"></span> | Вектор: <span class="text-light" v-text="currentTask.meta.exploit"></span>
+                    </div>
+                    <div class="small text-secondary">Цель: Немедленно изолировать уязвимый сетевой порт для предотвращения лавинообразного распространения!</div>
+                </div>
+
+                <!-- Виджет 2: Дамп Magic Bytes / XOR Header -->
+                <div v-if="currentTask.viewType === 'xor'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ДАМП ЗАГОЛОВКА ПОВРЕЖДЕННОГО СИСТЕМНОГО ФАЙЛА:</div>
+                    <div class="row g-2 text-center mb-2">
+                        <div class="col-6">
+                            <div class="bg-dark p-2 border border-secondary">
+                                <span class="text-secondary small d-block">ЭТАЛОННЫЙ ЗАГОЛОВОК (MZ):</span>
+                                <span class="text-success fs-5 fw-bold">4D 5A</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-dark p-2 border border-danger">
+                                <span class="text-secondary small d-block">ЗАШИФРОВАННЫЙ ЗАГОЛОВОК:</span>
+                                <span class="text-danger fs-5 fw-bold" v-text="currentTask.meta.cryptedHex"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="small text-secondary">Шифрование выполнено операцией побитового XOR. Вычислите однобайтовый ключ дешифратора!</div>
+                </div>
+
+                <!-- Виджет 3: Дерево процессов / Инъекция -->
+                <div v-if="currentTask.viewType === 'process'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ТАБЛИЦА АКТИВНЫХ ПРОЦЕССОВ В ОПЕРАТИВНОЙ ПАМЯТИ:</div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm table-bordered border-secondary font-monospace small mb-0 text-center">
+                            <thead>
+                                <tr>
+                                    <th>PID</th>
+                                    <th>Имя процесса</th>
+                                    <th>Каталог исполнения</th>
+                                    <th>Родительский процесс (PPID)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="p in currentTask.meta.procList" :key="p.pid" :class="p.isSuspicious ? 'table-active' : ''">
+                                    <td class="text-warning" v-text="p.pid"></td>
+                                    <td class="text-light" v-text="p.name"></td>
+                                    <td class="text-secondary" v-text="p.path"></td>
+                                    <td class="text-secondary" v-text="p.parent"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Виджет 4: Архитектура антивирусного реагирования -->
+                <div v-if="currentTask.viewType === 'code'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">СИСТЕМНЫЙ ТЕЛЕМЕТРИЧЕСКИЙ ЛОГ:</div>
+                    <div class="bg-dark p-2 border border-secondary text-warning small" v-text="currentTask.meta.log"></div>
+                </div>
+
+                <!-- Виджет 5: Таблица системных вызовов SSDT ядра -->
+                <div v-if="currentTask.viewType === 'ssdt'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ДАМП ДИСПЕТЧЕРИЗАЦИИ СИСТЕМНЫХ ВЫЗОВОВ ЯДРА (SSDT):</div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm table-bordered border-secondary font-monospace small mb-0 text-center">
+                            <thead>
+                                <tr>
+                                    <th>Индекс</th>
+                                    <th>API Ядра</th>
+                                    <th>Текущий адрес обработчика</th>
+                                    <th>Модуль памяти</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="fn in currentTask.meta.ssdtEntries" :key="fn.idx">
+                                    <td class="text-secondary" v-text="fn.idx"></td>
+                                    <td class="text-light" v-text="fn.name"></td>
+                                    <td :class="fn.hooked ? 'text-danger fw-bold' : 'text-success'" v-text="fn.addr"></td>
+                                    <td :class="fn.hooked ? 'text-danger fw-bold' : 'text-secondary'" v-text="fn.module"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Виджет 6: Инфраструктура хранилищ (Air-Gap) -->
+                <div v-if="currentTask.viewType === 'storage'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ИНФРАСТРУКТУРА ХРАНЕНИЯ ДАННЫХ И СТАТУС СЕТИ:</div>
+                    <div class="row g-2 text-center">
+                        <div v-for="st in currentTask.meta.storages" :key="st.name" class="col-md-3">
+                            <div class="p-2 border" :class="st.airgap ? 'border-success bg-dark' : 'border-secondary bg-black'">
+                                <span class="d-block small text-light" v-text="st.name"></span>
+                                <span class="badge rounded-0 mt-1" :class="st.airgap ? 'bg-success text-dark' : 'bg-secondary text-light'" v-text="st.status"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Виджет 7: DGA Сетевые запросы Beaconing -->
+                <div v-if="currentTask.viewType === 'dns'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ЖУРНАЛ ИСХОДЯЩИХ DNS-ЗАПРОСОВ КЛИЕНТСКОГО ХОСТА:</div>
+                    <div class="bg-dark p-2 border border-secondary font-monospace small">
+                        <div v-for="d in currentTask.meta.dnsLogs" :key="d" class="py-1 border-bottom border-dark text-secondary">
+                            [UDP/53] Query A: <span :class="d.includes('-c2-') ? 'text-danger fw-bold' : 'text-light'" v-text="d"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Виджет 8: Kill-Switch механизм червя -->
+                <div v-if="currentTask.viewType === 'killswitch'" class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                    <div class="text-secondary small mb-2">ДЕКОМПИЛИРОВАННЫЙ БЛОК ПРОВЕРКИ АВАРИЙНОГО ОСТАНОВА ЧЕРВЯ:</div>
+                    <pre class="bg-dark p-2 border border-danger text-warning small mb-0 font-monospace">
+if (InternetCheckConnection("<span class="text-danger fw-bold" v-text="currentTask.meta.killSwitchDomain"></span>", FLAG_ICC_FORCE_CONNECTION, 0)) &#123;
+    // АВАРИЙНЫЙ ОСТАНОВ: ЗАВЕРШЕНИЕ РАБОТЫ И САМОУДАЛЕНИЕ ЧЕРВЯ
+    ExitProcess(0);
+&#125; else &#123;
+    // ПРОДОЛЖИТЬ МАССОВОЕ ШИФРОВАНИЕ ВСЕХ ТОМОВ
+    DetonatePayload();
+&#125;</pre>
+                </div>
+
+            </div>
+
+            <!-- Интерактивные аварийные действия (Кнопки быстрого реагирования) -->
+            <div class="row g-3">
+                <div v-for="(opt, optIdx) in currentTask.options" :key="optIdx" class="col-md-6">
+                    <button @click="handleOptionClick(optIdx)"
+                            :id="'opt-btn-' + optIdx"
+                            class="btn btn-outline-danger w-100 py-3 text-start font-monospace rounded-0 fs-6 h-100 d-flex align-items-center">
+                        <span class="badge border border-danger text-danger me-2">#<span v-text="optIdx + 1"></span></span>
+                        <span class="text-light" v-text="opt.text"></span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Экран сбоя (Fatal Incident / Hardcore Reset) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <h1 id="fail-title" class="display-2 text-danger font-monospace fw-bold mb-3">⚠️ СИСТЕМА СКОМПРОМЕТИРОВАНА ⚠️</h1>
+            <h3 class="text-light font-monospace mb-3">Каскадный коллапс инфраструктуры</h3>
+            <p class="text-secondary fs-5 mb-4" v-text="failMessage"></p>
+            <div class="badge bg-danger text-black p-3 font-monospace fs-6 rounded-0 mb-4">
+                ХАРДКОР-СБРОС: Прогресс обнулен до Волны 1. Инициализация аварийного бэкапа...
+            </div>
+            <div>
+                <button @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace px-5 py-3">
+                    ПЕРЕЗАПУСТИТЬ ОБОРОНУ (ВОЛНА 1)
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран триумфальной победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-5 text-center">
+            <div id="success-title" class="display-3 text-success font-monospace mb-3">★ УГРОЗА ЛИКВИДИРОВАНА ★</div>
+            <h2 class="text-light font-monospace mb-3">ИНФРАСТРУКТУРА ПОЛНОСТЬЮ СПАСЕНА</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                Все 8 критических векторов атаки успешно нейтрализованы в экстремальных условиях дефицита времени. Вы продемонстрировали выдающиеся практические навыки инженера по информационной безопасности!
+            </p>
+            <div class="badge border border-success text-success bg-dark p-3 font-monospace fs-6 rounded-0">
+                Урок 20 пройден на 100%! Достигнут высший статус в рейтинге курса.
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const { createApp } = Vue;
+        const missionName = 'Урок 20 :: Вредоносное ПО и методы борьбы с ним (Уровень 3)';
+        let sessionStartTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(sessionStartTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function generateHex(len) {
+            const hex = '0123456789ABCDEF';
+            let res = '';
+            for (let i = 0; i < len; i++) res += hex[rnd(0, hex.length - 1)];
+            return res;
+        }
+
+        function generateIp() {
+            return `${rnd(45, 195)}.${rnd(10, 240)}.${rnd(1, 250)}.${rnd(2, 254)}`;
+        }
+
+        createApp({
+            data() {
+                return {
+                    gameState: 'intro', // 'intro', 'playing', 'failed', 'success'
+                    currentPhase: 1,
+                    totalPhases: 8,
+                    phaseTimeLeft: 10.0,
+                    maxPhaseTime: 10.0,
+                    timerInterval: null,
+                    failMessage: '',
+                    currentTask: {}
+                };
+            },
+            computed: {
+                formattedTime() {
+                    return this.phaseTimeLeft.toFixed(1);
+                }
+            },
+            methods: {
+                startGame() {
+                    sessionStartTime = Date.now();
+                    attempts = 0;
+                    this.currentPhase = 1;
+                    this.gameState = 'playing';
+                    sendTelemetry('in_progress');
+                    this.loadPhase(1);
+                },
+
+                loadPhase(phaseNum) {
+                    this.currentPhase = phaseNum;
+                    this.phaseTimeLeft = 10.0;
+                    this.maxPhaseTime = 10.0;
+                    clearInterval(this.timerInterval);
+
+                    this.generateTaskForPhase(phaseNum);
+
+                    // Локальный убывающий таймер (каждые 100мс)
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft = Math.max(0, this.phaseTimeLeft - 0.1);
+                        if (this.phaseTimeLeft <= 0.001) {
+                            clearInterval(this.timerInterval);
+                            this.triggerFailure('Время на нейтрализацию угрозы истекло! Вредоносный код парализовал инфраструктуру.');
+                        }
+                    }, 100);
+                },
+
+                triggerFailure(reason) {
+                    clearInterval(this.timerInterval);
+                    attempts++;
+                    this.failMessage = reason;
+                    this.gameState = 'failed';
+                    sendTelemetry('hardcore_reset');
+                },
+
+                handleOptionClick(idx) {
+                    clearInterval(this.timerInterval);
+                    const opt = this.currentTask.options[idx];
+
+                    if (opt.isCorrect) {
+                        if (this.currentPhase >= this.totalPhases) {
+                            this.gameState = 'success';
+                            sendTelemetry('level_complete', true);
+                        } else {
+                            sendTelemetry('in_progress');
+                            this.loadPhase(this.currentPhase + 1);
+                        }
+                    } else {
+                        this.triggerFailure(`Неверное действие аварийного реагирования: [${opt.text}]. Произошла компрометация узла!`);
+                    }
+                },
+
+                // =========================================================
+                // Генерация задач для 8 фаз Аркады
+                // =========================================================
+                generateTaskForPhase(p) {
+                    switch (p) {
+                        case 1:
+                            this.genPhase1();
+                            break;
+                        case 2:
+                            this.genPhase2();
+                            break;
+                        case 3:
+                            this.genPhase3();
+                            break;
+                        case 4:
+                            this.genPhase4();
+                            break;
+                        case 5:
+                            this.genPhase5();
+                            break;
+                        case 6:
+                            this.genPhase6();
+                            break;
+                        case 7:
+                            this.genPhase7();
+                            break;
+                        case 8:
+                            this.genPhase8();
+                            break;
+                    }
+                },
+
+                // Волна 1: Изоляция сетевого порта атаки червя
+                genPhase1() {
+                    const targets = [
+                        { proto: 'SMBv1', port: 445, desc: 'Переполнение буфера в службе общих папок SMB (Эксплойт EternalBlue)' },
+                        { proto: 'RDP', port: 3389, desc: 'Удаленное выполнение кода в службе удаленного рабочего стола RDP (BlueKeep)' },
+                        { proto: 'NetBIOS', port: 139, desc: 'Атака переполнения буфера в сервисе имен сессий NetBIOS' }
+                    ];
+                    const selected = targets[rnd(0, targets.length - 1)];
+                    const attackerIp = generateIp();
+
+                    const ports = [
+                        { text: `Блокировать PORT 445 (SMB) на пограничном файрволе`, isTarget: selected.port === 445 },
+                        { text: `Блокировать PORT 3389 (RDP) на пограничном файрволе`, isTarget: selected.port === 3389 },
+                        { text: `Блокировать PORT 80 (HTTP) на пограничном файрволе`, isTarget: false },
+                        { text: `Блокировать PORT 53 (DNS) на пограничном файрволе`, isTarget: false }
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 1: СЕТЕВОЙ ЧЕРВЬ',
+                        threatName: 'Remote RCE Worm Propagation',
+                        title: `Входящее сканирование службы ${selected.proto}`,
+                        description: `Сетевой червь атакует пограничный шлюз. Выберите экстренную блокировку порта целевой службы.`,
+                        viewType: 'ports',
+                        meta: { attackerIp, exploit: selected.desc },
+                        options: shuffle(ports.map(p => ({ text: p.text, isCorrect: p.isTarget })))
+                    };
+                },
+
+                // Волна 2: Вычисление XOR ключа шифровальщика
+                genPhase2() {
+                    // Оригинал MZ: 0x4D = 77, 0x5A = 90
+                    const key = rnd(10, 250);
+                    const b1 = (0x4D ^ key).toString(16).toUpperCase().padStart(2, '0');
+                    const b2 = (0x5A ^ key).toString(16).toUpperCase().padStart(2, '0');
+                    const cryptedHex = `${b1} ${b2}`;
+                    const correctKeyHex = `0x${key.toString(16).toUpperCase().padStart(2, '0')}`;
+
+                    const distractors = new Set();
+                    while (distractors.size < 3) {
+                        const fakeKey = rnd(10, 250);
+                        if (fakeKey !== key) {
+                            distractors.add(`0x${fakeKey.toString(16).toUpperCase().padStart(2, '0')}`);
+                        }
+                    }
+
+                    const opts = [
+                        { text: `Применить ключ XOR: ${correctKeyHex}`, isCorrect: true },
+                        ...Array.from(distractors).map(k => ({ text: `Применить ключ XOR: ${k}`, isCorrect: false }))
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 2: ШИФРОВАЛЬЩИК-ВЫМОГАТЕЛЬ',
+                        threatName: 'Header Cryptor XOR Stream',
+                        title: 'Дешифрование заголовка системного бинарника',
+                        description: 'Шифровальщик зашифровал сигнатуру MZ однобайтовым XOR. Вычислите верный ключ дешифратора.',
+                        viewType: 'xor',
+                        meta: { cryptedHex },
+                        options: shuffle(opts)
+                    };
+                },
+
+                // Волна 3: Охота за процессами (Process Injection)
+                genPhase3() {
+                    const badPid = rnd(3000, 7500);
+                    const goodPids = [1024, 1840, 2490];
+                    const procList = [
+                        { pid: goodPids[0], name: 'svchost.exe', path: 'C:\\Windows\\System32\\', parent: 'services.exe', isSuspicious: false },
+                        { pid: goodPids[1], name: 'lsass.exe', path: 'C:\\Windows\\System32\\', parent: 'wininit.exe', isSuspicious: false },
+                        { pid: badPid, name: 'svchost.exe', path: 'C:\\Users\\Public\\AppData\\', parent: 'powershell.exe', isSuspicious: true },
+                        { pid: goodPids[2], name: 'explorer.exe', path: 'C:\\Windows\\', parent: 'userinit.exe', isSuspicious: false }
+                    ];
+
+                    const opts = procList.map(p => ({
+                        text: `Завершить принудительно PID ${p.pid} [${p.name}] (${p.path})`,
+                        isCorrect: p.pid === badPid
+                    }));
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 3: БЕСФАЙЛОВЫЙ ИНЖЕКТОР',
+                        threatName: 'Memory Process Hollow',
+                        title: 'Выявление процесса с внедренным шелл-кодом',
+                        description: 'Определите маскирующийся процесс, запущенный из нелегитимной директории от имени командного процессора.',
+                        viewType: 'process',
+                        meta: { procList },
+                        options: shuffle(opts)
+                    };
+                },
+
+                // Волна 4: Динамическая эвристика против полиморфизма
+                genPhase4() {
+                    const log = `MUTATION_DETECTED: Sample entropy 7.94. Decryptor routine changes opcodes each iteration. Constant byte signature not found in database.`;
+
+                    const opts = [
+                        { text: 'Запустить виртуальный эмулятор процессора (Динамическая эвристика) для распаковки в RAM', isCorrect: true },
+                        { text: 'Провести поиск статической MD5-хеш суммы в локальной сигнатурной базе', isCorrect: false },
+                        { text: 'Выполнить дефрагментацию жесткого диска в безопасном режиме', isCorrect: false },
+                        { text: 'Удалить расширение файла и переместить его в корзину пользователя', isCorrect: false }
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 4: ПОЛИМОРФНЫЙ ДВИЖОК',
+                        threatName: 'Polymorphic Mutating Payload',
+                        title: 'Выбор метода детекта зашифрованного тела',
+                        description: 'У вируса отсутствует постоянная сигнатура из-за случайного дешифратора. Выберите единственный эффективный метод детекта.',
+                        viewType: 'code',
+                        meta: { log },
+                        options: shuffle(opts)
+                    };
+                },
+
+                // Волна 5: Восстановление SSDT ядра при рутките
+                genPhase5() {
+                    const ssdt = [
+                        { idx: '0x0029', name: 'NtCreateFile', addr: '0x80534A10', module: 'ntoskrnl.exe', hooked: false },
+                        { idx: '0x00A1', name: 'NtQuerySystemInformation', addr: '0xF89210B0', module: 'hook_driver.sys (UNVERIFIED)', hooked: true },
+                        { idx: '0x0112', name: 'NtReadFile', addr: '0x80538D40', module: 'ntoskrnl.exe', hooked: false },
+                        { idx: '0x014B', name: 'NtTerminateProcess', addr: '0x80541C00', module: 'ntoskrnl.exe', hooked: false }
+                    ];
+
+                    const opts = [
+                        { text: 'Сбросить хук SSDT: вернуть NtQuerySystemInformation оригинальный указатель ntoskrnl.exe', isCorrect: true },
+                        { text: 'Переустановить драйвер видеоадаптера и сетевой карты', isCorrect: false },
+                        { text: 'Заблокировать учетную запись гостя в панели управления', isCorrect: false },
+                        { text: 'Переименовать файл hook_driver.sys в hook_driver.old', isCorrect: false }
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 5: KERNEL-ROOTKIT (RING 0)',
+                        threatName: 'SSDT Table Hijacking',
+                        title: 'Обезвреживание перехвата системных сервисов',
+                        description: 'Руткит подменил функцию диспетчера задач для скрытия процессов. Восстановите целостность таблицы ядра.',
+                        viewType: 'ssdt',
+                        meta: { ssdtEntries: ssdt },
+                        options: shuffle(opts)
+                    };
+                },
+
+                // Волна 6: Аварийный Air-Gap бэкапа
+                genPhase6() {
+                    const storages = [
+                        { name: 'Облачный диск CloudSync', status: 'СЕТЕВОЙ / ONLINE', airgap: false },
+                        { name: 'Сетевая шара Corporate NAS', status: 'СЕТЕВОЙ / ONLINE', airgap: false },
+                        { name: 'Локальный RAID-массив', status: 'ПОДКЛЮЧЕН / R-W', airgap: false },
+                        { name: 'Изолированное хранилище Air-Gap', status: 'ОФЛАЙН / ИЗОЛИРОВАН', airgap: true }
+                    ];
+
+                    const opts = [
+                        { text: 'Активировать аварийное восстановление из автономного офлайн-хранилища (Air-Gap)', isCorrect: true },
+                        { text: 'Синхронизировать поврежденные файлы с облачным диском CloudSync', isCorrect: false },
+                        { text: 'Выплатить выкуп злоумышленникам по реквизитам в текстовом файле', isCorrect: false },
+                        { text: 'Отформатировать сетевое хранилище Corporate NAS без проверки', isCorrect: false }
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 6: ЗАЩИТА РЕЗЕРВНЫХ КОПИЙ',
+                        threatName: 'Ransomware Mass Wiper Threat',
+                        title: 'Спасение данных по стратегии 3-2-1',
+                        description: 'Шифровальщик стирает сетевые диски. Определите защищенный рубеж восстановления данных.',
+                        viewType: 'storage',
+                        meta: { storages },
+                        options: shuffle(opts)
+                    };
+                },
+
+                // Волна 7: DGA C2 Beaconing
+                genPhase7() {
+                    const legitDomains = ['update.microsoft.com', 'api.github.com', 'time.windows.com'];
+                    const dgaDomain = `${generateHex(8).toLowerCase()}-c2-botnet.cc`;
+                    const allDns = shuffle([...legitDomains, dgaDomain]);
+
+                    const opts = [
+                        { text: `Заблокировать на корпоративном DNS подозрительный DGA-домен: ${dgaDomain}`, isCorrect: true },
+                        { text: `Заблокировать на корпоративном DNS узел: update.microsoft.com`, isCorrect: false },
+                        { text: `Заблокировать на корпоративном DNS узел: time.windows.com`, isCorrect: false },
+                        { text: `Отключить протокол DNS во всей локальной сети`, isCorrect: false }
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 7: БОТНЕТ И C2 BEACONING',
+                        threatName: 'Domain Generation Algorithm (DGA)',
+                        title: 'Перехват канала связи с командным сервером',
+                        description: 'Троян генерирует запросы к псевдослучайным доменам ботнета. Локализуйте адрес командного центра.',
+                        viewType: 'dns',
+                        meta: { dnsLogs: allDns },
+                        options: shuffle(opts)
+                    };
+                },
+
+                // Волна 8: Финальный босс — Kill-Switch червя
+                genPhase8() {
+                    const ksDomain = `www.sinkhole-${generateHex(6).toLowerCase()}-killswitch.com`;
+
+                    const opts = [
+                        { text: `Зарегистрировать и активировать sinkhole-домен [${ksDomain}] для аварийного останова червя`, isCorrect: true },
+                        { text: `Заблокировать в файле hosts обращение червя к домену [${ksDomain}]`, isCorrect: false },
+                        { text: `Отправить запрос на выключение глобальных серверов корневых DNS зон`, isCorrect: false },
+                        { text: `Выключить электропитание во всем здании`, isCorrect: false }
+                    ];
+
+                    this.currentTask = {
+                        badge: 'ВОЛНА 8: ФИНАЛЬНЫЙ БОСС — АНТИДОТ',
+                        threatName: 'Worm Global Pandemic Kill-Switch',
+                        title: 'Активация встроенного механизма аварийного останова',
+                        description: 'В коде червя найден скрытый Kill-Switch: если указанный домен отвечает, червь прекращает заражение. Активируйте протокол нейтрализации!',
+                        viewType: 'killswitch',
+                        meta: { killSwitchDomain: ksDomain },
+                        options: shuffle(opts)
+                    };
+                }
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>
