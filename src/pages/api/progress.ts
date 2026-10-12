@@ -24,7 +24,7 @@ export const GET: APIRoute = async ({ request }) => {
       WHERE first_name = ? AND last_name = ? AND class_name = ? 
         AND mission_name LIKE ?
       ORDER BY timestamp ASC
-    `).all(firstName, lastName, className, `%${lessonPrefix}%`);
+    `).all(firstName.trim(), lastName.trim(), className.trim(), `%${lessonPrefix.trim()}%`);
 
     const normalLevels = new Set();
     const hardcoreLevels = new Set();
