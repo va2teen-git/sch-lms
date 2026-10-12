@@ -70,10 +70,21 @@ export const GET: APIRoute = async ({ request }) => {
       params.push(dateFilter);
     }
 
+    // Support multi-class filtering (comma-separated or multiple ?class= params)
+    const rawClassParams = url.searchParams.getAll('class');
+    const selectedClasses = rawClassParams
+      .flatMap(c => c.split(','))
+      .map(c => c.trim())
+      .filter(c => c && c !== 'all');
+
     let classCondition = '';
-    if (classFilter !== 'all') {
+    if (selectedClasses.length === 1) {
       classCondition = ' AND class_name = ?';
-      params.push(classFilter);
+      params.push(selectedClasses[0]);
+    } else if (selectedClasses.length > 1) {
+      const placeholders = selectedClasses.map(() => '?').join(', ');
+      classCondition = ` AND class_name IN (${placeholders})`;
+      params.push(...selectedClasses);
     }
 
     let lessonCondition = '';
@@ -321,7 +332,8 @@ export const GET: APIRoute = async ({ request }) => {
       availableDates,
       classes,
       selectedFilters: {
-        class: classFilter,
+        class: selectedClasses.length > 0 ? selectedClasses.join(',') : 'all',
+        classes: selectedClasses,
         lesson: lessonFilter,
         date: dateFilter,
         excludeTests,

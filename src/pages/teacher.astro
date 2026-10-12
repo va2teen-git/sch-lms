@@ -302,15 +302,29 @@ function formatSec(sec: number): string {
     <section class="bg-white border border-gray-200 p-4 shadow-sm space-y-3">
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
         
-        <!-- Class Filter -->
-        <div>
-          <label for="filter-class" class="block text-xs font-semibold text-gray-600 uppercase mb-1">Класс</label>
-          <select id="filter-class" class="w-full border border-gray-300 p-2 text-sm bg-white focus:outline-none focus:border-blue-600">
-            <option value="all">Все классы</option>
-            {coursesData.map(c => (
-              <option value={c.slug}>{c.name}</option>
-            ))}
-          </select>
+        <!-- Class Multi-Select Filter -->
+        <div class="relative" id="class-filter-container">
+          <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Класс</label>
+          <button type="button" id="filter-class" class="w-full border border-gray-300 p-2 text-sm bg-white focus:outline-none focus:border-blue-600 flex items-center justify-between text-left cursor-pointer hover:bg-gray-50/80 transition select-none">
+            <span id="class-select-label" class="truncate text-gray-800">Все классы</span>
+            <span class="text-[10px] text-gray-400 ml-1.5 shrink-0">▼</span>
+          </button>
+          
+          <!-- Dropdown menu with checkboxes -->
+          <div id="class-dropdown-menu" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 shadow-xl z-40 p-2 space-y-1.5 max-h-72 overflow-y-auto">
+            <div class="flex items-center justify-between pb-1.5 border-b border-gray-100 text-[11px] font-semibold">
+              <button type="button" id="btn-select-all-classes" class="text-blue-600 hover:text-blue-800 cursor-pointer">Выбрать все</button>
+              <button type="button" id="btn-clear-all-classes" class="text-gray-400 hover:text-gray-600 cursor-pointer">Сбросить</button>
+            </div>
+            <div class="space-y-1">
+              {coursesData.map(c => (
+                <label class="flex items-center gap-2 px-1.5 py-1 hover:bg-blue-50/60 cursor-pointer text-xs select-none">
+                  <input type="checkbox" value={c.slug} class="class-checkbox w-3.5 h-3.5 text-blue-600 border-gray-300 rounded-0" />
+                  <span class="text-gray-800">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
 
         <!-- Lesson Filter -->
@@ -576,7 +590,14 @@ function formatSec(sec: number): string {
   let sortRules = [{ col: 'last', asc: false }];
   let activeStudent = null;
 
-  const classSelect = document.getElementById('filter-class');
+  const classDropdownBtn = document.getElementById('filter-class');
+  const classDropdownMenu = document.getElementById('class-dropdown-menu');
+  const classSelectLabel = document.getElementById('class-select-label');
+  const classContainer = document.getElementById('class-filter-container');
+  const classCheckboxes = document.querySelectorAll('.class-checkbox');
+  const btnSelectAllClasses = document.getElementById('btn-select-all-classes');
+  const btnClearAllClasses = document.getElementById('btn-clear-all-classes');
+
   const lessonSelect = document.getElementById('filter-lesson');
   const dateSelect = document.getElementById('filter-date');
   const searchInput = document.getElementById('filter-search');
@@ -588,30 +609,82 @@ function formatSec(sec: number): string {
   const exportBtn = document.getElementById('export-btn');
   const modal = document.getElementById('detail-modal');
 
-  // Populate lessons dropdown based on selected class
+  function getSelectedClasses() {
+    const checked = Array.from(document.querySelectorAll('.class-checkbox:checked'));
+    return checked.map(cb => cb.value);
+  }
+
+  function getSelectedClassesParam() {
+    const sel = getSelectedClasses();
+    if (sel.length === 0 || sel.length === classCheckboxes.length) return 'all';
+    return sel.join(',');
+  }
+
+  function updateClassSelectLabel() {
+    const sel = getSelectedClasses();
+    if (!classSelectLabel) return;
+    if (sel.length === 0 || sel.length === classCheckboxes.length) {
+      classSelectLabel.textContent = 'Все классы';
+    } else if (sel.length === 1) {
+      const course = coursesData.find(c => c.slug === sel[0]);
+      classSelectLabel.textContent = course ? course.name : sel[0];
+    } else {
+      classSelectLabel.textContent = `Выбрано: ${sel.length} кл.`;
+    }
+  }
+
+  if (classDropdownBtn) {
+    Object.defineProperty(classDropdownBtn, 'value', {
+      get: () => getSelectedClassesParam(),
+      configurable: true
+    });
+  }
+
+  // Populate lessons dropdown based on selected classes
   function updateLessonsDropdown() {
-    const selectedClass = classSelect.value;
+    const selected = getSelectedClasses();
+    const prevVal = lessonSelect.value;
     lessonSelect.innerHTML = '<option value="all">Все уроки курса</option>';
 
-    if (selectedClass === 'all') {
-      // Collect unique lesson numbers across courses
+    if (selected.length === 1) {
+      const course = coursesData.find(c => c.slug === selected[0]);
+      if (course && course.lessons) {
+        course.lessons.forEach(l => {
+          const opt = document.createElement('option');
+          opt.value = `Урок ${l.id}`;
+          opt.textContent = `Урок ${l.id}: ${l.topic.substring(0, 48)}${l.topic.length > 48 ? '...' : ''}`;
+          lessonSelect.appendChild(opt);
+        });
+      }
+    } else {
+      // Multiple classes or all classes selected
+      // 1. Quick generic lesson numbers across all courses
+      const genericGroup = document.createElement('optgroup');
+      genericGroup.label = '— По номеру урока (все курсы) —';
       for (let i = 1; i <= 34; i++) {
         const opt = document.createElement('option');
         opt.value = `Урок ${i}`;
         opt.textContent = `Урок ${i}`;
-        lessonSelect.appendChild(opt);
+        genericGroup.appendChild(opt);
       }
-      return;
+      lessonSelect.appendChild(genericGroup);
+
+      // 2. Specific courses for inter-class competition selection
+      coursesData.forEach(c => {
+        const group = document.createElement('optgroup');
+        group.label = `Курс: ${c.name}`;
+        c.lessons.forEach(l => {
+          const opt = document.createElement('option');
+          opt.value = `Урок ${l.id}`;
+          opt.textContent = `${c.name.split('_')[0]} • Урок ${l.id}: ${l.topic.substring(0, 40)}${l.topic.length > 40 ? '...' : ''}`;
+          group.appendChild(opt);
+        });
+        lessonSelect.appendChild(group);
+      });
     }
 
-    const course = coursesData.find(c => c.slug === selectedClass);
-    if (course && course.lessons) {
-      course.lessons.forEach(l => {
-        const opt = document.createElement('option');
-        opt.value = `Урок ${l.id}`;
-        opt.textContent = `Урок ${l.id}: ${l.topic.substring(0, 48)}${l.topic.length > 48 ? '...' : ''}`;
-        lessonSelect.appendChild(opt);
-      });
+    if (prevVal && Array.from(lessonSelect.options).some(o => o.value === prevVal)) {
+      lessonSelect.value = prevVal;
     }
   }
 
@@ -625,7 +698,7 @@ function formatSec(sec: number): string {
 
   // Fetch telemetry from server API
   async function fetchTelemetry() {
-    const cls = classSelect.value;
+    const cls = getSelectedClassesParam();
     const lsn = lessonSelect.value;
     const dt = dateSelect.value;
     const exc = excludeTestsCheckbox.checked ? '1' : '0';
@@ -935,7 +1008,7 @@ function formatSec(sec: number): string {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Ведомость_телеметрии_${classSelect.value}_${dateSelect.value}.csv`);
+    link.setAttribute('download', `Ведомость_телеметрии_${getSelectedClassesParam()}_${dateSelect.value}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -965,8 +1038,38 @@ function formatSec(sec: number): string {
     fetchTelemetry();
   });
 
-  // Filter change listeners
-  classSelect.addEventListener('change', () => {
+  // Multi-class dropdown interaction
+  classDropdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    classDropdownMenu.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (classContainer && !classContainer.contains(e.target)) {
+      classDropdownMenu.classList.add('hidden');
+    }
+  });
+
+  classCheckboxes.forEach(cb => {
+    cb.addEventListener('change', () => {
+      updateClassSelectLabel();
+      updateLessonsDropdown();
+      fetchTelemetry();
+    });
+  });
+
+  btnSelectAllClasses.addEventListener('click', (e) => {
+    e.stopPropagation();
+    classCheckboxes.forEach(cb => cb.checked = true);
+    updateClassSelectLabel();
+    updateLessonsDropdown();
+    fetchTelemetry();
+  });
+
+  btnClearAllClasses.addEventListener('click', (e) => {
+    e.stopPropagation();
+    classCheckboxes.forEach(cb => cb.checked = false);
+    updateClassSelectLabel();
     updateLessonsDropdown();
     fetchTelemetry();
   });

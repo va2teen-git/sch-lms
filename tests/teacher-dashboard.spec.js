@@ -133,4 +133,43 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
 
     expect(pageErrors.length).toBe(0);
   });
+
+  test('GET /api/teacher/stats supports multiple classes filtering via comma-separated param', async ({ request }) => {
+    const res = await request.get(`${baseUrl}/api/teacher/stats?class=10-класс_углубленный,11-класс_углубленный&date=all`);
+    expect(res.status()).toBe(200);
+
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    const classes = [...new Set(body.students.map(s => s.className))];
+    expect(classes.some(c => c === '10-класс_углубленный')).toBe(true);
+    expect(classes.some(c => c === '11-класс_углубленный')).toBe(true);
+  });
+
+  test('Teacher dashboard allows multi-class selection via checkboxes dropdown', async ({ page }) => {
+    await page.goto(`${baseUrl}/teacher`);
+    await page.waitForTimeout(500);
+
+    // Initial label
+    await expect(page.locator('#class-select-label')).toHaveText('Все классы');
+
+    // Click dropdown button to open menu
+    await page.locator('#filter-class').click();
+    await expect(page.locator('#class-dropdown-menu')).toBeVisible();
+
+    // Check 10-класс_углубленный and 11-класс_углубленный
+    await page.locator('input[value="10-класс_углубленный"]').check();
+    await page.locator('input[value="11-класс_углубленный"]').check();
+
+    // Label reflects 2 classes selected
+    await expect(page.locator('#class-select-label')).toHaveText('Выбрано: 2 кл.');
+
+    // Click outside to close menu
+    await page.locator('#progress-table').click();
+    await expect(page.locator('#class-dropdown-menu')).toBeHidden();
+
+    // Check that table rows contain the selected classes
+    const classCells = await page.locator('.student-row td:nth-child(3)').allTextContents();
+    const unique = [...new Set(classCells.map(c => c.trim()))];
+    expect(unique.every(c => c === '10-класс_углубленный' || c === '11-класс_углубленный')).toBe(true);
+  });
 });
