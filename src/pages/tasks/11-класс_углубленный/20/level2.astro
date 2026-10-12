@@ -1,0 +1,609 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning font-monospace mb-0">Тренажер: Машина Тьюринга (Уровень 2: Продвинутый)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2 font-monospace">Продвинутый режим (Ручной ввод)</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Фаза 1 -->
+                <div id="phase1" class="phase-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 1 из 5: Синтез элементарной команды</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 1</span>
+                    </div>
+                    <p class="text-light">
+                        Для управления автоматом требуется составить элементарную микрокоманду.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="text-secondary small mb-2">ТЕХНИЧЕСКОЕ ЗАДАНИЕ ДЛЯ ТАКТА:</div>
+                        <ul class="list-unstyled text-light mb-0">
+                            <li>• Каретка находится в состоянии: <span id="p1-state" class="text-warning fw-bold"></span></li>
+                            <li>• Обозреваемый символ на ленте: <span id="p1-sym" class="text-warning fw-bold"></span></li>
+                            <li>• Требуемое действие: записать в ячейку символ <span id="p1-req-sym" class="text-success fw-bold"></span>, 
+                                сдвинуть каретку <span id="p1-req-dir-text" class="text-info fw-bold"></span> 
+                                и переключить состояние автомата на <span id="p1-req-next" class="text-warning fw-bold"></span>.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p1-input" class="form-label text-light font-monospace small mb-2">
+                            Введите правую часть команды в формате <code class="text-warning">[СИМВОЛ] [НАПРАВЛЕНИЕ] [СОСТОЯНИЕ]</code> (например, <span class="text-warning">1 R q2</span> или <span class="text-warning">0 L q0</span>):
+                        </label>
+                        <div class="input-group">
+                            <span id="p1-prefix" class="input-group-text bg-black text-secondary border-secondary font-monospace rounded-0"></span>
+                            <input type="text" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: 1 R q2" autocomplete="off">
+                            <button id="p1-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p1-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [СИНТАКСИЧЕСКАЯ ОШИБКА] Неверная команда перехода! Регенерация спецификации...
+                    </div>
+                </div>
+
+                <!-- Фаза 2 -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 2 из 5: Пошаговая трансформация ленты</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 2</span>
+                    </div>
+                    <p class="text-light">
+                        Проанализируйте начальное двоичное слово на ленте и примените к активной ячейке предписанную команду.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 text-center">
+                        <div class="text-secondary small font-monospace mb-2">ТЕКУЩАЯ КОНФИГУРАЦИЯ ЛЕНТЫ:</div>
+                        <div id="p2-tape-display" class="d-flex justify-content-center align-items-center gap-1 font-monospace fs-4"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3 font-monospace">
+                        <span class="text-secondary small d-block mb-1">КОМАНДА ДЛЯ ТАКТА:</span>
+                        <div id="p2-cmd-display" class="text-warning fs-5 fw-bold"></div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-light font-monospace small mb-2">
+                            Введите обновленное 3-битное слово на ленте (только 3 цифры под ячейками A, B, C):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: 101" autocomplete="off">
+                            <button id="p2-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p2-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [ОШИБКА ТРАНСФОРМАЦИИ] Неверное результирующее слово на ленте! Перезапуск такта...
+                    </div>
+                </div>
+
+                <!-- Фаза 3 -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 3 из 5: Вычисление арифметической функции в унарном коде</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 3</span>
+                    </div>
+                    <p class="text-light">
+                        В унарной системе счисления число <code class="text-warning">n</code> кодируется цепочкой из <code class="text-warning">n</code> единиц.
+                        Машина Тьюринга запрограммирована на выполнение арифметической операции над записанным числом.
+                    </p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="card bg-black border-warning rounded-0 p-3 h-100 font-monospace">
+                                <div class="text-secondary small mb-2">ПРОГРАММА ВЫЧИСЛИТЕЛЯ:</div>
+                                <table class="table table-dark table-sm table-bordered border-secondary text-center mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Q</th>
+                                            <th>λ</th>
+                                            <th>1</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="p3-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100 font-monospace">
+                                <div class="text-secondary small mb-2">НАЧАЛЬНЫЕ ДАННЫЕ:</div>
+                                <div class="mb-2">Входное число на ленте: <span id="p3-word" class="text-warning fw-bold fs-5"></span></div>
+                                <div class="mb-2">Десятичное значение: <span id="p3-dec" class="text-success fw-bold"></span></div>
+                                <div class="small text-secondary">Каретка находится на крайней левой единице в состоянии q1.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-light font-monospace small mb-2">
+                            Сколько единиц останется на ленте после останова машины в состоянии q0? Введите число (в десятичной системе):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: 4" autocomplete="off">
+                            <button id="p3-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p3-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [АРИФМЕТИЧЕСКИЙ СБОЙ] Неверный результат унарной функции! Генерация новых данных...
+                    </div>
+                </div>
+
+                <!-- Фаза 4 -->
+                <div id="phase4" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 4 из 5: Двоичный сумматор (Инкремент)</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 4</span>
+                    </div>
+                    <p class="text-light">
+                        Классический алгоритм машины Тьюринга для прибавления единицы к двоичному числу (+1).
+                        Выполните полную трассировку с учетом распространения переноса разряда.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="text-secondary small mb-1">АЛГОРИТМ ИНКРЕМЕНТА (+1):</div>
+                                <div class="small text-light">
+                                    • q1 0 → 1 S q0 (записать 1 и остановиться)<br>
+                                    • q1 1 → 0 L q1 (записать 0, перенос влево)<br>
+                                    • q1 λ → 1 S q0 (записать 1 в пустую ячейку и остановиться)
+                                </div>
+                            </div>
+                            <div class="col-md-6 border-start border-secondary ps-md-3 mt-3 mt-md-0">
+                                <div class="text-secondary small mb-1">ВХОДНОЕ ДВОИЧНОЕ ЧИСЛО:</div>
+                                <div class="fs-4 text-warning fw-bold" id="p4-bin-word"></div>
+                                <div class="small text-secondary">Каретка стоит над младшим (крайним правым) разрядом в q1.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-light font-monospace small mb-2">
+                            Введите двоичное число, которое останется на ленте после останова (например, <span class="text-warning">110</span>):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: 1000" autocomplete="off">
+                            <button id="p4-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p4-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [ОШИБКА ПЕРЕНОСА] Неверный результат двоичного инкремента! Новое число...
+                    </div>
+                </div>
+
+                <!-- Фаза 5 -->
+                <div id="phase5" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 5 из 5: Анализ проблемы остановки (Halting Analysis)</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 5</span>
+                    </div>
+                    <p class="text-light">
+                        Проанализируйте поведение машины Тьюринга на ленте с входными данными.
+                        Определите, завершится ли программа за конечное число тактов или войдет в бесконечный цикл.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <div class="text-secondary small mb-2">ПРОГРАММА АВТОМАТА:</div>
+                                <table class="table table-dark table-sm table-bordered border-secondary text-center mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Q</th>
+                                            <th>λ</th>
+                                            <th>1</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="p5-table"></tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-5 border-start border-secondary ps-md-3 mt-3 mt-md-0">
+                                <div class="text-secondary small mb-1">ЛЕНТА:</div>
+                                <div class="text-light mb-2">... λ <span id="p5-tape-word" class="text-warning fw-bold"></span> λ ...</div>
+                                <div class="text-secondary small">Каретка стартует на первой единице слева в состоянии q1.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-light font-monospace small mb-2">
+                            Если машина останавливается — введите <strong>число тактов</strong> до останова в q0 (например, <span class="text-warning">3</span>).
+                            Если машина никогда не остановится — введите слово <span class="text-danger fw-bold">LOOP</span>:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="число тактов или LOOP" autocomplete="off">
+                            <button id="p5-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p5-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [ОШИБКА АНАЛИЗА] Неверный диагноз остановки! Реконфигурация автомата...
+                    </div>
+                </div>
+
+                <!-- Экран завершения -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-warning font-monospace display-4">★ УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light font-monospace mb-3">Синтез и трассировка вычислений завершены</h3>
+                    <p class="text-secondary max-w-md mx-auto mb-4">
+                        Вы успешно справились с прямым текстовым вводом команд, трассировкой унарных и двоичных операций и предиктивным анализом остановки машины Тьюринга.
+                    </p>
+                    <div class="badge border border-danger text-danger bg-black p-3 font-monospace fs-6 rounded-0">
+                        Финальное испытание: Перейдите на Уровень 3 (Аркада на время) в шапке страницы!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        const missionName = 'Урок 20 :: Машина Тьюринга (Уровень 2)';
+        const startTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // ==========================================
+        // ФАЗА 1: Синтез команды
+        // ==========================================
+        let p1ExpectedAnswer = '';
+
+        function initPhase1() {
+            const states = ['q1', 'q2'];
+            const nextStates = ['q0', 'q1', 'q2'];
+            const symbols = ['0', '1', 'λ'];
+            const directions = ['L', 'R', 'S'];
+            const dirNames = { 'L': 'влево (L)', 'R': 'вправо (R)', 'S': 'на месте (S)' };
+
+            const currState = states[rnd(0, 1)];
+            const currSymbol = symbols[rnd(0, 2)];
+            const reqSymbol = symbols.filter(s => s !== currSymbol)[rnd(0, 1)];
+            const reqDir = directions[rnd(0, 2)];
+            const reqNext = nextStates[rnd(0, 2)];
+
+            document.getElementById('p1-state').textContent = currState;
+            document.getElementById('p1-sym').textContent = currSymbol;
+            document.getElementById('p1-req-sym').textContent = reqSymbol;
+            document.getElementById('p1-req-dir-text').textContent = dirNames[reqDir];
+            document.getElementById('p1-req-next').textContent = reqNext;
+
+            document.getElementById('p1-prefix').textContent = `${currState} ${currSymbol} →`;
+            document.getElementById('p1-input').value = '';
+
+            p1ExpectedAnswer = `${reqSymbol} ${reqDir} ${reqNext}`.toUpperCase();
+        }
+
+        function handlePhase1Submit() {
+            const input = document.getElementById('p1-input');
+            const btn = document.getElementById('p1-btn');
+            const feedback = document.getElementById('p1-feedback');
+
+            // Нормализация ответа (сжатие пробелов, uppercase)
+            const userVal = input.value.trim().replace(/\s+/g, ' ').toUpperCase();
+
+            if (userVal === p1ExpectedAnswer) {
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                sendTelemetry('in_progress');
+                initPhase2();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                input.disabled = true;
+                btn.disabled = true;
+                feedback.classList.remove('d-none');
+                setTimeout(() => {
+                    initPhase1();
+                    input.disabled = false;
+                    btn.disabled = false;
+                    feedback.classList.add('d-none');
+                    input.focus();
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 2: Трансформация ленты
+        // ==========================================
+        let p2ExpectedWord = '';
+
+        function initPhase2() {
+            // Лента из 3 значимых бит A, B, C
+            const bits = [rnd(0, 1).toString(), rnd(0, 1).toString(), rnd(0, 1).toString()];
+            const activeIdx = rnd(0, 2); // 0=A, 1=B, 2=C
+            const labels = ['A', 'B', 'C'];
+
+            const newSym = bits[activeIdx] === '1' ? '0' : '1';
+            const dirs = ['L', 'R', 'S'];
+            const chosenDir = dirs[rnd(0, 2)];
+            const chosenNext = ['q0', 'q1', 'q2'][rnd(0, 2)];
+
+            // Отображение ленты
+            const tapeContainer = document.getElementById('p2-tape-display');
+            tapeContainer.innerHTML = '';
+
+            bits.forEach((b, idx) => {
+                const cell = document.createElement('div');
+                cell.className = 'd-flex flex-column align-items-center';
+
+                const box = document.createElement('div');
+                box.className = `border px-3 py-2 ${idx === activeIdx ? 'border-warning text-warning bg-black fw-bold' : 'border-secondary text-light'}`;
+                box.textContent = b;
+
+                const lbl = document.createElement('div');
+                lbl.className = 'small text-secondary mt-1 font-monospace';
+                lbl.innerHTML = `${labels[idx]} ${idx === activeIdx ? '<span class="text-warning">▲[q1]</span>' : ''}`;
+
+                cell.appendChild(box);
+                cell.appendChild(lbl);
+                tapeContainer.appendChild(cell);
+            });
+
+            document.getElementById('p2-cmd-display').textContent = `q1 ${bits[activeIdx]} → ${newSym} ${chosenDir} ${chosenNext}`;
+            document.getElementById('p2-input').value = '';
+
+            // Вычисляем итоговое 3-битное слово
+            const finalBits = [...bits];
+            finalBits[activeIdx] = newSym;
+            p2ExpectedWord = finalBits.join('');
+        }
+
+        function handlePhase2Submit() {
+            const input = document.getElementById('p2-input');
+            const btn = document.getElementById('p2-btn');
+            const feedback = document.getElementById('p2-feedback');
+
+            const userVal = input.value.trim();
+
+            if (userVal === p2ExpectedWord) {
+                document.getElementById('phase2').classList.add('d-none');
+                document.getElementById('phase3').classList.remove('d-none');
+                sendTelemetry('in_progress');
+                initPhase3();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                input.disabled = true;
+                btn.disabled = true;
+                feedback.classList.remove('d-none');
+                setTimeout(() => {
+                    initPhase2();
+                    input.disabled = false;
+                    btn.disabled = false;
+                    feedback.classList.add('d-none');
+                    input.focus();
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 3: Унарные вычисления
+        // ==========================================
+        let p3ExpectedResult = '';
+
+        function initPhase3() {
+            const opType = rnd(1, 2); // 1 = прибавление 1, 2 = вычитание 1
+            const count = rnd(2, 5); // от 2 до 5 единиц
+            const word = '1'.repeat(count);
+
+            const tbody = document.getElementById('p3-table');
+            tbody.innerHTML = '';
+
+            if (opType === 1) {
+                // n + 1 (идет вправо до конца, заменяет λ на 1 и останавливается)
+                tbody.innerHTML = `
+                    <tr>
+                        <td class="text-warning fw-bold">q1</td>
+                        <td>1 S q0</td>
+                        <td>1 R q1</td>
+                    </tr>
+                `;
+                p3ExpectedResult = (count + 1).toString();
+            } else {
+                // n - 1 (заменяет первую единицу на λ и останавливается)
+                tbody.innerHTML = `
+                    <tr>
+                        <td class="text-warning fw-bold">q1</td>
+                        <td>λ S q0</td>
+                        <td>λ S q0</td>
+                    </tr>
+                `;
+                p3ExpectedResult = (count - 1).toString();
+            }
+
+            document.getElementById('p3-word').textContent = word;
+            document.getElementById('p3-dec').textContent = count.toString();
+            document.getElementById('p3-input').value = '';
+        }
+
+        function handlePhase3Submit() {
+            const input = document.getElementById('p3-input');
+            const btn = document.getElementById('p3-btn');
+            const feedback = document.getElementById('p3-feedback');
+
+            const userVal = input.value.trim();
+
+            if (userVal === p3ExpectedResult) {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('phase4').classList.remove('d-none');
+                sendTelemetry('in_progress');
+                initPhase4();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                input.disabled = true;
+                btn.disabled = true;
+                feedback.classList.remove('d-none');
+                setTimeout(() => {
+                    initPhase3();
+                    input.disabled = false;
+                    btn.disabled = false;
+                    feedback.classList.add('d-none');
+                    input.focus();
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 4: Двоичный инкремент
+        // ==========================================
+        let p4ExpectedBinary = '';
+
+        function initPhase4() {
+            // Генерируем число от 3 до 14
+            const num = rnd(3, 14);
+            const binStr = num.toString(2);
+
+            document.getElementById('p4-bin-word').textContent = binStr;
+            document.getElementById('p4-input').value = '';
+
+            p4ExpectedBinary = (num + 1).toString(2);
+        }
+
+        function handlePhase4Submit() {
+            const input = document.getElementById('p4-input');
+            const btn = document.getElementById('p4-btn');
+            const feedback = document.getElementById('p4-feedback');
+
+            const userVal = input.value.trim();
+
+            if (userVal === p4ExpectedBinary) {
+                document.getElementById('phase4').classList.add('d-none');
+                document.getElementById('phase5').classList.remove('d-none');
+                sendTelemetry('in_progress');
+                initPhase5();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                input.disabled = true;
+                btn.disabled = true;
+                feedback.classList.remove('d-none');
+                setTimeout(() => {
+                    initPhase4();
+                    input.disabled = false;
+                    btn.disabled = false;
+                    feedback.classList.add('d-none');
+                    input.focus();
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 5: Проблема остановки
+        // ==========================================
+        let p5ExpectedAnswer = '';
+
+        function initPhase5() {
+            const isHalt = Math.random() > 0.45; // остановится или LOOP
+            const tbody = document.getElementById('p5-table');
+            tbody.innerHTML = '';
+
+            const onesCount = rnd(2, 4);
+            const tapeWord = '1 '.repeat(onesCount).trim();
+            document.getElementById('p5-tape-word').textContent = tapeWord;
+            document.getElementById('p5-input').value = '';
+
+            if (isHalt) {
+                // Машина проходит все единицы и останавливается на λ
+                tbody.innerHTML = `
+                    <tr>
+                        <td class="text-warning fw-bold">q1</td>
+                        <td>λ S q0</td>
+                        <td>1 R q1</td>
+                    </tr>
+                `;
+                // Количество тактов: для каждой единицы сдвиг вправо (onesCount тактов), плюс шаг на λ (1 такт)
+                p5ExpectedAnswer = (onesCount + 1).toString();
+            } else {
+                // Машина зацикливается между q1 и q2 на месте или бежит бесконечно
+                tbody.innerHTML = `
+                    <tr>
+                        <td class="text-warning fw-bold">q1</td>
+                        <td>λ R q1</td>
+                        <td>1 S q2</td>
+                    </tr>
+                    <tr>
+                        <td class="text-warning fw-bold">q2</td>
+                        <td>λ R q2</td>
+                        <td>1 S q1</td>
+                    </tr>
+                `;
+                p5ExpectedAnswer = 'LOOP';
+            }
+        }
+
+        function handlePhase5Submit() {
+            const input = document.getElementById('p5-input');
+            const btn = document.getElementById('p5-btn');
+            const feedback = document.getElementById('p5-feedback');
+
+            const userVal = input.value.trim().toUpperCase();
+
+            if (userVal === p5ExpectedAnswer) {
+                document.getElementById('phase5').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+                sendTelemetry('level_complete', true);
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                input.disabled = true;
+                btn.disabled = true;
+                feedback.classList.remove('d-none');
+                setTimeout(() => {
+                    initPhase5();
+                    input.disabled = false;
+                    btn.disabled = false;
+                    feedback.classList.add('d-none');
+                    input.focus();
+                }, 1200);
+            }
+        }
+
+        // Привязка обработчиков
+        document.getElementById('p1-btn').addEventListener('click', handlePhase1Submit);
+        document.getElementById('p1-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePhase1Submit(); });
+
+        document.getElementById('p2-btn').addEventListener('click', handlePhase2Submit);
+        document.getElementById('p2-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePhase2Submit(); });
+
+        document.getElementById('p3-btn').addEventListener('click', handlePhase3Submit);
+        document.getElementById('p3-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePhase3Submit(); });
+
+        document.getElementById('p4-btn').addEventListener('click', handlePhase4Submit);
+        document.getElementById('p4-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePhase4Submit(); });
+
+        document.getElementById('p5-btn').addEventListener('click', handlePhase5Submit);
+        document.getElementById('p5-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePhase5Submit(); });
+
+        // Старт
+        sendTelemetry('in_progress');
+        initPhase1();
+    </script>
+</TaskLayout>
