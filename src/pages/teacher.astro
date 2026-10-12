@@ -359,15 +359,15 @@ function formatSec(sec: number): string {
           <thead>
             <tr class="bg-gray-100 border-b border-gray-200 text-xs font-bold text-gray-700 uppercase tracking-wider select-none">
               <th class="p-3 w-12 text-center">#</th>
-              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" onclick="setSort('name')">Ученик <span id="sort-name-icon">↕</span></th>
-              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" onclick="setSort('class')">Класс <span id="sort-class-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" onclick="setSort('status')">Статус урока <span id="sort-status-icon">↕</span></th>
+              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="name">Ученик <span id="sort-name-icon">↕</span></th>
+              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="class">Класс <span id="sort-class-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="status">Статус урока <span id="sort-status-icon">↕</span></th>
               <th class="p-3 text-center">Уровень 1</th>
               <th class="p-3 text-center">Уровень 2</th>
               <th class="p-3 text-center">Уровень 3</th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" onclick="setSort('time')">Активное время <span id="sort-time-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" onclick="setSort('errors')">Ошибки <span id="sort-errors-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" onclick="setSort('last')">Активность <span id="sort-last-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="time">Активное время <span id="sort-time-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="errors">Ошибки <span id="sort-errors-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="last">Активность <span id="sort-last-icon">↕</span></th>
               <th class="p-3 text-center w-28">Действия</th>
             </tr>
           </thead>
@@ -662,18 +662,34 @@ function formatSec(sec: number): string {
     document.getElementById('kpi-active').textContent = activeCount;
   }
 
+  function updateSortIcons() {
+    const cols = ['name', 'class', 'status', 'time', 'errors', 'last'];
+    cols.forEach(col => {
+      const icon = document.getElementById(`sort-${col}-icon`);
+      if (icon) {
+        if (sortColumn === col) {
+          icon.textContent = sortAsc ? '↑' : '↓';
+        } else {
+          icon.textContent = '↕';
+        }
+      }
+    });
+  }
+
   function setSort(col) {
+    if (!currentStudents || currentStudents.length === 0) return;
     if (sortColumn === col) {
       sortAsc = !sortAsc;
     } else {
       sortColumn = col;
-      sortAsc = false;
+      sortAsc = col === 'name' || col === 'class';
     }
     renderTable();
   }
 
   function renderTable() {
     const tbody = tableBody;
+    updateSortIcons();
     document.getElementById('footer-count').textContent = currentStudents.length;
 
     if (currentStudents.length === 0) {
@@ -927,7 +943,17 @@ function formatSec(sec: number): string {
     searchTimeout = setTimeout(fetchTelemetry, 300);
   });
 
+  // Table column sorting listeners
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.getAttribute('data-sort');
+      if (col) setSort(col);
+    });
+  });
+  window.setSort = setSort;
+
   // Initialize
+  updateSortIcons();
   updateLessonsDropdown();
   setupPolling();
   fetchTelemetry();

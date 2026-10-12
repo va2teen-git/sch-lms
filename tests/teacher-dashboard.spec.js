@@ -74,4 +74,32 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     await expect(page.locator('#export-btn')).toBeVisible();
     await expect(page.locator('#toggle-live-btn')).toBeVisible();
   });
+
+  test('Teacher dashboard table column sorting works and updates sort indicators without page errors', async ({ page }) => {
+    let pageErrors = [];
+    page.on('pageerror', err => pageErrors.push(err.message));
+
+    await page.goto(`${baseUrl}/teacher`);
+    await page.waitForTimeout(500);
+
+    // Initial state: Last activity is sorted desc
+    await expect(page.locator('#sort-last-icon')).toHaveText('↓');
+    await expect(page.locator('#sort-name-icon')).toHaveText('↕');
+
+    // Click Student Name column header: sorts ascending
+    await page.locator('th[data-sort="name"]').click();
+    await expect(page.locator('#sort-name-icon')).toHaveText('↑');
+    await expect(page.locator('#sort-last-icon')).toHaveText('↕');
+
+    // Click Student Name column header again: sorts descending
+    await page.locator('th[data-sort="name"]').click();
+    await expect(page.locator('#sort-name-icon')).toHaveText('↓');
+
+    // Click Active Time column header: sorts descending
+    await page.locator('th[data-sort="time"]').click();
+    await expect(page.locator('#sort-time-icon')).toHaveText('↓');
+    await expect(page.locator('#sort-name-icon')).toHaveText('↕');
+
+    expect(pageErrors.length).toBe(0);
+  });
 });
