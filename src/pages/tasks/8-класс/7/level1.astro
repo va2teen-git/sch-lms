@@ -1,0 +1,475 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Синтаксический анализатор высказываний (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация базовых утверждений и бытовых фактов</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- Описание задания -->
+                <p class="text-light mb-3">
+                    Синтаксический парсер перехватил входящий поток языковых выражений. 
+                    Используя мышь, <strong>перетащите каждую карточку</strong> (или кликните по ней, затем по нужному шлюзу) в соответствующий функциональный буфер.
+                </p>
+
+                <!-- Окно системных уведомлений / ошибок -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СБОЙ КЛАССИФИКАЦИИ] <span id="feedback-text">Неверное распределение утверждений!</span> Перегенерация потока...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- Зона активных карточек (источник для перетаскивания) -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-secondary small">НЕРАСПРЕДЕЛЕННЫЕ ВЫРАЖЕНИЯ (ПЕРЕТАЩИТЕ В БУФЕРЫ НИЖЕ):</span>
+                        <button id="reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                            Сбросить на исходную
+                        </button>
+                    </div>
+                    <div id="cards-pool" class="d-flex flex-wrap gap-2 min-vh-10 p-2 border border-dashed border-secondary bg-dark">
+                        <!-- Карточки генерируются JS -->
+                    </div>
+                </div>
+
+                <!-- Целевые бакеты / контейнеры приемники -->
+                <div class="row g-3 mb-4">
+                    <!-- Бакет 1: ИСТИНА -->
+                    <div class="col-md-4">
+                        <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="true" id="bucket-true">
+                            <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold">1. ИСТИНА [1]</span>
+                                <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                            </div>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <p class="text-secondary small mb-2">Повествовательные объективные факты, соответствующие действительности.</p>
+                                <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2 min-vh-20">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Бакет 2: ЛОЖЬ -->
+                    <div class="col-md-4">
+                        <div class="card bg-black border-danger rounded-0 h-100 target-bucket" data-category="false" id="bucket-false">
+                            <div class="card-header bg-dark border-bottom border-danger text-danger d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold">2. ЛОЖЬ [0]</span>
+                                <span class="badge border border-danger text-danger bg-black rounded-0 count-badge">0</span>
+                            </div>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <p class="text-secondary small mb-2">Повествовательные объективные факты, противоречащие действительности.</p>
+                                <div class="bucket-slot flex-grow-1 p-2 border border-danger bg-dark d-flex flex-column gap-2 min-vh-20">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Бакет 3: НЕ ВЫСКАЗЫВАНИЕ -->
+                    <div class="col-md-4">
+                        <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="not_statement" id="bucket-not-statement">
+                            <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold">3. НЕ ВЫСКАЗЫВАНИЕ</span>
+                                <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                            </div>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <p class="text-secondary small mb-2">Вопросы, команды, субъективные мнения, предикаты с неизвестными переменными.</p>
+                                <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2 min-vh-20">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопка проверки -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">
+                        Переместите все карточки по трем буферам, затем отправьте на верификацию.
+                    </span>
+                    <button id="verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                        ПРОВЕРИТЬ КЛАССИФИКАЦИЮ
+                    </button>
+                </div>
+
+                <!-- Экран завершения уровня -->
+                <div id="success-screen" class="d-none text-center py-5 border border-success bg-black mt-3">
+                    <div class="text-success fs-1 mb-3">✓</div>
+                    <h3 class="text-success mb-2">СИНТАКСИЧЕСКИЙ АНАЛИЗ ЗАВЕРШЕН</h3>
+                    <p class="text-light mb-4">
+                        Все 3 потока высказываний успешно отфильтрованы и нормализованы. 
+                        Парсер функционирует в штатном режиме.
+                    </p>
+                    <div class="d-inline-block p-3 border border-success bg-dark text-start font-monospace small">
+                        <div>СТАТУС: <span class="text-success">УРОВЕНЬ 1 ПРОЙДЕН</span></div>
+                        <div>ЗАТРАЧЕНО ВРЕМЕНИ: <span id="final-time" class="text-warning"></span> СЕК</div>
+                        <div>ОШИБОК КЛАССИФИКАЦИИ: <span id="final-attempts" class="text-warning"></span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        (function() {
+            const missionName = 'Урок 7 :: Логические высказывания (Уровень 1)';
+            const startTime = Date.now();
+            let attempts = 0;
+            let currentPhase = 1;
+            let activeCardsData = [];
+            let selectedCardElement = null;
+
+            // Телеметрия
+            function sendTelemetry(actionType, isSuccess = false) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: actionType,
+                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                    start_time: new Date(startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: attempts,
+                    success: isSuccess
+                }, '*');
+            }
+
+            // Отправка начала работы
+            sendTelemetry('in_progress', false);
+
+            // Банки данных для процедурной генерации по 3 фазам
+            const PHASES_BANK = {
+                1: {
+                    title: 'Классификация базовых утверждений и бытовых фактов',
+                    items: [
+                        { text: '«В одном байте ровно 8 бит»', category: 'true' },
+                        { text: '«Земля обращается вокруг Солнца»', category: 'true' },
+                        { text: '«Монитор является устройством вывода информации»', category: 'true' },
+                        { text: '«Десятичное число 10 равно 1010 в двоичной системе»', category: 'true' },
+                        { text: '«2 + 2 = 4»', category: 'true' },
+                        { text: '«Один килобайт содержит 1024 байта»', category: 'true' },
+                        
+                        { text: '«Клавиатура предназначена для вывода звука»', category: 'false' },
+                        { text: '«Число 15 делится на 2 без остатка»', category: 'false' },
+                        { text: '«В одном байте ровно 10 бит»', category: 'false' },
+                        { text: '«При полном отключении электропитания ОЗУ сохраняет данные»', category: 'false' },
+                        { text: '«Луна — самая большая звезда в Солнечной системе»', category: 'false' },
+                        { text: '«100 в двоичной системе равно пяти в десятичной»', category: 'false' },
+
+                        { text: '«Сколько мегабайт в одном гигабайте?»', category: 'not_statement' },
+                        { text: '«Закройте текстовый редактор и сохраните файл!»', category: 'not_statement' },
+                        { text: '«Информатика — самый интересный предмет в школе»', category: 'not_statement' },
+                        { text: '«Сегодня на улице прекрасная теплая погода»', category: 'not_statement' },
+                        { text: '«Нажмите клавишу Enter для продолжения»', category: 'not_statement' },
+                        { text: '«Какая красивая новая клавиатура!»', category: 'not_statement' }
+                    ]
+                },
+                2: {
+                    title: 'Математические равенства, неравенства и предикаты с неизвестными',
+                    items: [
+                        { text: '«16 > 9»', category: 'true' },
+                        { text: '«2³ = 8»', category: 'true' },
+                        { text: '«101₂ = 5₁₀»', category: 'true' },
+                        { text: '«Сумма углов любого треугольника равна 180°»', category: 'true' },
+                        { text: '«Число 24 делится без остатка на 6»', category: 'true' },
+                        { text: '«1 Кбайт > 1000 байт»', category: 'true' },
+
+                        { text: '«7 × 8 = 54»', category: 'false' },
+                        { text: '«3² = 6»', category: 'false' },
+                        { text: '«110₂ = 4₁₀»', category: 'false' },
+                        { text: '«Число 17 является четным»', category: 'false' },
+                        { text: '«15 ≤ 10»', category: 'false' },
+                        { text: '«100 байт > 1 Кбайт»', category: 'false' },
+
+                        { text: '«x + 5 = 12»', category: 'not_statement' },
+                        { text: '«a > b»', category: 'not_statement' },
+                        { text: '«y < 0»', category: 'not_statement' },
+                        { text: '«Вычислите значение квадратного корня!»', category: 'not_statement' },
+                        { text: '«Какое число больше: 10 или 20?»', category: 'not_statement' },
+                        { text: '«Математика значительно сложнее информатики»', category: 'not_statement' }
+                    ]
+                },
+                3: {
+                    title: 'Архитектура ЭВМ, системные логи и скрытые логические ловушки',
+                    items: [
+                        { text: '«Операционная система управляет аппаратными ресурсами ЭВМ»', category: 'true' },
+                        { text: '«Символ "A" в таблице ASCII имеет десятичный код 65»', category: 'true' },
+                        { text: '«Процессор выполняет машинные команды программы»', category: 'true' },
+                        { text: '«Python является языком программирования высокого уровня»', category: 'true' },
+                        { text: '«Файловая система организует структуру хранения файлов на носителе»', category: 'true' },
+
+                        { text: '«Принтер выполняет арифметические вычисления вместо процессора»', category: 'false' },
+                        { text: '«ПЗУ (ROM) очищается при каждом перезапуске компьютера»', category: 'false' },
+                        { text: '«Файл с расширением .txt предназначен для воспроизведения видео»', category: 'false' },
+                        { text: '«Двоичный алфавит содержит символы 0, 1 и 2»', category: 'false' },
+                        { text: '«1 Кбайт равен ровно 1000 байтам»', category: 'false' },
+
+                        { text: '«Какой язык программирования лучше изучать первым?»', category: 'not_statement' },
+                        { text: '«Не удаляйте файлы конфигурации из системного каталога!»', category: 'not_statement' },
+                        { text: '«Операционная система Linux гораздо удобнее, чем Windows»', category: 'not_statement' },
+                        { text: '«k делится на 3 без остатка»', category: 'not_statement' },
+                        { text: '«Этот файл слишком много весит»', category: 'not_statement' },
+                        { text: '«То, что здесь написано, является ложью»', category: 'not_statement' }
+                    ]
+                }
+            };
+
+            // Случайная выборка N элементов из массива
+            function getRandomSubarray(arr, size) {
+                const shuffled = arr.slice();
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled.slice(0, size);
+            }
+
+            // Инициализация фазы
+            function initPhase(phaseNum) {
+                currentPhase = phaseNum;
+                selectedCardElement = null;
+
+                // Обновляем бейджи
+                document.getElementById('phase-badge').textContent = `Шаг ${phaseNum} из 3`;
+                document.getElementById('phase-title').textContent = PHASES_BANK[phaseNum].title;
+                document.getElementById('feedback-box').classList.add('d-none');
+
+                // Очищаем бакеты и исходный пул
+                const pool = document.getElementById('cards-pool');
+                pool.innerHTML = '';
+                document.querySelectorAll('.bucket-slot').forEach(slot => slot.innerHTML = '');
+                updateBucketCounts();
+                checkVerificationReadiness();
+
+                // Процедурно выбираем по 1 элементу каждой категории + 1 случайный дополнительный (всего 4 карточки)
+                const phaseData = PHASES_BANK[phaseNum];
+                const trueItems = phaseData.items.filter(x => x.category === 'true');
+                const falseItems = phaseData.items.filter(x => x.category === 'false');
+                const notItems = phaseData.items.filter(x => x.category === 'not_statement');
+
+                const chosen = [
+                    getRandomSubarray(trueItems, 1)[0],
+                    getRandomSubarray(falseItems, 1)[0],
+                    getRandomSubarray(notItems, 1)[0]
+                ];
+
+                // 4-й элемент берем случайно из оставшихся
+                const remaining = phaseData.items.filter(x => !chosen.includes(x));
+                chosen.push(getRandomSubarray(remaining, 1)[0]);
+
+                // Перемешиваем карточки
+                activeCardsData = getRandomSubarray(chosen, chosen.length);
+
+                // Рендерим карточки в пул
+                activeCardsData.forEach((item, index) => {
+                    const card = createCardElement(item, index);
+                    pool.appendChild(card);
+                });
+            }
+
+            // Создание DOM-элемента карточки
+            function createCardElement(item, index) {
+                const el = document.createElement('div');
+                el.className = 'card-token p-2 bg-black border border-secondary text-light font-monospace small user-select-none';
+                el.style.cursor = 'grab';
+                el.style.maxWidth = '100%';
+                el.setAttribute('draggable', 'true');
+                el.dataset.id = String(index);
+                el.dataset.category = item.category;
+                el.textContent = item.text;
+
+                // Drag & Drop события
+                el.addEventListener('dragstart', (e) => {
+                    el.classList.add('opacity-50', 'border-warning');
+                    e.dataTransfer.setData('text/plain', el.dataset.id);
+                });
+
+                el.addEventListener('dragend', () => {
+                    el.classList.remove('opacity-50', 'border-warning');
+                });
+
+                // Клик-альтернатива (выбор карточки)
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (selectedCardElement === el) {
+                        el.classList.remove('border-warning', 'text-warning');
+                        selectedCardElement = null;
+                    } else {
+                        if (selectedCardElement) {
+                            selectedCardElement.classList.remove('border-warning', 'text-warning');
+                        }
+                        selectedCardElement = el;
+                        el.classList.add('border-warning', 'text-warning');
+                    }
+                });
+
+                return el;
+            }
+
+            // Навешивание слушателей на слоты и корзины
+            function setupDropTargets() {
+                const targets = [
+                    { element: document.getElementById('bucket-true'), slot: document.querySelector('#bucket-true .bucket-slot') },
+                    { element: document.getElementById('bucket-false'), slot: document.querySelector('#bucket-false .bucket-slot') },
+                    { element: document.getElementById('bucket-not-statement'), slot: document.querySelector('#bucket-not-statement .bucket-slot') },
+                    { element: document.getElementById('cards-pool'), slot: document.getElementById('cards-pool') }
+                ];
+
+                targets.forEach(({ element, slot }) => {
+                    element.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        slot.classList.add('border-warning');
+                    });
+
+                    element.addEventListener('dragleave', () => {
+                        slot.classList.remove('border-warning');
+                    });
+
+                    element.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        slot.classList.remove('border-warning');
+                        const cardId = e.dataTransfer.getData('text/plain');
+                        const card = document.querySelector(`.card-token[data-id="${cardId}"]`);
+                        if (card) {
+                            slot.appendChild(card);
+                            updateBucketCounts();
+                            checkVerificationReadiness();
+                        }
+                    });
+
+                    // Клик по контейнеру перемещает выбранную карточку
+                    element.addEventListener('click', () => {
+                        if (selectedCardElement) {
+                            selectedCardElement.classList.remove('border-warning', 'text-warning');
+                            slot.appendChild(selectedCardElement);
+                            selectedCardElement = null;
+                            updateBucketCounts();
+                            checkVerificationReadiness();
+                        }
+                    });
+                });
+            }
+
+            // Обновление счетчиков в шапках бакетов
+            function updateBucketCounts() {
+                const countTrue = document.querySelectorAll('#bucket-true .card-token').length;
+                const countFalse = document.querySelectorAll('#bucket-false .card-token').length;
+                const countNot = document.querySelectorAll('#bucket-not-statement .card-token').length;
+
+                document.querySelector('#bucket-true .count-badge').textContent = countTrue;
+                document.querySelector('#bucket-false .count-badge').textContent = countFalse;
+                document.querySelector('#bucket-not-statement .count-badge').textContent = countNot;
+            }
+
+            // Проверка готовности к отправке (все ли карточки распределены из пула)
+            function checkVerificationReadiness() {
+                const poolCards = document.querySelectorAll('#cards-pool .card-token').length;
+                const verifyBtn = document.getElementById('verify-btn');
+                verifyBtn.disabled = poolCards > 0;
+            }
+
+            // Сброс всех карточек обратно в пул
+            document.getElementById('reset-pool-btn').addEventListener('click', () => {
+                const pool = document.getElementById('cards-pool');
+                document.querySelectorAll('.card-token').forEach(card => pool.appendChild(card));
+                if (selectedCardElement) {
+                    selectedCardElement.classList.remove('border-warning', 'text-warning');
+                    selectedCardElement = null;
+                }
+                updateBucketCounts();
+                checkVerificationReadiness();
+            });
+
+            // Проверка ответов
+            document.getElementById('verify-btn').addEventListener('click', () => {
+                const verifyBtn = document.getElementById('verify-btn');
+                verifyBtn.disabled = true;
+
+                let hasError = false;
+
+                // Проверяем бакет ИСТИНА
+                document.querySelectorAll('#bucket-true .card-token').forEach(card => {
+                    if (card.dataset.category !== 'true') hasError = true;
+                });
+
+                // Проверяем бакет ЛОЖЬ
+                document.querySelectorAll('#bucket-false .card-token').forEach(card => {
+                    if (card.dataset.category !== 'false') hasError = true;
+                });
+
+                // Проверяем бакет НЕ ВЫСКАЗЫВАНИЕ
+                document.querySelectorAll('#bucket-not-statement .card-token').forEach(card => {
+                    if (card.dataset.category !== 'not_statement') hasError = true;
+                });
+
+                if (hasError) {
+                    attempts++;
+                    document.getElementById('attempts-display').textContent = attempts;
+                    
+                    // Сигнал телеметрии о сбросе
+                    sendTelemetry('hardcore_reset', false);
+
+                    // Визуализация ошибки
+                    const feedback = document.getElementById('feedback-box');
+                    document.getElementById('feedback-text').textContent = 'Обнаружена ошибка в распределении утверждений!';
+                    feedback.classList.remove('d-none');
+
+                    // Перегенерация текущего шага через 1.2 секунды
+                    setTimeout(() => {
+                        initPhase(currentPhase);
+                    }, 1200);
+
+                } else {
+                    // Шаг успешно пройден
+                    if (currentPhase < 3) {
+                        initPhase(currentPhase + 1);
+                    } else {
+                        // Все 3 фазы пройдены!
+                        finishMission();
+                    }
+                }
+            });
+
+            // Финал миссии
+            function finishMission() {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                sendTelemetry('level_complete', true);
+
+                document.getElementById('phase1') && document.getElementById('phase1').classList.add('d-none');
+                document.querySelector('.row.g-3').classList.add('d-none');
+                document.querySelector('.card.bg-black').classList.add('d-none');
+                document.getElementById('verify-btn').classList.add('d-none');
+                document.getElementById('phase-badge').textContent = 'УСПЕХ';
+                document.getElementById('phase-title').textContent = 'Все фазы успешно пройдены';
+
+                document.getElementById('final-time').textContent = timeSpent;
+                document.getElementById('final-attempts').textContent = attempts;
+                document.getElementById('success-screen').classList.remove('d-none');
+            }
+
+            // Инициализация игры
+            setupDropTargets();
+            initPhase(1);
+        })();
+    </script>
+</TaskLayout>
