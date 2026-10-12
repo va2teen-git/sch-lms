@@ -6,6 +6,7 @@ test.describe('Lesson 11-20 Level 1: Turing Machine', () => {
   test('should complete the level successfully', async ({ page }) => {
     // Navigate to the lesson page
     await page.goto('http://localhost:4321/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
+    await page.evaluate(() => localStorage.removeItem('hardcore_mode'));
     
     // Wait for iframe 1
     const frame = page.frameLocator('#iframe-1');
@@ -17,6 +18,7 @@ test.describe('Lesson 11-20 Level 1: Turing Machine', () => {
     // Format: "qi aj → al D qk"
     const [fromPart, toPart] = cmdText.split('→').map(s => s.trim());
     const [newSym, dir, nextState] = toPart.split(' ');
+    const dirName = dir === 'L' ? 'влево' : (dir === 'R' ? 'вправо' : 'на месте');
     
     // Find matching button
     const p1Buttons = frame.locator('#p1-options button');
@@ -26,7 +28,7 @@ test.describe('Lesson 11-20 Level 1: Turing Machine', () => {
     for (let i = 0; i < p1Count; i++) {
       const btn = p1Buttons.nth(i);
       const text = await btn.innerText();
-      if (text.includes(`Записать '${newSym}'`) && text.includes(`состояние ${nextState}`)) {
+      if (text.includes(`Записать '${newSym}'`) && text.includes(dirName) && text.includes(`состояние ${nextState}`)) {
         await btn.click();
         clickedP1 = true;
         break;
@@ -117,6 +119,7 @@ test.describe('Lesson 11-20 Level 1: Turing Machine', () => {
     const cmdText = await frame.locator('#p1-command-display').innerText();
     const [fromPart, toPart] = cmdText.split('→').map(s => s.trim());
     const [newSym, dir, nextState] = toPart.split(' ');
+    const dirName = dir === 'L' ? 'влево' : (dir === 'R' ? 'вправо' : 'на месте');
     
     // Pick an intentionally WRONG button
     const p1Buttons = frame.locator('#p1-options button');
@@ -126,7 +129,7 @@ test.describe('Lesson 11-20 Level 1: Turing Machine', () => {
     for (let i = 0; i < p1Count; i++) {
       const btn = p1Buttons.nth(i);
       const text = await btn.innerText();
-      if (!text.includes(`Записать '${newSym}'`) || !text.includes(`состояние ${nextState}`)) {
+      if (!text.includes(`Записать '${newSym}'`) || !text.includes(dirName) || !text.includes(`состояние ${nextState}`)) {
         wrongBtn = btn;
         break;
       }
