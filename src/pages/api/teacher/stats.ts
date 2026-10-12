@@ -46,6 +46,7 @@ export interface StudentMetric {
 export const GET: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
   const classFilter = url.searchParams.get('class') || 'all';
+  const courseFilter = url.searchParams.get('course') || 'all'; // e.g. '8-класс' or 'all'
   const lessonFilter = url.searchParams.get('lesson') || 'all'; // e.g. 'Урок 20' or '20' or 'all'
   const dateFilter = url.searchParams.get('date') || 'today'; // 'today', 'all', or 'YYYY-MM-DD'
   const excludeTests = url.searchParams.get('exclude_tests') !== '0';
@@ -77,37 +78,31 @@ export const GET: APIRoute = async ({ request }) => {
       .map(c => c.trim())
       .filter(c => c && c !== 'all');
 
-    // Build student primary class mapping to correctly identify student cohort even during inter-class competitions
-    const classCountRows = db.prepare(`
-      SELECT first_name, last_name, class_name, count(*) as cnt 
-      FROM telemetry 
-      WHERE first_name NOT LIKE '%Unknown%' AND last_name NOT LIKE '%Unknown%' 
-        AND class_name NOT LIKE '%Unknown%' AND class_name != '11-ИТ' 
-      GROUP BY first_name, last_name, class_name
-    `).all();
+    let classCondition = '';
+    if (selectedClasses.length > 0) {
+      const placeholders = selectedClasses.map(() => '?').join(', ');
+      classCondition = ` AND COALESCE(student_class, class_name) IN (${placeholders})`;
+      params.push(...selectedClasses);
+    }
 
-    const studentClassCounts = new Map<string, Record<string, number>>();
-    classCountRows.forEach((r: any) => {
-      const normKey = [(r.first_name || '').trim().toLowerCase(), (r.last_name || '').trim().toLowerCase()].sort().join(' ');
-      if (!studentClassCounts.has(normKey)) studentClassCounts.set(normKey, {});
-      const m = studentClassCounts.get(normKey)!;
-      m[r.class_name] = (m[r.class_name] || 0) + r.cnt;
-    });
-
-    const studentPrimaryClass = new Map<string, string>();
-    studentClassCounts.forEach((counts, normKey) => {
-      let best = '', max = -1;
-      for (const [cls, cnt] of Object.entries(counts)) {
-        if (cnt > max) { max = cnt; best = cls; }
-      }
-      studentPrimaryClass.set(normKey, best);
-    });
+    let courseCondition = '';
+    if (courseFilter !== 'all') {
+      courseCondition = ' AND course_slug = ?';
+      params.push(courseFilter);
+    }
 
     let lessonCondition = '';
     if (lessonFilter !== 'all') {
-      const prefix = lessonFilter.startsWith('Урок ') ? lessonFilter : `Урок ${lessonFilter}`;
-      lessonCondition = ' AND mission_name LIKE ?';
-      params.push(`%${prefix}%`);
+      const match = lessonFilter.match(/\d+/);
+      const lId = match ? match[0] : null;
+      if (lId) {
+        lessonCondition = ' AND (lesson_id = ? OR mission_name LIKE ?)';
+        params.push(lId, `%Урок ${lId}%`);
+      } else {
+        const prefix = lessonFilter.startsWith('Урок ') ? lessonFilter : `Урок ${lessonFilter}`;
+        lessonCondition = ' AND mission_name LIKE ?';
+        params.push(`%${prefix}%`);
+      }
     }
 
     let testCondition = '';
@@ -116,16 +111,16 @@ export const GET: APIRoute = async ({ request }) => {
                         AND last_name NOT LIKE '%Unknown%' 
                         AND first_name NOT LIKE '%Тест%' 
                         AND last_name NOT LIKE '%Тест%' 
-                        AND class_name NOT LIKE '%Unknown%'
-                        AND class_name != '11-ИТ'`;
+                        AND COALESCE(student_class, class_name) NOT LIKE '%Unknown%'
+                        AND COALESCE(student_class, class_name) != '11-ИТ'`;
     }
 
     const query = `
       SELECT id, first_name, last_name, class_name, mission_name, action_type,
              time_spent_sec, attempts_count, success, status, action_log,
-             is_hardcore, timestamp
+             is_hardcore, student_class, course_slug, lesson_id, level_number, timestamp
       FROM telemetry
-      WHERE 1=1 ${dateCondition} ${lessonCondition} ${testCondition}
+      WHERE 1=1 ${dateCondition} ${classCondition} ${courseCondition} ${lessonCondition} ${testCondition}
       ORDER BY timestamp ASC
     `;
 
@@ -137,17 +132,8 @@ export const GET: APIRoute = async ({ request }) => {
     rows.forEach((r: any) => {
       const fn = (r.first_name || '').trim();
       const ln = (r.last_name || '').trim();
-      const recordedCls = (r.class_name || '').trim();
+      const effectiveCls = (r.student_class || r.class_name || 'Unknown').trim();
       const nameWords = [fn.toLowerCase(), ln.toLowerCase()].sort();
-      const normKey = nameWords.join(' ');
-      const effectiveCls = studentPrimaryClass.get(normKey) || recordedCls;
-
-      // Filter by selected classes if active
-      if (selectedClasses.length > 0) {
-        if (!selectedClasses.includes(effectiveCls)) {
-          return;
-        }
-      }
 
       // Canonical key (word-sorted to treat "Вадим Басин" and "Басин Вадим" as one)
       const canonicalKey = `${effectiveCls}_${nameWords.join('_')}`;
@@ -192,9 +178,11 @@ export const GET: APIRoute = async ({ request }) => {
       const s = studentsMap[canonicalKey];
       s.lastSeen = r.timestamp;
 
-      // Extract Level Number from mission_name
+      // Extract Level Number
       let lvlNum: 1 | 2 | 3 | null = null;
-      if (r.mission_name.includes('Уровень 1')) lvlNum = 1;
+      if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
+        lvlNum = r.level_number as 1 | 2 | 3;
+      } else if (r.mission_name.includes('Уровень 1')) lvlNum = 1;
       else if (r.mission_name.includes('Уровень 2')) lvlNum = 2;
       else if (r.mission_name.includes('Уровень 3')) lvlNum = 3;
 
@@ -359,6 +347,7 @@ export const GET: APIRoute = async ({ request }) => {
       selectedFilters: {
         class: selectedClasses.length > 0 ? selectedClasses.join(',') : 'all',
         classes: selectedClasses,
+        course: courseFilter,
         lesson: lessonFilter,
         date: dateFilter,
         excludeTests,

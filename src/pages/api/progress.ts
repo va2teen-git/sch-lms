@@ -18,13 +18,29 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     db = new Database(dbPath, { readonly: true });
     
-    const rows = db.prepare(`
-      SELECT action_type, mission_name, is_hardcore 
-      FROM telemetry 
-      WHERE first_name = ? AND last_name = ? AND class_name = ? 
-        AND mission_name LIKE ?
-      ORDER BY timestamp ASC
-    `).all(firstName.trim(), lastName.trim(), className.trim(), `%${lessonPrefix.trim()}%`);
+    const courseSlug = url.searchParams.get('courseSlug');
+    const lessonId = url.searchParams.get('lessonId');
+
+    let rows: any[];
+    if (courseSlug && lessonId) {
+      rows = db.prepare(`
+        SELECT action_type, mission_name, is_hardcore 
+        FROM telemetry 
+        WHERE (first_name = ? AND last_name = ?)
+          AND (student_class = ? OR class_name = ?)
+          AND ((course_slug = ? AND lesson_id = ?) OR mission_name LIKE ?)
+        ORDER BY timestamp ASC
+      `).all(firstName.trim(), lastName.trim(), className.trim(), className.trim(), courseSlug.trim(), lessonId.trim(), `%${lessonPrefix.trim()}%`);
+    } else {
+      rows = db.prepare(`
+        SELECT action_type, mission_name, is_hardcore 
+        FROM telemetry 
+        WHERE (first_name = ? AND last_name = ?)
+          AND (student_class = ? OR class_name = ?)
+          AND mission_name LIKE ?
+        ORDER BY timestamp ASC
+      `).all(firstName.trim(), lastName.trim(), className.trim(), className.trim(), `%${lessonPrefix.trim()}%`);
+    }
 
     const normalLevels = new Set();
     const hardcoreLevels = new Set();

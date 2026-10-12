@@ -121,7 +121,7 @@ const tasks = [
   </div>
 </Layout>
 
-<script>
+<script define:vars={{ classSlug, lessonId }}>
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
@@ -148,7 +148,7 @@ const tasks = [
 
     if (fName && lName && cName) {
       try {
-        const res = await fetch(`/api/progress?firstName=${encodeURIComponent(fName)}&lastName=${encodeURIComponent(lName)}&className=${encodeURIComponent(cName)}&lessonPrefix=${encodeURIComponent(lessonPrefix)}`);
+        const res = await fetch(`/api/progress?firstName=${encodeURIComponent(fName)}&lastName=${encodeURIComponent(lName)}&className=${encodeURIComponent(cName)}&lessonPrefix=${encodeURIComponent(lessonPrefix)}&courseSlug=${encodeURIComponent(classSlug)}&lessonId=${encodeURIComponent(lessonId)}`);
         if (res.ok) {
           const data = await res.json();
           isNormalCompleted = data.isNormalCompleted;
@@ -226,6 +226,8 @@ const tasks = [
           student_firstName: localStorage.getItem('student_firstName'),
           student_lastName: localStorage.getItem('student_lastName'),
           student_class: localStorage.getItem('student_class'),
+          course_slug: classSlug,
+          lesson_id: lessonId,
           is_hardcore: isHardcore,
           action_type: isHardcore ? 'hardcore_reset' : 'normal_reset',
           mission_name: fullTitle
@@ -351,6 +353,17 @@ const tasks = [
         }
       }
 
+      let levelNum = null;
+      const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
+      if (sourceIframe) {
+        levelNum = parseInt(sourceIframe.id.replace('iframe-', ''), 10) || null;
+      }
+      if (!levelNum && data.mission_name) {
+        if (data.mission_name.includes('Уровень 1')) levelNum = 1;
+        else if (data.mission_name.includes('Уровень 2')) levelNum = 2;
+        else if (data.mission_name.includes('Уровень 3')) levelNum = 3;
+      }
+
       fetch('/api/telemetry', {
         method: 'POST',
         headers: {
@@ -360,6 +373,9 @@ const tasks = [
           student_firstName: localStorage.getItem('student_firstName'),
           student_lastName: localStorage.getItem('student_lastName'),
           student_class: localStorage.getItem('student_class'),
+          course_slug: classSlug,
+          lesson_id: lessonId,
+          level_number: levelNum,
           is_hardcore: isHardcore,
           ...data
         })

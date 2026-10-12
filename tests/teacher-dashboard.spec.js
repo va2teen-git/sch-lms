@@ -203,4 +203,52 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     const optgroupLabels = await page.locator('#filter-lesson optgroup').evaluateAll(groups => groups.map(g => g.label));
     expect(optgroupLabels.some(label => label.includes('8-класс') || label.includes('Другой курс'))).toBe(true);
   });
+
+  test('GET /api/teacher/stats filters by course parameter accurately', async ({ request }) => {
+    const res = await request.get(`${baseUrl}/api/teacher/stats?class=10-класс_углубленный&course=8-класс&lesson=7&date=2026-10-12`);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.students.length).toBeGreaterThan(0);
+    expect(body.students.every(s => s.className === '10-класс_углубленный')).toBe(true);
+    expect(body.selectedFilters.course).toBe('8-класс');
+  });
+
+  test('GET /api/teacher/stats displays competitive multi-class leaderboard across courses without no-data error', async ({ request }) => {
+    const res = await request.get(`${baseUrl}/api/teacher/stats?class=10-класс_углубленный,11-класс_углубленный&course=8-класс&lesson=7&date=2026-10-12`);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.students.length).toBeGreaterThan(0);
+  });
+
+  test('Student dashboard /courses allows switching course catalog without resetting student profile', async ({ page }) => {
+    await page.goto(baseUrl);
+    await page.evaluate(() => {
+      localStorage.setItem('student_firstName', 'Алексей');
+      localStorage.setItem('student_lastName', 'Смирнов');
+      localStorage.setItem('student_class', '10-класс_углубленный');
+    });
+
+    await page.goto(`${baseUrl}/courses`);
+    await expect(page.locator('#student-name')).toHaveText('Смирнов Алексей');
+    await expect(page.locator('#class-name')).toContainText('10 класс_углубленный');
+
+    const courseSelect = page.locator('#course-select');
+    await expect(courseSelect).toBeVisible();
+    await expect(courseSelect).toHaveValue('10-класс_углубленный');
+
+    // Switch to 8-класс
+    await courseSelect.selectOption('8-класс');
+    await page.waitForTimeout(200);
+
+    // Profile stays 10th grade
+    await expect(page.locator('#student-name')).toHaveText('Смирнов Алексей');
+    await expect(page.locator('#class-name')).toContainText('10 класс_углубленный');
+
+    // Lessons container now contains 8th grade lesson links
+    const lessonLinks = await page.locator('#lessons-container a').evaluateAll(links => links.map(a => a.getAttribute('href')));
+    expect(lessonLinks.length).toBeGreaterThan(0);
+    expect(lessonLinks.some(href => href.includes('/lesson/8-класс/'))).toBe(true);
+  });
 });

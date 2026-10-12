@@ -19,6 +19,10 @@ test.describe('Telemetry & Database Contract Integrity', () => {
     expect(columnNames).toContain('status');
     expect(columnNames).toContain('action_log');
     expect(columnNames).toContain('is_hardcore');
+    expect(columnNames).toContain('student_class');
+    expect(columnNames).toContain('course_slug');
+    expect(columnNames).toContain('lesson_id');
+    expect(columnNames).toContain('level_number');
     expect(columnNames).toContain('timestamp');
     db.close();
   });
@@ -29,6 +33,9 @@ test.describe('Telemetry & Database Contract Integrity', () => {
       student_firstName: 'Тест',
       student_lastName: 'Автоматический',
       student_class: '11-ИТ',
+      course_slug: '11-класс_углубленный',
+      lesson_id: '20',
+      level_number: 1,
       mission_name: testMission,
       action_type: 'level_complete',
       start_time: new Date().toISOString(),
@@ -58,6 +65,10 @@ test.describe('Telemetry & Database Contract Integrity', () => {
     expect(row.attempts_count).toBe(1);
     expect(row.success).toBe(1);
     expect(row.is_hardcore).toBe(0);
+    expect(row.student_class).toBe('11-ИТ');
+    expect(row.course_slug).toBe('11-класс_углубленный');
+    expect(row.lesson_id).toBe('20');
+    expect(row.level_number).toBe(1);
 
     const parsedLog = JSON.parse(row.action_log);
     expect(Array.isArray(parsedLog)).toBe(true);
