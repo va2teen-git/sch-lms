@@ -1,0 +1,354 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <div class="display-3 text-danger mb-3">🛡️ WAF: БРАНДМАУЭР ПРИКЛАДНОГО УРОВНЯ 🛡️</div>
+            <h2 class="text-light mb-3">REAL-TIME LOGIC STREAM INTERCEPTOR</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 700px;">
+                На сетевой шлюз безопасности обрушился высокоскоростной поток неструктурированных пакетов. 
+                Вам необходимо отразить <span class="text-danger fw-bold">8 волн логического трафика</span> 
+                в режиме реального времени до переполнения буфера шлюза.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start small" style="max-width: 650px;">
+                <div class="text-danger fw-bold mb-2">[ПРАВИЛА БОЯ В ХАРДКОР-РЕЖИМЕ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning">Динамический таймер:</span> На классификацию каждого пакета отводится жесткое время такта (<span class="text-danger fw-bold">6–8 секунд</span>).</div>
+                <div class="text-light mb-1">• <span class="text-warning">Тотальный сброс:</span> Любая ошибка классификации или истечение таймера вызывают Kernel Panic и <span class="text-danger fw-bold">ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</span>!</div>
+                <div class="text-light">• <span class="text-warning">3 шлюза перехвата:</span> [ALLOW: Истина (1)], [DROP: Ложь (0)] и [QUARANTINE: Не высказывание] (вопросы, команды, субъективные оценки, предикаты с неизвестными переменными).</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ШЛЮЗ WAF
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4">
+            
+            <!-- Хедер со статусом и таймером -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="text-secondary small d-block">ШЛЮЗ БЕЗОПАСНОСТИ WAF:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentWave"></span> ИЗ 8</span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО ПЕРЕПОЛНЕНИЯ БУФЕРА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 2.5 ? 'text-danger' : 'text-warning'">
+                        <span v-text="formattedTime"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Полоса локального таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar"
+                     :class="phaseTimeLeft <= 2.5 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / maxPhaseTime) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Панель перехваченного пакета -->
+            <div class="card bg-dark border-danger rounded-0 p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-1">
+                        PACKET #<span v-text="currentPacket.id"></span>
+                    </span>
+                    <span class="text-secondary small">
+                        КАТЕГОРИЯ: <span class="text-info fw-bold" v-text="currentPacket.categoryTitle"></span>
+                    </span>
+                </div>
+
+                <div class="text-secondary small mb-1">ПЕРЕХВАЧЕННАЯ ПОЛЕЗНАЯ НАГРУЗКА (PAYLOAD):</div>
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3 text-center">
+                    <div class="fs-4 text-light fw-bold my-2" v-text="currentPacket.payload"></div>
+                </div>
+
+                <div class="text-secondary small mb-3">
+                    СИСТЕМНЫЙ СТАТУС: <span class="text-warning" v-text="currentPacket.hint"></span>
+                </div>
+
+                <!-- Клавиши экстренного реагирования (3 фильтра WAF) -->
+                <div class="row g-3">
+                    <!-- Кнопка 1: ИСТИНА -->
+                    <div class="col-md-4">
+                        <button @click="handleAction('true')" 
+                                class="btn btn-outline-success w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center">
+                            <span class="fs-5">✓ ПРОПУСТИТЬ [ALLOW]</span>
+                            <span class="small text-secondary mt-1">Истинное высказывание (1)</span>
+                        </button>
+                    </div>
+
+                    <!-- Кнопка 2: ЛОЖЬ -->
+                    <div class="col-md-4">
+                        <button @click="handleAction('false')" 
+                                class="btn btn-outline-danger w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center">
+                            <span class="fs-5">✗ СБРОСИТЬ [DROP]</span>
+                            <span class="small text-secondary mt-1">Ложное высказывание (0)</span>
+                        </button>
+                    </div>
+
+                    <!-- Кнопка 3: НЕ ВЫСКАЗЫВАНИЕ -->
+                    <div class="col-md-4">
+                        <button @click="handleAction('not_statement')" 
+                                class="btn btn-outline-warning w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center">
+                            <span class="fs-5">⚠️ КАРАНТИН [ISOLATE]</span>
+                            <span class="small text-secondary mt-1">Не высказывание (Шум / Предикат)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Индикатор комбо / секторов -->
+            <div class="d-flex justify-content-between align-items-center text-secondary small">
+                <div>СТАТУС ШЛЮЗА: <span class="text-success fw-bold">ONLINE</span></div>
+                <div class="d-flex gap-1">
+                    <span v-for="w in 8" :key="w" class="badge rounded-0 px-2 py-1"
+                          :class="w < currentWave ? 'bg-success text-black' : (w === currentWave ? 'bg-danger text-light' : 'bg-dark border border-secondary text-secondary')">
+                        W<span v-text="w"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран ошибки (Хардкор-сброс) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-5 text-center">
+            <h1 class="text-danger display-1 mb-3">CRITICAL SECURITY BREACH</h1>
+            <h3 class="text-light mb-3">ПРОТОКОЛ WAF НАРУШЕН // СБРОС СЕССИИ</h3>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 600px;" v-text="failReason"></p>
+            <div class="text-warning fs-5">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Аварийная перезагрузка ядра... Возврат на Волну 1
+            </div>
+        </div>
+
+        <!-- Экран победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-5 text-center">
+            <div class="text-success display-1 mb-3">🛡️ СИСТЕМА ЗАЩИЩЕНА 🛡️</div>
+            <h2 class="text-light mb-3">ШЛЮЗ WAF УСПЕШНО ОТРАЗИЛ ВСЕ 8 ВОЛН АТАКИ</h2>
+            <p class="fs-5 text-secondary mb-4">
+                Все логические пакеты нормализованы. Аномалии изолированы. Сервер стабилен.
+            </p>
+            <div class="d-inline-block p-4 border border-success bg-dark text-start small mx-auto">
+                <div class="mb-1">СТАТУС: <span class="text-success fw-bold">АРКАДНЫЙ БОСС УРОВНЯ 3 ПОВЕРЖЕН</span></div>
+                <div class="mb-1">ОТРАЖЕНО ВОЛН: <span class="text-light fw-bold">8 / 8</span></div>
+                <div class="mb-1">ЗАТРАЧЕНО ВРЕМЕНИ: <span class="text-warning fw-bold"><span v-text="totalTimeSpent"></span> СЕК</span></div>
+                <div>СБРОСОВ ХАРДКОРА: <span class="text-warning fw-bold"><span v-text="attempts"></span></span></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        (function() {
+            const missionName = 'Урок 7 :: Логические высказывания (Уровень 3)';
+            const sessionStartTime = Date.now();
+            let attempts = 0;
+
+            function sendTelemetry(actionType, success = false) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: actionType,
+                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                    start_time: new Date(sessionStartTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: attempts,
+                    success: success
+                }, '*');
+            }
+
+            // Старт сессии
+            sendTelemetry('in_progress', false);
+
+            const { createApp, ref, computed, onUnmounted } = Vue;
+
+            createApp({
+                setup() {
+                    const gameState = ref('intro'); // 'intro', 'playing', 'failed', 'success'
+                    const currentWave = ref(1);
+                    const phaseTimeLeft = ref(7.5);
+                    const maxPhaseTime = ref(7.5);
+                    const failReason = ref('');
+                    const totalTimeSpent = ref(0);
+                    let timerInterval = null;
+
+                    const formattedTime = computed(() => {
+                        return Math.max(0, phaseTimeLeft.value).toFixed(1);
+                    });
+
+                    // Банк пакетов по 8 волнам
+                    const WAVE_PACKETS = [
+                        // Волна 1: Архитектура ЭВМ и единицы измерения
+                        [
+                            { payload: '«В одном килобайте ровно 1024 байта»', target: 'true', category: 'ОБЪЕМ ПАМЯТИ', hint: 'Анализ соотношения двоичных приставок' },
+                            { payload: '«Монитор является устройством ввода текстовой информации»', target: 'false', category: 'ПЕРИФЕРИЯ', hint: 'Проверка типа функционального устройства' },
+                            { payload: '«Сколько бит содержится в половине байта?»', target: 'not_statement', category: 'СЕТЕВОЙ ЗАПРОС', hint: 'Синтаксический разбор вопросительной формы' }
+                        ],
+                        // Волна 2: Числовые равенства и неравенства
+                        [
+                            { payload: '«19 ≥ 19»', target: 'true', category: 'НЕСТРОГОЕ НЕРАВЕНСТВО', hint: 'Проверка условия больше или равно' },
+                            { payload: '«45 < 20»', target: 'false', category: 'СТРОГОЕ НЕРАВЕНСТВО', hint: 'Сравнение двух натуральных чисел' },
+                            { payload: '«x > 100»', target: 'not_statement', category: 'НЕОПРЕДЕЛЕННАЯ ПЕРЕМЕННАЯ', hint: 'Попытка инъекции неинициализированного аргумента' }
+                        ],
+                        // Волна 3: Позиционные системы счисления
+                        [
+                            { payload: '«101₂ = 5₁₀»', target: 'true', category: 'ДВОИЧНЫЙ КОД', hint: 'Сверка эквивалентности двоичной и десятичной записи' },
+                            { payload: '«1111₂ = 12₁₀»', target: 'false', category: 'ДВОИЧНЫЙ КОД', hint: 'Проверка значения 4-битной тетрады' },
+                            { payload: '«Переведите число 25 в шестнадцатеричную систему!»', target: 'not_statement', category: 'КОМАНДНЫЙ ПРИКАЗ', hint: 'Повелительное наклонение в заголовке' }
+                        ],
+                        // Волна 4: Субъективные оценки и системные факты
+                        [
+                            { payload: '«Операционная система управляет файловой структурой носителя»', target: 'true', category: 'СИСТЕМНОЕ ПО', hint: 'Базовая функция системного уровня' },
+                            { payload: '«Клавиатура преобразует электрический ток в звуковые волны»', target: 'false', category: 'АППАРАТНАЯ СХЕМА', hint: 'Анализ назначения устройства ввода' },
+                            { payload: '«Язык программирования Python гораздо приятнее, чем C++»', target: 'not_statement', category: 'СУБЪЕКТИВНАЯ ОЦЕНКА', hint: 'Личное мнение пользователя без измеримого критерия' }
+                        ],
+                        // Волна 5: Предикаты с неизвестными и парадоксы
+                        [
+                            { payload: '«2⁴ = 16»', target: 'true', category: 'СТЕПЕНЬ ДВОЙКИ', hint: 'Вычисление значения машинного регистра' },
+                            { payload: '«Число 33 делится нацело на 5»', target: 'false', category: 'АРИФМЕТИКА', hint: 'Проверка признака делимости на 5' },
+                            { payload: '«То, что утверждает данный сетевой пакет, является ложью»', target: 'not_statement', category: 'ПАРАДОКС ЛЖЕЦА', hint: 'Самоприменимая циклическая аномалия' }
+                        ],
+                        // Волна 6: Составные связки с союзом «И»
+                        [
+                            { payload: '«(15 > 10) И (8 является чётным числом)»', target: 'true', category: 'КОНЪЮНКЦИЯ (И)', hint: 'Оба простых высказывания истинны' },
+                            { payload: '«(15 > 10) И (9 является чётным числом)»', target: 'false', category: 'КОНЪЮНКЦИЯ (И)', hint: 'Второе высказывание ложно, итог связки ложен' },
+                            { payload: '«(x > 5) И (x < 15)»', target: 'not_statement', category: 'ПРЕДИКАТ', hint: 'Двухстороннее условие с неопределенным x' }
+                        ],
+                        // Волна 7: Составные связки с союзом «ИЛИ»
+                        [
+                            { payload: '«(5 > 10) ИЛИ (16 кратно 4)»', target: 'true', category: 'ДИЗЪЮНКЦИЯ (ИЛИ)', hint: 'Хотя бы одно высказывание истинно' },
+                            { payload: '«(5 > 10) ИЛИ (15 кратно 4)»', target: 'false', category: 'ДИЗЪЮНКЦИЯ (ИЛИ)', hint: 'Оба высказывания ложны, итог связки ложен' },
+                            { payload: '«Не выключайте питание компьютера во время обновления системы!»', target: 'not_statement', category: 'ИНСТРУКЦИЯ', hint: 'Предупреждающая директива оператору' }
+                        ],
+                        // Волна 8: Финальный супер-пакет
+                        [
+                            { payload: '«Символ "A" в кодировке ASCII имеет код 65, а "B" — код 66»', target: 'true', category: 'ФИНАЛЬНЫЙ РУБЕЖ', hint: 'Стандарт кодирования символов' },
+                            { payload: '«Число 100 в десятичной системе записывается как 100 в двоичной»', target: 'false', category: 'ФИНАЛЬНЫЙ РУБЕЖ', hint: '100₂ = 4₁₀' },
+                            { payload: '«k кратно 7 без остатка»', target: 'not_statement', category: 'ФИНАЛЬНЫЙ РУБЕЖ', hint: 'Неопределенная переменная k' }
+                        ]
+                    ];
+
+                    const currentPacket = ref({
+                        id: '101',
+                        payload: '',
+                        target: '',
+                        categoryTitle: '',
+                        hint: ''
+                    });
+
+                    function pickRandomPacket(waveIndex) {
+                        const candidates = WAVE_PACKETS[waveIndex];
+                        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+                        const idNum = Math.floor(Math.random() * 900) + 100;
+                        currentPacket.value = {
+                            id: `${idNum}-WAF`,
+                            payload: chosen.payload,
+                            target: chosen.target,
+                            categoryTitle: chosen.category,
+                            hint: chosen.hint
+                        };
+                    }
+
+                    function startWave(waveNum) {
+                        currentWave.value = waveNum;
+                        
+                        // С 1 по 4 волну — 7.5 секунд, с 5 по 8 волну — 6.0 секунд
+                        const timeLimit = waveNum <= 4 ? 7.5 : 6.0;
+                        maxPhaseTime.value = timeLimit;
+                        phaseTimeLeft.value = timeLimit;
+
+                        pickRandomPacket(waveNum - 1);
+
+                        clearInterval(timerInterval);
+                        timerInterval = setInterval(() => {
+                            phaseTimeLeft.value -= 0.1;
+                            if (phaseTimeLeft.value <= 0) {
+                                clearInterval(timerInterval);
+                                triggerHardcoreFail('ВРЕМЯ ИСТЕКЛО! Буфер шлюза переполнен необработанным трафиком.');
+                            }
+                        }, 100);
+                    }
+
+                    function handleAction(chosenAction) {
+                        clearInterval(timerInterval);
+
+                        if (chosenAction === currentPacket.value.target) {
+                            // Верный перехват
+                            if (currentWave.value < 8) {
+                                startWave(currentWave.value + 1);
+                            } else {
+                                // Победа
+                                finishGame();
+                            }
+                        } else {
+                            // Ошибка классификации пакета
+                            const names = {
+                                'true': '«ИСТИНА [ALLOW]»',
+                                'false': '«ЛОЖЬ [DROP]»',
+                                'not_statement': '«НЕ ВЫСКАЗЫВАНИЕ [QUARANTINE]»'
+                            };
+                            const expectedName = names[currentPacket.value.target];
+                            const chosenName = names[chosenAction];
+                            triggerHardcoreFail(`ОШИБКА ШЛЮЗА: Вы выбрали ${chosenName}, а требовалось ${expectedName}. Пакет вызвал сбой в ядре.`);
+                        }
+                    }
+
+                    function triggerHardcoreFail(reason) {
+                        clearInterval(timerInterval);
+                        attempts++;
+                        sendTelemetry('hardcore_reset', false);
+
+                        failReason.value = reason;
+                        gameState.value = 'failed';
+
+                        // Через 2 секунды сброс на Волна 1!
+                        setTimeout(() => {
+                            gameState.value = 'playing';
+                            startWave(1);
+                        }, 2200);
+                    }
+
+                    function startGame() {
+                        gameState.value = 'playing';
+                        startWave(1);
+                    }
+
+                    function finishGame() {
+                        clearInterval(timerInterval);
+                        totalTimeSpent.value = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
+                        sendTelemetry('level_complete', true);
+                        gameState.value = 'success';
+                    }
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                    });
+
+                    return {
+                        gameState,
+                        currentWave,
+                        phaseTimeLeft,
+                        maxPhaseTime,
+                        formattedTime,
+                        currentPacket,
+                        failReason,
+                        totalTimeSpent,
+                        attempts,
+                        startGame,
+                        handleAction
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>
