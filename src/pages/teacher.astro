@@ -27,6 +27,32 @@ try {
   const dateRows = db.prepare(`SELECT DISTINCT DATE(timestamp) as d FROM telemetry ORDER BY d DESC LIMIT 30`).all();
   availableDates = dateRows.map((r: any) => r.d).filter(Boolean);
 
+  // Build student primary class mapping to correctly attribute students during inter-class competitions
+  const classCountRows = db.prepare(`
+    SELECT first_name, last_name, class_name, count(*) as cnt 
+    FROM telemetry 
+    WHERE first_name NOT LIKE '%Unknown%' AND last_name NOT LIKE '%Unknown%' 
+      AND class_name NOT LIKE '%Unknown%' AND class_name != '11-ИТ' 
+    GROUP BY first_name, last_name, class_name
+  `).all();
+
+  const studentClassCounts = new Map<string, Record<string, number>>();
+  classCountRows.forEach((r: any) => {
+    const normKey = [(r.first_name || '').trim().toLowerCase(), (r.last_name || '').trim().toLowerCase()].sort().join(' ');
+    if (!studentClassCounts.has(normKey)) studentClassCounts.set(normKey, {});
+    const m = studentClassCounts.get(normKey)!;
+    m[r.class_name] = (m[r.class_name] || 0) + r.cnt;
+  });
+
+  const studentPrimaryClass = new Map<string, string>();
+  studentClassCounts.forEach((counts, normKey) => {
+    let best = '', max = -1;
+    for (const [c, cnt] of Object.entries(counts)) {
+      if (cnt > max) { max = cnt; best = c; }
+    }
+    studentPrimaryClass.set(normKey, best);
+  });
+
   // Default query: today's telemetry, excluding test users
   const rows = db.prepare(`
     SELECT id, first_name, last_name, class_name, mission_name, action_type,
@@ -48,8 +74,10 @@ try {
   rows.forEach((r: any) => {
     const fn = (r.first_name || '').trim();
     const ln = (r.last_name || '').trim();
-    const cls = (r.class_name || '').trim();
+    const recordedCls = (r.class_name || '').trim();
     const nameWords = [fn.toLowerCase(), ln.toLowerCase()].sort();
+    const normKey = nameWords.join(' ');
+    const cls = studentPrimaryClass.get(normKey) || recordedCls;
     const canonicalKey = `${cls}_${nameWords.join('_')}`;
 
     if (!studentsMap[canonicalKey]) {
@@ -644,44 +672,63 @@ function formatSec(sec: number): string {
   function updateLessonsDropdown() {
     const selected = getSelectedClasses();
     const prevVal = lessonSelect.value;
-    lessonSelect.innerHTML = '<option value="all">Все уроки курса</option>';
+    lessonSelect.innerHTML = '<option value="all">Все уроки курса / выборки</option>';
 
-    if (selected.length === 1) {
-      const course = coursesData.find(c => c.slug === selected[0]);
-      if (course && course.lessons) {
-        course.lessons.forEach(l => {
+    const isSpecificSelection = selected.length > 0 && selected.length < classCheckboxes.length;
+
+    if (isSpecificSelection) {
+      // 1. Lessons of the selected classes first (primary context)
+      const selectedCourses = coursesData.filter(c => selected.includes(c.slug));
+      selectedCourses.forEach(c => {
+        const group = document.createElement('optgroup');
+        group.label = `★ Выбранный класс: ${c.name}`;
+        c.lessons.forEach(l => {
           const opt = document.createElement('option');
           opt.value = `Урок ${l.id}`;
           opt.textContent = `Урок ${l.id}: ${l.topic.substring(0, 48)}${l.topic.length > 48 ? '...' : ''}`;
-          lessonSelect.appendChild(opt);
+          group.appendChild(opt);
         });
-      }
-    } else {
-      // Multiple classes or all classes selected
-      // 1. Quick generic lesson numbers across all courses
-      const genericGroup = document.createElement('optgroup');
-      genericGroup.label = '— По номеру урока (все курсы) —';
-      for (let i = 1; i <= 34; i++) {
-        const opt = document.createElement('option');
-        opt.value = `Урок ${i}`;
-        opt.textContent = `Урок ${i}`;
-        genericGroup.appendChild(opt);
-      }
-      lessonSelect.appendChild(genericGroup);
+        lessonSelect.appendChild(group);
+      });
 
-      // 2. Specific courses for inter-class competition selection
+      // 2. Other courses available for cross-course evaluation & inter-class competitions
+      const otherCourses = coursesData.filter(c => !selected.includes(c.slug));
+      otherCourses.forEach(c => {
+        const group = document.createElement('optgroup');
+        group.label = `Другой курс: ${c.name}`;
+        c.lessons.forEach(l => {
+          const opt = document.createElement('option');
+          opt.value = `Урок ${l.id}`;
+          opt.textContent = `${c.name.split('_')[0]} • Урок ${l.id}: ${l.topic.substring(0, 42)}${l.topic.length > 42 ? '...' : ''}`;
+          group.appendChild(opt);
+        });
+        lessonSelect.appendChild(group);
+      });
+    } else {
+      // All classes or none selected: list each course
       coursesData.forEach(c => {
         const group = document.createElement('optgroup');
         group.label = `Курс: ${c.name}`;
         c.lessons.forEach(l => {
           const opt = document.createElement('option');
           opt.value = `Урок ${l.id}`;
-          opt.textContent = `${c.name.split('_')[0]} • Урок ${l.id}: ${l.topic.substring(0, 40)}${l.topic.length > 40 ? '...' : ''}`;
+          opt.textContent = `${c.name.split('_')[0]} • Урок ${l.id}: ${l.topic.substring(0, 42)}${l.topic.length > 42 ? '...' : ''}`;
           group.appendChild(opt);
         });
         lessonSelect.appendChild(group);
       });
     }
+
+    // Generic lesson number group for rapid selection
+    const genericGroup = document.createElement('optgroup');
+    genericGroup.label = '— Быстрый выбор по номеру (любой курс) —';
+    for (let i = 1; i <= 34; i++) {
+      const opt = document.createElement('option');
+      opt.value = `Урок ${i}`;
+      opt.textContent = `Урок ${i}`;
+      genericGroup.appendChild(opt);
+    }
+    lessonSelect.appendChild(genericGroup);
 
     if (prevVal && Array.from(lessonSelect.options).some(o => o.value === prevVal)) {
       lessonSelect.value = prevVal;

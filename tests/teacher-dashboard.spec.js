@@ -172,4 +172,35 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     const unique = [...new Set(classCells.map(c => c.trim()))];
     expect(unique.every(c => c === '10-класс_углубленный' || c === '11-класс_углубленный')).toBe(true);
   });
+
+  test('GET /api/teacher/stats attributes 10th grade students who solved 8th grade lesson to 10-класс_углубленный', async ({ request }) => {
+    // Testing the exact scenario reported by teacher: 10th grade solved 8th grade lesson (Lesson 7) today
+    const resSingle = await request.get(`${baseUrl}/api/teacher/stats?class=10-класс_углубленный&lesson=7&date=2026-10-12`);
+    expect(resSingle.status()).toBe(200);
+    const bodySingle = await resSingle.json();
+    expect(bodySingle.success).toBe(true);
+    expect(bodySingle.students.length).toBeGreaterThan(0);
+    expect(bodySingle.students.every(s => s.className === '10-класс_углубленный')).toBe(true);
+
+    // Multi-class scenario: 10th and 11th grade selected, returns 10th grade data without 'no data'
+    const resMulti = await request.get(`${baseUrl}/api/teacher/stats?class=10-класс_углубленный,11-класс_углубленный&lesson=7&date=2026-10-12`);
+    expect(resMulti.status()).toBe(200);
+    const bodyMulti = await resMulti.json();
+    expect(bodyMulti.success).toBe(true);
+    expect(bodyMulti.students.length).toBeGreaterThan(0);
+  });
+
+  test('Teacher dashboard allows cross-course lesson selection from dropdown when 10th grade is selected', async ({ page }) => {
+    await page.goto(`${baseUrl}/teacher`);
+    await page.waitForTimeout(500);
+
+    // Filter class by 10-класс_углубленный only
+    await page.locator('#filter-class').click();
+    await page.locator('input[value="10-класс_углубленный"]').check();
+    await page.locator('#progress-table').click();
+
+    // Verify lesson dropdown still offers other courses (e.g. 8-класс)
+    const optgroupLabels = await page.locator('#filter-lesson optgroup').evaluateAll(groups => groups.map(g => g.label));
+    expect(optgroupLabels.some(label => label.includes('8-класс') || label.includes('Другой курс'))).toBe(true);
+  });
 });

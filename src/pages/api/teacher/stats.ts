@@ -77,15 +77,31 @@ export const GET: APIRoute = async ({ request }) => {
       .map(c => c.trim())
       .filter(c => c && c !== 'all');
 
-    let classCondition = '';
-    if (selectedClasses.length === 1) {
-      classCondition = ' AND class_name = ?';
-      params.push(selectedClasses[0]);
-    } else if (selectedClasses.length > 1) {
-      const placeholders = selectedClasses.map(() => '?').join(', ');
-      classCondition = ` AND class_name IN (${placeholders})`;
-      params.push(...selectedClasses);
-    }
+    // Build student primary class mapping to correctly identify student cohort even during inter-class competitions
+    const classCountRows = db.prepare(`
+      SELECT first_name, last_name, class_name, count(*) as cnt 
+      FROM telemetry 
+      WHERE first_name NOT LIKE '%Unknown%' AND last_name NOT LIKE '%Unknown%' 
+        AND class_name NOT LIKE '%Unknown%' AND class_name != '11-ИТ' 
+      GROUP BY first_name, last_name, class_name
+    `).all();
+
+    const studentClassCounts = new Map<string, Record<string, number>>();
+    classCountRows.forEach((r: any) => {
+      const normKey = [(r.first_name || '').trim().toLowerCase(), (r.last_name || '').trim().toLowerCase()].sort().join(' ');
+      if (!studentClassCounts.has(normKey)) studentClassCounts.set(normKey, {});
+      const m = studentClassCounts.get(normKey)!;
+      m[r.class_name] = (m[r.class_name] || 0) + r.cnt;
+    });
+
+    const studentPrimaryClass = new Map<string, string>();
+    studentClassCounts.forEach((counts, normKey) => {
+      let best = '', max = -1;
+      for (const [cls, cnt] of Object.entries(counts)) {
+        if (cnt > max) { max = cnt; best = cls; }
+      }
+      studentPrimaryClass.set(normKey, best);
+    });
 
     let lessonCondition = '';
     if (lessonFilter !== 'all') {
@@ -109,7 +125,7 @@ export const GET: APIRoute = async ({ request }) => {
              time_spent_sec, attempts_count, success, status, action_log,
              is_hardcore, timestamp
       FROM telemetry
-      WHERE 1=1 ${dateCondition} ${classCondition} ${lessonCondition} ${testCondition}
+      WHERE 1=1 ${dateCondition} ${lessonCondition} ${testCondition}
       ORDER BY timestamp ASC
     `;
 
@@ -121,11 +137,20 @@ export const GET: APIRoute = async ({ request }) => {
     rows.forEach((r: any) => {
       const fn = (r.first_name || '').trim();
       const ln = (r.last_name || '').trim();
-      const cls = (r.class_name || '').trim();
+      const recordedCls = (r.class_name || '').trim();
+      const nameWords = [fn.toLowerCase(), ln.toLowerCase()].sort();
+      const normKey = nameWords.join(' ');
+      const effectiveCls = studentPrimaryClass.get(normKey) || recordedCls;
+
+      // Filter by selected classes if active
+      if (selectedClasses.length > 0) {
+        if (!selectedClasses.includes(effectiveCls)) {
+          return;
+        }
+      }
 
       // Canonical key (word-sorted to treat "Вадим Басин" and "Басин Вадим" as one)
-      const nameWords = [fn.toLowerCase(), ln.toLowerCase()].sort();
-      const canonicalKey = `${cls}_${nameWords.join('_')}`;
+      const canonicalKey = `${effectiveCls}_${nameWords.join('_')}`;
 
       if (!studentsMap[canonicalKey]) {
         // Detect Russian surname for proper display name
@@ -139,7 +164,7 @@ export const GET: APIRoute = async ({ request }) => {
           displayName: disp,
           firstName: fn,
           lastName: ln,
-          className: cls,
+          className: effectiveCls,
           firstSeen: r.timestamp,
           lastSeen: r.timestamp,
           isActiveNow: false,

@@ -16,6 +16,12 @@ import coursesData from '../data/courses.json';
       </div>
     </div>
     
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-gray-50 p-3 border border-gray-300">
+      <label for="course-select" class="text-xs font-bold text-gray-700 uppercase tracking-wider">Курс для прохождения:</label>
+      <select id="course-select" class="border border-gray-300 px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-600 cursor-pointer">
+      </select>
+    </div>
+
     <div id="lessons-container" class="space-y-4">
       <!-- Lessons will be rendered here via client-side script -->
     </div>
@@ -34,15 +40,37 @@ import coursesData from '../data/courses.json';
   } else {
     const studentNameEl = document.getElementById('student-name');
     const classNameEl = document.getElementById('class-name');
+    const courseSelectEl = document.getElementById('course-select') as HTMLSelectElement;
+    const container = document.getElementById('lessons-container');
     
     if (studentNameEl) studentNameEl.textContent = `${lastName} ${firstName}`;
     
-    const course = coursesData.find(c => c.slug === studentClass);
-    if (course && classNameEl) {
-      classNameEl.textContent = course.name;
-      
-      const container = document.getElementById('lessons-container');
-      if (container) {
+    const homeCourse = coursesData.find(c => c.slug === studentClass);
+    if (classNameEl) {
+      classNameEl.textContent = homeCourse ? `Мой класс: ${homeCourse.name}` : studentClass;
+    }
+
+    // Populate course switcher
+    if (courseSelectEl) {
+      coursesData.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.slug;
+        opt.textContent = c.slug === studentClass ? `${c.name} (Основной)` : c.name;
+        if (c.slug === studentClass) opt.selected = true;
+        courseSelectEl.appendChild(opt);
+      });
+
+      courseSelectEl.addEventListener('change', () => {
+        renderLessons(courseSelectEl.value);
+      });
+    }
+
+    function renderLessons(courseSlug: string) {
+      if (!container) return;
+      container.innerHTML = '';
+
+      const course = coursesData.find(c => c.slug === courseSlug);
+      if (course && course.lessons.length > 0) {
         course.lessons.forEach(lesson => {
           const lessonCard = document.createElement('a');
           lessonCard.href = `/lesson/${course.slug}/${lesson.id}`;
@@ -60,13 +88,12 @@ import coursesData from '../data/courses.json';
           lessonCard.appendChild(topic);
           container.appendChild(lessonCard);
         });
-      }
-    } else {
-      const container = document.getElementById('lessons-container');
-      if (container) {
-        container.innerHTML = `<p class="text-red-500">Класс не найден или темы еще не добавлены.</p>`;
+      } else {
+        container.innerHTML = `<p class="text-gray-500 p-4 bg-white border border-gray-300">В данном курсе пока нет доступных уроков.</p>`;
       }
     }
+
+    renderLessons(studentClass);
 
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
