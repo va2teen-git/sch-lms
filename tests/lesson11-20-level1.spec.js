@@ -47,11 +47,11 @@ test.describe('Lesson 11-20 Level 1: Turing Machine', () => {
     let clickedP2 = false;
     
     // Find the exact cell command from the table
-    const targetRow = frame.locator('#p2-table-body tr').filter({ hasText: targetState });
-    const colIndex = targetSymbol === 'λ' ? 1 : (targetSymbol === '0' ? 2 : 3);
-    const cellCmd = await targetRow.locator('td').nth(colIndex).innerText();
+    const rowIndex = targetState.trim() === 'q1' ? 0 : 1;
+    const colIndex = targetSymbol.trim() === 'λ' ? 1 : (targetSymbol.trim() === '0' ? 2 : 3);
+    const cellCmd = (await frame.locator('#p2-table-body tr').nth(rowIndex).locator('td').nth(colIndex).innerText()).trim();
     
-    const expectedOptionPrefix = `[ ${targetState} ${targetSymbol} → ${cellCmd} ]`;
+    const expectedOptionPrefix = `[ ${targetState.trim()} ${targetSymbol.trim()} → ${cellCmd} ]`;
     
     for (let i = 0; i < p2Count; i++) {
       const btn = p2Buttons.nth(i);
