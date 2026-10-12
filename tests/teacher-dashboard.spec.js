@@ -102,4 +102,35 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
 
     expect(pageErrors.length).toBe(0);
   });
+
+  test('Teacher dashboard supports multi-column sorting with Ctrl/Shift key and shows priority superscripts', async ({ page }) => {
+    let pageErrors = [];
+    page.on('pageerror', err => pageErrors.push(err.message));
+
+    await page.goto(`${baseUrl}/teacher`);
+    await page.waitForTimeout(500);
+
+    // 1. Click Class: primary sort ascending
+    await page.locator('th[data-sort="class"]').click();
+    await expect(page.locator('#sort-class-icon')).toHaveText('↑');
+    await expect(page.locator('#sort-name-icon')).toHaveText('↕');
+
+    // 2. Ctrl + Click Student Name: adds secondary sort ascending
+    await page.locator('th[data-sort="name"]').click({ modifiers: ['Control'] });
+    await expect(page.locator('#sort-class-icon')).toHaveText('¹↑');
+    await expect(page.locator('#sort-name-icon')).toHaveText('²↑');
+
+    // 3. Ctrl + Click Student Name again: toggles secondary to descending
+    await page.locator('th[data-sort="name"]').click({ modifiers: ['Control'] });
+    await expect(page.locator('#sort-class-icon')).toHaveText('¹↑');
+    await expect(page.locator('#sort-name-icon')).toHaveText('²↓');
+
+    // 4. Normal Click Active Time: resets back to single sort
+    await page.locator('th[data-sort="time"]').click();
+    await expect(page.locator('#sort-time-icon')).toHaveText('↓');
+    await expect(page.locator('#sort-class-icon')).toHaveText('↕');
+    await expect(page.locator('#sort-name-icon')).toHaveText('↕');
+
+    expect(pageErrors.length).toBe(0);
+  });
 });

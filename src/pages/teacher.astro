@@ -359,15 +359,15 @@ function formatSec(sec: number): string {
           <thead>
             <tr class="bg-gray-100 border-b border-gray-200 text-xs font-bold text-gray-700 uppercase tracking-wider select-none">
               <th class="p-3 w-12 text-center">#</th>
-              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="name">Ученик <span id="sort-name-icon">↕</span></th>
-              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="class">Класс <span id="sort-class-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="status">Статус урока <span id="sort-status-icon">↕</span></th>
+              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="name" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Ученик <span id="sort-name-icon">↕</span></th>
+              <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="class" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Класс <span id="sort-class-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="status" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Статус урока <span id="sort-status-icon">↕</span></th>
               <th class="p-3 text-center">Уровень 1</th>
               <th class="p-3 text-center">Уровень 2</th>
               <th class="p-3 text-center">Уровень 3</th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="time">Активное время <span id="sort-time-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="errors">Ошибки <span id="sort-errors-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="last">Активность <span id="sort-last-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="time" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Активное время <span id="sort-time-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="errors" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Ошибки <span id="sort-errors-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="last" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Активность <span id="sort-last-icon">↕</span></th>
               <th class="p-3 text-center w-28">Действия</th>
             </tr>
           </thead>
@@ -525,7 +525,7 @@ function formatSec(sec: number): string {
       
       <!-- Footer Note -->
       <div class="p-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
-        <span>Всего отображено: <strong id="footer-count">{initialStudents.length}</strong> учащихся</span>
+        <span>Всего отображено: <strong id="footer-count">{initialStudents.length}</strong> учащихся <span class="hidden sm:inline text-gray-400 ml-2">• Зажмите Ctrl / Shift для мульти-сортировки</span></span>
         <span>Школьная сеть • Автономный сбор телеметрии</span>
       </div>
     </section>
@@ -573,8 +573,7 @@ function formatSec(sec: number): string {
   let currentStudents = [];
   let isLive = true;
   let pollingInterval = null;
-  let sortColumn = 'last';
-  let sortAsc = false;
+  let sortRules = [{ col: 'last', asc: false }];
   let activeStudent = null;
 
   const classSelect = document.getElementById('filter-class');
@@ -664,27 +663,85 @@ function formatSec(sec: number): string {
 
   function updateSortIcons() {
     const cols = ['name', 'class', 'status', 'time', 'errors', 'last'];
+    const superscripts = ['¹', '²', '³', '⁴', '⁵', '⁶'];
+
     cols.forEach(col => {
       const icon = document.getElementById(`sort-${col}-icon`);
-      if (icon) {
-        if (sortColumn === col) {
-          icon.textContent = sortAsc ? '↑' : '↓';
+      if (!icon) return;
+
+      const ruleIdx = sortRules.findIndex(r => r.col === col);
+      if (ruleIdx !== -1) {
+        const rule = sortRules[ruleIdx];
+        const arrow = rule.asc ? '↑' : '↓';
+        if (sortRules.length > 1) {
+          const num = superscripts[ruleIdx] || `${ruleIdx + 1}`;
+          icon.textContent = `${num}${arrow}`;
+          icon.title = `Приоритет ${ruleIdx + 1}: ${rule.asc ? 'по возрастанию' : 'по убыванию'}`;
         } else {
-          icon.textContent = '↕';
+          icon.textContent = arrow;
+          icon.title = rule.asc ? 'По возрастанию' : 'По убыванию';
         }
+      } else {
+        icon.textContent = '↕';
+        icon.title = 'Не отсортировано';
       }
     });
   }
 
-  function setSort(col) {
+  function setSort(col, isMulti = false) {
     if (!currentStudents || currentStudents.length === 0) return;
-    if (sortColumn === col) {
-      sortAsc = !sortAsc;
+
+    const defaultAsc = (col === 'name' || col === 'class');
+    const existingIdx = sortRules.findIndex(r => r.col === col);
+
+    if (isMulti) {
+      if (existingIdx !== -1) {
+        // If already in rules: toggle asc <-> desc
+        sortRules[existingIdx].asc = !sortRules[existingIdx].asc;
+      } else {
+        // Append secondary/tertiary sort rule
+        sortRules.push({ col, asc: defaultAsc });
+      }
     } else {
-      sortColumn = col;
-      sortAsc = col === 'name' || col === 'class';
+      // Single column click
+      if (sortRules.length === 1 && sortRules[0].col === col) {
+        sortRules[0].asc = !sortRules[0].asc;
+      } else {
+        sortRules = [{ col, asc: defaultAsc }];
+      }
     }
+
     renderTable();
+  }
+
+  function compareStudents(a, b, col, asc) {
+    let diff = 0;
+    if (col === 'name') {
+      const valA = (a.displayName || '').toLowerCase();
+      const valB = (b.displayName || '').toLowerCase();
+      diff = valA.localeCompare(valB, 'ru');
+    } else if (col === 'class') {
+      const valA = a.className || '';
+      const valB = b.className || '';
+      diff = valA.localeCompare(valB, 'ru');
+    } else if (col === 'status') {
+      const statusWeight = {
+        'hardcore_completed': 4,
+        'completed': 3,
+        'in_progress': 2,
+        'not_started': 1
+      };
+      diff = (statusWeight[a.lessonStatus] || 0) - (statusWeight[b.lessonStatus] || 0);
+    } else if (col === 'time') {
+      diff = (a.totalActiveTimeSec || 0) - (b.totalActiveTimeSec || 0);
+    } else if (col === 'errors') {
+      diff = (a.totalErrors || 0) - (b.totalErrors || 0);
+    } else if (col === 'last') {
+      const timeA = a.lastSeen ? new Date(a.lastSeen + 'Z').getTime() : 0;
+      const timeB = b.lastSeen ? new Date(b.lastSeen + 'Z').getTime() : 0;
+      diff = timeA - timeB;
+    }
+    return asc ? diff : -diff;
   }
 
   function renderTable() {
@@ -705,32 +762,13 @@ function formatSec(sec: number): string {
       return;
     }
 
-    // Sort students
+    // Sort students with chained multi-column rules
     const sorted = [...currentStudents].sort((a, b) => {
-      let valA, valB;
-      if (sortColumn === 'name') {
-        valA = a.displayName.toLowerCase();
-        valB = b.displayName.toLowerCase();
-        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      } else if (sortColumn === 'class') {
-        valA = a.className;
-        valB = b.className;
-        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      } else if (sortColumn === 'time') {
-        valA = a.totalActiveTimeSec || 0;
-        valB = b.totalActiveTimeSec || 0;
-      } else if (sortColumn === 'errors') {
-        valA = a.totalErrors || 0;
-        valB = b.totalErrors || 0;
-      } else if (sortColumn === 'status') {
-        valA = a.lessonStatus;
-        valB = b.lessonStatus;
-        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      } else {
-        valA = a.lastSeen ? new Date(a.lastSeen + 'Z').getTime() : 0;
-        valB = b.lastSeen ? new Date(b.lastSeen + 'Z').getTime() : 0;
+      for (const rule of sortRules) {
+        const diff = compareStudents(a, b, rule.col, rule.asc);
+        if (diff !== 0) return diff;
       }
-      return sortAsc ? valA - valB : valB - valA;
+      return (a.displayName || '').localeCompare(b.displayName || '', 'ru');
     });
 
     let html = '';
@@ -943,14 +981,16 @@ function formatSec(sec: number): string {
     searchTimeout = setTimeout(fetchTelemetry, 300);
   });
 
-  // Table column sorting listeners
+  // Table column sorting listeners (supports Ctrl / Cmd / Shift for multi-column sorting)
   document.querySelectorAll('th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
+    th.addEventListener('click', (e) => {
       const col = th.getAttribute('data-sort');
-      if (col) setSort(col);
+      const isMulti = !!(e.ctrlKey || e.metaKey || e.shiftKey);
+      if (col) setSort(col, isMulti);
     });
   });
   window.setSort = setSort;
+  window.getSortRules = () => sortRules;
 
   // Initialize
   updateSortIcons();
