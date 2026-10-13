@@ -1,0 +1,502 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Криптографические расчеты и трассировка (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Заголовок и индикатор прогресса -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="level-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="level-title" class="text-light fw-bold fs-6">Арифметика сдвигов моноалфавитной подстановки</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сброса -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА РАСЧЕТА] <span id="feedback-text">Неверное вычисленное значение!</span> Перегенерация параметров...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 1: Сдвиг Цезаря по модулю -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Шаг 1: Расчет индекса шифротекста Цезаря по модулю N</h5>
+                    <p class="text-light">
+                        В криптографическом модуле используется русский алфавит мощности <strong>N = 33</strong> буквы с индексацией от <strong>0</strong> (буква А) до <strong>32</strong> (буква Я).
+                        Шифрование задается формулой: <strong>C<sub>i</sub> = (M<sub>i</sub> + k) mod 33</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">СИМВОЛ И ИНДЕКС M<sub>i</sub>:</span>
+                                <span id="p1-char-info" class="fs-4 text-light fw-bold"></span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">СЕКРЕТНЫЙ СДВИГ k:</span>
+                                <span id="p1-shift-info" class="fs-4 text-warning fw-bold"></span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">МОЩНОСТЬ АЛФАВИТА N:</span>
+                                <span class="fs-4 text-info fw-bold">33</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Вычислите результирующий числовой индекс буквы шифротекста <strong>C<sub>i</sub></strong>. Введите целое число от 0 до 32:
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Числовой индекс (0..32)" autocomplete="off">
+                        <button id="p1-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 2: Побитовое исключающее ИЛИ (Шифр Вернама) -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 2: Побитовое шифрование Вернама (Операция XOR ⊕)</h5>
+                    <p class="text-light">
+                        Для передачи секретного октета данных применяется одноразовый блокнот (One-Time Pad). 
+                        Шифротекст формируется по формуле побитового сложения по модулю 2: <strong>C = M ⊕ K</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="font-monospace fs-5">
+                            <div class="text-light mb-1">
+                                <span class="text-secondary small d-inline-block" style="width: 140px;">ОТКРЫТЫЙ БАЙТ M:</span>
+                                <span id="p2-byte-m" class="text-info fw-bold tracking-widest"></span>
+                            </div>
+                            <div class="text-light mb-1">
+                                <span class="text-secondary small d-inline-block" style="width: 140px;">КЛЮЧ БЛОКНОТА K:</span>
+                                <span id="p2-byte-k" class="text-warning fw-bold tracking-widest"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Вычислите результирующий 8-битный шифротекст <strong>C</strong>. Введите 8-значную двоичную строку из нулей и единиц (например, 10101100):
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="8-битная строка (0 и 1)" maxlength="8" autocomplete="off">
+                        <button id="p2-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 3: Расчет количества ключей в симметричной сети -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 3: Масштабирование симметричной сети (Проблема распределения ключей)</h5>
+                    <p class="text-light">
+                        В корпоративной полносвязной топологии развернуто <strong>N</strong> независимых рабочих станций. 
+                        Для гарантированной конфиденциальности каждая пара абонентов обязана использовать собственный уникальный симметричный ключ шифрования (AES-256).
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТР СЕТЕВОЙ ТОПОЛОГИИ:</div>
+                        <div class="fs-4 text-light">
+                            Количество участников обмена (N): <span id="p3-nodes-count" class="text-warning fw-bold"></span> станций
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Сколько всего уникальных парных симметричных ключей <strong>K<sub>sym</sub> = N × (N - 1) / 2</strong> требуется сгенерировать и распределить для этой сети? Введите точное целое число:
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Число пар ключей" autocomplete="off">
+                        <button id="p3-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 4: Выравнивание блоков данных (Дополнение PKCS#7) -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 4: Расчет дополнения набивки блочного шифра (PKCS#7 Padding)</h5>
+                    <p class="text-light">
+                        Современный блочный шифр (AES / ГОСТ Р 34.12-2015 «Кузнечик») шифрует данные блоками фиксированного размера ровно по <strong>16 байт</strong> (128 бит). 
+                        Если длина открытого текста <strong>L</strong> не кратна 16 байтам, стандарт PKCS#7 дополняет сообщение <strong>P</strong> байтами набивки (значение каждого байта равно P). Если длина уже кратна 16, добавляется целый блок из 16 байт.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТРЫ ПЕРЕДАВАЕМОГО ПАКЕТА:</div>
+                        <div class="fs-5 text-light mb-1">
+                            Размер блока шифра: <span class="text-info fw-bold">16 байт (128 бит)</span>
+                        </div>
+                        <div class="fs-5 text-light">
+                            Длина открытого сообщения (L): <span id="p4-msg-len" class="text-warning fw-bold"></span> байт
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Сколько байтов набивки <strong>P</strong> добавит алгоритм PKCS#7 перед шифрованием? Введите целое число от 1 до 16:
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Байты набивки (1..16)" autocomplete="off">
+                        <button id="p4-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 5: Криптоанализ повторного использования одноразового ключа (Two-Time Pad) -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 5: Криптоанализ коллизии ключа (Атака Two-Time Pad)</h5>
+                    <p class="text-light">
+                        Произошла критическая ошибка безопасности: одноразовый ключ шифра Вернама был использован дважды для зашифрования двух различных октетов 
+                        <strong>M<sub>1</sub></strong> и <strong>M<sub>2</sub></strong>, в результате чего перехвачены шифротексты 
+                        <strong>C<sub>1</sub> = M<sub>1</sub> ⊕ K</strong> и <strong>C<sub>2</sub> = M<sub>2</sub> ⊕ K</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="font-monospace fs-5">
+                            <div class="text-light mb-1">
+                                <span class="text-secondary small d-inline-block" style="width: 160px;">ШИФРОТЕКСТ C<sub>1</sub>:</span>
+                                <span id="p5-c1" class="text-danger fw-bold tracking-widest"></span>
+                            </div>
+                            <div class="text-light mb-1">
+                                <span class="text-secondary small d-inline-block" style="width: 160px;">ШИФРОТЕКСТ C<sub>2</sub>:</span>
+                                <span id="p5-c2" class="text-danger fw-bold tracking-widest"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        По формуле Шеннона, результат сложения <strong>C<sub>1</sub> ⊕ C<sub>2</sub></strong> равен <strong>M<sub>1</sub> ⊕ M<sub>2</sub></strong> и полностью исключает влияние ключа.
+                        Вычислите результат <strong>C<sub>1</sub> ⊕ C<sub>2</sub></strong>. Введите полученную 8-битную двоичную строку:
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="8-битная строка (0 и 1)" maxlength="8" autocomplete="off">
+                        <button id="p5-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- Экран победы -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-warning font-monospace display-4">✓ УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light font-monospace mb-3">Аналитические расчеты и трассировка криптоалгоритмов освоены</h3>
+                    <p class="text-secondary max-w-md mx-auto mb-4">
+                        Вы успешно рассчитали параметры модульной арифметики Цезаря, выполнили побитовую трассировку шифра Вернама, определили масштабируемость ключевого пространства сети, рассчитали блочную набивку PKCS#7 и раскрыли коллизию двухкратного применения одноразового блокнота.
+                    </p>
+                    <div class="badge border border-warning text-warning bg-black p-3 font-monospace fs-6 rounded-0">
+                        Переходите к Уровню 3 (Аркадный боевой режим на реакцию) на верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    const MISSION_NAME = 'Урок 23 :: Шифрование данных (Уровень 2)';
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    let currentPhase = 1;
+
+    // Таймер
+    setInterval(() => {
+        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        const el = document.getElementById('timer-display');
+        if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+    // Первичная телеметрия
+    window.parent.postMessage({
+        type: 'TELEMETRY_EVENT',
+        mission_name: MISSION_NAME,
+        action_type: 'in_progress',
+        status: 'in_progress',
+        start_time: new Date(startTime).toISOString(),
+        time_spent_sec: 0,
+        attempts_count: 0,
+        success: false
+    }, '*');
+
+    function notifyError(msg) {
+        attemptsCount++;
+        const attEl = document.getElementById('attempts-display');
+        if (attEl) attEl.textContent = attemptsCount;
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: 'hardcore_reset',
+            status: 'in_progress',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attemptsCount,
+            success: false
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+        }, 2000);
+    }
+
+    function notifyComplete() {
+        const totalSec = Math.floor((Date.now() - startTime) / 1000);
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: 'level_complete',
+            status: 'completed',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: totalSec,
+            attempts_count: attemptsCount,
+            success: true
+        }, '*');
+
+        for (let i = 1; i <= 5; i++) {
+            document.getElementById(`phase${i}`)?.classList.add('d-none');
+        }
+        document.getElementById('success-screen')?.classList.remove('d-none');
+
+        const badge = document.getElementById('level-badge');
+        const title = document.getElementById('level-title');
+        if (badge) badge.textContent = 'Завершено';
+        if (title) title.textContent = 'Криптоаналитический срез сдан';
+    }
+
+    function switchPhase(next) {
+        document.getElementById(`phase${currentPhase}`)?.classList.add('d-none');
+        currentPhase = next;
+        document.getElementById(`phase${currentPhase}`)?.classList.remove('d-none');
+
+        const badge = document.getElementById('level-badge');
+        const title = document.getElementById('level-title');
+        if (badge) badge.textContent = `Шаг ${currentPhase} из 5`;
+
+        const titles = [
+            '',
+            'Арифметика сдвигов моноалфавитной подстановки',
+            'Побитовое шифрование Вернама (XOR ⊕)',
+            'Масштабирование симметричной сети',
+            'Выравнивание блоков данных (PKCS#7)',
+            'Криптоанализ коллизии ключа (Two-Time Pad)'
+        ];
+        if (title) title.textContent = titles[currentPhase] || '';
+    }
+
+    // Вспомогательные функции
+    function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function randomByteString() {
+        let res = '';
+        for (let i = 0; i < 8; i++) {
+            res += Math.random() > 0.5 ? '1' : '0';
+        }
+        return res;
+    }
+
+    function xorByteStrings(a, b) {
+        let res = '';
+        for (let i = 0; i < 8; i++) {
+            res += (a[i] === b[i] ? '0' : '1');
+        }
+        return res;
+    }
+
+    const ALPHABET = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+
+    // ==========================================
+    // ФАЗА 1: Расчет сдвига Цезаря
+    // ==========================================
+    let p1CorrectAnswer = 0;
+
+    function initPhase1() {
+        const charIdx = randInt(0, 32);
+        const char = ALPHABET[charIdx];
+        const shift = randInt(3, 30);
+        p1CorrectAnswer = (charIdx + shift) % 33;
+
+        document.getElementById('p1-char-info').textContent = `'${char}' (индекс ${charIdx})`;
+        document.getElementById('p1-shift-info').textContent = `k = ${shift}`;
+        const input = document.getElementById('p1-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    function checkPhase1() {
+        const val = parseInt(document.getElementById('p1-input').value.trim(), 10);
+        if (val === p1CorrectAnswer) {
+            switchPhase(2);
+            initPhase2();
+        } else {
+            notifyError(`Неверный индекс шифротекста (${val})! Должно быть (${p1CorrectAnswer}).`);
+            setTimeout(initPhase1, 1200);
+        }
+    }
+
+    document.getElementById('p1-btn')?.addEventListener('click', checkPhase1);
+    document.getElementById('p1-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase1();
+    });
+
+    // ==========================================
+    // ФАЗА 2: Побитовое исключающее ИЛИ (Вернам)
+    // ==========================================
+    let p2CorrectAnswer = '';
+
+    function initPhase2() {
+        const byteM = randomByteString();
+        const byteK = randomByteString();
+        p2CorrectAnswer = xorByteStrings(byteM, byteK);
+
+        document.getElementById('p2-byte-m').textContent = byteM;
+        document.getElementById('p2-byte-k').textContent = byteK;
+        const input = document.getElementById('p2-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    function checkPhase2() {
+        const val = document.getElementById('p2-input').value.trim();
+        if (val === p2CorrectAnswer) {
+            switchPhase(3);
+            initPhase3();
+        } else {
+            notifyError(`Ошибка побитового XOR (${val})! Векторы не совпали.`);
+            setTimeout(initPhase2, 1200);
+        }
+    }
+
+    document.getElementById('p2-btn')?.addEventListener('click', checkPhase2);
+    document.getElementById('p2-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase2();
+    });
+
+    // ==========================================
+    // ФАЗА 3: Расчет количества ключей N*(N-1)/2
+    // ==========================================
+    let p3CorrectAnswer = 0;
+
+    function initPhase3() {
+        const nodes = randInt(16, 50);
+        p3CorrectAnswer = (nodes * (nodes - 1)) / 2;
+
+        document.getElementById('p3-nodes-count').textContent = nodes;
+        const input = document.getElementById('p3-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    function checkPhase3() {
+        const val = parseInt(document.getElementById('p3-input').value.trim(), 10);
+        if (val === p3CorrectAnswer) {
+            switchPhase(4);
+            initPhase4();
+        } else {
+            notifyError(`Неверное число ключей (${val})! Формула: N*(N-1)/2.`);
+            setTimeout(initPhase3, 1200);
+        }
+    }
+
+    document.getElementById('p3-btn')?.addEventListener('click', checkPhase3);
+    document.getElementById('p3-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase3();
+    });
+
+    // ==========================================
+    // ФАЗА 4: Выравнивание PKCS#7 (16 байт)
+    // ==========================================
+    let p4CorrectAnswer = 0;
+
+    function initPhase4() {
+        // Выбираем длину сообщения от 20 до 500 байт
+        const len = randInt(20, 500);
+        const rem = len % 16;
+        p4CorrectAnswer = rem === 0 ? 16 : 16 - rem;
+
+        document.getElementById('p4-msg-len').textContent = len;
+        const input = document.getElementById('p4-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    function checkPhase4() {
+        const val = parseInt(document.getElementById('p4-input').value.trim(), 10);
+        if (val === p4CorrectAnswer) {
+            switchPhase(5);
+            initPhase5();
+        } else {
+            notifyError(`Неверный размер набивки (${val})! Должно быть ${p4CorrectAnswer} байт.`);
+            setTimeout(initPhase4, 1200);
+        }
+    }
+
+    document.getElementById('p4-btn')?.addEventListener('click', checkPhase4);
+    document.getElementById('p4-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase4();
+    });
+
+    // ==========================================
+    // ФАЗА 5: Two-Time Pad (C1 ⊕ C2)
+    // ==========================================
+    let p5CorrectAnswer = '';
+
+    function initPhase5() {
+        const c1 = randomByteString();
+        const c2 = randomByteString();
+        p5CorrectAnswer = xorByteStrings(c1, c2);
+
+        document.getElementById('p5-c1').textContent = c1;
+        document.getElementById('p5-c2').textContent = c2;
+        const input = document.getElementById('p5-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    function checkPhase5() {
+        const val = document.getElementById('p5-input').value.trim();
+        if (val === p5CorrectAnswer) {
+            notifyComplete();
+        } else {
+            notifyError(`Неверный результат сложения C1 ⊕ C2 (${val})!`);
+            setTimeout(initPhase5, 1200);
+        }
+    }
+
+    document.getElementById('p5-btn')?.addEventListener('click', checkPhase5);
+    document.getElementById('p5-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase5();
+    });
+
+    // Старт с 1 фазы
+    initPhase1();
+})();
+</script>
