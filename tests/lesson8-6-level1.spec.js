@@ -52,8 +52,10 @@ test.describe('Lesson 8-6 Level 1: Number Systems', () => {
     
     // Check DB
     const db = new sqlite3('telemetry.db');
-    const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' ORDER BY id DESC LIMIT 1`).get();
-    expect(row).toBeDefined();
+    await expect.poll(() => {
+      return db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' AND mission_name LIKE '%Уровень 1%' ORDER BY id DESC LIMIT 1`).get();
+    }, { timeout: 10000 }).toBeDefined();
+    const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' AND mission_name LIKE '%Уровень 1%' ORDER BY id DESC LIMIT 1`).get();
     expect(row.success).toBe(1);
   });
 
