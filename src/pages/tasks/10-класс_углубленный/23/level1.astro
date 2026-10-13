@@ -1,0 +1,760 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Архитектура криптосистем (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Заголовок и индикатор прогресса -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация криптографических примитивов</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сброса -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[КРИПТОГРАФИЧЕСКИЙ СБОЙ] <span id="feedback-text">Неверное распределение алгоритмов!</span> Перегенерация варианта...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 1: Сортировка по контейнерам (Drag-to-Bucket) -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-3">
+                        Криптографический шлюз перехватил спецификации алгоритмов и методов защиты. 
+                        Используя мышь, <strong>перетащите каждую карточку</strong> (или кликните по карточке, затем по нужному контейнеру) в соответствующий класс криптосистемы по классификации К.Ю. Полякова.
+                    </p>
+
+                    <!-- Пул нераспределенных карточек -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ВХОДЯЩИЕ КРИПТОПРИМИТИВЫ (ПЕРЕТАЩИТЕ В КОНТЕЙНЕРЫ НИЖЕ):</span>
+                            <button id="p1-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Карточки генерируются динамически через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Целевые контейнеры (Бакеты) -->
+                    <div class="row g-3 mb-4">
+                        <!-- Бакет 1: Симметричные шифры -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="symmetric" id="bucket-symmetric">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">1. СИММЕТРИЧНЫЕ ШИФРЫ</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Единый секретный ключ (K<sub>enc</sub> = K<sub>dec</sub>). Высокая скорость, SP-сети и сети Фейстеля, блочный/потоковый режим.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2 min-vh-20">
+                                        <!-- Карточки -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: Асимметричные алгоритмы -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-info rounded-0 h-100 target-bucket" data-category="asymmetric" id="bucket-asymmetric">
+                                <div class="card-header bg-dark border-bottom border-info text-info d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">2. АСИММЕТРИЧНЫЕ СИСТЕМЫ</span>
+                                    <span class="badge border border-info text-info bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Ключевая пара (K<sub>pub</sub>, K<sub>priv</sub>). Односторонние функции с лазейкой, решение проблемы передачи ключа, ЭЦП.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-info bg-dark d-flex flex-column gap-2 min-vh-20">
+                                        <!-- Карточки -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 3: Классические шифры -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="classic" id="bucket-classic">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">3. КЛАССИЧЕСКИЕ И OTP</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Шифры перестановки (решетки, таблицы), подстановки (Цезарь, Виженер) и одноразовый блокнот Вернама (совершенная секретность).</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2 min-vh-20">
+                                        <!-- Карточки -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-success rounded-0 px-4 py-2 font-monospace fw-bold">
+                            ПРОВЕРИТЬ КЛАССИФИКАЦИЮ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 2: Калибратор сдвига Цезаря (Interactive Dial / Scrubber) -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Перехвачено зашифрованное кодовое слово. Аналитический модуль выявил использование шифра Цезаря со сдвигом 
+                        <strong>k</strong> в русском алфавите (33 буквы, А=0 .. Я=32).
+                        Используя интерактивный калибратор (ползунок), <strong>вращайте сдвиг регистра</strong>, наблюдая за расшифровкой в реальном времени, пока открытый текст не примет осмысленный вид.
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-black border-warning rounded-0 p-3 h-100">
+                                <span class="text-secondary small mb-1">ПЕРЕХВАЧЕННЫЙ ШИФРОТЕКСТ:</span>
+                                <div id="p2-ciphertext" class="fs-4 text-warning fw-bold tracking-widest mb-3"></div>
+
+                                <span class="text-secondary small mb-1">МАРКЕР АНАЛИЗАТОРА:</span>
+                                <div id="p2-hint" class="text-light small p-2 bg-dark border border-secondary mb-3"></div>
+
+                                <span class="text-secondary small mb-1">РЕЗУЛЬТАТ ТЕКУЩЕЙ КАЛИБРОВКИ ДЕКОДЕРА:</span>
+                                <div id="p2-plaintext-preview" class="fs-4 text-success fw-bold tracking-widest p-2 bg-dark border border-success">
+                                    ---
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card bg-black border-success rounded-0 p-3 h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-secondary small">КАЛИБРАТОР СДВИГА КЛЮЧА k:</span>
+                                        <span id="p2-shift-value" class="badge bg-success text-dark fs-6 rounded-0">k = 0</span>
+                                    </div>
+                                    <input type="range" class="form-range w-100" id="p2-slider" min="0" max="32" value="0" step="1">
+
+                                    <div class="d-flex justify-content-between text-secondary small font-monospace mt-1">
+                                        <span>0 (исходный)</span>
+                                        <span>16</span>
+                                        <span>32 (сдвиг Я)</span>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 p-2 bg-dark border border-secondary font-monospace small">
+                                    <div class="text-secondary mb-1">ЛЕНТА АЛФАВИТНОЙ ТРАНСЛЯЦИИ:</div>
+                                    <div id="p2-alphabet-map" class="text-info text-truncate">
+                                        А → А | Б → Б | В → В | Г → Г | ...
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 d-flex justify-content-end">
+                                    <button id="p2-verify-btn" class="btn btn-success rounded-0 px-4 py-2 font-monospace fw-bold">
+                                        СИНХРОНИЗИРОВАТЬ ДЕКОДЕР →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 3: Слот-пазл гибридного криптографического конвейера (Slot & Snap) -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Для организации защищенного туннеля (TLS 1.3 / HTTPS) требуется выстроить технологический конвейер гибридной криптосистемы.
+                        <strong>Перетащите блоки операций</strong> в правильные слоты конвейера сверху вниз (от шага 1 к шагу 4). 
+                        Остерегайтесь криптографически некорректных действий и уязвимых дистракторов!
+                    </p>
+
+                    <!-- Палитра блоков операций -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ДОСТУПНЫЕ ОПЕРАЦИИ (ПЕРЕТАЩИТЕ В СЛОТЫ КОНВЕЙЕРА НИЖЕ):</span>
+                            <button id="p3-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить блоки
+                            </button>
+                        </div>
+                        <div id="p3-blocks-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Блоки генерируются динамически -->
+                        </div>
+                    </div>
+
+                    <!-- Целевые слоты конвейера -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4">
+                        <div class="text-secondary small mb-3">АРХИТЕКТУРНЫЙ КОНВЕЙЕР ГИБРИДНОЙ КРИПТОСИСТЕМЫ:</div>
+                        <div class="d-flex flex-column gap-3">
+                            <!-- Слот 1 -->
+                            <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark" data-step="1">
+                                <div class="text-secondary small mb-1 fw-bold text-success">ЭТАП 1: ГЕНЕРАЦИЯ СЕАНСОВОГО КЛЮЧА</div>
+                                <div class="pipeline-slot p-2 border border-dashed border-success min-vh-5 bg-black" data-slot="1">
+                                    <span class="text-secondary small placeholder-text">Перетащите сюда блок этапа 1...</span>
+                                </div>
+                            </div>
+
+                            <!-- Слот 2 -->
+                            <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark" data-step="2">
+                                <div class="text-secondary small mb-1 fw-bold text-info">ЭТАП 2: ЗАЩИЩЕННАЯ ДОСТАВКА СЕАНСОВОГО КЛЮЧА (АСИММЕТРИЯ)</div>
+                                <div class="pipeline-slot p-2 border border-dashed border-info min-vh-5 bg-black" data-slot="2">
+                                    <span class="text-secondary small placeholder-text">Перетащите сюда блок этапа 2...</span>
+                                </div>
+                            </div>
+
+                            <!-- Слот 3 -->
+                            <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark" data-step="3">
+                                <div class="text-secondary small mb-1 fw-bold text-warning">ЭТАП 3: ШИФРОВАНИЕ ОСНОВНОГО ТРАФИКА (СИММЕТРИЯ)</div>
+                                <div class="pipeline-slot p-2 border border-dashed border-warning min-vh-5 bg-black" data-slot="3">
+                                    <span class="text-secondary small placeholder-text">Перетащите сюда блок этапа 3...</span>
+                                </div>
+                            </div>
+
+                            <!-- Слот 4 -->
+                            <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark" data-step="4">
+                                <div class="text-secondary small mb-1 fw-bold text-danger">ЭТАП 4: КОНТРОЛЬ ЦЕЛОСТНОСТИ И АУТЕНТИФИКАЦИЯ (ЭЦП / ДАЙДЖЕСТ)</div>
+                                <div class="pipeline-slot p-2 border border-dashed border-danger min-vh-5 bg-black" data-slot="4">
+                                    <span class="text-secondary small placeholder-text">Перетащите сюда блок этапа 4...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" class="btn btn-success rounded-0 px-4 py-2 font-monospace fw-bold">
+                            ЗАПУСТИТЬ КРИПТОГРАФИЧЕСКИЙ КОНВЕЙЕР →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Экран победы -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-success font-monospace display-4">✓ УРОВЕНЬ 1 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light font-monospace mb-3">Базовые принципы и архитектура криптосистем освоены</h3>
+                    <p class="text-secondary max-w-md mx-auto mb-4">
+                        Вы успешно классифицировали криптографические алгоритмы, синхронизировали алфавитный калибратор Цезаря и сконструировали гибридный конвейер защищенной передачи данных.
+                    </p>
+                    <div class="badge border border-success text-success bg-black p-3 font-monospace fs-6 rounded-0">
+                        Переходите к Уровню 2 (Аналитические расчеты и ручной ввод) на верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    // === ГЛОБАЛЬНОЕ СОСТОЯНИЕ ТРЕНАЖЕРА ===
+    const MISSION_NAME = 'Урок 23 :: Шифрование данных (Уровень 1)';
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    let currentPhase = 1;
+    let selectedItem = null;
+
+    // Таймер
+    setInterval(() => {
+        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        const el = document.getElementById('timer-display');
+        if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+    // Первичная телеметрия старта
+    window.parent.postMessage({
+        type: 'TELEMETRY_EVENT',
+        mission_name: MISSION_NAME,
+        action_type: 'in_progress',
+        status: 'in_progress',
+        start_time: new Date(startTime).toISOString(),
+        time_spent_sec: 0,
+        attempts_count: 0,
+        success: false
+    }, '*');
+
+    function notifyError(msg) {
+        attemptsCount++;
+        const attEl = document.getElementById('attempts-display');
+        if (attEl) attEl.textContent = attemptsCount;
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        // Телеметрия сброса
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: 'hardcore_reset',
+            status: 'in_progress',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+            attempts_count: attemptsCount,
+            success: false
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+        }, 2000);
+    }
+
+    function notifyComplete() {
+        const totalSec = Math.floor((Date.now() - startTime) / 1000);
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: 'level_complete',
+            status: 'completed',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: totalSec,
+            attempts_count: attemptsCount,
+            success: true
+        }, '*');
+
+        document.getElementById('phase1')?.classList.add('d-none');
+        document.getElementById('phase2')?.classList.add('d-none');
+        document.getElementById('phase3')?.classList.add('d-none');
+        document.getElementById('success-screen')?.classList.remove('d-none');
+
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        if (badge) badge.textContent = 'Завершено';
+        if (title) title.textContent = 'Криптосистема полностью верифицирована';
+    }
+
+    // ==========================================
+    // ФАЗА 1: Классификация (Drag-to-Bucket)
+    // ==========================================
+    const P1_DATABASE = {
+        symmetric: [
+            { id: 's1', text: 'AES-256 (Симметричный блочный шифр)', category: 'symmetric' },
+            { id: 's2', text: 'ГОСТ Р 34.12-2015 «Кузнечик» (128-бит SP-сеть)', category: 'symmetric' },
+            { id: 's3', text: 'ChaCha20 (Высокоскоростной потоковый шифр)', category: 'symmetric' },
+            { id: 's4', text: '3DES (Тройная сеть Фейстеля)', category: 'symmetric' },
+            { id: 's5', text: 'ГОСТ Р 34.12-2015 «Магма» (64-битный блочный шифр)', category: 'symmetric' }
+        ],
+        asymmetric: [
+            { id: 'a1', text: 'RSA-4096 (Факторизация больших простых чисел)', category: 'asymmetric' },
+            { id: 'a2', text: 'Diffie-Hellman (Протокол согласования общего ключа)', category: 'asymmetric' },
+            { id: 'a3', text: 'ГОСТ Р 34.10-2012 (ЭЦП на эллиптических кривых)', category: 'asymmetric' },
+            { id: 'a4', text: 'ECDSA (Эллиптическая цифровая подпись)', category: 'asymmetric' },
+            { id: 'a5', text: 'Эль-Гамаль (Асимметричная схема на дискретном логарифме)', category: 'asymmetric' }
+        ],
+        classic: [
+            { id: 'c1', text: 'Шифр Вернама / OTP (Абсолютная стойкость по Шеннону)', category: 'classic' },
+            { id: 'c2', text: 'Шифр Виженера (Полиалфавитная подстановка)', category: 'classic' },
+            { id: 'c3', text: 'Решетка Кардано (Поворотный трафарет перестановки)', category: 'classic' },
+            { id: 'c4', text: 'Шифр Цезаря (Моноалфавитный циклический сдвиг)', category: 'classic' },
+            { id: 'c5', text: 'Древнегреческая Скитала (Шифр цилиндрической перестановки)', category: 'classic' }
+        ]
+    };
+
+    let p1CurrentCards = [];
+
+    function initPhase1() {
+        const pool = document.getElementById('p1-cards-pool');
+        if (!pool) return;
+
+        // Очищаем бакеты и пул
+        pool.innerHTML = '';
+        document.querySelectorAll('.target-bucket .bucket-slot').forEach(slot => slot.innerHTML = '');
+        updateBucketBadges();
+
+        // Процедурный выбор: по 2 случайных карточки из каждой категории (итого 6)
+        function pickRandom(arr, count) {
+            return [...arr].sort(() => Math.random() - 0.5).slice(0, count);
+        }
+
+        p1CurrentCards = [
+            ...pickRandom(P1_DATABASE.symmetric, 2),
+            ...pickRandom(P1_DATABASE.asymmetric, 2),
+            ...pickRandom(P1_DATABASE.classic, 2)
+        ].sort(() => Math.random() - 0.5);
+
+        // Отрисовка карточек
+        p1CurrentCards.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'draggable-crypto-card p-2 border border-secondary bg-black text-light small font-monospace rounded-0 user-select-none cursor-pointer';
+            card.setAttribute('draggable', 'true');
+            card.setAttribute('data-id', item.id);
+            card.setAttribute('data-category', item.category);
+            card.textContent = item.text;
+
+            // Drag and drop слушатели
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.id);
+                card.classList.add('opacity-50');
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-50');
+            });
+
+            // Клик для сенсорных экранов и доступности
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedItem === card) {
+                    card.classList.remove('border-warning', 'text-warning');
+                    selectedItem = null;
+                } else {
+                    if (selectedItem) {
+                        selectedItem.classList.remove('border-warning', 'text-warning');
+                    }
+                    selectedItem = card;
+                    card.classList.add('border-warning', 'text-warning');
+                }
+            });
+
+            pool.appendChild(card);
+        });
+    }
+
+    function updateBucketBadges() {
+        document.querySelectorAll('.target-bucket').forEach(bucket => {
+            const count = bucket.querySelectorAll('.draggable-crypto-card').length;
+            const badge = bucket.querySelector('.count-badge');
+            if (badge) badge.textContent = count;
+        });
+    }
+
+    // Обработка зон сброса для бакетов
+    document.querySelectorAll('.target-bucket').forEach(bucket => {
+        bucket.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            bucket.classList.add('border-white');
+        });
+        bucket.addEventListener('dragleave', () => {
+            bucket.classList.remove('border-white');
+        });
+        bucket.addEventListener('drop', (e) => {
+            e.preventDefault();
+            bucket.classList.remove('border-white');
+            const cardId = e.dataTransfer.getData('text/plain');
+            const cardEl = document.querySelector(`.draggable-crypto-card[data-id="${cardId}"]`);
+            if (cardEl) {
+                bucket.querySelector('.bucket-slot').appendChild(cardEl);
+                updateBucketBadges();
+            }
+        });
+
+        // Клик по бакету при выбранной карточке
+        bucket.addEventListener('click', () => {
+            if (selectedItem) {
+                bucket.querySelector('.bucket-slot').appendChild(selectedItem);
+                selectedItem.classList.remove('border-warning', 'text-warning');
+                selectedItem = null;
+                updateBucketBadges();
+            }
+        });
+    });
+
+    // Сброс в пул
+    document.getElementById('p1-reset-btn')?.addEventListener('click', () => {
+        const pool = document.getElementById('p1-cards-pool');
+        document.querySelectorAll('.draggable-crypto-card').forEach(c => pool.appendChild(c));
+        updateBucketBadges();
+        if (selectedItem) {
+            selectedItem.classList.remove('border-warning', 'text-warning');
+            selectedItem = null;
+        }
+    });
+
+    // Проверка Фазы 1
+    document.getElementById('p1-verify-btn')?.addEventListener('click', () => {
+        const buckets = document.querySelectorAll('.target-bucket');
+        let totalPlaced = 0;
+        let hasError = false;
+
+        buckets.forEach(bucket => {
+            const expectedCategory = bucket.getAttribute('data-category');
+            const cards = bucket.querySelectorAll('.draggable-crypto-card');
+            totalPlaced += cards.length;
+
+            cards.forEach(c => {
+                if (c.getAttribute('data-category') !== expectedCategory) {
+                    hasError = true;
+                }
+            });
+        });
+
+        if (totalPlaced < 6) {
+            notifyError('Не все криптографические примитивы распределены по контейнерам!');
+            return;
+        }
+
+        if (hasError) {
+            notifyError('Один или несколько алгоритмов помещены в неверный класс криптосистем!');
+            setTimeout(initPhase1, 1200);
+            return;
+        }
+
+        // Успех Фазы 1 -> Переход к Фазе 2
+        currentPhase = 2;
+        document.getElementById('phase1')?.classList.add('d-none');
+        document.getElementById('phase2')?.classList.remove('d-none');
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        if (badge) badge.textContent = 'Шаг 2 из 3';
+        if (title) title.textContent = 'Калибровка алфавитного сдвига Цезаря';
+        initPhase2();
+    });
+
+    // ==========================================
+    // ФАЗА 2: Калибратор Цезаря (Interactive Slider)
+    // ==========================================
+    const ALPHABET = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+    const P2_DICTIONARY = [
+        { word: 'АЛГОРИТМ', marker: 'Слово начинается на первую букву русского алфавита.' },
+        { word: 'ПРОТОКОЛ', marker: 'Сетевой регламент передачи данных. Содержит три одинаковые гласные.' },
+        { word: 'СИММЕТРИЯ', marker: 'Свойство шифров с единым секретным ключом.' },
+        { word: 'БЕЗОПАСНОСТЬ', marker: 'Состояние защищенности информационной среды.' },
+        { word: 'СЕРТИФИКАТ', marker: 'Электронный паспорт открытого ключа стандарта X.509.' },
+        { word: 'КРИПТОГРАФИЯ', marker: 'Наука о методах обеспечения конфиденциальности и целостности.' }
+    ];
+
+    let p2TargetWord = '';
+    let p2TargetShift = 0;
+    let p2Ciphertext = '';
+
+    function caesarEncrypt(text, shift) {
+        return text.split('').map(ch => {
+            const idx = ALPHABET.indexOf(ch);
+            if (idx === -1) return ch;
+            return ALPHABET[(idx + shift) % ALPHABET.length];
+        }).join('');
+    }
+
+    function caesarDecrypt(text, shift) {
+        return text.split('').map(ch => {
+            const idx = ALPHABET.indexOf(ch);
+            if (idx === -1) return ch;
+            return ALPHABET[(idx - shift + ALPHABET.length) % ALPHABET.length];
+        }).join('');
+    }
+
+    function initPhase2() {
+        const item = P2_DICTIONARY[Math.floor(Math.random() * P2_DICTIONARY.length)];
+        p2TargetWord = item.word;
+        // Случайный сдвиг от 3 до 29
+        p2TargetShift = Math.floor(Math.random() * 26) + 3;
+        p2Ciphertext = caesarEncrypt(p2TargetWord, p2TargetShift);
+
+        document.getElementById('p2-ciphertext').textContent = p2Ciphertext;
+        document.getElementById('p2-hint').textContent = `ПОДСКАЗКА ЭКСПЕРТИЗЫ: ${item.marker}`;
+
+        const slider = document.getElementById('p2-slider');
+        slider.value = '0';
+        updatePhase2Preview(0);
+    }
+
+    function updatePhase2Preview(shift) {
+        const shiftBadge = document.getElementById('p2-shift-value');
+        if (shiftBadge) shiftBadge.textContent = `k = ${shift}`;
+
+        const previewEl = document.getElementById('p2-plaintext-preview');
+        const decoded = caesarDecrypt(p2Ciphertext, shift);
+        if (previewEl) previewEl.textContent = decoded;
+
+        // Обновление карты трансляции алфавита
+        const mapEl = document.getElementById('p2-alphabet-map');
+        if (mapEl) {
+            const samples = [0, 1, 2, 3, 4].map(i => {
+                const src = ALPHABET[i];
+                const dst = ALPHABET[(i + shift) % ALPHABET.length];
+                return `${src} → ${dst}`;
+            });
+            mapEl.textContent = samples.join(' | ') + ' | ...';
+        }
+    }
+
+    document.getElementById('p2-slider')?.addEventListener('input', (e) => {
+        const shift = parseInt(e.target.value, 10);
+        updatePhase2Preview(shift);
+    });
+
+    document.getElementById('p2-verify-btn')?.addEventListener('click', () => {
+        const slider = document.getElementById('p2-slider');
+        const currentShift = parseInt(slider.value, 10);
+
+        if (currentShift === p2TargetShift) {
+            // Успех Фазы 2 -> Переход к Фазе 3
+            currentPhase = 3;
+            document.getElementById('phase2')?.classList.add('d-none');
+            document.getElementById('phase3')?.classList.remove('d-none');
+            const badge = document.getElementById('phase-badge');
+            const title = document.getElementById('phase-title');
+            if (badge) badge.textContent = 'Шаг 3 из 3';
+            if (title) title.textContent = 'Конструирование гибридного криптографического конвейера';
+            initPhase3();
+        } else {
+            notifyError(`Неверный сдвиг калибратора (k=${currentShift})! Текст остается зашифрованным.`);
+            setTimeout(initPhase2, 1200);
+        }
+    });
+
+    // ==========================================
+    // ФАЗА 3: Слот-пазл гибридного конвейера (Slot & Snap)
+    // ==========================================
+    const P3_DATABASE = {
+        correct: [
+            { id: 'b1', step: 1, text: '1. Генерация одноразового сеансового ключа (Session Key AES-256)' },
+            { id: 'b2', step: 2, text: '2. Зашифрование сеансового ключа открытым ключом сервера K_pub (RSA / ECC)' },
+            { id: 'b3', step: 3, text: '3. Скоростное потоковое шифрование полезной нагрузки сеансовым ключом (AES-GCM)' },
+            { id: 'b4', step: 4, text: '4. Вычисление дайджеста SHA-256 и верификация электронной подписи' }
+        ],
+        distractors: [
+            { id: 'd1', step: 0, text: '[ДИСТРАКТОР] Прямое шифрование всего потока данных медленным асимметричным ключом RSA' },
+            { id: 'd2', step: 0, text: '[ДИСТРАКТОР] Передача сеансового симметричного ключа открытым текстом в URL-заголовке' },
+            { id: 'd3', step: 0, text: '[ДИСТРАКТОР] Применение блочного режима ECB без вектора инициализации IV' }
+        ]
+    };
+
+    function initPhase3() {
+        const pool = document.getElementById('p3-blocks-pool');
+        if (!pool) return;
+
+        pool.innerHTML = '';
+        document.querySelectorAll('.pipeline-slot').forEach(slot => {
+            slot.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите сюда блок этапа...</span>';
+        });
+
+        // 4 правильных блока + 2 случайных дистрактора (итого 6 блоков), перемешанных
+        const chosenDistractors = [...P3_DATABASE.distractors].sort(() => Math.random() - 0.5).slice(0, 2);
+        const allBlocks = [...P3_DATABASE.correct, ...chosenDistractors].sort(() => Math.random() - 0.5);
+
+        allBlocks.forEach(item => {
+            const block = document.createElement('div');
+            block.className = 'draggable-pipeline-block p-2 border border-secondary bg-black text-light small font-monospace rounded-0 user-select-none cursor-pointer';
+            block.setAttribute('draggable', 'true');
+            block.setAttribute('data-id', item.id);
+            block.setAttribute('data-step', item.step);
+            block.textContent = item.text;
+
+            block.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.id);
+                block.classList.add('opacity-50');
+            });
+            block.addEventListener('dragend', () => {
+                block.classList.remove('opacity-50');
+            });
+
+            block.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedItem === block) {
+                    block.classList.remove('border-warning', 'text-warning');
+                    selectedItem = null;
+                } else {
+                    if (selectedItem) {
+                        selectedItem.classList.remove('border-warning', 'text-warning');
+                    }
+                    selectedItem = block;
+                    block.classList.add('border-warning', 'text-warning');
+                }
+            });
+
+            pool.appendChild(block);
+        });
+    }
+
+    // Обработка зон сброса конвейера
+    document.querySelectorAll('.pipeline-slot').forEach(slot => {
+        slot.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            slot.classList.add('border-white');
+        });
+        slot.addEventListener('dragleave', () => {
+            slot.classList.remove('border-white');
+        });
+        slot.addEventListener('drop', (e) => {
+            e.preventDefault();
+            slot.classList.remove('border-white');
+            const blockId = e.dataTransfer.getData('text/plain');
+            const blockEl = document.querySelector(`.draggable-pipeline-block[data-id="${blockId}"]`);
+            if (blockEl) {
+                placeBlockIntoSlot(slot, blockEl);
+            }
+        });
+
+        slot.addEventListener('click', () => {
+            if (selectedItem && selectedItem.classList.contains('draggable-pipeline-block')) {
+                placeBlockIntoSlot(slot, selectedItem);
+                selectedItem.classList.remove('border-warning', 'text-warning');
+                selectedItem = null;
+            }
+        });
+    });
+
+    function placeBlockIntoSlot(slot, blockEl) {
+        // Если в слоте уже был блок, возвращаем его в пул
+        const pool = document.getElementById('p3-blocks-pool');
+        const existingBlock = slot.querySelector('.draggable-pipeline-block');
+        if (existingBlock && existingBlock !== blockEl) {
+            pool.appendChild(existingBlock);
+        }
+
+        // Очищаем плейсхолдер
+        slot.innerHTML = '';
+        slot.appendChild(blockEl);
+    }
+
+    // Сброс конвейера
+    document.getElementById('p3-reset-btn')?.addEventListener('click', () => {
+        const pool = document.getElementById('p3-blocks-pool');
+        document.querySelectorAll('.draggable-pipeline-block').forEach(b => pool.appendChild(b));
+        document.querySelectorAll('.pipeline-slot').forEach(slot => {
+            slot.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите сюда блок этапа...</span>';
+        });
+        if (selectedItem) {
+            selectedItem.classList.remove('border-warning', 'text-warning');
+            selectedItem = null;
+        }
+    });
+
+    // Проверка конвейера
+    document.getElementById('p3-verify-btn')?.addEventListener('click', () => {
+        let isComplete = true;
+        let hasError = false;
+
+        for (let step = 1; step <= 4; step++) {
+            const slot = document.querySelector(`.pipeline-slot[data-slot="${step}"]`);
+            const block = slot ? slot.querySelector('.draggable-pipeline-block') : null;
+
+            if (!block) {
+                isComplete = false;
+                break;
+            }
+
+            const blockStep = parseInt(block.getAttribute('data-step'), 10);
+            if (blockStep !== step) {
+                hasError = true;
+            }
+        }
+
+        if (!isComplete) {
+            notifyError('Все 4 этапа конвейера должны быть заполнены блоками операций!');
+            return;
+        }
+
+        if (hasError) {
+            notifyError('Нарушена технологическая последовательность этапов или внедрен небезопасный дистрактор!');
+            setTimeout(initPhase3, 1200);
+            return;
+        }
+
+        // Финальный триумф
+        notifyComplete();
+    });
+
+    // Инициализация при старте
+    initPhase1();
+})();
+</script>
