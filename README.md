@@ -1,46 +1,101 @@
-# Astro Starter Kit: Basics
+# School LMS — Интерактивная Образовательная Платформа
 
-```sh
-npm create astro@latest -- --template basics
-```
+Интерактивная EdTech-платформа нового поколения для изучения школьного курса информатики (7–11 классы) по углубленной и базовой программе на основе учебников К.Ю. Полякова.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+---
 
-## 🚀 Project Structure
+## ⚡ Ключевые Особенности и Архитектура
 
-Inside of your Astro project, you'll see the following folders and files:
+1. **Zero Multiple Choice Policy (Анти-угадывание):**
+   * Полный запрет на тесты с выбором вариантов (радиокнопки, дропдауны с ответами).
+   * **Уровень 1 (Манипуляции):** Drag-and-Drop, коммутация цепей, прямое редактирование лент/сеток, сортировка.
+   * **Уровень 2 (Аналитика):** Ручной ввод вычисленных значений, трассировка алгоритмов, консольные команды.
+   * **Уровень 3 (Аркада):** Аркадные механики с таймерами, банк уникальных архетипов, мгновенная реакция.
+2. **Глобальный Режим Хардкора:**
+   * Прохождение всех трёх уровней без единой ошибки на одном дыхании. Любая ошибка вызывает полный сброс на шаг 1 и процедурную перегенерацию данных.
+3. **Нормализованная Телеметрия (Стандарты xAPI / IMS Caliper Analytics):**
+   * Чёткое разделение сущностей: постоянный класс ученика (`student_class`), программа курса (`course_slug`), номер урока (`lesson_id`) и уровень (`level_number`).
+   * Поддержка межкурсовых соревнований (например, срез 10-го класса на уроках 8-го класса без сброса профиля).
+   * Композитные индексы SQLite (`idx_telemetry_student_cohort`, `idx_telemetry_course_lesson`) для мгновенной выборки без эвристик.
+4. **Дашборд Учителя Реального Времени (`/teacher`):**
+   * Мультивыбор классов через чекбоксы для соревновательных срезов между параллелями.
+   * Фильтр по программам заданий («Курс задания») и динамический список тем.
+   * Мульти-сортировка колонок таблицы с удержанием `Ctrl` / `Shift`.
+   * Live Polling каждые 5 секунд с индикацией сетевой активности и экспорт в CSV.
+
+---
+
+## 🛠 Стек Технологий
+
+* **Фреймворк:** [Astro 5](https://astro.build/) (режим SSR, `@astrojs/node` адаптер).
+* **База данных:** SQLite via `better-sqlite3`.
+* **Стилизация:** Tailwind CSS v4, киберпанк / терминальный UI.
+* **Песочницы:** Pyodide (Python в браузере), Web Workers, изолированные `<iframe>`.
+* **Тестирование:** Playwright (трехуровневая пирамида тестов: линтинг теории, контракты телеметрии, сквозные E2E).
+
+---
+
+## 📁 Структура Проекта
 
 ```text
-/
-├── public/
-│   └── favicon.svg
-├── src
-│   ├── assets
-│   │   └── astro.svg
-│   ├── components
-│   │   └── Welcome.astro
-│   ├── layouts
-│   │   └── Layout.astro
-│   └── pages
-│       └── index.astro
-└── package.json
+school-lms/
+├── docs/                 # Модульная документация проекта
+│   ├── telemetry-api.md  # Модель данных, API телеметрии, дашборд учителя
+│   ├── testing.md        # Пирамида тестирования, Playwright, CI/CD
+│   ├── curriculum.md     # Учебный план, соответствие Полякову, Zero-LaTeX
+│   ├── design-levels-1-2.md # Геймдизайн 1 и 2 уровней
+│   ├── design-level-3.md # Геймдизайн 3 уровня (аркада)
+│   ├── ui-styling.md     # UI-гайдлайны и стилизация
+│   ├── components.md     # Встроенные компоненты (Terminal, PythonIDE)
+│   └── ai-workflow.md    # Регламент работы автономных ИИ-агентов
+├── scripts/
+│   └── migrate_telemetry.js # Скрипт нормализации и миграции базы данных
+├── src/
+│   ├── content/lessons/  # Теоретические материалы уроков (theory.md)
+│   ├── pages/
+│   │   ├── api/          # Серверные эндпоинты (telemetry, progress, teacher/stats)
+│   │   ├── courses.astro # Каталог программ и личный кабинет ученика
+│   │   ├── teacher.astro # Панель мониторинга учителя
+│   │   └── lesson/       # Динамический роутинг уроков
+│   └── data/courses.json # Реестр учебных курсов и уроков
+├── tests/                # Набор автотестов Playwright
+├── AGENTS.md             # Диспетчер инструкций для ИИ-агентов
+└── telemetry.db          # База данных SQLite (в .gitignore)
 ```
 
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
+---
 
-## 🧞 Commands
+## 🚀 Команды Разработки
 
-All commands are run from the root of the project, from a terminal:
+```bash
+# Установка зависимостей
+npm install
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+# Запуск локального сервера разработки
+npm run dev
 
-## 👀 Want to learn more?
+# Сборка продакшн-сервера
+npm run build
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+# Быстрые тесты контрактов (линтинг теории + схема БД + аналитика учителя)
+npm run test:contracts
+
+# Запуск полного набора автотестов Playwright
+npm test
+
+# Запуск тестов в интерактивном GUI Playwright
+npx playwright test --ui
+
+# Запуск миграции базы данных телеметрии
+node scripts/migrate_telemetry.js
+```
+
+---
+
+## 📚 Документация
+
+Подробная документация разделена по направлениям в папке [`docs/`](file:///D:/school-lms/docs/):
+* [docs/telemetry-api.md](file:///D:/school-lms/docs/telemetry-api.md) — Спецификация телеметрии, SQLite схемы и дашборда учителя.
+* [docs/testing.md](file:///D:/school-lms/docs/testing.md) — Руководство по автоматическому тестированию и CI/CD.
+* [docs/curriculum.md](file:///D:/school-lms/docs/curriculum.md) — Учебный план и правила оформления формул.
+* [AGENTS.md](file:///D:/school-lms/AGENTS.md) — Диспетчер правил для автономных ИИ-ассистентов.
