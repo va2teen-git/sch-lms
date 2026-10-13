@@ -54,7 +54,8 @@ test.describe('7 класс. Урок 6. Уровень 3: Аркада Firewall
       });
     });
 
-    await page.goto('/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level3');
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:4321';
+    await page.goto(`${BASE_URL}/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level3`);
 
     // Стартуем испытание
     const btnStart = page.locator('#btn-start');
@@ -106,7 +107,8 @@ test.describe('7 класс. Урок 6. Уровень 3: Аркада Firewall
       });
     });
 
-    await page.goto('/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level3');
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:4321';
+    await page.goto(`${BASE_URL}/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level3`);
     await page.locator('#btn-start').click();
 
     await expect(page.locator('#target-packet-card')).toBeVisible();

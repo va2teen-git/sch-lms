@@ -50,7 +50,8 @@ test.describe('7 класс. Урок 6. Уровень 1: Компьютерн�
     });
 
     // Переход напрямую на страницу тренажера
-    await page.goto('/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level1');
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:4321';
+    await page.goto(`${BASE_URL}/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level1`);
 
     // --- ФАЗА 1: Drag-to-Bucket сортировка угроз ---
     await expect(page.locator('#phase1')).toBeVisible();

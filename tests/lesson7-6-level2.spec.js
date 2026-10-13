@@ -57,7 +57,8 @@ test.describe('7 класс. Урок 6. Уровень 2: Аналитика у
     });
 
     // Переход напрямую на страницу тренажера
-    await page.goto('/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level2');
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:4321';
+    await page.goto(`${BASE_URL}/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level2`);
 
     // --- ФАЗА 1: Двойные расширения ---
     await expect(page.locator('#phase1')).toBeVisible();
