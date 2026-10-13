@@ -1,0 +1,974 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Лаборатория логических элементов (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Шапка и индикатор прогресса -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Спецификация логических операций и моделей Полякова</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- Системный алерт об ошибке / сбросе -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СБОЙ СХЕМЫ] <span id="feedback-text">Неверная конфигурация логических узлов!</span> Перекалибровка стенда...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: КОНСТРУИРОВАНИЕ СПЕЦИФИКАЦИЙ ОПЕРАЦИЙ (Slot & Snap) ================= -->
+                <div id="phase-1-container">
+                    <p class="text-light mb-3">
+                        На лабораторном стенде представлены три фундаментальные логические операции. 
+                        <strong>Перетащите мышью</strong> (или кликните по токену, затем по целевому гнезду) правильные спецификации в соответствующие слоты каждого модуля.
+                    </p>
+
+                    <!-- Пул доступных токенов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ПУЛ ТОКЕНОВ СПЕЦИФИКАЦИЙ (ПЕРЕТАЩИТЕ В ГНЕЗДА НИЖЕ):</span>
+                            <button id="p1-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить токены
+                            </button>
+                        </div>
+                        <div id="p1-tokens-pool" class="d-flex flex-wrap gap-2 p-3 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3 функциональных модуля операций -->
+                    <div class="row g-3 mb-4">
+                        <!-- Модуль 1: НЕ (Инверсия) -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-info rounded-0 h-100 op-module" data-op="not">
+                                <div class="card-header bg-dark border-bottom border-info text-info py-2 fw-bold d-flex justify-content-between">
+                                    <span>1. Отрицание (Инверсия)</span>
+                                    <span class="badge bg-black text-info border border-info rounded-0">НЕ</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    <div>
+                                        <div class="text-secondary small mb-1">МАТЕМАТИЧЕСКИЙ СИМВОЛ:</div>
+                                        <div class="slot-target p-2 border border-dashed border-info bg-dark text-center min-h-slot" data-slot="symbol">
+                                            <span class="placeholder-text text-muted small">[Перетащите символ]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">ЭЛЕКТРИЧЕСКАЯ МОДЕЛЬ (ПОЛЯКОВ):</div>
+                                        <div class="slot-target p-2 border border-dashed border-info bg-dark text-center min-h-slot" data-slot="circuit">
+                                            <span class="placeholder-text text-muted small">[Перетащите тип цепи]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">АРИФМЕТИЧЕСКИЙ ЗАКОН:</div>
+                                        <div class="slot-target p-2 border border-dashed border-info bg-dark text-center min-h-slot" data-slot="math">
+                                            <span class="placeholder-text text-muted small">[Перетащите закон]</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Модуль 2: И (Конъюнкция) -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100 op-module" data-op="and">
+                                <div class="card-header bg-dark border-bottom border-success text-success py-2 fw-bold d-flex justify-content-between">
+                                    <span>2. Умножение (Конъюнкция)</span>
+                                    <span class="badge bg-black text-success border border-success rounded-0">И</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    <div>
+                                        <div class="text-secondary small mb-1">МАТЕМАТИЧЕСКИЙ СИМВОЛ:</div>
+                                        <div class="slot-target p-2 border border-dashed border-success bg-dark text-center min-h-slot" data-slot="symbol">
+                                            <span class="placeholder-text text-muted small">[Перетащите символ]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">ЭЛЕКТРИЧЕСКАЯ МОДЕЛЬ (ПОЛЯКОВ):</div>
+                                        <div class="slot-target p-2 border border-dashed border-success bg-dark text-center min-h-slot" data-slot="circuit">
+                                            <span class="placeholder-text text-muted small">[Перетащите тип цепи]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">АРИФМЕТИЧЕСКИЙ ЗАКОН:</div>
+                                        <div class="slot-target p-2 border border-dashed border-success bg-dark text-center min-h-slot" data-slot="math">
+                                            <span class="placeholder-text text-muted small">[Перетащите закон]</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Модуль 3: ИЛИ (Дизъюнкция) -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100 op-module" data-op="or">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning py-2 fw-bold d-flex justify-content-between">
+                                    <span>3. Сложение (Дизъюнкция)</span>
+                                    <span class="badge bg-black text-warning border border-warning rounded-0">ИЛИ</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    <div>
+                                        <div class="text-secondary small mb-1">МАТЕМАТИЧЕСКИЙ СИМВОЛ:</div>
+                                        <div class="slot-target p-2 border border-dashed border-warning bg-dark text-center min-h-slot" data-slot="symbol">
+                                            <span class="placeholder-text text-muted small">[Перетащите символ]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">ЭЛЕКТРИЧЕСКАЯ МОДЕЛЬ (ПОЛЯКОВ):</div>
+                                        <div class="slot-target p-2 border border-dashed border-warning bg-dark text-center min-h-slot" data-slot="circuit">
+                                            <span class="placeholder-text text-muted small">[Перетащите тип цепи]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">АРИФМЕТИЧЕСКИЙ ЗАКОН:</div>
+                                        <div class="slot-target p-2 border border-dashed border-warning bg-dark text-center min-h-slot" data-slot="math">
+                                            <span class="placeholder-text text-muted small">[Перетащите закон]</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ПРОВЕРИТЬ КОНФИГУРАЦИЮ ОПЕРАЦИЙ
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- ================= ФАЗА 2: ИНТЕРАКТИВНАЯ ТАБЛИЦА ИСТИННОСТИ (Grid Toggle) ================= -->
+                <div id="phase-2-container" class="d-none">
+                    <p class="text-light mb-3">
+                        Анализатор собрал логическую цепочку: 
+                        <span id="p2-formula-display" class="badge bg-black border border-warning text-warning fs-6 px-3 py-2 ms-2"></span>
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        Используя манипуляцию мышью, <strong>кликайте по пустым ячейкам [?]</strong> в таблице истинности, чтобы выставить значения <strong>0</strong> или <strong>1</strong>. 
+                        Вы также можете переключать тумблеры сигналов A и B слева на симуляторе, чтобы наблюдать за реакцией промежуточного узла и выхода цепи.
+                    </p>
+
+                    <div class="row g-4 mb-4">
+                        <!-- Интерактивный симулятор сигналов схемы -->
+                        <div class="col-md-5">
+                            <div class="card bg-black border-secondary rounded-0 h-100 p-3">
+                                <h6 class="text-info border-bottom border-secondary pb-2 mb-3">СХЕМОТЕХНИЧЕСКИЙ СИМУЛЯТОР</h6>
+                                
+                                <div class="d-flex justify-content-around mb-4">
+                                    <div class="text-center">
+                                        <div class="small text-secondary mb-1">ТУМБЛЕР A</div>
+                                        <button id="p2-toggle-a" class="btn btn-outline-primary btn-lg rounded-0 fw-bold px-4 py-2">
+                                            A = 0
+                                        </button>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="small text-secondary mb-1">ТУМБЛЕР B</div>
+                                        <button id="p2-toggle-b" class="btn btn-outline-primary btn-lg rounded-0 fw-bold px-4 py-2">
+                                            B = 0
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="border border-secondary bg-dark p-3 mb-2">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-secondary">Узел 1 (<span id="p2-node-name">X</span>):</span>
+                                        <span id="p2-node-val" class="badge bg-black border border-secondary text-secondary">0</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-light fw-bold">Итоговый выход F:</span>
+                                        <span id="p2-out-val" class="badge bg-black border border-secondary text-secondary">0</span>
+                                    </div>
+                                </div>
+                                <div class="text-secondary small mt-auto">
+                                    * Переключение тумблеров помогает визуально трассировать уровни сигналов в реальном времени.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Интерактивная таблица истинности (прямое редактирование ячеек) -->
+                        <div class="col-md-7">
+                            <div class="card bg-black border-success rounded-0 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-2">
+                                    <h6 class="text-success mb-0">ТАБЛИЦА ИСТИННОСТИ СХЕМЫ</h6>
+                                    <span class="text-secondary small">Клик по ячейке: [?] → [0] → [1]</span>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-bordered border-secondary text-center align-middle mb-0">
+                                        <thead>
+                                            <tr class="table-secondary text-dark">
+                                                <th style="width: 15%;">A</th>
+                                                <th style="width: 15%;">B</th>
+                                                <th id="p2-th-mid" style="width: 35%;">Промежуточный узел</th>
+                                                <th style="width: 35%;">Выход F</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="p2-truth-table-body">
+                                            <!-- Строки генерируются JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ПРОВЕРИТЬ ТАБЛИЦУ ИСТИННОСТИ
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- ================= ФАЗА 3: СИНТЕЗ ЦЕПИ ПОД ТРЕБОВАНИЯ ТЕХЗАДАНИЯ ================= -->
+                <div id="phase-3-container" class="d-none">
+                    <p class="text-light mb-3">
+                        <strong>Инженерная задача синтеза:</strong> 
+                        Необходимо сконструировать логический контур системы безопасности.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-4">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <span class="badge bg-warning text-dark rounded-0 me-2">ТЕХЗАДАНИЕ</span>
+                                <span id="p3-mission-condition" class="text-light fw-bold"></span>
+                            </div>
+                            <div class="text-secondary small">
+                                Эталонная таблица выхода: <span id="p3-target-pattern" class="badge bg-dark border border-secondary text-warning font-monospace"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Палитра логических вентилей -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ПАЛИТРА ЛОГИЧЕСКИХ ВЕНТИЛЕЙ (ПЕРЕТАЩИТЕ В СЛОТЫ СХЕМЫ):</span>
+                            <button id="p3-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить вентили
+                            </button>
+                        </div>
+                        <div id="p3-gates-palette" class="d-flex flex-wrap gap-2 p-3 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- Интерактивная монтажная плата схемы -->
+                    <div class="card bg-black border-info rounded-0 p-4 mb-4">
+                        <h6 class="text-info border-bottom border-secondary pb-2 mb-4">МОНТАЖНАЯ ПЛАТА ЛОГИЧЕСКОГО БЛОКА</h6>
+
+                        <div class="row align-items-center g-3 text-center">
+                            <!-- Входные терминалы датчиков -->
+                            <div class="col-md-3 d-flex flex-column gap-4">
+                                <div class="p-3 border border-secondary bg-dark">
+                                    <div class="text-secondary small">ВХОД ДАТЧИКА</div>
+                                    <div class="fw-bold fs-5 text-light">Датчик A</div>
+                                </div>
+                                <div class="p-3 border border-secondary bg-dark">
+                                    <div class="text-secondary small">ВХОД ДАТЧИКА</div>
+                                    <div class="fw-bold fs-5 text-light">Датчик B</div>
+                                </div>
+                            </div>
+
+                            <!-- Слот вентиля Каскада 1 -->
+                            <div class="col-md-4">
+                                <div class="text-secondary small mb-2">КАСКАД 1 (ВХОДНОЙ ВЕНТИЛЬ):</div>
+                                <div class="p-4 border border-dashed border-warning bg-dark p3-gate-slot" data-slot="gate1" id="p3-slot-gate1">
+                                    <span class="placeholder-text text-muted small">[Установите вентиль 1]</span>
+                                </div>
+                                <div class="text-secondary small mt-2">Принимает сигналы A и B</div>
+                            </div>
+
+                            <!-- Слот вентиля Каскада 2 -->
+                            <div class="col-md-3">
+                                <div class="text-secondary small mb-2">КАСКАД 2 (ВЫХОДНОЙ МОДУЛЬ):</div>
+                                <div class="p-4 border border-dashed border-info bg-dark p3-gate-slot" data-slot="gate2" id="p3-slot-gate2">
+                                    <span class="placeholder-text text-muted small">[Установите вентиль 2]</span>
+                                </div>
+                                <div class="text-secondary small mt-2">Преобразует сигнал каскада 1</div>
+                            </div>
+
+                            <!-- Выходной индикатор -->
+                            <div class="col-md-2">
+                                <div class="p-3 border border-success bg-dark d-flex flex-column align-items-center justify-content-center h-100">
+                                    <div class="text-secondary small mb-1">СИГНАЛ ТРЕВОГИ</div>
+                                    <div id="p3-lamp-indicator" class="rounded-circle border border-success bg-black p-3 mb-2" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                                        <span class="fs-4">💡</span>
+                                    </div>
+                                    <div class="small fw-bold text-success">ВЫХОД F</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-secondary small">
+                            Установите необходимые вентили в оба каскада и запустите автоматический диагностический тест.
+                        </span>
+                        <button id="p3-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ТЕСТИРОВАТЬ ЦЕПЬ НА ВСЕХ СИГНАЛАХ
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- ================= ЭКРАН УСПЕХА ================= -->
+                <div id="success-screen" class="d-none text-center py-5 border border-success bg-black mt-3">
+                    <div class="text-success fs-1 mb-3">✓</div>
+                    <h3 class="text-success mb-2">ЛАБОРАТОРНЫЙ СТЕНД ВЕРИФИЦИРОВАН</h3>
+                    <p class="text-light mb-4">
+                        Все 3 этапа схемотехнической калибровки успешно завершены.<br>
+                        Логические операции «НЕ», «И» и «ИЛИ» освоены на практике.
+                    </p>
+                    <div class="row justify-content-center mb-4">
+                        <div class="col-auto">
+                            <span class="text-secondary">Время работы: </span>
+                            <span id="final-time" class="text-success fw-bold"></span> с
+                        </div>
+                        <div class="col-auto">
+                            <span class="text-secondary">Всего попыток: </span>
+                            <span id="final-attempts" class="text-warning fw-bold"></span>
+                        </div>
+                    </div>
+                    <div class="badge border border-success text-success bg-dark rounded-0 px-4 py-2 fs-6">
+                        ПРОГРЕСС СОХРАНЕН // УРОВЕНЬ 1 ПРОЙДЕН
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .min-h-slot {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .token-item {
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .token-item:active {
+            cursor: grabbing;
+        }
+        .token-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 255, 0, 0.15);
+        }
+        .grid-toggle-cell {
+            cursor: pointer;
+            font-size: 1.15rem;
+            font-weight: bold;
+            user-select: none;
+            transition: background-color 0.15s ease;
+        }
+        .grid-toggle-cell:hover {
+            background-color: #2b3035 !important;
+        }
+        .cell-unknown {
+            color: #6c757d;
+        }
+        .cell-zero {
+            color: #0dcaf0;
+        }
+        .cell-one {
+            color: #198754;
+        }
+    </style>
+
+    <script>
+        (function() {
+            const courseSlug = '8-класс';
+            const lessonId = '8';
+            const missionName = 'Урок 8 :: Логические операции «и», «или», «не» (Уровень 1)';
+            
+            let startTime = Date.now();
+            let attempts = 0;
+            let currentPhase = 1;
+
+            // Телеметрия
+            function sendTelemetry(actionType, success = false) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                const payload = {
+                    type: 'TELEMETRY_EVENT',
+                    course_slug: courseSlug,
+                    lesson_id: lessonId,
+                    level_number: 1,
+                    mission_name: missionName,
+                    action_type: actionType,
+                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                    start_time: new Date(startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: attempts,
+                    success: success
+                };
+                window.parent.postMessage(payload, '*');
+
+                if (actionType === 'level_complete') {
+                    try {
+                        localStorage.setItem(`progress_${courseSlug}_${lessonId}_level1`, 'completed');
+                        window.parent.postMessage({ type: 'PROGRESS_UPDATE', level: 1, status: 'completed' }, '*');
+                    } catch (e) {
+                        console.error('Storage error:', e);
+                    }
+                }
+            }
+
+            // Обработка ошибок фаз с автоперегенерацией
+            function triggerError(msg, callback) {
+                attempts++;
+                document.getElementById('attempts-display').textContent = attempts;
+                sendTelemetry('hardcore_reset', false);
+
+                const feedback = document.getElementById('feedback-box');
+                const feedbackText = document.getElementById('feedback-text');
+                feedbackText.textContent = msg;
+                feedback.classList.remove('d-none');
+
+                setTimeout(() => {
+                    feedback.classList.add('d-none');
+                    if (callback) callback();
+                }, 1200);
+            }
+
+            // Переключение выбранного токена для клик-манипуляций
+            let selectedToken = null;
+            function selectToken(tokenEl) {
+                if (selectedToken) {
+                    selectedToken.classList.remove('border-warning', 'text-warning');
+                }
+                if (selectedToken === tokenEl) {
+                    selectedToken = null;
+                } else {
+                    selectedToken = tokenEl;
+                    selectedToken.classList.add('border-warning', 'text-warning');
+                }
+            }
+
+            /* =========================================================================
+               ФАЗА 1: КОНСТРУИРОВАНИЕ СПЕЦИФИКАЦИЙ ОПЕРАЦИЙ
+            ========================================================================= */
+            const p1TargetMap = {
+                'not_symbol': '¬A',
+                'not_circuit': 'Инвертор (нормально замкнутый контакт)',
+                'not_math': '1 − A',
+
+                'and_symbol': 'A ∧ B',
+                'and_circuit': 'Последовательное соединение ключей',
+                'and_math': 'min(A, B)',
+
+                'or_symbol': 'A ∨ B',
+                'or_circuit': 'Параллельное соединение ключей',
+                'or_math': 'max(A, B)'
+            };
+
+            const p1Distractors = [
+                'A + B + 1',
+                'Линейный сдвиг',
+                'A = B',
+                'A · B + 1',
+                'Кольцевая цепь'
+            ];
+
+            function initPhase1() {
+                const pool = document.getElementById('p1-tokens-pool');
+                pool.innerHTML = '';
+
+                // Очистить все слоты
+                document.querySelectorAll('#phase-1-container .slot-target').forEach(slot => {
+                    slot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+                    slot.removeAttribute('data-token-id');
+                });
+                document.getElementById('p1-verify-btn').disabled = true;
+
+                // Сборка всех токенов
+                const allTokens = [];
+                for (const [key, text] of Object.entries(p1TargetMap)) {
+                    allTokens.push({ id: key, text: text, isDistractor: false });
+                }
+                // Добавляем 2 случайных дистрактора
+                const shuffledDistractors = [...p1Distractors].sort(() => 0.5 - Math.random());
+                allTokens.push({ id: 'dist_1', text: shuffledDistractors[0], isDistractor: true });
+                allTokens.push({ id: 'dist_2', text: shuffledDistractors[1], isDistractor: true });
+
+                // Перемешиваем токены
+                allTokens.sort(() => 0.5 - Math.random());
+
+                allTokens.forEach(t => {
+                    const badge = document.createElement('div');
+                    badge.className = 'badge bg-black border border-secondary text-light p-2 rounded-0 token-item';
+                    badge.setAttribute('draggable', 'true');
+                    badge.setAttribute('data-token-id', t.id);
+                    badge.textContent = t.text;
+
+                    // Drag & drop
+                    badge.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', t.id);
+                    });
+
+                    // Click fallback
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectToken(badge);
+                    });
+
+                    pool.appendChild(badge);
+                });
+
+                setupPhase1Slots();
+            }
+
+            function setupPhase1Slots() {
+                const slots = document.querySelectorAll('#phase-1-container .slot-target');
+                const pool = document.getElementById('p1-tokens-pool');
+
+                slots.forEach(slot => {
+                    slot.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        slot.classList.add('border-warning');
+                    });
+                    slot.addEventListener('dragleave', () => {
+                        slot.classList.remove('border-warning');
+                    });
+                    slot.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        slot.classList.remove('border-warning');
+                        const tokenId = e.dataTransfer.getData('text/plain');
+                        const tokenEl = document.querySelector(`.token-item[data-token-id="${tokenId}"]`);
+                        if (tokenEl) placeTokenInSlot(tokenEl, slot);
+                    });
+                    slot.addEventListener('click', () => {
+                        if (selectedToken) {
+                            placeTokenInSlot(selectedToken, slot);
+                            selectToken(selectedToken); // сброс выделения
+                        }
+                    });
+                });
+
+                // Возврат токена кликом по нему внутри слота
+                function placeTokenInSlot(tokenEl, slot) {
+                    // Если в слоте уже был токен — вернуть его в пул
+                    const existingToken = slot.querySelector('.token-item');
+                    if (existingToken && existingToken !== tokenEl) {
+                        pool.appendChild(existingToken);
+                    }
+                    slot.innerHTML = '';
+                    slot.appendChild(tokenEl);
+                    slot.setAttribute('data-token-id', tokenEl.getAttribute('data-token-id'));
+
+                    checkPhase1Completion();
+                }
+
+                function checkPhase1Completion() {
+                    const filledSlots = Array.from(slots).filter(s => s.querySelector('.token-item'));
+                    document.getElementById('p1-verify-btn').disabled = filledSlots.length < slots.length;
+                }
+
+                document.getElementById('p1-reset-btn').addEventListener('click', () => {
+                    initPhase1();
+                });
+
+                document.getElementById('p1-verify-btn').addEventListener('click', () => {
+                    let isAllCorrect = true;
+                    slots.forEach(slot => {
+                        const moduleEl = slot.closest('.op-module');
+                        const op = moduleEl.dataset.op;
+                        const slotType = slot.dataset.slot;
+                        const expectedId = `${op}_${slotType}`;
+                        const currentId = slot.getAttribute('data-token-id');
+
+                        if (currentId !== expectedId) {
+                            isAllCorrect = false;
+                        }
+                    });
+
+                    if (isAllCorrect) {
+                        // Переход на Фазу 2
+                        currentPhase = 2;
+                        document.getElementById('phase-1-container').classList.add('d-none');
+                        document.getElementById('phase-2-container').classList.remove('d-none');
+                        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+                        document.getElementById('phase-title').textContent = 'Трассировка таблицы истинности схемы';
+                        initPhase2();
+                    } else {
+                        triggerError('Ошибка в спецификациях операций! Перегенерация...', () => {
+                            initPhase1();
+                        });
+                    }
+                });
+            }
+
+
+            /* =========================================================================
+               ФАЗА 2: ТАБЛИЦА ИСТИННОСТИ (Grid Toggle)
+            ========================================================================= */
+            const p2Presets = [
+                {
+                    formulaText: 'F = ¬(A ∧ B)  [Штрих Шеффера / И-НЕ]',
+                    midHeader: 'Узел X = A ∧ B',
+                    midEval: (a, b) => (a && b) ? 1 : 0,
+                    outEval: (a, b) => !(a && b) ? 1 : 0
+                },
+                {
+                    formulaText: 'F = ¬A ∨ B  [Отрицание A или B]',
+                    midHeader: 'Узел X = ¬A',
+                    midEval: (a, b) => (!a) ? 1 : 0,
+                    outEval: (a, b) => (!a || b) ? 1 : 0
+                },
+                {
+                    formulaText: 'F = (A ∨ B) ∧ ¬A',
+                    midHeader: 'Узел X = A ∨ B',
+                    midEval: (a, b) => (a || b) ? 1 : 0,
+                    outEval: (a, b) => ((a || b) && !a) ? 1 : 0
+                },
+                {
+                    formulaText: 'F = ¬(A ∨ B)  [Стрелка Пирса / ИЛИ-НЕ]',
+                    midHeader: 'Узел X = A ∨ B',
+                    midEval: (a, b) => (a || b) ? 1 : 0,
+                    outEval: (a, b) => !(a || b) ? 1 : 0
+                },
+                {
+                    formulaText: 'F = A ∧ ¬B',
+                    midHeader: 'Узел X = ¬B',
+                    midEval: (a, b) => (!b) ? 1 : 0,
+                    outEval: (a, b) => (a && !b) ? 1 : 0
+                }
+            ];
+
+            let activeP2 = null;
+            let simA = 0;
+            let simB = 0;
+
+            function initPhase2() {
+                activeP2 = p2Presets[Math.floor(Math.random() * p2Presets.length)];
+                document.getElementById('p2-formula-display').textContent = activeP2.formulaText;
+                document.getElementById('p2-th-mid').textContent = activeP2.midHeader;
+                document.getElementById('p2-node-name').textContent = activeP2.midHeader.split('=')[1]?.trim() || 'X';
+
+                simA = 0;
+                simB = 0;
+                updateSimulatorUI();
+
+                const tbody = document.getElementById('p2-truth-table-body');
+                tbody.innerHTML = '';
+
+                const inputs = [
+                    [0, 0],
+                    [0, 1],
+                    [1, 0],
+                    [1, 1]
+                ];
+
+                inputs.forEach(([a, b], idx) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="text-secondary fw-bold">${a}</td>
+                        <td class="text-secondary fw-bold">${b}</td>
+                        <td class="grid-toggle-cell cell-unknown" data-row="${idx}" data-col="mid" data-state="unknown">?</td>
+                        <td class="grid-toggle-cell cell-unknown" data-row="${idx}" data-col="out" data-state="unknown">?</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // Навешиваем клики переключения ячеек
+                tbody.querySelectorAll('.grid-toggle-cell').forEach(cell => {
+                    cell.addEventListener('click', () => {
+                        const state = cell.getAttribute('data-state');
+                        if (state === 'unknown') {
+                            cell.setAttribute('data-state', '0');
+                            cell.className = 'grid-toggle-cell cell-zero';
+                            cell.textContent = '0';
+                        } else if (state === '0') {
+                            cell.setAttribute('data-state', '1');
+                            cell.className = 'grid-toggle-cell cell-one';
+                            cell.textContent = '1';
+                        } else {
+                            cell.setAttribute('data-state', '0');
+                            cell.className = 'grid-toggle-cell cell-zero';
+                            cell.textContent = '0';
+                        }
+                        checkPhase2Ready();
+                    });
+                });
+
+                document.getElementById('p2-verify-btn').disabled = true;
+            }
+
+            // Тумблеры симулятора
+            document.getElementById('p2-toggle-a').addEventListener('click', () => {
+                simA = simA === 0 ? 1 : 0;
+                updateSimulatorUI();
+            });
+            document.getElementById('p2-toggle-b').addEventListener('click', () => {
+                simB = simB === 0 ? 1 : 0;
+                updateSimulatorUI();
+            });
+
+            function updateSimulatorUI() {
+                const btnA = document.getElementById('p2-toggle-a');
+                const btnB = document.getElementById('p2-toggle-b');
+                btnA.textContent = `A = ${simA}`;
+                btnB.textContent = `B = ${simB}`;
+                btnA.className = simA ? 'btn btn-success btn-lg rounded-0 fw-bold px-4 py-2' : 'btn btn-outline-primary btn-lg rounded-0 fw-bold px-4 py-2';
+                btnB.className = simB ? 'btn btn-success btn-lg rounded-0 fw-bold px-4 py-2' : 'btn btn-outline-primary btn-lg rounded-0 fw-bold px-4 py-2';
+
+                if (activeP2) {
+                    const midVal = activeP2.midEval(simA, simB);
+                    const outVal = activeP2.outEval(simA, simB);
+
+                    const nodeBadge = document.getElementById('p2-node-val');
+                    const outBadge = document.getElementById('p2-out-val');
+                    nodeBadge.textContent = midVal;
+                    nodeBadge.className = midVal ? 'badge bg-black border border-info text-info' : 'badge bg-black border border-secondary text-secondary';
+                    outBadge.textContent = outVal;
+                    outBadge.className = outVal ? 'badge bg-black border border-success text-success' : 'badge bg-black border border-secondary text-secondary';
+                }
+            }
+
+            function checkPhase2Ready() {
+                const unknownCells = document.querySelectorAll('#p2-truth-table-body .cell-unknown');
+                document.getElementById('p2-verify-btn').disabled = unknownCells.length > 0;
+            }
+
+            document.getElementById('p2-verify-btn').addEventListener('click', () => {
+                const rows = document.querySelectorAll('#p2-truth-table-body tr');
+                const inputs = [
+                    [0, 0],
+                    [0, 1],
+                    [1, 0],
+                    [1, 1]
+                ];
+
+                let isTableCorrect = true;
+                rows.forEach((row, idx) => {
+                    const [a, b] = inputs[idx];
+                    const midCell = row.querySelector('[data-col="mid"]');
+                    const outCell = row.querySelector('[data-col="out"]');
+
+                    const userMid = parseInt(midCell.getAttribute('data-state'), 10);
+                    const userOut = parseInt(outCell.getAttribute('data-state'), 10);
+
+                    const expMid = activeP2.midEval(a, b);
+                    const expOut = activeP2.outEval(a, b);
+
+                    if (userMid !== expMid || userOut !== expOut) {
+                        isTableCorrect = false;
+                    }
+                });
+
+                if (isTableCorrect) {
+                    // Переход на Фазу 3
+                    currentPhase = 3;
+                    document.getElementById('phase-2-container').classList.add('d-none');
+                    document.getElementById('phase-3-container').classList.remove('d-none');
+                    document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+                    document.getElementById('phase-title').textContent = 'Синтез логической цепи по техзаданию';
+                    initPhase3();
+                } else {
+                    triggerError('Таблица истинности содержит ошибки! Генерация новой схемы...', () => {
+                        initPhase2();
+                    });
+                }
+            });
+
+
+            /* =========================================================================
+               ФАЗА 3: СИНТЕЗ ЛОГИЧЕСКОЙ ЦЕПИ ПО ТЕХЗАДАНИЮ
+            ========================================================================= */
+            const p3Missions = [
+                {
+                    title: 'Сигнал тревоги аварийного клапана: F = ¬(A ∧ B)',
+                    description: 'Лампа тревоги должна светиться во всех состояниях, КРОМЕ случая, когда оба датчика одновременно активны (A=1 и B=1).',
+                    gate1Needed: 'and', // A and B
+                    gate2Needed: 'not', // not (A and B)
+                    targetPattern: '1 1 1 0'
+                },
+                {
+                    title: 'Сигнал резервного охлаждения: F = ¬(A ∨ B)',
+                    description: 'Лампа активируется ТОЛЬКО тогда, когда оба контура полностью отключены (A=0 и B=0).',
+                    gate1Needed: 'or',  // A or B
+                    gate2Needed: 'not', // not (A or B)
+                    targetPattern: '1 0 0 0'
+                },
+                {
+                    title: 'Сигнал запуска продувки: F = (A ∨ B)',
+                    description: 'Лампа активируется, если хотя бы один из датчиков давления (A или B, либо оба) зафиксировал перепад.',
+                    gate1Needed: 'or',
+                    gate2Needed: 'buf', // прямой повторитель (или отсутствие инверсии)
+                    targetPattern: '0 1 1 1'
+                }
+            ];
+
+            let activeP3 = null;
+            const p3AvailableGates = [
+                { id: 'not', label: 'Вентиль НЕ (Инвертор)', type: 'not', badge: '¬' },
+                { id: 'and', label: 'Вентиль И (Конъюнктор)', type: 'and', badge: '&' },
+                { id: 'or',  label: 'Вентиль ИЛИ (Дизъюнктор)', type: 'or', badge: '≥1' },
+                { id: 'buf', label: 'Вентиль ПОВТОРИТЕЛЬ (Буфер)', type: 'buf', badge: '=' },
+                { id: 'xor', label: 'Вентиль ИСКЛЮЧАЮЩЕЕ ИЛИ', type: 'xor', badge: '⊕' } // дистрактор
+            ];
+
+            function initPhase3() {
+                activeP3 = p3Missions[Math.floor(Math.random() * p3Missions.length)];
+                document.getElementById('p3-mission-condition').textContent = activeP3.description;
+                document.getElementById('p3-target-pattern').textContent = activeP3.targetPattern;
+
+                const palette = document.getElementById('p3-gates-palette');
+                palette.innerHTML = '';
+
+                // Очистка слотов
+                const slot1 = document.getElementById('p3-slot-gate1');
+                const slot2 = document.getElementById('p3-slot-gate2');
+                slot1.innerHTML = '<span class="placeholder-text text-muted small">[Установите вентиль 1]</span>';
+                slot2.innerHTML = '<span class="placeholder-text text-muted small">[Установите вентиль 2]</span>';
+                slot1.removeAttribute('data-gate-id');
+                slot2.removeAttribute('data-gate-id');
+
+                document.getElementById('p3-verify-btn').disabled = true;
+
+                // Перемешиваем вентили
+                const gates = [...p3AvailableGates].sort(() => 0.5 - Math.random());
+                gates.forEach(g => {
+                    const card = document.createElement('div');
+                    card.className = 'badge bg-black border border-info text-info p-3 rounded-0 token-item d-flex align-items-center gap-2';
+                    card.setAttribute('draggable', 'true');
+                    card.setAttribute('data-gate-id', g.id);
+                    card.innerHTML = `<span class="badge bg-info text-black fw-bold">${g.badge}</span> <span>${g.label}</span>`;
+
+                    card.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', g.id);
+                    });
+                    card.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectToken(card);
+                    });
+
+                    palette.appendChild(card);
+                });
+
+                setupPhase3Slots();
+            }
+
+            function setupPhase3Slots() {
+                const slots = document.querySelectorAll('.p3-gate-slot');
+                const palette = document.getElementById('p3-gates-palette');
+
+                slots.forEach(slot => {
+                    slot.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        slot.classList.add('border-success');
+                    });
+                    slot.addEventListener('dragleave', () => {
+                        slot.classList.remove('border-success');
+                    });
+                    slot.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        slot.classList.remove('border-success');
+                        const gateId = e.dataTransfer.getData('text/plain');
+                        const card = document.querySelector(`.token-item[data-gate-id="${gateId}"]`);
+                        if (card) placeGateInSlot(card, slot);
+                    });
+                    slot.addEventListener('click', () => {
+                        if (selectedToken && selectedToken.hasAttribute('data-gate-id')) {
+                            placeGateInSlot(selectedToken, slot);
+                            selectToken(selectedToken);
+                        }
+                    });
+                });
+
+                function placeGateInSlot(card, slot) {
+                    const existing = slot.querySelector('.token-item');
+                    if (existing && existing !== card) {
+                        palette.appendChild(existing);
+                    }
+                    slot.innerHTML = '';
+                    slot.appendChild(card);
+                    slot.setAttribute('data-gate-id', card.getAttribute('data-gate-id'));
+
+                    const slot1 = document.getElementById('p3-slot-gate1');
+                    const slot2 = document.getElementById('p3-slot-gate2');
+                    document.getElementById('p3-verify-btn').disabled = !(slot1.hasAttribute('data-gate-id') && slot2.hasAttribute('data-gate-id'));
+                }
+
+                document.getElementById('p3-reset-btn').addEventListener('click', () => {
+                    initPhase3();
+                });
+
+                document.getElementById('p3-verify-btn').addEventListener('click', () => {
+                    const gate1 = document.getElementById('p3-slot-gate1').getAttribute('data-gate-id');
+                    const gate2 = document.getElementById('p3-slot-gate2').getAttribute('data-gate-id');
+
+                    // Вычисляем отклик цепи на 4 наборах: (0,0), (0,1), (1,0), (1,1)
+                    const inputs = [[0,0], [0,1], [1,0], [1,1]];
+                    const outputs = inputs.map(([a, b]) => {
+                        let mid = 0;
+                        if (gate1 === 'and') mid = a && b ? 1 : 0;
+                        else if (gate1 === 'or') mid = a || b ? 1 : 0;
+                        else if (gate1 === 'xor') mid = a !== b ? 1 : 0;
+                        else if (gate1 === 'buf') mid = a;
+                        else if (gate1 === 'not') mid = !a ? 1 : 0;
+
+                        let finalOut = 0;
+                        if (gate2 === 'not') finalOut = !mid ? 1 : 0;
+                        else if (gate2 === 'buf') finalOut = mid;
+                        else if (gate2 === 'and') finalOut = mid && 1 ? 1 : 0;
+                        else if (gate2 === 'or') finalOut = mid || 0 ? 1 : 0;
+                        else finalOut = mid;
+
+                        return finalOut;
+                    });
+
+                    const resultPattern = outputs.join(' ');
+
+                    if (resultPattern === activeP3.targetPattern) {
+                        // Анимация успешного включения лампочки
+                        const lamp = document.getElementById('p3-lamp-indicator');
+                        lamp.className = 'rounded-circle border border-success bg-success text-dark p-3 mb-2 shadow-lg';
+
+                        setTimeout(() => {
+                            finishMission();
+                        }, 800);
+                    } else {
+                        triggerError(`Схема выдала [${resultPattern}] вместо [${activeP3.targetPattern}]! Сброс...`, () => {
+                            initPhase3();
+                        });
+                    }
+                });
+            }
+
+            function finishMission() {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                sendTelemetry('level_complete', true);
+
+                document.getElementById('phase-3-container').classList.add('d-none');
+                document.getElementById('phase-badge').textContent = 'УСПЕХ';
+                document.getElementById('phase-title').textContent = 'Все фазы успешно завершены';
+
+                document.getElementById('final-time').textContent = timeSpent;
+                document.getElementById('final-attempts').textContent = attempts;
+                document.getElementById('success-screen').classList.remove('d-none');
+            }
+
+            // Старт
+            initPhase1();
+        })();
+    </script>
+</TaskLayout>

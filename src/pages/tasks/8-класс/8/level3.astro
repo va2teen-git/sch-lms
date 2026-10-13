@@ -1,0 +1,765 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 8 класс, Урок 8 - Логические операции «и», «или», «не»
+// Архетип: «Short-Circuit WAF / Logic Stream Interceptor» (Аудит сетевого шлюза и ленивые вычисления)
+// 10 процедурных волн, жесткий динамический таймер (7.0 - 5.0 сек на волну), тотальный сброс на шаг 1 при любой ошибке.
+---
+
+<TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
+<div id="app" class="container-fluid min-vh-100 p-4 rounded-0 bg-black text-danger">
+    
+    <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ МИССИИ) -->
+    <div v-if="!started && !completed" class="text-center py-5">
+        <div class="d-inline-block border border-danger p-4 bg-dark rounded-0 mb-4 text-start" style="max-width: 800px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                <h1 class="h3 text-danger mb-0 fw-bold">🛡️ WAF: LOGIC STREAM INTERCEPTOR</h1>
+                <span class="badge bg-danger text-black rounded-0 fw-bold">ФИНАЛЬНЫЙ БОСС</span>
+            </div>
+            <p class="text-light fs-5">
+                На пограничный сетевой экран WAF (Web Application Firewall) на высокой скорости поступает поток пакетов данных. 
+                В заголовке каждого пакета зашито составное логическое правило доступа. 
+                Вам поручено экстренное отражение <span class="text-danger fw-bold">10 волн логического трафика</span> 
+                до переполнения буфера шлюза.
+            </p>
+
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
+                <div class="fw-bold text-danger mb-2 text-uppercase">[ПРОТОКОЛ ХАРДКОР-РЕАГИРОВАНИЯ]:</div>
+                <ul class="mb-0 ps-3">
+                    <li class="mb-1">• <span class="text-warning">Динамический таймер такта:</span> На принятие решения отводится от <span class="text-danger fw-bold">7.0 до 5.0 секунд</span> на волну!</li>
+                    <li class="mb-1">• <span class="text-warning">Тотальный сброс:</span> Любая ошибка классификации или истечение таймера вызывают Kernel Panic и <span class="text-danger fw-bold">ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</span> с новой генерацией пакетов!</li>
+                    <li class="mb-1">• <span class="text-warning">2 тактических шлюза:</span> <span class="text-success fw-bold">[ALLOW: Истина (1)]</span> для пропуска и <span class="text-danger fw-bold">[DROP: Ложь (0)]</span> для блокировки.</li>
+                    <li>• <span class="text-warning">Short-Circuit тактика:</span> Если в связке <span class="text-info">ИЛИ</span> левая часть равна 1, или в связке <span class="text-info">И</span> левая часть равна 0 — экономьте секунды и сразу фиксируйте ответ!</li>
+                </ul>
+            </div>
+
+            <div class="text-secondary small mb-4">
+                Управление: кликами по тактическим кнопкам или горячими клавишами 
+                <kbd class="bg-dark text-success border border-success">1</kbd> / <kbd class="bg-dark text-success border border-success">Z</kbd> (ALLOW), 
+                <kbd class="bg-dark text-danger border border-danger">0</kbd> / <kbd class="bg-dark text-danger border border-danger">X</kbd> (DROP).
+            </div>
+
+            <div class="text-center pt-2">
+                <button @click="startGame" id="btn-start" class="btn btn-outline-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ШЛЮЗ WAF [ENTER]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ЭКРАН ПОБЕДЫ -->
+    <div v-else-if="completed" id="success-screen" class="text-center py-5">
+        <div class="d-inline-block border border-success p-5 bg-dark rounded-0" style="max-width: 750px;">
+            <div class="text-success display-2 mb-3">🛡️ СИСТЕМА ЗАЩИЩЕНА 🛡️</div>
+            <h1 class="display-6 text-success fw-bold mb-3">ПЕРИМЕТР БЕЗОПАСНОСТИ УСПЕШНО ОТРАЗИЛ АТАКУ</h1>
+            <p class="fs-5 text-light mb-4">
+                Все 10 волн высокоскоростного логического трафика нейтрализованы! Все составные правила доступа верифицированы, свойства констант и законы Short-Circuit применены безупречно.
+            </p>
+            <div class="d-inline-block p-4 border border-success bg-black text-start small mx-auto mb-4" style="min-width: 380px;">
+                <div class="mb-1">СТАТУС: <span class="text-success fw-bold">АРКАДНЫЙ БОСС УРОВНЯ 3 ПОВЕРЖЕН</span></div>
+                <div class="mb-1">ОТРАЖЕНО ВОЛН: <span class="text-light fw-bold">10 / 10</span></div>
+                <div class="mb-1">ЗАТРАЧЕНО ВРЕМЕНИ: <span class="text-warning fw-bold"><span v-text="totalTimeSpent"></span> СЕК</span></div>
+                <div>СБРОСОВ ХАРДКОРА: <span class="text-warning fw-bold"><span v-text="attempts"></span></span></div>
+            </div>
+            <div>
+                <button @click="startGame" class="btn btn-outline-success btn-lg rounded-0 fw-bold px-5 py-3">
+                    ПОВТОРИТЬ МИССИЮ [ENTER]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ИГРОВОЙ ЭКРАН (ОТРАЖЕНИЕ ВОЛН WAF) -->
+    <div v-else class="row justify-content-center">
+        <div class="col-lg-10 col-xl-9">
+
+            <!-- Шапка волны и таймера -->
+            <div class="card bg-dark border-danger rounded-0 mb-4 p-3 shadow">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold">ОБОРОНА ШЛЮЗА WAF:</span>
+                            <span id="phase-counter" class="text-danger fw-bold fs-5">ВОЛНА <span v-text="currentWaveIndex + 1"></span> ИЗ 10</span>
+                        </div>
+                        <div class="progress bg-black border border-secondary rounded-0" style="height: 12px;">
+                            <div class="progress-bar bg-danger" :style="{ width: progressPercent + '%' }"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-3 mt-md-0 text-md-end">
+                        <div class="text-secondary small fw-bold mb-1">ТАЙМЕР РЕАКЦИИ БУФЕРА:</div>
+                        <div class="d-flex align-items-center justify-content-md-end gap-2">
+                            <span id="timer-display" :class="{'text-danger': timeLeft <= 2.5, 'text-warning': timeLeft > 2.5}" class="fs-4 fw-bold">
+                                <span v-text="formattedTime"></span> сек
+                            </span>
+                            <div class="progress bg-black border border-secondary rounded-0 d-inline-block" style="width: 140px; height: 12px;">
+                                <div class="progress-bar" :class="timeLeft <= 2.5 ? 'bg-danger' : 'bg-warning'" :style="{ width: (timeLeft / waveTimeLimit * 100) + '%' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сирена тревоги при сбросе -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black border-danger rounded-0 text-center py-3 mb-4" role="alert">
+                <h4 class="fw-bold mb-1">[СИСТЕМНАЯ СИРЕНА // АВАРИЙНЫЙ СБРОС]</h4>
+                <div class="text-light fs-5" v-text="alarmMessage"></div>
+                <div class="text-warning small mt-2">ТОТАЛЬНЫЙ СБРОС НА ВОЛНУ 1... ПЕРЕЗАГРУЗКА ПАКЕТНОГО ФИЛЬТРА...</div>
+            </div>
+
+            <!-- Карточка входящего пакета (WAF Target Packet) -->
+            <div id="target-packet-card" :data-target="currentWave.target" class="card bg-dark border-danger rounded-0 p-4 mb-4 shadow">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-1">
+                        PACKET #<span v-text="currentWave.id"></span>
+                    </span>
+                    <span class="text-secondary small">
+                        КАТЕГОРИЯ: <span class="text-info fw-bold" v-text="currentWave.category"></span>
+                    </span>
+                    <span v-if="currentWave.xVal !== null" class="badge bg-black border border-warning text-warning rounded-0 px-2 py-1">
+                        ВХОДНОЙ АРГУМЕНТ: x = <span v-text="currentWave.xVal"></span>
+                    </span>
+                </div>
+
+                <div class="text-secondary small mb-1">ПЕРЕХВАЧЕННОЕ ЛОГИЧЕСКОЕ ПРАВИЛО (PAYLOAD):</div>
+                <div class="card bg-black border-secondary rounded-0 p-4 mb-3 text-center">
+                    <div class="fs-3 text-light fw-bold my-1 font-monospace" v-text="currentWave.formulaText"></div>
+                </div>
+
+                <div class="text-secondary small mb-3">
+                    СИСТЕМНЫЙ АНАЛИЗАТОР: <span class="text-warning" v-text="currentWave.hint"></span>
+                </div>
+
+                <!-- Клавиши экстренного реагирования шлюза (ALLOW / DROP) -->
+                <div class="row g-3">
+                    <!-- Кнопка 1: ИСТИНА (1) -->
+                    <div class="col-md-6">
+                        <button @click="submitAction('allow')" 
+                                id="btn-action-allow"
+                                data-action="allow"
+                                :disabled="alarmActive"
+                                class="btn btn-outline-success w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center shadow">
+                            <span class="fs-4">✓ ПРОПУСТИТЬ [ALLOW]</span>
+                            <span class="small text-secondary mt-1">Сигнал 1 (Истина) • Клавиша [ 1 ] или [ Z ]</span>
+                        </button>
+                    </div>
+
+                    <!-- Кнопка 2: ЛОЖЬ (0) -->
+                    <div class="col-md-6">
+                        <button @click="submitAction('drop')" 
+                                id="btn-action-drop"
+                                data-action="drop"
+                                :disabled="alarmActive"
+                                class="btn btn-outline-danger w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center shadow">
+                            <span class="fs-4">✗ СБРОСИТЬ [DROP]</span>
+                            <span class="small text-secondary mt-1">Сигнал 0 (Ложь) • Клавиша [ 0 ] или [ X ]</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Информационная полоса статуса -->
+            <div class="d-flex justify-content-between text-secondary small px-1">
+                <span>ШЛЮЗ: WAF_ENGINE_v4.8 ACTIVE</span>
+                <span>ХАРДКОР-РЕЖИМ: АКТИВЕН</span>
+                <span>ОШИБОК ДОПУЩЕНО: <span class="text-warning fw-bold" v-text="attempts"></span></span>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+    (function() {
+        const missionName = 'Урок 8 :: Логические операции «и», «или», «не» (Уровень 3)';
+        const sessionStartTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(actionType, success = false) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: actionType,
+                status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(sessionStartTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        // Старт сессии
+        sendTelemetry('in_progress', false);
+
+        // Синтезатор звуковых сигналов (Web Audio API)
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtxClass) audioCtx = new AudioCtxClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playSound(type) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                const now = ctx.currentTime;
+
+                if (type === 'success') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.15); // A5
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'alarm') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.35);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'victory') {
+                    const freqs = [523.25, 659.25, 783.99, 1046.50];
+                    freqs.forEach((f, idx) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(f, now + idx * 0.1);
+                        g.gain.setValueAtTime(0.15, now + idx * 0.1);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.3);
+                        o.start(now + idx * 0.1);
+                        o.stop(now + idx * 0.1 + 0.3);
+                    });
+                }
+            } catch (e) {
+                // Audio failure ignored gracefully
+            }
+        }
+
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const started = ref(false);
+                const completed = ref(false);
+                const alarmActive = ref(false);
+                const alarmMessage = ref('');
+                const currentWaveIndex = ref(0);
+                const waveTimeLimit = ref(7.0);
+                const timeLeft = ref(7.0);
+                const totalTimeSpent = ref(0);
+                let timerInterval = null;
+
+                const formattedTime = computed(() => {
+                    return Math.max(0, timeLeft.value).toFixed(1);
+                });
+
+                const progressPercent = computed(() => {
+                    return Math.round(((currentWaveIndex.value) / 10) * 100);
+                });
+
+                // Генератор процедурных волн
+                function createWave(index) {
+                    const idNum = Math.floor(Math.random() * 800) + 100;
+                    const packetId = `WAF-${idNum}`;
+                    let category = '';
+                    let formulaText = '';
+                    let target = ''; // 'allow' (1) or 'drop' (0)
+                    let hint = '';
+                    let xVal = null;
+                    let errorExplanation = '';
+
+                    switch (index) {
+                        case 0: {
+                            // Волна 1: Базовые логические связки констант и простых предикатов
+                            category = 'БАЗОВЫЕ ОПЕРАЦИИ (НЕ, И, ИЛИ)';
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                const a = Math.floor(Math.random() * 10) + 5;
+                                const b = a - 3;
+                                const c = Math.floor(Math.random() * 8) + 2;
+                                const d = c + 4;
+                                formulaText = `(${a} > ${b}) ∧ (${c} < ${d})`;
+                                target = 'allow';
+                                hint = 'Конъюнкция: проверяем истинность обоих условий';
+                                errorExplanation = `Оба условия (${a} > ${b} и ${c} < ${d}) истинны (1 ∧ 1 = 1), требовалось [ALLOW]`;
+                            } else if (variant === 1) {
+                                const a = Math.floor(Math.random() * 8) + 2;
+                                const b = a + 5;
+                                const c = Math.floor(Math.random() * 6) + 1;
+                                formulaText = `(${a} > ${b}) ∨ (${c} = ${c})`;
+                                target = 'allow';
+                                hint = 'Дизъюнкция: достаточно истинности хотя бы одного высказывания';
+                                errorExplanation = `Второе условие ${c} = ${c} истинно, поэтому дизъюнкция 0 ∨ 1 равна 1 [ALLOW]`;
+                            } else if (variant === 2) {
+                                const a = Math.floor(Math.random() * 6) + 4;
+                                const b = a + 2;
+                                formulaText = `¬(${a} > ${b}) ∧ (${b} > ${a})`;
+                                target = 'allow';
+                                hint = 'Отрицание ложного высказывания дает истину (¬0 = 1)';
+                                errorExplanation = `¬(Ложь) = 1, второе условие тоже 1, 1 ∧ 1 = 1 [ALLOW]`;
+                            } else {
+                                const a = Math.floor(Math.random() * 5) + 3;
+                                const b = a + 2;
+                                formulaText = `(${a} > ${b}) ∧ ¬(${a} = ${a})`;
+                                target = 'drop';
+                                hint = 'Конъюнкция с ложью всегда дает ложь';
+                                errorExplanation = `Оба высказывания ложны (0 ∧ 0 = 0), требовалось [DROP]`;
+                            }
+                            break;
+                        }
+
+                        case 1: {
+                            // Волна 2: Скоростное отсечение Short-Circuit (ИЛИ с 1 или И с 0)
+                            category = 'SHORT-CIRCUIT EVALUATION (ЛЕНИВЫЕ ВЫЧИСЛЕНИЯ)';
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                const a = Math.floor(Math.random() * 10) + 12;
+                                const b = a - 7;
+                                formulaText = `(${a} > ${b}) ∨ (¬(x⁴ - 18 кратно 13) ∧ (x ≤ 999))`;
+                                target = 'allow';
+                                hint = 'SHORT-CIRCUIT: Левый операнд ИЛИ равен 1! Правая часть не требует вычислений!';
+                                errorExplanation = `Поскольку (${a} > ${b}) = 1, результат дизъюнкции 1 ∨ (...) равен 1 [ALLOW]`;
+                            } else if (variant === 1) {
+                                const a = Math.floor(Math.random() * 6) + 2;
+                                const b = a + 8;
+                                formulaText = `(${a} > ${b}) ∧ ((x² + 7 = 55) ∨ ¬(x кратно 3))`;
+                                target = 'drop';
+                                hint = 'SHORT-CIRCUIT: Левый операнд И равен 0! Выражение гарантированно ложно!';
+                                errorExplanation = `Поскольку (${a} > ${b}) = 0, результат конъюнкции 0 ∧ (...) гарантированно равен 0 [DROP]`;
+                            } else if (variant === 2) {
+                                formulaText = `1 ∨ (¬(x > 50) ∧ (x кратно 7))`;
+                                target = 'allow';
+                                hint = 'Свойство констант: 1 ∨ F всегда равно 1';
+                                errorExplanation = `Выражение вида 1 ∨ F всегда истинно [ALLOW]`;
+                            } else {
+                                formulaText = `0 ∧ (¬(x ≤ 40) ∨ (x < 10))`;
+                                target = 'drop';
+                                hint = 'Свойство констант: 0 ∧ F всегда равно 0';
+                                errorExplanation = `Выражение вида 0 ∧ F всегда ложно [DROP]`;
+                            }
+                            break;
+                        }
+
+                        case 2: {
+                            // Волна 3: Отрицание числовых условий и свойств
+                            category = 'ОТРИЦАНИЕ (НЕ) И ЧИСЛОВЫЕ ПРЕДИКАТЫ';
+                            const variant = Math.floor(Math.random() * 4);
+                            xVal = Math.floor(Math.random() * 15) + 5;
+                            if (variant === 0) {
+                                const limit = xVal + 4;
+                                formulaText = `¬(x > ${limit})`;
+                                target = 'allow';
+                                hint = 'x > limit ложно, значит отрицание ¬(0) истинно';
+                                errorExplanation = `Так как ${xVal} не больше ${limit}, отрицание ¬(0) равно 1 [ALLOW]`;
+                            } else if (variant === 1) {
+                                const limit = xVal - 3;
+                                formulaText = `¬(x > ${limit})`;
+                                target = 'drop';
+                                hint = 'x > limit истинно, значит отрицание ¬(1) ложно';
+                                errorExplanation = `Так как ${xVal} > ${limit} истинно (1), его отрицание ¬(1) равно 0 [DROP]`;
+                            } else if (variant === 2) {
+                                formulaText = `¬(x четное)`;
+                                const isEven = (xVal % 2 === 0);
+                                target = isEven ? 'drop' : 'allow';
+                                hint = 'Отрицание четности равносильно нечетности';
+                                errorExplanation = `Число ${xVal} ${isEven ? 'четное (1), значит ¬(1) = 0 [DROP]' : 'нечетное (0), значит ¬(0) = 1 [ALLOW]'}`;
+                            } else {
+                                const k = 3;
+                                formulaText = `¬(x кратно ${k})`;
+                                const isDiv = (xVal % k === 0);
+                                target = isDiv ? 'drop' : 'allow';
+                                hint = 'Проверка признака делимости нацело с отрицанием';
+                                errorExplanation = `Число ${xVal} ${isDiv ? 'кратно 3 (1), значит ¬(1) = 0 [DROP]' : 'не кратно 3 (0), значит ¬(0) = 1 [ALLOW]'}`;
+                            }
+                            break;
+                        }
+
+                        case 3: {
+                            // Волна 4: Приоритет операций (НЕ > И > ИЛИ без скобок)
+                            category = 'ПРИОРИТЕТ ОПЕРАЦИЙ (НЕ > И > ИЛИ)';
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                formulaText = `0 ∨ 1 ∧ 0`;
+                                target = 'drop';
+                                hint = 'Приоритет: сначала конъюнкция (1 ∧ 0 = 0), затем дизъюнкция (0 ∨ 0 = 0)';
+                                errorExplanation = `Сначала выполняется 1 ∧ 0 = 0, затем 0 ∨ 0 = 0 [DROP]`;
+                            } else if (variant === 1) {
+                                formulaText = `1 ∨ 0 ∧ 1`;
+                                target = 'allow';
+                                hint = 'Приоритет: 0 ∧ 1 = 0, затем 1 ∨ 0 = 1';
+                                errorExplanation = `0 ∧ 1 = 0, затем 1 ∨ 0 = 1 [ALLOW]`;
+                            } else if (variant === 2) {
+                                formulaText = `¬0 ∧ 0 ∨ 1`;
+                                target = 'allow';
+                                hint = 'Приоритет: ¬0 = 1, затем 1 ∧ 0 = 0, затем 0 ∨ 1 = 1';
+                                errorExplanation = `¬0 = 1, 1 ∧ 0 = 0, 0 ∨ 1 = 1 [ALLOW]`;
+                            } else {
+                                formulaText = `¬1 ∧ 1 ∨ 0`;
+                                target = 'drop';
+                                hint = 'Приоритет: ¬1 = 0, 0 ∧ 1 = 0, 0 ∨ 0 = 0';
+                                errorExplanation = `¬1 = 0, 0 ∧ 1 = 0, 0 ∨ 0 = 0 [DROP]`;
+                            }
+                            break;
+                        }
+
+                        case 4: {
+                            // Волна 5: Законы исключенного третьего и противоречия
+                            category = 'ЗАКОНЫ АЛГЕБРЫ ЛОГИКИ (A ∧ ¬A, A ∨ ¬A)';
+                            xVal = Math.floor(Math.random() * 20) + 10;
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                formulaText = `(x > 15) ∧ ¬(x > 15)`;
+                                target = 'drop';
+                                hint = 'Закон противоречия: A ∧ ¬A ВСЕГДА тождественно равно 0';
+                                errorExplanation = `Высказывание и его отрицание не могут быть истинны одновременно (A ∧ ¬A = 0) [DROP]`;
+                            } else if (variant === 1) {
+                                formulaText = `(x ≤ 15) ∨ ¬(x ≤ 15)`;
+                                target = 'allow';
+                                hint = 'Закон исключенного третьего: A ∨ ¬A ВСЕГДА тождественно равно 1';
+                                errorExplanation = `Высказывание или его отрицание всегда истинно (A ∨ ¬A = 1) [ALLOW]`;
+                            } else if (variant === 2) {
+                                formulaText = `¬((x = 10) ∧ ¬(x = 10))`;
+                                target = 'allow';
+                                hint = 'Внутри скобок A ∧ ¬A = 0, а отрицание ¬(0) равно 1';
+                                errorExplanation = `¬(A ∧ ¬A) = ¬(0) = 1 [ALLOW]`;
+                            } else {
+                                formulaText = `((x < 30) ∨ ¬(x < 30)) ∧ 0`;
+                                target = 'drop';
+                                hint = 'В скобках 1, но конъюнкция с 0 дает 0';
+                                errorExplanation = `1 ∧ 0 = 0 [DROP]`;
+                            }
+                            break;
+                        }
+
+                        case 5: {
+                            // Волна 6: Числовые отрезки (двойные неравенства)
+                            category = 'ЧИСЛОВЫЕ ОТРЕЗКИ И ДИАПАЗОНЫ';
+                            const leftBound = 10;
+                            const rightBound = 20;
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                xVal = 15; // Внутри
+                                formulaText = `(x ≥ ${leftBound}) ∧ (x ≤ ${rightBound})`;
+                                target = 'allow';
+                                hint = 'Двойное неравенство: 10 ≤ x ≤ 20';
+                                errorExplanation = `${xVal} попадает в отрезок [${leftBound}, ${rightBound}], значит оба условия истинны [ALLOW]`;
+                            } else if (variant === 1) {
+                                xVal = 25; // Снаружи
+                                formulaText = `(x ≥ ${leftBound}) ∧ (x ≤ ${rightBound})`;
+                                target = 'drop';
+                                hint = 'Двойное неравенство: 10 ≤ x ≤ 20';
+                                errorExplanation = `${xVal} не попадает в отрезок [${leftBound}, ${rightBound}], условие ложно [DROP]`;
+                            } else if (variant === 2) {
+                                xVal = 5; // Снаружи (меньше 10)
+                                formulaText = `(x < ${leftBound}) ∨ (x > ${rightBound})`;
+                                target = 'allow';
+                                hint = 'Попадание вне отрезка: x < 10 ИЛИ x > 20';
+                                errorExplanation = `${xVal} < ${leftBound} истинно, дизъюнкция дает 1 [ALLOW]`;
+                            } else {
+                                xVal = 14; // Внутри отрезка
+                                formulaText = `(x < ${leftBound}) ∨ (x > ${rightBound})`;
+                                target = 'drop';
+                                hint = 'Попадание вне отрезка: x < 10 ИЛИ x > 20';
+                                errorExplanation = `${xVal} находится внутри отрезка, оба условия ложны (0 ∨ 0 = 0) [DROP]`;
+                            }
+                            break;
+                        }
+
+                        case 6: {
+                            // Волна 7: Отрицание на границах отрезков (Строгие vs Нестрогие)
+                            category = 'ГРАНИЧНЫЙ АНАЛИЗ НЕРАВЕНСТВ С ИНВЕРСИЕЙ';
+                            const bound = 8;
+                            xVal = bound; // Точно на границе!
+                            const variant = Math.floor(Math.random() * 3);
+                            if (variant === 0) {
+                                formulaText = `¬(x < ${bound}) ∧ (x ≤ 15)`;
+                                target = 'allow';
+                                hint = 'x < 8 при x = 8 ЛОЖНО (0). Отрицание ¬(0) равно 1!';
+                                errorExplanation = `8 < 8 ложно, ¬(0) = 1. Второе условие 8 ≤ 15 истинно (1). 1 ∧ 1 = 1 [ALLOW]`;
+                            } else if (variant === 1) {
+                                formulaText = `¬(x ≤ ${bound}) ∧ (x < 15)`;
+                                target = 'drop';
+                                hint = 'x ≤ 8 при x = 8 ИСТИННО (1). Отрицание ¬(1) равно 0!';
+                                errorExplanation = `8 ≤ 8 истинно, ¬(1) = 0. 0 ∧ 1 = 0 [DROP]`;
+                            } else {
+                                formulaText = `¬(x > ${bound}) ∨ (x = 100)`;
+                                target = 'allow';
+                                hint = 'x > 8 при x = 8 ЛОЖНО (0). Отрицание ¬(0) равно 1!';
+                                errorExplanation = `8 > 8 ложно, ¬(0) = 1. Дизъюнкция 1 ∨ 0 = 1 [ALLOW]`;
+                            }
+                            break;
+                        }
+
+                        case 7: {
+                            // Волна 8: Предикаты четности и делимости
+                            category = 'СОСТАВНЫЕ ПРЕДИКАТЫ ДЕЛИМОСТИ И ЧЕТНОСТИ';
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                xVal = 15;
+                                formulaText = `(x кратно 5) ∧ ¬(x четное)`;
+                                target = 'allow';
+                                hint = 'Проверка делимости на 5 и нечетности числа 15';
+                                errorExplanation = `15 кратно 5 (1), и 15 нечетное (¬0 = 1). 1 ∧ 1 = 1 [ALLOW]`;
+                            } else if (variant === 1) {
+                                xVal = 20;
+                                formulaText = `(x кратно 5) ∧ ¬(x четное)`;
+                                target = 'drop';
+                                hint = 'Проверка делимости на 5 и нечетности числа 20';
+                                errorExplanation = `20 четное (¬1 = 0), поэтому конъюнкция 1 ∧ 0 = 0 [DROP]`;
+                            } else if (variant === 2) {
+                                xVal = 21;
+                                formulaText = `¬(x кратно 7) ∨ (x > 30)`;
+                                target = 'drop';
+                                hint = '21 кратно 7 (¬1 = 0), и 21 не больше 30 (0)';
+                                errorExplanation = `21 кратно 7, значит ¬(1) = 0; 21 > 30 ложно (0). 0 ∨ 0 = 0 [DROP]`;
+                            } else {
+                                xVal = 22;
+                                formulaText = `¬(x кратно 7) ∨ (x > 30)`;
+                                target = 'allow';
+                                hint = '22 не кратно 7, значит ¬(0) = 1';
+                                errorExplanation = `22 не кратно 7 (0), ¬(0) = 1. Дизъюнкция 1 ∨ 0 = 1 [ALLOW]`;
+                            }
+                            break;
+                        }
+
+                        case 8: {
+                            // Волна 9: Законы де Моргана и многоуровневые отрицания
+                            category = 'МНОГОУРОВНЕВЫЕ СКОБКИ И ДВОЙНЫЕ ОТРИЦАНИЯ';
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                xVal = 25;
+                                formulaText = `¬((x > 10) ∧ (x < 20))`;
+                                target = 'allow';
+                                hint = '25 не лежит в диапазоне (10, 20), в скобках 0, отрицание ¬(0) = 1';
+                                errorExplanation = `В скобках 1 ∧ 0 = 0, отрицание ¬(0) дает 1 [ALLOW]`;
+                            } else if (variant === 1) {
+                                xVal = 15;
+                                formulaText = `¬((x > 10) ∧ (x < 20))`;
+                                target = 'drop';
+                                hint = '15 лежит в диапазоне (10, 20), в скобках 1, отрицание ¬(1) = 0';
+                                errorExplanation = `В скобках 1 ∧ 1 = 1, отрицание ¬(1) дает 0 [DROP]`;
+                            } else if (variant === 2) {
+                                xVal = 12;
+                                formulaText = `¬(¬(x > 10)) ∧ (x кратно 3)`;
+                                target = 'allow';
+                                hint = 'Двойное отрицание: ¬(¬(A)) = A';
+                                errorExplanation = `¬(¬(1)) = 1, 12 кратно 3 (1). 1 ∧ 1 = 1 [ALLOW]`;
+                            } else {
+                                xVal = 8;
+                                formulaText = `¬(¬(x > 10)) ∨ (x = 100)`;
+                                target = 'drop';
+                                hint = 'Двойное отрицание: ¬(¬(A)) = A';
+                                errorExplanation = `¬(¬(0)) = 0, 8 = 100 ложно (0). 0 ∨ 0 = 0 [DROP]`;
+                            }
+                            break;
+                        }
+
+                        case 9: {
+                            // Волна 10: Финальный босс (Сверхскоростной комплексный WAF — 5.0 сек!)
+                            category = 'ФИНАЛЬНЫЙ БОСС // КОМПЛЕКСНЫЙ СПРИНТ';
+                            const variant = Math.floor(Math.random() * 4);
+                            if (variant === 0) {
+                                xVal = 5;
+                                formulaText = `((x > 100) ∨ (x = 5)) ∧ ¬(x кратно 2)`;
+                                target = 'allow';
+                                hint = 'В первой скобке (0 ∨ 1) = 1, число 5 нечетное ¬(0) = 1';
+                                errorExplanation = `(0 ∨ 1) ∧ ¬(0) = 1 ∧ 1 = 1 [ALLOW]`;
+                            } else if (variant === 1) {
+                                xVal = 10;
+                                formulaText = `(x < 50) ∧ 0 ∨ ¬(x = 10)`;
+                                target = 'drop';
+                                hint = 'Конъюнкция с 0 дает 0; 10 = 10 дает ¬(1) = 0; итог 0 ∨ 0 = 0';
+                                errorExplanation = `(1 ∧ 0) ∨ ¬(1) = 0 ∨ 0 = 0 [DROP]`;
+                            } else if (variant === 2) {
+                                xVal = 7;
+                                formulaText = `(x > 0) ∨ ((x³ - 5 кратно 17) ∧ ¬(x = 9))`;
+                                target = 'allow';
+                                hint = 'МГНОВЕННЫЙ SHORT-CIRCUIT: x > 0 истинно, результат дизъюнкции равен 1!';
+                                errorExplanation = `Так как 7 > 0 истинно, вся дизъюнкция 1 ∨ (...) сразу равна 1 [ALLOW]`;
+                            } else {
+                                xVal = 4;
+                                formulaText = `¬(x ≥ 0) ∧ ((x² + 10 > 50) ∨ (x кратно 3))`;
+                                target = 'drop';
+                                hint = 'МГНОВЕННЫЙ SHORT-CIRCUIT: ¬(4 ≥ 0) = ¬(1) = 0, конъюнкция 0 ∧ (...) ложна!';
+                                errorExplanation = `¬(4 ≥ 0) = 0, поэтому вся конъюнкция 0 ∧ (...) сразу равна 0 [DROP]`;
+                            }
+                            break;
+                        }
+                    }
+
+                    return {
+                        id: packetId,
+                        category: category,
+                        formulaText: formulaText,
+                        target: target,
+                        hint: hint,
+                        xVal: xVal,
+                        errorExplanation: errorExplanation
+                    };
+                }
+
+                // Массив волн
+                const waves = ref([]);
+                function initAllWaves() {
+                    const list = [];
+                    for (let i = 0; i < 10; i++) {
+                        list.push(createWave(i));
+                    }
+                    waves.value = list;
+                }
+
+                const currentWave = computed(() => {
+                    return waves.value[currentWaveIndex.value] || {};
+                });
+
+                function startWave(index) {
+                    currentWaveIndex.value = index;
+
+                    // Динамический таймер такта:
+                    // Волны 1-3: 7.0 сек
+                    // Волны 4-6: 6.5 сек
+                    // Волны 7-9: 6.0 сек
+                    // Волна 10: 5.0 сек
+                    let limit = 7.0;
+                    if (index >= 9) limit = 5.0;
+                    else if (index >= 6) limit = 6.0;
+                    else if (index >= 3) limit = 6.5;
+
+                    waveTimeLimit.value = limit;
+                    timeLeft.value = limit;
+
+                    clearInterval(timerInterval);
+                    timerInterval = setInterval(() => {
+                        timeLeft.value -= 0.1;
+                        if (timeLeft.value <= 0) {
+                            clearInterval(timerInterval);
+                            triggerHardcoreFail('ТАЙМ-АУТ ШЛЮЗА: Время реакции истекло! Буфер WAF переполнен необработанным трафиком.');
+                        }
+                    }, 100);
+                }
+
+                function submitAction(action) {
+                    if (!started.value || completed.value || alarmActive.value) return;
+
+                    clearInterval(timerInterval);
+                    const expected = currentWave.value.target;
+
+                    if (action === expected) {
+                        // Успешный перехват
+                        playSound('success');
+                        if (currentWaveIndex.value < 9) {
+                            startWave(currentWaveIndex.value + 1);
+                        } else {
+                            // Финальная победа
+                            finishGame();
+                        }
+                    } else {
+                        // Ошибка аудитора
+                        const actionName = action === 'allow' ? '«ПРОПУСТИТЬ [ALLOW] (1)»' : '«СБРОСИТЬ [DROP] (0)»';
+                        const expectedName = expected === 'allow' ? '«ПРОПУСТИТЬ [ALLOW] (1)»' : '«СБРОСИТЬ [DROP] (0)»';
+                        const reason = `ОШИБКА АУДИТА: Вы выбрали ${actionName}, а требовалось ${expectedName}. ${currentWave.value.errorExplanation || ''}`;
+                        triggerHardcoreFail(reason);
+                    }
+                }
+
+                function triggerHardcoreFail(reason) {
+                    clearInterval(timerInterval);
+                    attempts++;
+                    sendTelemetry('hardcore_reset', false);
+                    playSound('alarm');
+
+                    alarmMessage.value = reason;
+                    alarmActive.value = true;
+
+                    // Через 2 секунды сброс на Волну 1 с новой процедурной генерацией!
+                    setTimeout(() => {
+                        alarmActive.value = false;
+                        initAllWaves();
+                        startWave(0);
+                    }, 2200);
+                }
+
+                function startGame() {
+                    attempts = 0;
+                    completed.value = false;
+                    alarmActive.value = false;
+                    started.value = true;
+                    initAllWaves();
+                    sendTelemetry('in_progress', false);
+                    startWave(0);
+                }
+
+                function finishGame() {
+                    clearInterval(timerInterval);
+                    completed.value = true;
+                    totalTimeSpent.value = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
+                    sendTelemetry('level_complete', true);
+                    playSound('victory');
+                }
+
+                function handleKeyDown(e) {
+                    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+                    if (!started.value || completed.value) {
+                        if (e.key === 'Enter') {
+                            startGame();
+                        }
+                        return;
+                    }
+
+                    if (started.value && !completed.value && !alarmActive.value) {
+                        if (e.key === '1' || e.key === 'z' || e.key === 'Z') {
+                            submitAction('allow');
+                        } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
+                            submitAction('drop');
+                        }
+                    }
+                }
+
+                onMounted(() => {
+                    window.addEventListener('keydown', handleKeyDown);
+                });
+
+                onUnmounted(() => {
+                    clearInterval(timerInterval);
+                    window.removeEventListener('keydown', handleKeyDown);
+                });
+
+                return {
+                    started,
+                    completed,
+                    alarmActive,
+                    alarmMessage,
+                    waves,
+                    currentWaveIndex,
+                    currentWave,
+                    progressPercent,
+                    waveTimeLimit,
+                    timeLeft,
+                    formattedTime,
+                    totalTimeSpent,
+                    attempts,
+                    startGame,
+                    submitAction
+                };
+            }
+        }).mount('#app');
+    })();
+</script>
+</TaskLayout>
