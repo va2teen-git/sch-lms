@@ -12,7 +12,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }]
   ],
   use: {
-    baseURL: 'http://localhost:4321',
+    baseURL: process.env.BASE_URL || 'http://localhost:4321',
     // In CI (GitHub Actions), use default Chromium. Locally on Windows, use system Edge.
     channel: process.env.CI ? undefined : 'msedge',
     headless: true,

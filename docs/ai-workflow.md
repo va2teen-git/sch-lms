@@ -65,6 +65,8 @@ gh pr create --title "..." --body "..."
 
 ```powershell
 # Из основного каталога D:\school-lms:
+# ВАЖНО: На Windows перед удалением worktree обязательно отвязать junction на node_modules:
+if (Test-Path "D:\school-lms-dev\node_modules") { cmd /c rmdir "D:\school-lms-dev\node_modules" }
 git worktree remove D:\school-lms-dev --force
 ```
 
