@@ -92,10 +92,50 @@ node scripts/migrate_telemetry.js
 
 ---
 
+## 🛡️ Изоляция Продакшна и Разработка через Git Worktree
+
+Боевой сервер запущен непосредственно из директории `D:\school-lms` (порт `8080`) и обслуживает учащихся. Во избежание блокировок файлов сборки в Windows и загрязнения боевой базы `telemetry.db`, **любая разработка и тестирование ведутся в изолированном дереве `git worktree`**:
+
+### 1. Создание изолированного рабочего места:
+```powershell
+# Из основной директории D:\school-lms:
+git worktree add -b type/feature-name D:\school-lms-dev
+cmd /c mklink /J "D:\school-lms-dev\node_modules" "D:\school-lms\node_modules"
+```
+
+### 2. Разработка и тестирование:
+Внутри каталога `D:\school-lms-dev`:
+* Запуск сервера разработки: `npm run dev` (порт `4321`, не конфликтует с продакшном).
+* База данных изолирована (`D:\school-lms-dev\telemetry.db`).
+* Прогон тестов: `npm run test:contracts` и `npm test`.
+
+### 3. Очистка после сдачи задачи (PR / слияние):
+```powershell
+# Из основной директории D:\school-lms:
+git worktree remove D:\school-lms-dev --force
+```
+
+### 4. Регламент обновления боевого сервера после слияния в `main`:
+```powershell
+# В основной директории D:\school-lms:
+git checkout main
+git pull origin main
+npm install                        # При изменении package.json
+node scripts/migrate_telemetry.js   # При миграциях схемы БД
+npm run build                      # Компиляция новой сборки
+# Мягкий перезапуск: сторож start_server.ps1 автоматически поднимет новый билд за 2 сек:
+Get-Process -Name node | Where-Object { $_.Path -like '*node.exe*' } | Stop-Process
+```
+
+---
+
 ## 📚 Документация
 
 Подробная документация разделена по направлениям в папке [`docs/`](file:///D:/school-lms/docs/):
+* [docs/ai-workflow.md](file:///D:/school-lms/docs/ai-workflow.md) — Регламент работы ИИ-агентов, изоляция Worktree и деплой.
 * [docs/telemetry-api.md](file:///D:/school-lms/docs/telemetry-api.md) — Спецификация телеметрии, SQLite схемы и дашборда учителя.
 * [docs/testing.md](file:///D:/school-lms/docs/testing.md) — Руководство по автоматическому тестированию и CI/CD.
 * [docs/curriculum.md](file:///D:/school-lms/docs/curriculum.md) — Учебный план и правила оформления формул.
+* [docs/design-levels-1-2.md](file:///D:/school-lms/docs/design-levels-1-2.md) — Геймдизайн уровней 1 и 2.
+* [docs/design-level-3.md](file:///D:/school-lms/docs/design-level-3.md) — Геймдизайн уровня 3 (аркада).
 * [AGENTS.md](file:///D:/school-lms/AGENTS.md) — Диспетчер правил для автономных ИИ-ассистентов.
