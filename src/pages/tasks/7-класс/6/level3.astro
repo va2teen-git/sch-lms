@@ -1,0 +1,486 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 7 класс, Урок 6 - Компьютерные вирусы и антивирусные программы
+// Архетип 9: «Firewall Interceptor / Active Defense» (Активный сетевой брандмауэр и антивирусный перехватчик)
+// 10 процедурных волн, жесткий локальный таймер (6 секунд на волну), тотальный сброс на шаг 1 при любой ошибке.
+---
+
+<TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
+<div id="app" class="container-fluid min-vh-100 p-4 rounded-0 bg-black text-danger">
+    
+    <!-- 1. СТАРТОВЫЙ ЭКРАН -->
+    <div v-if="!started && !completed" class="text-center py-5">
+        <div class="d-inline-block border border-danger p-4 bg-dark rounded-0 mb-4 text-start" style="max-width: 750px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                <h1 class="h3 text-danger mb-0 fw-bold">АРХЕТИП: FIREWALL INTERCEPTOR // АКТИВНАЯ ОБОРОНА</h1>
+                <span class="badge bg-danger text-black rounded-0 fw-bold">ФИНАЛЬНЫЙ БОСС</span>
+            </div>
+            <p class="text-light fs-5">
+                Центральный сервер школы подвергся массированной распределенной вирусной атаке. На сетевой шлюз непрерывно поступают пакеты данных, сетевые запросы и файлы.
+            </p>
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
+                <div class="fw-bold text-danger mb-2 text-uppercase">[ПРАВИЛА ОБОРОНЫ СЕТИ]:</div>
+                <ul class="mb-0 ps-3">
+                    <li class="mb-1">Вам необходимо отразить <strong>10 нарастающих волн</strong> сетевого трафика.</li>
+                    <li class="mb-1">На анализ каждого объекта дается жесткий таймер: ровно <strong>6 секунд</strong> на волну!</li>
+                    <li class="mb-1"><strong>ТОТАЛЬНЫЙ ХАРДКОР-СБРОС:</strong> любая ошибка в классификации или истечение таймера мгновенно сбрасывает весь прогресс <strong>на Волну 1</strong> с процедурной перегенерацией всех волн!</li>
+                </ul>
+            </div>
+            <div class="text-secondary small mb-3">
+                Управление: кликами по тактическим кнопкам или горячими клавишами <kbd class="bg-dark text-danger border border-danger">1</kbd> (ALLOW), <kbd class="bg-dark text-danger border border-danger">2</kbd> (BLOCK), <kbd class="bg-dark text-danger border border-danger">3</kbd> (QUARANTINE), <kbd class="bg-dark text-danger border border-danger">4</kbd> (DISINFECT).
+            </div>
+            <div class="text-center pt-2">
+                <button @click="startGame" id="btn-start" class="btn btn-outline-danger btn-lg rounded-0 fw-bold px-5 py-3">
+                    АКТИВИРОВАТЬ БРАНДМАУЭР [ENTER]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ЭКРАН ПОБЕДЫ -->
+    <div v-else-if="completed" id="success-screen" class="text-center py-5">
+        <div class="d-inline-block border border-success p-5 bg-dark rounded-0" style="max-width: 700px;">
+            <h1 class="display-5 text-success fw-bold mb-3">ПЕРИМЕТР БЕЗОПАСНОСТИ УСПЕШНО ЗАЩИЩЕН</h1>
+            <p class="fs-5 text-light mb-4">
+                Все 10 волн вредоносных атак нейтрализованы! Сетевой шлюз отразил червей, заблокировал фишинг, изолировал неизвестные образцы и вылечил системные файлы.
+            </p>
+            <div class="badge bg-black text-success border border-success rounded-0 fs-6 px-4 py-2">
+                УРОВЕНЬ 3 (АРКАДА) ПРОЙДЕН // СТАТУС: VICTORY
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ИГРОВОЙ ЭКРАН (ОТРАЖЕНИЕ ВОЛН) -->
+    <div v-else class="row justify-content-center">
+        <div class="col-lg-10">
+
+            <!-- Шапка волны и таймера -->
+            <div class="card bg-dark border-danger rounded-0 mb-4 p-3">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold">ПРОГРЕСС ОБОРОНЫ:</span>
+                            <span class="text-danger fw-bold fs-5">ВОЛНА: <span v-text="currentWaveIndex + 1"></span> / <span v-text="waves.length"></span></span>
+                        </div>
+                        <div class="progress bg-black border border-secondary rounded-0" style="height: 12px;">
+                            <div class="progress-bar bg-danger" :style="{ width: progressPercent + '%' }"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-3 mt-md-0 text-md-end">
+                        <div class="text-secondary small fw-bold mb-1">ТАЙМЕР РЕАКЦИИ ШЛЮЗА:</div>
+                        <div class="d-flex align-items-center justify-content-md-end gap-2">
+                            <span id="timer-display" :class="{'text-danger': timeLeft > 2, 'text-warning': timeLeft <= 2}" class="fs-4 fw-bold">
+                                <span v-text="timeLeft"></span> сек
+                            </span>
+                            <div class="progress bg-black border border-secondary rounded-0 d-inline-block" style="width: 140px; height: 12px;">
+                                <div class="progress-bar bg-danger" :style="{ width: (timeLeft / waveTimeLimit * 100) + '%' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сирена тревоги при сбросе -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black border-danger rounded-0 text-center py-3 mb-4" role="alert">
+                <h4 class="fw-bold mb-1">[СИСТЕМНАЯ СИРЕНА // ПРОРЫВ БЕЗОПАСНОСТИ]</h4>
+                <div class="text-light" v-text="alarmMessage"></div>
+                <div class="text-warning small mt-1">ТОТАЛЬНЫЙ СБРОС НА ВОЛНУ 1... ПЕРЕЗАПУСК ШЛЮЗА...</div>
+            </div>
+
+            <!-- Карточка входящего пакета / угрозы -->
+            <div class="card bg-black border-danger rounded-0 p-4 mb-4" id="target-packet-card">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                    <span class="text-danger fw-bold fs-6">ВХОДЯЩИЙ ПОТОК: ПОРТ <span v-text="currentWave.port"></span> // ПРОТОКОЛ <span v-text="currentWave.protocol"></span></span>
+                    <span class="badge bg-danger text-black rounded-0 font-monospace">ИНДЕКС УГРОЗЫ: <span v-text="currentWave.threatIndex"></span></span>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-secondary small mb-1">ОБЪЕКТ ТРАФИКА:</div>
+                    <div class="fs-4 text-light fw-bold font-monospace" id="packet-filename" v-text="currentWave.fileName"></div>
+                </div>
+
+                <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                    <div class="text-secondary small mb-1">АНАЛИЗ АНТИВИРУСНОГО ДВИЖКА:</div>
+                    <div class="fs-5 text-light mb-2" v-text="currentWave.description"></div>
+                    <div class="font-monospace small text-warning">
+                        <span class="text-secondary">СИСТЕМНЫЙ ИНДИКАТОР: </span><span v-text="currentWave.indicator"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Тактическая консоль оператора: 4 действия -->
+            <div class="card bg-dark border-danger rounded-0 p-3">
+                <div class="text-secondary small mb-3 text-uppercase">Выберите тактическое действие брандмауэра:</div>
+                <div class="row g-3">
+                    <!-- 1. ALLOW -->
+                    <div class="col-md-3">
+                        <button @click="submitAction('ALLOW')" id="btn-action-allow" class="btn btn-outline-success rounded-0 w-100 py-3 text-start h-100">
+                            <div class="fw-bold text-success fs-5 mb-1">[1] ПРОПУСК</div>
+                            <div class="small text-secondary lh-sm">Легитимные обновления, безопасные запросы, доверенный трафик.</div>
+                        </button>
+                    </div>
+
+                    <!-- 2. BLOCK -->
+                    <div class="col-md-3">
+                        <button @click="submitAction('BLOCK')" id="btn-action-block" class="btn btn-outline-danger rounded-0 w-100 py-3 text-start h-100">
+                            <div class="fw-bold text-danger fs-5 mb-1">[2] БЛОКИРОВКА</div>
+                            <div class="small text-secondary lh-sm">Сетевые черви, фишинг, дропперы и опасные скрипты.</div>
+                        </button>
+                    </div>
+
+                    <!-- 3. QUARANTINE -->
+                    <div class="col-md-3">
+                        <button @click="submitAction('QUARANTINE')" id="btn-action-quarantine" class="btn btn-outline-warning rounded-0 w-100 py-3 text-start h-100">
+                            <div class="fw-bold text-warning fs-5 mb-1">[3] КАРАНТИН</div>
+                            <div class="small text-secondary lh-sm">Неизвестные полиморфные объекты без сигнатуры для лаборатории.</div>
+                        </button>
+                    </div>
+
+                    <!-- 4. DISINFECT -->
+                    <div class="col-md-3">
+                        <button @click="submitAction('DISINFECT')" id="btn-action-disinfect" class="btn btn-outline-info rounded-0 w-100 py-3 text-start h-100">
+                            <div class="fw-bold text-info fs-5 mb-1">[4] ЛЕЧЕНИЕ</div>
+                            <div class="small text-secondary lh-sm">Критичные системные файлы, из которых можно вырезать код вируса.</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+</TaskLayout>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const started = ref(false);
+            const completed = ref(false);
+            const alarmActive = ref(false);
+            const alarmMessage = ref('');
+            
+            const waveTimeLimit = 6; // секунд на волну
+            const timeLeft = ref(waveTimeLimit);
+            let timerInterval = null;
+
+            const startTime = new Date();
+            let attempts = 0;
+            const missionName = 'Урок 6 :: Компьютерные вирусы и антивирусные программы (Уровень 3)';
+
+            function sendTelemetry(action_type, status, success) {
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: action_type,
+                    status: status,
+                    start_time: startTime.toISOString(),
+                    time_spent_sec: Math.floor((new Date() - startTime) / 1000),
+                    attempts_count: attempts,
+                    success: success
+                }, '*');
+            }
+
+            // Банк образцов для процедурной генерации 10 волн
+            const SCENARIOS_BANK = [
+                // ALLOW (Легитимный трафик)
+                {
+                    expected: 'ALLOW',
+                    port: 443,
+                    protocol: 'HTTPS',
+                    threatIndex: 'LOW (0.01)',
+                    fileName: 'windows_security_update_kb503412.msu',
+                    description: 'Официальный накопительный пакет обновлений безопасности операционной системы с валидной цифровой подписью.',
+                    indicator: 'VALID_DIGITAL_SIGNATURE // VENDOR: MICROSOFT_CORP'
+                },
+                {
+                    expected: 'ALLOW',
+                    port: 53,
+                    protocol: 'DNS',
+                    threatIndex: 'LOW (0.02)',
+                    fileName: 'query_school_edu_portal.dat',
+                    description: 'Стандартный DNS-запрос рабочей станции на разрешение доменного имени регионального образовательного портала.',
+                    indicator: 'STANDARD_A_RECORD_QUERY // STATUS: NOERROR'
+                },
+                {
+                    expected: 'ALLOW',
+                    port: 80,
+                    protocol: 'HTTP',
+                    threatIndex: 'LOW (0.00)',
+                    fileName: 'informatics_7_grade_polyakov.pdf',
+                    description: 'Электронный методический учебник в формате PDF. Макросы, исполняемые скрипты и внешние ссылки отсутствуют.',
+                    indicator: 'CLEAN_STATIC_DOCUMENT // NO_EMBEDDED_JS'
+                },
+                {
+                    expected: 'ALLOW',
+                    port: 25,
+                    protocol: 'SMTP',
+                    threatIndex: 'LOW (0.03)',
+                    fileName: 'essay_pushkin_report.txt',
+                    description: 'Текстовое домашнее задание по литературе. Чистый текст в кодировке UTF-8, исполняемый код отсутствует.',
+                    indicator: 'PLAIN_TEXT_ASCII // MD5_VERIFIED'
+                },
+                {
+                    expected: 'ALLOW',
+                    port: 123,
+                    protocol: 'NTP',
+                    threatIndex: 'LOW (0.01)',
+                    fileName: 'time_synchronization_stratum2.pkt',
+                    description: 'Пакет синхронизации системного времени с сервером точного времени Stratum 2.',
+                    indicator: 'CORRECT_NTP_TIMESTAMP // NO_PAYLOAD'
+                },
+
+                // BLOCK (Черви, фишинг, дропперы, опасные скрипты)
+                {
+                    expected: 'BLOCK',
+                    port: 445,
+                    protocol: 'SMB',
+                    threatIndex: 'CRITICAL (0.99)',
+                    fileName: 'net_worm_eternal_recon.bin',
+                    description: 'Сетевой червь эксплуатирует известную уязвимость SMBv1, генерируя лавинообразное сканирование всех IP школы.',
+                    indicator: 'EXPLOIT:MS17-010_WORM_PAYLOAD // DANGEROUS'
+                },
+                {
+                    expected: 'BLOCK',
+                    port: 25,
+                    protocol: 'SMTP',
+                    threatIndex: 'HIGH (0.95)',
+                    fileName: 'Prikoz_ob_otchislenii.pdf.exe',
+                    description: 'Фишинговое почтовое вложение с двойным расширением. Притворяется документом PDF, но запускает троян-дроппер.',
+                    indicator: 'MASQUERADE_EXTENSION // PE_HEADER_DETECTED'
+                },
+                {
+                    expected: 'BLOCK',
+                    port: 8080,
+                    protocol: 'HTTP_PROXY',
+                    threatIndex: 'HIGH (0.91)',
+                    fileName: 'silent_crypto_miner_xmrig.sh',
+                    description: 'Скрытый скрипт майнинга криптовалюты, маскирующийся под фоновый системный демон для 100% загрузки процессора.',
+                    indicator: 'POW_MINER_SIGNATURE // CPU_THROTTLING'
+                },
+                {
+                    expected: 'BLOCK',
+                    port: 3389,
+                    protocol: 'RDP',
+                    threatIndex: 'CRITICAL (0.98)',
+                    fileName: 'rdp_bruteforce_spray_attack.raw',
+                    description: 'Атака перебора паролей учетной записи Администратора с подозрительного внешнего IP-адреса.',
+                    indicator: 'BRUTEFORCE_BURST // 500_FAILED_AUTHS_PER_SEC'
+                },
+                {
+                    expected: 'BLOCK',
+                    port: 443,
+                    protocol: 'HTTPS',
+                    threatIndex: 'CRITICAL (0.97)',
+                    fileName: 'winlocker_ransom_lockscreen.exe',
+                    description: 'Блокировщик экрана (винлокер), модифицирующий ветку реестра Winlogon для блокировки рабочего стола Windows.',
+                    indicator: 'RANSOM_WINLOCK_TROJAN // MALICIOUS'
+                },
+
+                // QUARANTINE (Неизвестные 0-day, полиморфы, зашифрованные файлы)
+                {
+                    expected: 'QUARANTINE',
+                    port: 443,
+                    protocol: 'HTTPS',
+                    threatIndex: 'SUSPICIOUS (0.75)',
+                    fileName: 'unknown_sample_entropy99.bin',
+                    description: 'Ранее неизвестный бинарный модуль с высокой энтропией и полиморфным дешифратором. Сигнатура отсутствует (0-Day).',
+                    indicator: 'HEURISTIC:POLYMOPHIC_CODE // LAB_ANALYSIS_REQUIRED'
+                },
+                {
+                    expected: 'QUARANTINE',
+                    port: 25,
+                    protocol: 'SMTP',
+                    threatIndex: 'SUSPICIOUS (0.72)',
+                    fileName: 'encrypted_archive_password_locked.zip',
+                    description: 'Зашифрованный архив с защитой паролем от неизвестного зарубежного отправителя. Статический анализ невозможен.',
+                    indicator: 'ENCRYPTED_ZIP_PAYLOAD // OBFUSCATION_SUSPECTED'
+                },
+                {
+                    expected: 'QUARANTINE',
+                    port: 80,
+                    protocol: 'HTTP',
+                    threatIndex: 'SUSPICIOUS (0.70)',
+                    fileName: 'dynamic_eval_loader.js',
+                    description: 'Скрипт использует многослойную обфускацию, base64-кодирование и недокументированные API браузера.',
+                    indicator: 'HEURISTIC:SUSPICIOUS_OBFUSCATION // UNCONFIRMED'
+                },
+                {
+                    expected: 'QUARANTINE',
+                    port: 139,
+                    protocol: 'NetBIOS',
+                    threatIndex: 'SUSPICIOUS (0.68)',
+                    fileName: 'unidentified_driver_hook.sys',
+                    description: 'Неизвестный драйвер устройства без сертификата WHQL, запрашивающий доступ к низкоуровневой таблице SSDT.',
+                    indicator: 'HEURISTIC:KERNEL_HOOK_BEHAVIOR // ISOLATE'
+                },
+
+                // DISINFECT (Лечение зараженных ценных системных файлов)
+                {
+                    expected: 'DISINFECT',
+                    port: 445,
+                    protocol: 'SMB',
+                    threatIndex: 'MODERATE (0.80)',
+                    fileName: 'C:\\Windows\\System32\\notepad.exe',
+                    description: 'Критический системный файл «Блокнот» заражен паразитическим вирусом. Тело вируса локализовано, файл подлежит лечению.',
+                    indicator: 'PARASITIC_VIRUS_ATTACHED // CURE_AVAILABLE'
+                },
+                {
+                    expected: 'DISINFECT',
+                    port: 25,
+                    protocol: 'SMTP',
+                    threatIndex: 'MODERATE (0.78)',
+                    fileName: 'Annual_Budget_School_2026.docm',
+                    description: 'Ценный финансовый отчет школы заражен макровирусом. Содержимое документа сохранено, макрос можно удалить.',
+                    indicator: 'MACRO_VIRUS_CONTAINED // DISINFECT_DOC'
+                },
+                {
+                    expected: 'DISINFECT',
+                    port: 80,
+                    protocol: 'HTTP',
+                    threatIndex: 'MODERATE (0.82)',
+                    fileName: 'school_main_portal_index.html',
+                    description: 'В исходный код главной страницы школы внедрен скрытый фрейм iframe. Разметка чистится без потери сайта.',
+                    indicator: 'WEB_SCRIPT_INJECTION // REMOVABLE'
+                }
+            ];
+
+            const waves = ref([]);
+            const currentWaveIndex = ref(0);
+
+            const currentWave = computed(() => {
+                return waves.value[currentWaveIndex.value] || {};
+            });
+
+            const progressPercent = computed(() => {
+                if (waves.value.length === 0) return 0;
+                return (currentWaveIndex.value / waves.value.length) * 100;
+            });
+
+            function shuffle(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            function generate10Waves() {
+                // Балансируем 10 волн: 3 ALLOW, 3 BLOCK, 2 QUARANTINE, 2 DISINFECT
+                const allows = shuffle(SCENARIOS_BANK.filter(s => s.expected === 'ALLOW')).slice(0, 3);
+                const blocks = shuffle(SCENARIOS_BANK.filter(s => s.expected === 'BLOCK')).slice(0, 3);
+                const quarantines = shuffle(SCENARIOS_BANK.filter(s => s.expected === 'QUARANTINE')).slice(0, 2);
+                const disinfects = shuffle(SCENARIOS_BANK.filter(s => s.expected === 'DISINFECT')).slice(0, 2);
+
+                waves.value = shuffle([...allows, ...blocks, ...quarantines, ...disinfects]);
+                currentWaveIndex.value = 0;
+            }
+
+            function startTimer() {
+                clearInterval(timerInterval);
+                timeLeft.value = waveTimeLimit;
+
+                timerInterval = setInterval(() => {
+                    timeLeft.value--;
+                    if (timeLeft.value <= 0) {
+                        clearInterval(timerInterval);
+                        handleHardcoreFailure('ВРЕМЯ ИСТЕКЛО! Периметр пробит, вредоносный пакет просочился в память!');
+                    }
+                }, 1000);
+            }
+
+            function handleHardcoreFailure(msg) {
+                attempts++;
+                clearInterval(timerInterval);
+                alarmMessage.value = msg;
+                alarmActive.value = true;
+
+                // Тотальный сброс телеметрии
+                sendTelemetry('hardcore_reset', 'in_progress', false);
+
+                setTimeout(() => {
+                    alarmActive.value = false;
+                    generate10Waves();
+                    startTimer();
+                }, 1800);
+            }
+
+            function submitAction(actionType) {
+                if (!started.value || completed.value || alarmActive.value) return;
+
+                const expected = currentWave.value.expected;
+                if (actionType === expected) {
+                    // Верное действие!
+                    if (currentWaveIndex.value < waves.value.length - 1) {
+                        currentWaveIndex.value++;
+                        startTimer();
+                    } else {
+                        // Все 10 волн успешно завершены!
+                        clearInterval(timerInterval);
+                        completed.value = true;
+                        sendTelemetry('level_complete', 'completed', true);
+                    }
+                } else {
+                    // Ошибка действия -> Тотальный хардкор-сброс
+                    let reason = 'Неверное тактическое действие!';
+                    if (expected === 'ALLOW') reason = 'Вы заблокировали легитимный пакет! Служба парализована.';
+                    else if (expected === 'BLOCK') reason = 'Опасный червь/вредонос пропущен в ядро системы!';
+                    else if (expected === 'QUARANTINE') reason = 'Неизвестный 0-Day требовал изоляции в карантин!';
+                    else if (expected === 'DISINFECT') reason = 'Критичный системный файл подлежал лечению, а не блокировке!';
+
+                    handleHardcoreFailure(reason);
+                }
+            }
+
+            function startGame() {
+                started.value = true;
+                completed.value = false;
+                alarmActive.value = false;
+                sendTelemetry('in_progress', 'in_progress', false);
+                generate10Waves();
+                startTimer();
+            }
+
+            function handleKeyDown(e) {
+                if (!started.value && e.key === 'Enter') {
+                    startGame();
+                    return;
+                }
+                if (started.value && !completed.value && !alarmActive.value) {
+                    if (e.key === '1' || e.key === 'q' || e.key === 'Q') submitAction('ALLOW');
+                    else if (e.key === '2' || e.key === 'w' || e.key === 'W') submitAction('BLOCK');
+                    else if (e.key === '3' || e.key === 'e' || e.key === 'E') submitAction('QUARANTINE');
+                    else if (e.key === '4' || e.key === 'r' || e.key === 'R') submitAction('DISINFECT');
+                }
+            }
+
+            onMounted(() => {
+                window.addEventListener('keydown', handleKeyDown);
+            });
+
+            onUnmounted(() => {
+                clearInterval(timerInterval);
+                window.removeEventListener('keydown', handleKeyDown);
+            });
+
+            return {
+                started,
+                completed,
+                alarmActive,
+                alarmMessage,
+                waves,
+                currentWaveIndex,
+                currentWave,
+                progressPercent,
+                waveTimeLimit,
+                timeLeft,
+                startGame,
+                submitAction
+            };
+        }
+    }).mount('#app');
+</script>
