@@ -132,6 +132,30 @@ const tasks = [
 
   const fullTitle = document.querySelector('h1')?.textContent?.trim() || '';
   const lessonPrefix = fullTitle.split(':')[0].trim(); // 'Урок X'
+
+  const ATTEMPT_KEY = `school_lms_attempt_${classSlug}_${lessonId}`;
+  function getOrCreateAttempt(forceNew = false, modeOverride = null) {
+    const raw = sessionStorage.getItem(ATTEMPT_KEY);
+    let attempt = null;
+    if (raw && !forceNew) {
+      try {
+        attempt = JSON.parse(raw);
+      } catch (e) {}
+    }
+    const currentMode = modeOverride || (isHardcore ? 'hardcore' : 'normal');
+    if (!attempt || forceNew || attempt.mode !== currentMode) {
+      const prevNum = attempt && typeof attempt.number === 'number' ? attempt.number : 0;
+      attempt = {
+        id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        number: prevNum + 1,
+        mode: currentMode,
+        startTime: Date.now()
+      };
+      sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify(attempt));
+    }
+    return attempt;
+  }
+  let currentAttempt = getOrCreateAttempt();
   
   // Set initial state to locked
   tabs.forEach((tab, index) => {
@@ -219,6 +243,8 @@ const tasks = [
     const btn = document.getElementById('reset-lesson-btn');
     if (btn) btn.innerHTML = 'Сброс...';
     
+    const nextAttempt = getOrCreateAttempt(true, isHardcore ? 'hardcore' : 'normal');
+
     fetch('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,6 +255,9 @@ const tasks = [
           course_slug: classSlug,
           lesson_id: lessonId,
           is_hardcore: isHardcore,
+          attempt_id: nextAttempt.id,
+          attempt_number: nextAttempt.number,
+          attempt_mode: nextAttempt.mode,
           action_type: isHardcore ? 'hardcore_reset' : 'normal_reset',
           mission_name: fullTitle
         })
@@ -295,6 +324,7 @@ const tasks = [
     isHardcore = !isHardcore;
     localStorage.setItem('hardcore_mode', String(isHardcore));
     updateHardcoreUI();
+    getOrCreateAttempt(true, isHardcore ? 'hardcore' : 'normal');
     window.location.reload();
   });
 
@@ -316,11 +346,14 @@ const tasks = [
         }
       }
 
-      const mName = data.mission_name;
-      if (!platformTimers[mName]) {
-        platformTimers[mName] = Date.now();
+      // Preserve pure time spent from iframe if already provided; fallback to platform timer only if missing
+      if (typeof data.time_spent_sec !== 'number') {
+        const mName = data.mission_name;
+        if (!platformTimers[mName]) {
+          platformTimers[mName] = Date.now();
+        }
+        data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
       }
-      data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
 
       if (data.action_type === 'hardcore_reset' && isHardcore) {
         alert('💀 ОШИБКА В РЕЖИМЕ ХАРДКОРА! Прогресс сброшен!');
@@ -332,6 +365,8 @@ const tasks = [
           const src = iframe.src;
           iframe.src = src; 
         });
+
+        currentAttempt = getOrCreateAttempt(true, 'hardcore');
       }
 
       if (data.action_type === 'level_complete') {
@@ -377,6 +412,9 @@ const tasks = [
           lesson_id: lessonId,
           level_number: levelNum,
           is_hardcore: isHardcore,
+          attempt_id: currentAttempt.id,
+          attempt_number: currentAttempt.number,
+          attempt_mode: currentAttempt.mode,
           ...data
         })
       }).catch(err => console.error('Telemetry error:', err));
@@ -390,6 +428,7 @@ const tasks = [
       localStorage.removeItem('student_firstName');
       localStorage.removeItem('student_lastName');
       localStorage.removeItem('student_class');
+      localStorage.removeItem('hardcore_mode');
       window.location.href = '/';
     });
   }

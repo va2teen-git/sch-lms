@@ -26,6 +26,9 @@ db.exec(`
     course_slug TEXT,
     lesson_id TEXT,
     level_number INTEGER,
+    attempt_id TEXT,
+    attempt_number INTEGER DEFAULT 1,
+    attempt_mode TEXT DEFAULT 'normal',
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
@@ -45,6 +48,15 @@ try {
 try {
   db.exec("ALTER TABLE telemetry ADD COLUMN level_number INTEGER");
 } catch(e) {}
+try {
+  db.exec("ALTER TABLE telemetry ADD COLUMN attempt_id TEXT");
+} catch(e) {}
+try {
+  db.exec("ALTER TABLE telemetry ADD COLUMN attempt_number INTEGER DEFAULT 1");
+} catch(e) {}
+try {
+  db.exec("ALTER TABLE telemetry ADD COLUMN attempt_mode TEXT DEFAULT 'normal'");
+} catch(e) {}
 
 try {
   db.exec(`
@@ -53,6 +65,8 @@ try {
     CREATE INDEX IF NOT EXISTS idx_telemetry_mission ON telemetry (mission_name);
     CREATE INDEX IF NOT EXISTS idx_telemetry_student_cohort ON telemetry(student_class, timestamp);
     CREATE INDEX IF NOT EXISTS idx_telemetry_course_lesson ON telemetry(course_slug, lesson_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_attempt ON telemetry(attempt_id);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, last_name, first_name, attempt_id);
   `);
 } catch(e) {
   // Indexes might already exist, ignore
@@ -67,9 +81,10 @@ export const POST: APIRoute = async ({ request }) => {
         INSERT INTO telemetry (
           first_name, last_name, class_name, mission_name, action_type,
           start_time, time_spent_sec, attempts_count, success, status, action_log, is_hardcore,
-          student_class, course_slug, lesson_id, level_number
+          student_class, course_slug, lesson_id, level_number,
+          attempt_id, attempt_number, attempt_mode
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `);
       
@@ -92,6 +107,10 @@ export const POST: APIRoute = async ({ request }) => {
       let levelNum = (body.level_number !== undefined && body.level_number !== null)
         ? parseInt(body.level_number, 10)
         : null;
+
+      const attemptId = body.attempt_id ? String(body.attempt_id).trim() : null;
+      const attemptNum = body.attempt_number ? Math.max(1, parseInt(body.attempt_number, 10) || 1) : 1;
+      const attemptMode = body.attempt_mode ? String(body.attempt_mode).trim() : (isHc ? 'hardcore' : 'normal');
 
       if (!levelNum && mName) {
         if (/Уровень\s*1/i.test(mName) || /Ур\s*1/i.test(mName)) levelNum = 1;
@@ -122,7 +141,10 @@ export const POST: APIRoute = async ({ request }) => {
         sClass,
         courseSlug,
         lessonId,
-        levelNum
+        levelNum,
+        attemptId,
+        attemptNum,
+        attemptMode
       );
       
       return new Response(JSON.stringify({ success: true }), {

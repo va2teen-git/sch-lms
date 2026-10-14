@@ -8,11 +8,30 @@ const dbPath = path.join(process.cwd(), 'telemetry.db');
 export interface LevelMetric {
   status: 'not_started' | 'in_progress' | 'completed' | 'reset';
   timeSpentSec: number;
+  rawTimeSpentSec?: number;
+  firstTs?: Date | null;
   errors: number;
   attempts: number;
   completed: boolean;
   hardcore: boolean;
   lastUpdated: string | null;
+}
+
+export interface AttemptMetric {
+  attemptId: string;
+  attemptNumber: number;
+  mode: 'normal' | 'hardcore';
+  status: 'completed' | 'in_progress' | 'failed';
+  startedAt: string | null;
+  lastActiveAt: string | null;
+  totalTimeSec: number;
+  errorsCount: number;
+  completedLevelsCount: number;
+  levels: {
+    1: LevelMetric;
+    2: LevelMetric;
+    3: LevelMetric;
+  };
 }
 
 export interface StudentMetric {
@@ -24,15 +43,35 @@ export interface StudentMetric {
   firstSeen: string | null;
   lastSeen: string | null;
   isActiveNow: boolean;
+  latestIsHardcore?: number;
   levels: {
     1: LevelMetric;
     2: LevelMetric;
     3: LevelMetric;
   };
+  normalCompletedLevels?: Set<number>;
+  allHardcoreCompletedLevels?: Set<number>;
+  hardcoreStreakLevels?: Set<number>;
+  hardcoreAttempted?: boolean;
+  hardcoreResetsCount?: number;
+  hardcoreLevelsConquered?: number;
+  hardcoreStatus?: 'none' | 'attempting' | 'failed' | 'completed';
+  isHardcoreLegend?: boolean;
   totalActiveTimeSec: number;
   totalErrors: number;
   isHardcore: boolean;
   lessonStatus: 'hardcore_completed' | 'completed' | 'in_progress' | 'not_started';
+  
+  // Attempts & Run Tracking
+  attemptsCount: number;
+  normalAttemptsCount: number;
+  hardcoreAttemptsCount: number;
+  isNormalMastered: boolean;
+  bestNormalTimeSec: number | null;
+  bestHardcoreTimeSec: number | null;
+  currentAttempt?: AttemptMetric | null;
+  attempts: AttemptMetric[];
+
   recentEvents: Array<{
     id: number;
     mission: string;
@@ -118,7 +157,8 @@ export const GET: APIRoute = async ({ request }) => {
     const query = `
       SELECT id, first_name, last_name, class_name, mission_name, action_type,
              time_spent_sec, attempts_count, success, status, action_log,
-             is_hardcore, student_class, course_slug, lesson_id, level_number, timestamp
+             is_hardcore, student_class, course_slug, lesson_id, level_number,
+             attempt_id, attempt_number, attempt_mode, timestamp
       FROM telemetry
       WHERE 1=1 ${dateCondition} ${classCondition} ${courseCondition} ${lessonCondition} ${testCondition}
       ORDER BY timestamp ASC
@@ -126,8 +166,15 @@ export const GET: APIRoute = async ({ request }) => {
 
     const rows = db.prepare(query).all(...params);
 
+    interface StudentAccumulator extends StudentMetric {
+      _attemptsMap: Record<string, AttemptMetric>;
+      _attemptOrder: string[];
+      _legacyIdx: number;
+      _lastHc: number | null;
+    }
+
     // Grouping by student
-    const studentsMap: Record<string, StudentMetric> = {};
+    const studentsMap: Record<string, StudentAccumulator> = {};
 
     rows.forEach((r: any) => {
       const fn = (r.first_name || '').trim();
@@ -155,14 +202,15 @@ export const GET: APIRoute = async ({ request }) => {
           lastSeen: r.timestamp,
           isActiveNow: false,
           levels: {
-            1: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, lastUpdated: null },
-            2: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, lastUpdated: null },
-            3: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, lastUpdated: null }
+            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null },
+            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null },
+            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null }
           },
           normalCompletedLevels: new Set<number>(),
           allHardcoreCompletedLevels: new Set<number>(),
           hardcoreStreakLevels: new Set<number>(),
           hardcoreAttempted: false,
+          latestIsHardcore: 0,
           hardcoreResetsCount: 0,
           hardcoreLevelsConquered: 0,
           totalActiveTimeSec: 0,
@@ -171,12 +219,65 @@ export const GET: APIRoute = async ({ request }) => {
           isHardcoreLegend: false,
           hardcoreStatus: 'none',
           lessonStatus: 'not_started',
-          recentEvents: []
+          attemptsCount: 0,
+          normalAttemptsCount: 0,
+          hardcoreAttemptsCount: 0,
+          isNormalMastered: false,
+          bestNormalTimeSec: null,
+          bestHardcoreTimeSec: null,
+          currentAttempt: null,
+          attempts: [],
+          recentEvents: [],
+          _attemptsMap: {},
+          _attemptOrder: [],
+          _legacyIdx: 1,
+          _lastHc: null
         };
       }
 
       const s = studentsMap[canonicalKey];
       s.lastSeen = r.timestamp;
+      s.latestIsHardcore = r.is_hardcore;
+      const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
+
+      // Determine attempt assignment
+      let attId = r.attempt_id;
+      let attNum = r.attempt_number ? parseInt(r.attempt_number, 10) : null;
+      let attMode: 'normal' | 'hardcore' = (r.attempt_mode === 'hardcore' || r.is_hardcore === 1) ? 'hardcore' : 'normal';
+
+      if (!attId) {
+        // Fallback for legacy rows without explicit attempt_id:
+        if (s._lastHc !== null && (r.is_hardcore !== s._lastHc || r.action_type === 'normal_reset' || (r.action_type === 'hardcore_reset' && s._lastHc === 1))) {
+          s._legacyIdx++;
+        }
+        s._lastHc = r.is_hardcore;
+        attId = `${canonicalKey}_att_${s._legacyIdx}`;
+        attNum = s._legacyIdx;
+        attMode = r.is_hardcore === 1 ? 'hardcore' : 'normal';
+      }
+
+      if (!s._attemptsMap[attId]) {
+        s._attemptOrder.push(attId);
+        s._attemptsMap[attId] = {
+          attemptId: attId,
+          attemptNumber: attNum || s._attemptOrder.length,
+          mode: attMode,
+          status: 'in_progress',
+          startedAt: r.timestamp,
+          lastActiveAt: r.timestamp,
+          totalTimeSec: 0,
+          errorsCount: 0,
+          completedLevelsCount: 0,
+          levels: {
+            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, lastUpdated: null },
+            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, lastUpdated: null },
+            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, lastUpdated: null }
+          }
+        };
+      }
+
+      const att = s._attemptsMap[attId];
+      att.lastActiveAt = r.timestamp;
 
       // Extract Level Number
       let lvlNum: 1 | 2 | 3 | null = null;
@@ -190,6 +291,7 @@ export const GET: APIRoute = async ({ request }) => {
 
       if (isError) {
         s.totalErrors++;
+        att.errorsCount++;
       }
 
       if (r.is_hardcore === 1) {
@@ -199,18 +301,43 @@ export const GET: APIRoute = async ({ request }) => {
       if (r.action_type === 'hardcore_reset' && r.is_hardcore === 1) {
         s.hardcoreStreakLevels.clear();
         s.hardcoreResetsCount++;
+        att.status = 'failed';
       }
       if (r.action_type === 'normal_reset' && r.is_hardcore === 0) {
         s.normalCompletedLevels.clear();
       }
 
       if (lvlNum) {
+        // Update level in current attempt
+        const aLvl = att.levels[lvlNum];
+        aLvl.attempts++;
+        aLvl.lastUpdated = r.timestamp;
+        if (aLvl.firstTs === null && rTs) aLvl.firstTs = rTs;
+        if (isError) aLvl.errors++;
+        if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (aLvl.rawTimeSpentSec || 0)) {
+          aLvl.rawTimeSpentSec = r.time_spent_sec;
+        }
+        if (r.action_type === 'level_complete') {
+          aLvl.completed = true;
+          aLvl.status = 'completed';
+        } else if (r.action_type === 'hardcore_reset') {
+          if (!aLvl.completed) aLvl.status = att.mode === 'hardcore' ? 'reset' : 'in_progress';
+        } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
+          if (!aLvl.completed) aLvl.status = 'in_progress';
+        }
+
+        // Global student level tracking
         const lvl = s.levels[lvlNum];
         lvl.attempts++;
         lvl.lastUpdated = r.timestamp;
-
+        if (lvl.firstTs === null && rTs) {
+          lvl.firstTs = rTs;
+        }
         if (isError) {
           lvl.errors++;
+        }
+        if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (lvl.rawTimeSpentSec || 0)) {
+          lvl.rawTimeSpentSec = r.time_spent_sec;
         }
 
         if (r.action_type === 'level_complete') {
@@ -222,19 +349,13 @@ export const GET: APIRoute = async ({ request }) => {
           } else {
             s.normalCompletedLevels.add(lvlNum);
           }
-          if (r.time_spent_sec > lvl.timeSpentSec) {
-            lvl.timeSpentSec = r.time_spent_sec;
-          }
         } else if (r.action_type === 'hardcore_reset') {
           if (!lvl.completed) {
-            lvl.status = 'reset';
+            lvl.status = r.is_hardcore === 1 ? 'reset' : 'in_progress';
           }
         } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
           if (!lvl.completed) {
             lvl.status = 'in_progress';
-          }
-          if (r.time_spent_sec > lvl.timeSpentSec) {
-            lvl.timeSpentSec = r.time_spent_sec;
           }
         }
       }
@@ -257,14 +378,94 @@ export const GET: APIRoute = async ({ request }) => {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
     const students = Object.values(studentsMap).map(s => {
-      // Calculate total active time from all 3 levels
-      s.totalActiveTimeSec = s.levels[1].timeSpentSec + s.levels[2].timeSpentSec + s.levels[3].timeSpentSec;
+      // 1. Finalize each attempt (deduplicate pure time and evaluate completed levels)
+      s._attemptOrder.forEach(id => {
+        const att = s._attemptsMap[id];
+        const a1Raw = att.levels[1].rawTimeSpentSec || 0;
+        const a2Raw = att.levels[2].rawTimeSpentSec || 0;
+        const a3Raw = att.levels[3].rawTimeSpentSec || 0;
 
-      const isHardcoreCompleted = s.hardcoreStreakLevels.size >= 3;
-      const isNormalCompleted = s.normalCompletedLevels.size >= 3;
+        let a1Pure = a1Raw;
+        let a2Pure = a2Raw;
+        let a3Pure = a3Raw;
+
+        const a1First = att.levels[1].firstTs;
+        const a2First = att.levels[2].firstTs;
+        const a3First = att.levels[3].firstTs;
+
+        if (a1First && a2First && a1Raw > 0 && a2Raw >= a1Raw) {
+          if (Math.abs(a2First.getTime() - a1First.getTime()) < 60000) {
+            a2Pure = a2Raw - a1Raw;
+          }
+        }
+        if (a1First && a3First && a2Raw > 0 && a3Raw >= a2Raw) {
+          if (Math.abs(a3First.getTime() - a1First.getTime()) < 60000) {
+            a3Pure = a3Raw - a2Raw;
+          }
+        }
+
+        att.levels[1].timeSpentSec = a1Pure;
+        att.levels[2].timeSpentSec = a2Pure;
+        att.levels[3].timeSpentSec = a3Pure;
+        att.totalTimeSec = a1Pure + a2Pure + a3Pure;
+
+        const compCount = [1, 2, 3].filter(num => att.levels[num as 1 | 2 | 3].completed).length;
+        att.completedLevelsCount = compCount;
+        if (compCount >= 3) {
+          att.status = 'completed';
+        }
+      });
+
+      s.attempts = s._attemptOrder.map(id => s._attemptsMap[id]);
+      s.attemptsCount = s.attempts.length;
+      s.normalAttemptsCount = s.attempts.filter(a => a.mode === 'normal').length;
+      s.hardcoreAttemptsCount = s.attempts.filter(a => a.mode === 'hardcore').length;
+
+      const completedNormals = s.attempts.filter(a => a.mode === 'normal' && a.status === 'completed');
+      const completedHardcores = s.attempts.filter(a => a.mode === 'hardcore' && a.status === 'completed');
+
+      s.isNormalMastered = completedNormals.length > 0;
+      s.isHardcoreLegend = completedHardcores.length > 0;
+
+      s.bestNormalTimeSec = completedNormals.length > 0 ? Math.min(...completedNormals.map(a => a.totalTimeSec)) : null;
+      s.bestHardcoreTimeSec = completedHardcores.length > 0 ? Math.min(...completedHardcores.map(a => a.totalTimeSec)) : null;
+
+      s.currentAttempt = s.attempts.length > 0 ? s.attempts[s.attempts.length - 1] : null;
+
+      // Pure active time across session
+      const attemptsTotalTime = s.attempts.reduce((sum, a) => sum + a.totalTimeSec, 0);
+
+      // Global fallback deduplication
+      const l1Raw = s.levels[1].rawTimeSpentSec || 0;
+      const l2Raw = s.levels[2].rawTimeSpentSec || 0;
+      const l3Raw = s.levels[3].rawTimeSpentSec || 0;
+      let l1Pure = l1Raw;
+      let l2Pure = l2Raw;
+      let l3Pure = l3Raw;
+      const l1First = s.levels[1].firstTs;
+      const l2First = s.levels[2].firstTs;
+      const l3First = s.levels[3].firstTs;
+      if (l1First && l2First && l1Raw > 0 && l2Raw >= l1Raw) {
+        if (Math.abs(l2First.getTime() - l1First.getTime()) < 60000) {
+          l2Pure = l2Raw - l1Raw;
+        }
+      }
+      if (l1First && l3First && l2Raw > 0 && l3Raw >= l2Raw) {
+        if (Math.abs(l3First.getTime() - l1First.getTime()) < 60000) {
+          l3Pure = l3Raw - l2Raw;
+        }
+      }
+      s.levels[1].timeSpentSec = l1Pure;
+      s.levels[2].timeSpentSec = l2Pure;
+      s.levels[3].timeSpentSec = l3Pure;
+
+      s.totalActiveTimeSec = Math.max(attemptsTotalTime, l1Pure + l2Pure + l3Pure);
+
+      const isHardcoreCompleted = s.isHardcoreLegend || s.hardcoreStreakLevels.size >= 3;
+      const isNormalCompleted = s.isNormalMastered || s.normalCompletedLevels.size >= 3;
       s.hardcoreLevelsConquered = s.allHardcoreCompletedLevels.size;
 
-      // Update level hardcore badges: level indicates if it was solved on hardcore
+      // Update level hardcore badges
       [1, 2, 3].forEach(num => {
         s.levels[num as 1 | 2 | 3].hardcore = s.allHardcoreCompletedLevels.has(num);
       });
@@ -276,11 +477,15 @@ export const GET: APIRoute = async ({ request }) => {
       } else if (isNormalCompleted) {
         s.lessonStatus = 'completed';
         s.isHardcoreLegend = false;
-        s.hardcoreStatus = s.hardcoreAttempted ? (s.hardcoreResetsCount > 0 ? 'failed' : 'attempting') : 'none';
+        if (s.currentAttempt && s.currentAttempt.mode === 'hardcore') {
+          s.hardcoreStatus = s.currentAttempt.status === 'failed' ? 'failed' : 'attempting';
+        } else {
+          s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
+        }
       } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].attempts > 0 || s.levels[2].attempts > 0 || s.levels[3].attempts > 0) {
         s.lessonStatus = 'in_progress';
         s.isHardcoreLegend = false;
-        s.hardcoreStatus = s.hardcoreAttempted ? 'attempting' : 'none';
+        s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
       } else {
         s.lessonStatus = 'not_started';
         s.isHardcoreLegend = false;
@@ -288,10 +493,15 @@ export const GET: APIRoute = async ({ request }) => {
       }
 
       s.isHardcore = isHardcoreCompleted;
-      s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen + 'Z').toISOString() >= fifteenMinutesAgo));
+      s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen.replace(' ', 'T') + 'Z').toISOString() >= fifteenMinutesAgo));
 
       // Reverse recent events so newest is first
       s.recentEvents.reverse();
+
+      delete (s as any)._attemptsMap;
+      delete (s as any)._attemptOrder;
+      delete (s as any)._legacyIdx;
+      delete (s as any)._lastHc;
 
       return s;
     });

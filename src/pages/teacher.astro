@@ -33,7 +33,8 @@ try {
   const rows = db.prepare(`
     SELECT id, first_name, last_name, class_name, mission_name, action_type,
            time_spent_sec, attempts_count, success, status, action_log,
-           is_hardcore, student_class, course_slug, lesson_id, level_number, timestamp
+           is_hardcore, student_class, course_slug, lesson_id, level_number,
+           attempt_id, attempt_number, attempt_mode, timestamp
     FROM telemetry
     WHERE DATE(timestamp) = ?
       AND first_name NOT LIKE '%Unknown%' 
@@ -69,14 +70,15 @@ try {
         firstSeen: r.timestamp,
         lastSeen: r.timestamp,
         levels: {
-          1: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false },
-          2: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false },
-          3: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false }
+          1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null },
+          2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null },
+          3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null }
         },
         normalCompletedLevels: new Set<number>(),
         allHardcoreCompletedLevels: new Set<number>(),
         hardcoreStreakLevels: new Set<number>(),
         hardcoreAttempted: false,
+        latestIsHardcore: 0,
         hardcoreResetsCount: 0,
         hardcoreLevelsConquered: 0,
         totalActiveTimeSec: 0,
@@ -85,12 +87,64 @@ try {
         isHardcoreLegend: false,
         hardcoreStatus: 'none',
         lessonStatus: 'not_started',
-        recentEvents: []
+        attemptsCount: 0,
+        normalAttemptsCount: 0,
+        hardcoreAttemptsCount: 0,
+        isNormalMastered: false,
+        bestNormalTimeSec: null,
+        bestHardcoreTimeSec: null,
+        currentAttempt: null,
+        attempts: [],
+        recentEvents: [],
+        _attemptsMap: {},
+        _attemptOrder: [],
+        _legacyIdx: 1,
+        _lastHc: null
       };
     }
 
     const s = studentsMap[canonicalKey];
     s.lastSeen = r.timestamp;
+    s.latestIsHardcore = r.is_hardcore;
+    const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
+
+    // Determine attempt
+    let attId = r.attempt_id;
+    let attNum = r.attempt_number ? parseInt(r.attempt_number, 10) : null;
+    let attMode: 'normal' | 'hardcore' = (r.attempt_mode === 'hardcore' || r.is_hardcore === 1) ? 'hardcore' : 'normal';
+
+    if (!attId) {
+      if (s._lastHc !== null && (r.is_hardcore !== s._lastHc || r.action_type === 'normal_reset' || (r.action_type === 'hardcore_reset' && s._lastHc === 1))) {
+        s._legacyIdx++;
+      }
+      s._lastHc = r.is_hardcore;
+      attId = `${canonicalKey}_att_${s._legacyIdx}`;
+      attNum = s._legacyIdx;
+      attMode = r.is_hardcore === 1 ? 'hardcore' : 'normal';
+    }
+
+    if (!s._attemptsMap[attId]) {
+      s._attemptOrder.push(attId);
+      s._attemptsMap[attId] = {
+        attemptId: attId,
+        attemptNumber: attNum || s._attemptOrder.length,
+        mode: attMode,
+        status: 'in_progress',
+        startedAt: r.timestamp,
+        lastActiveAt: r.timestamp,
+        totalTimeSec: 0,
+        errorsCount: 0,
+        completedLevelsCount: 0,
+        levels: {
+          1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null },
+          2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null },
+          3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null }
+        }
+      };
+    }
+
+    const att = s._attemptsMap[attId];
+    att.lastActiveAt = r.timestamp;
 
     let lvlNum: 1 | 2 | 3 | null = null;
     if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) lvlNum = r.level_number as 1 | 2 | 3;
@@ -100,21 +154,48 @@ try {
 
     const isError = r.action_type === 'hardcore_reset' || (r.action_log && r.action_log.includes('Error'));
 
-    if (isError) s.totalErrors++;
+    if (isError) {
+      s.totalErrors++;
+      att.errorsCount++;
+    }
     if (r.is_hardcore === 1) s.hardcoreAttempted = true;
 
     if (r.action_type === 'hardcore_reset' && r.is_hardcore === 1) {
       s.hardcoreStreakLevels.clear();
       s.hardcoreResetsCount++;
+      att.status = 'failed';
     }
     if (r.action_type === 'normal_reset' && r.is_hardcore === 0) {
       s.normalCompletedLevels.clear();
     }
 
     if (lvlNum) {
+      const aLvl = att.levels[lvlNum];
+      aLvl.attempts++;
+      if (aLvl.firstTs === null && rTs) aLvl.firstTs = rTs;
+      if (isError) aLvl.errors++;
+      if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (aLvl.rawTimeSpentSec || 0)) {
+        aLvl.rawTimeSpentSec = r.time_spent_sec;
+      }
+      if (r.action_type === 'level_complete') {
+        aLvl.completed = true;
+        aLvl.status = 'completed';
+      } else if (r.action_type === 'hardcore_reset') {
+        if (!aLvl.completed) aLvl.status = att.mode === 'hardcore' ? 'reset' : 'in_progress';
+      } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
+        if (!aLvl.completed) aLvl.status = 'in_progress';
+      }
+
       const lvl = s.levels[lvlNum];
       lvl.attempts++;
+      if (lvl.firstTs === null && rTs) {
+        lvl.firstTs = rTs;
+      }
       if (isError) lvl.errors++;
+
+      if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (lvl.rawTimeSpentSec || 0)) {
+        lvl.rawTimeSpentSec = r.time_spent_sec;
+      }
 
       if (r.action_type === 'level_complete') {
         lvl.completed = true;
@@ -125,12 +206,10 @@ try {
         } else {
           s.normalCompletedLevels.add(lvlNum);
         }
-        if (r.time_spent_sec > lvl.timeSpentSec) lvl.timeSpentSec = r.time_spent_sec;
       } else if (r.action_type === 'hardcore_reset') {
-        if (!lvl.completed) lvl.status = 'reset';
+        if (!lvl.completed) lvl.status = r.is_hardcore === 1 ? 'reset' : 'in_progress';
       } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
         if (!lvl.completed) lvl.status = 'in_progress';
-        if (r.time_spent_sec > lvl.timeSpentSec) lvl.timeSpentSec = r.time_spent_sec;
       }
     }
 
@@ -148,10 +227,93 @@ try {
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
   initialStudents = Object.values(studentsMap).map(s => {
-    s.totalActiveTimeSec = s.levels[1].timeSpentSec + s.levels[2].timeSpentSec + s.levels[3].timeSpentSec;
+    s._attemptOrder.forEach((id: string) => {
+      const att = s._attemptsMap[id];
+      const a1Raw = att.levels[1].rawTimeSpentSec || 0;
+      const a2Raw = att.levels[2].rawTimeSpentSec || 0;
+      const a3Raw = att.levels[3].rawTimeSpentSec || 0;
+
+      let a1Pure = a1Raw;
+      let a2Pure = a2Raw;
+      let a3Pure = a3Raw;
+
+      const a1First = att.levels[1].firstTs;
+      const a2First = att.levels[2].firstTs;
+      const a3First = att.levels[3].firstTs;
+
+      if (a1First && a2First && a1Raw > 0 && a2Raw >= a1Raw) {
+        if (Math.abs(a2First.getTime() - a1First.getTime()) < 60000) {
+          a2Pure = a2Raw - a1Raw;
+        }
+      }
+      if (a1First && a3First && a2Raw > 0 && a3Raw >= a2Raw) {
+        if (Math.abs(a3First.getTime() - a1First.getTime()) < 60000) {
+          a3Pure = a3Raw - a2Raw;
+        }
+      }
+
+      att.levels[1].timeSpentSec = a1Pure;
+      att.levels[2].timeSpentSec = a2Pure;
+      att.levels[3].timeSpentSec = a3Pure;
+      att.totalTimeSec = a1Pure + a2Pure + a3Pure;
+
+      const compCount = [1, 2, 3].filter(num => att.levels[num].completed).length;
+      att.completedLevelsCount = compCount;
+      if (compCount >= 3) {
+        att.status = 'completed';
+      }
+    });
+
+    s.attempts = s._attemptOrder.map((id: string) => s._attemptsMap[id]);
+    s.attemptsCount = s.attempts.length;
+    s.normalAttemptsCount = s.attempts.filter((a: any) => a.mode === 'normal').length;
+    s.hardcoreAttemptsCount = s.attempts.filter((a: any) => a.mode === 'hardcore').length;
+
+    const completedNormals = s.attempts.filter((a: any) => a.mode === 'normal' && a.status === 'completed');
+    const completedHardcores = s.attempts.filter((a: any) => a.mode === 'hardcore' && a.status === 'completed');
+
+    s.isNormalMastered = completedNormals.length > 0;
+    s.isHardcoreLegend = completedHardcores.length > 0;
+
+    s.bestNormalTimeSec = completedNormals.length > 0 ? Math.min(...completedNormals.map((a: any) => a.totalTimeSec)) : null;
+    s.bestHardcoreTimeSec = completedHardcores.length > 0 ? Math.min(...completedHardcores.map((a: any) => a.totalTimeSec)) : null;
+
+    s.currentAttempt = s.attempts.length > 0 ? s.attempts[s.attempts.length - 1] : null;
+
+    const attemptsTotalTime = s.attempts.reduce((sum: number, a: any) => sum + a.totalTimeSec, 0);
+
+    const l1Raw = s.levels[1].rawTimeSpentSec || 0;
+    const l2Raw = s.levels[2].rawTimeSpentSec || 0;
+    const l3Raw = s.levels[3].rawTimeSpentSec || 0;
+
+    let l1Pure = l1Raw;
+    let l2Pure = l2Raw;
+    let l3Pure = l3Raw;
+
+    const l1First = s.levels[1].firstTs;
+    const l2First = s.levels[2].firstTs;
+    const l3First = s.levels[3].firstTs;
+
+    if (l1First && l2First && l1Raw > 0 && l2Raw >= l1Raw) {
+      if (Math.abs(l2First.getTime() - l1First.getTime()) < 60000) {
+        l2Pure = l2Raw - l1Raw;
+      }
+    }
+
+    if (l1First && l3First && l2Raw > 0 && l3Raw >= l2Raw) {
+      if (Math.abs(l3First.getTime() - l1First.getTime()) < 60000) {
+        l3Pure = l3Raw - l2Raw;
+      }
+    }
+
+    s.levels[1].timeSpentSec = l1Pure;
+    s.levels[2].timeSpentSec = l2Pure;
+    s.levels[3].timeSpentSec = l3Pure;
+
+    s.totalActiveTimeSec = Math.max(attemptsTotalTime, l1Pure + l2Pure + l3Pure);
     
-    const isHardcoreCompleted = s.hardcoreStreakLevels.size >= 3;
-    const isNormalCompleted = s.normalCompletedLevels.size >= 3;
+    const isHardcoreCompleted = s.isHardcoreLegend || s.hardcoreStreakLevels.size >= 3;
+    const isNormalCompleted = s.isNormalMastered || s.normalCompletedLevels.size >= 3;
     s.hardcoreLevelsConquered = s.allHardcoreCompletedLevels.size;
 
     [1, 2, 3].forEach(num => {
@@ -165,11 +327,15 @@ try {
     } else if (isNormalCompleted) {
       s.lessonStatus = 'completed';
       s.isHardcoreLegend = false;
-      s.hardcoreStatus = s.hardcoreAttempted ? (s.hardcoreResetsCount > 0 ? 'failed' : 'attempting') : 'none';
+      if (s.currentAttempt && s.currentAttempt.mode === 'hardcore') {
+        s.hardcoreStatus = s.currentAttempt.status === 'failed' ? 'failed' : 'attempting';
+      } else {
+        s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
+      }
     } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].attempts > 0 || s.levels[2].attempts > 0 || s.levels[3].attempts > 0) {
       s.lessonStatus = 'in_progress';
       s.isHardcoreLegend = false;
-      s.hardcoreStatus = s.hardcoreAttempted ? 'attempting' : 'none';
+      s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
     } else {
       s.lessonStatus = 'not_started';
       s.isHardcoreLegend = false;
@@ -177,8 +343,14 @@ try {
     }
 
     s.isHardcore = isHardcoreCompleted;
-    s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen + 'Z').toISOString() >= fifteenMinutesAgo));
+    s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen.replace(' ', 'T') + 'Z').toISOString() >= fifteenMinutesAgo));
     s.recentEvents.reverse();
+
+    delete s._attemptsMap;
+    delete s._attemptOrder;
+    delete s._legacyIdx;
+    delete s._lastHc;
+
     return s;
   });
 
@@ -577,6 +749,14 @@ function formatSec(sec: number): string {
             <!-- Will be populated by JS -->
           </div>
 
+          <!-- Attempts / Runs List in Modal -->
+          <div id="modal-attempts-container" class="space-y-2">
+            <h4 class="text-xs font-bold text-gray-600 uppercase tracking-wider">История забегов (Попытки прохождения)</h4>
+            <div class="space-y-2 max-h-56 overflow-y-auto" id="modal-attempts-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
           <!-- History timeline -->
           <div>
             <h4 class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Хронология последних событий (Таймлайн)</h4>
@@ -893,17 +1073,19 @@ function formatSec(sec: number): string {
     let html = '';
     sorted.forEach((s, idx) => {
       let statusBadge = '';
+      const attBadge = s.attemptsCount > 1 ? `<div class="text-[10px] text-gray-500 font-medium mt-0.5">${s.attemptsCount} забега (${s.normalAttemptsCount} обычн.${s.hardcoreAttemptsCount > 0 ? `, ${s.hardcoreAttemptsCount} 💀` : ''})</div>` : '';
+
       if (s.lessonStatus === 'hardcore_completed') {
-        statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300">💀 Хардкор сдан</span>';
+        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300">💀 Хардкор сдан</span>${attBadge}</div>`;
       } else if (s.lessonStatus === 'completed') {
         let extra = '';
         if (s.hardcoreLevelsConquered > 0) extra = `<span class="text-[10px] text-red-600 font-semibold" title="Пройдено на хардкоре: ${s.hardcoreLevelsConquered} из 3 уровней">💀 ${s.hardcoreLevelsConquered}/3 ур.</span>`;
         else if (s.hardcoreStatus === 'failed') extra = '<span class="text-[10px] text-red-600 font-medium" title="Была попытка пройти на хардкоре, сброшена на ошибке">💀 сброс</span>';
         else if (s.hardcoreStatus === 'attempting') extra = '<span class="text-[10px] text-amber-600 font-medium" title="Сейчас решает в режиме хардкора">💀 попытка</span>';
-        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800 border border-green-300">✓ Пройден</span>${extra}</div>`;
+        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800 border border-green-300">✓ Пройден</span>${extra}${attBadge}</div>`;
       } else if (s.lessonStatus === 'in_progress') {
         let extra = s.hardcoreStatus === 'attempting' ? '<span class="text-[10px] text-amber-600 font-medium">💀 хардкор</span>' : '';
-        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">⏳ В процессе</span>${extra}</div>`;
+        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">⏳ В процессе</span>${extra}${attBadge}</div>`;
       } else {
         statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">— Не начат</span>';
       }
@@ -969,7 +1151,7 @@ function formatSec(sec: number): string {
   function openModal(student) {
     activeStudent = student;
     document.getElementById('modal-student-name').textContent = student.displayName;
-    document.getElementById('modal-student-sub').textContent = `${student.className} • Чистое время: ${formatTime(student.totalActiveTimeSec)} • Всего ошибок: ${student.totalErrors}`;
+    document.getElementById('modal-student-sub').textContent = `${student.className} • Чистое время: ${formatTime(student.totalActiveTimeSec)} • Всего ошибок: ${student.totalErrors} • Забегов: ${student.attemptsCount || 1}`;
 
     // Render level summary cards
     const cards = document.getElementById('modal-level-cards');
@@ -987,6 +1169,64 @@ function formatSec(sec: number): string {
       `;
     });
     cards.innerHTML = cardsHtml;
+
+    // Render attempts list
+    const attemptsList = document.getElementById('modal-attempts-list');
+    if (attemptsList) {
+      if (!student.attempts || student.attempts.length === 0) {
+        attemptsList.innerHTML = '<div class="p-3 text-center text-gray-400 bg-gray-50 border border-gray-100 text-xs">Нет данных по отдельным попыткам</div>';
+      } else {
+        let attHtml = '';
+        student.attempts.forEach((att, idx) => {
+          const isHc = att.mode === 'hardcore';
+          const modeBadge = isHc
+            ? '<span class="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">💀 Хардкор</span>'
+            : '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">Обычный</span>';
+          
+          let stBadge = '<span class="text-amber-600 font-semibold">⏳ В процессе</span>';
+          if (att.status === 'completed') {
+            stBadge = isHc
+              ? '<span class="text-red-700 font-bold">👑 Покорен</span>'
+              : '<span class="text-green-700 font-bold">✓ Завершён</span>';
+          } else if (att.status === 'failed') {
+            stBadge = '<span class="text-red-600 font-medium">❌ Сброс</span>';
+          }
+
+          function miniLvl(l, num) {
+            if (!l) return `<span class="text-[11px] text-gray-400">Ур.${num}: —</span>`;
+            const icon = l.completed ? '✓' : l.status === 'reset' ? '❌' : l.status === 'in_progress' ? '⏳' : '—';
+            return `<span class="text-[11px] text-gray-700">Ур.${num}: <strong>${icon} ${formatTime(l.timeSpentSec)}</strong></span>`;
+          }
+
+          attHtml += `
+            <div class="p-3 bg-gray-50 border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-gray-900">Забег #${att.attemptNumber || (idx + 1)}</span>
+                  ${modeBadge}
+                  ${stBadge}
+                </div>
+                <div class="flex items-center gap-2 text-gray-500 text-[11px]">
+                  <span>Время: <strong class="text-gray-800 font-mono">${formatTime(att.totalTimeSec)}</strong></span>
+                  <span>•</span>
+                  <span>Ошибок: <strong class="text-gray-800">${att.errorsCount}</strong></span>
+                  <span>•</span>
+                  <span>Сдано: <strong>${att.completedLevelsCount}/3 уровней</strong></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 sm:gap-3 bg-white px-2.5 py-1.5 border border-gray-200 shrink-0">
+                ${miniLvl(att.levels[1], 1)}
+                <span class="text-gray-300">•</span>
+                ${miniLvl(att.levels[2], 2)}
+                <span class="text-gray-300">•</span>
+                ${miniLvl(att.levels[3], 3)}
+              </div>
+            </div>
+          `;
+        });
+        attemptsList.innerHTML = attHtml;
+      }
+    }
 
     // Render recent events
     const list = document.getElementById('modal-events-list');

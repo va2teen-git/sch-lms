@@ -1,0 +1,325 @@
+import { test, expect } from '@playwright/test';
+import Database from 'better-sqlite3';
+import path from 'path';
+
+test.describe('Comprehensive Telemetry & Attempt Lifecycle Engine Suite', () => {
+  const baseUrl = 'http://localhost:4321';
+  const dbPath = path.join(process.cwd(), 'telemetry.db');
+
+  test('1. Academic Mastery Retention: Normal pass is never revoked by subsequent hardcore failure', async ({ request }) => {
+    const studentFn = `Мастери_${Date.now()}`;
+    const studentLn = 'Попыткин';
+    const sClass = '11-класс_углубленный';
+    const lessonId = '991';
+    const missionPrefix = `Урок ${lessonId} :: Машина Поста`;
+
+    // Attempt 1: Normal mode pass (Levels 1, 2, 3 complete)
+    const att1Id = `att_norm_${Date.now()}`;
+    for (let lvl = 1; lvl <= 3; lvl++) {
+      await request.post(`${baseUrl}/api/telemetry`, {
+        data: {
+          student_firstName: studentFn,
+          student_lastName: studentLn,
+          student_class: sClass,
+          course_slug: sClass,
+          lesson_id: lessonId,
+          level_number: lvl,
+          mission_name: `${missionPrefix} (Уровень ${lvl})`,
+          action_type: 'level_complete',
+          time_spent_sec: 120 * lvl,
+          attempt_id: att1Id,
+          attempt_number: 1,
+          attempt_mode: 'normal',
+          is_hardcore: false,
+          success: true
+        },
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Attempt 2: Hardcore attempt that wipes at Level 2
+    const att2Id = `att_hc_${Date.now()}`;
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        course_slug: sClass,
+        lesson_id: lessonId,
+        level_number: 1,
+        mission_name: `${missionPrefix} (Уровень 1)`,
+        action_type: 'level_complete',
+        time_spent_sec: 90,
+        attempt_id: att2Id,
+        attempt_number: 2,
+        attempt_mode: 'hardcore',
+        is_hardcore: true,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        course_slug: sClass,
+        lesson_id: lessonId,
+        level_number: 2,
+        mission_name: `${missionPrefix} (Уровень 2)`,
+        action_type: 'hardcore_reset',
+        time_spent_sec: 45,
+        attempt_id: att2Id,
+        attempt_number: 2,
+        attempt_mode: 'hardcore',
+        is_hardcore: true,
+        success: false
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Query teacher stats API
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.students.length).toBe(1);
+
+    const s = body.students[0];
+    // Check academic retention:
+    expect(s.isNormalMastered).toBe(true);
+    expect(s.lessonStatus).toBe('completed');
+    expect(s.hardcoreStatus).toBe('failed');
+    expect(s.attemptsCount).toBe(2);
+    expect(s.normalAttemptsCount).toBe(1);
+    expect(s.hardcoreAttemptsCount).toBe(1);
+
+    // Verify individual attempt objects:
+    expect(s.attempts.length).toBe(2);
+    expect(s.attempts[0].attemptId).toBe(att1Id);
+    expect(s.attempts[0].mode).toBe('normal');
+    expect(s.attempts[0].status).toBe('completed');
+    expect(s.attempts[0].completedLevelsCount).toBe(3);
+
+    expect(s.attempts[1].attemptId).toBe(att2Id);
+    expect(s.attempts[1].mode).toBe('hardcore');
+    expect(s.attempts[1].status).toBe('failed');
+  });
+
+  test('2. Pure Active Time Deduplication across concurrent iframes within an attempt', async ({ request }) => {
+    const studentFn = `Дедуп_${Date.now()}`;
+    const studentLn = 'Попыткин';
+    const sClass = '11-класс_углубленный';
+    const lessonId = '992';
+    const missionPrefix = `Урок ${lessonId} :: Задание`;
+    const attId = `att_dedup_${Date.now()}`;
+
+    // Level 1: 500s pure time
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 1,
+        mission_name: `${missionPrefix} (Уровень 1)`,
+        action_type: 'level_complete',
+        time_spent_sec: 500,
+        attempt_id: attId,
+        attempt_number: 1,
+        attempt_mode: 'normal',
+        is_hardcore: false,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Level 2: concurrently loaded at T0, reports 850s from page start
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 2,
+        mission_name: `${missionPrefix} (Уровень 2)`,
+        action_type: 'level_complete',
+        time_spent_sec: 850,
+        attempt_id: attId,
+        attempt_number: 1,
+        attempt_mode: 'normal',
+        is_hardcore: false,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    const body = await res.json();
+    const s = body.students[0];
+    const att = s.attempts[0];
+
+    // Level 1 pure: 500s
+    expect(att.levels[1].timeSpentSec).toBe(500);
+    // Level 2 pure: 850 - 500 = 350s
+    expect(att.levels[2].timeSpentSec).toBe(350);
+    // Total pure time for attempt: 500 + 350 = 850s (not 500 + 850 = 1350s!)
+    expect(att.totalTimeSec).toBe(850);
+  });
+
+  test('3. Multi-Run Cumulative Active Time vs Best Run Time tracking', async ({ request }) => {
+    const studentFn = `МултиРан_${Date.now()}`;
+    const studentLn = 'Попыткин';
+    const sClass = '11-класс_углубленный';
+    const lessonId = '993';
+    const missionPrefix = `Урок ${lessonId} :: Марафон`;
+
+    // Run 1: Slow pass (Levels 1,2,3 totaling 900s)
+    const run1Id = `run1_${Date.now()}`;
+    for (let lvl = 1; lvl <= 3; lvl++) {
+      await request.post(`${baseUrl}/api/telemetry`, {
+        data: {
+          student_firstName: studentFn,
+          student_lastName: studentLn,
+          student_class: sClass,
+          lesson_id: lessonId,
+          level_number: lvl,
+          mission_name: `${missionPrefix} (Уровень ${lvl})`,
+          action_type: 'level_complete',
+          time_spent_sec: 300 * lvl,
+          attempt_id: run1Id,
+          attempt_number: 1,
+          attempt_mode: 'normal',
+          is_hardcore: false
+        },
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Run 2: Fast pass (Levels 1,2,3 totaling 300s)
+    const run2Id = `run2_${Date.now()}`;
+    for (let lvl = 1; lvl <= 3; lvl++) {
+      await request.post(`${baseUrl}/api/telemetry`, {
+        data: {
+          student_firstName: studentFn,
+          student_lastName: studentLn,
+          student_class: sClass,
+          lesson_id: lessonId,
+          level_number: lvl,
+          mission_name: `${missionPrefix} (Уровень ${lvl})`,
+          action_type: 'level_complete',
+          time_spent_sec: 100 * lvl,
+          attempt_id: run2Id,
+          attempt_number: 2,
+          attempt_mode: 'normal',
+          is_hardcore: false
+        },
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    const body = await res.json();
+    const s = body.students[0];
+
+    expect(s.attemptsCount).toBe(2);
+    // Best normal run time is the faster run (300s)
+    expect(s.bestNormalTimeSec).toBe(300);
+    // Total engagement active time sums both runs (900 + 300 = 1200s)
+    expect(s.totalActiveTimeSec).toBe(1200);
+  });
+
+  test('4. Hardcore Conquered (Ironman Victory) grants legend status and isolates hardcore time', async ({ request }) => {
+    const studentFn = `Легенда_${Date.now()}`;
+    const studentLn = 'Попыткин';
+    const sClass = '11-класс_углубленный';
+    const lessonId = '994';
+    const missionPrefix = `Урок ${lessonId} :: Испытание`;
+
+    const hcAttId = `att_hc_win_${Date.now()}`;
+    for (let lvl = 1; lvl <= 3; lvl++) {
+      await request.post(`${baseUrl}/api/telemetry`, {
+        data: {
+          student_firstName: studentFn,
+          student_lastName: studentLn,
+          student_class: sClass,
+          lesson_id: lessonId,
+          level_number: lvl,
+          mission_name: `${missionPrefix} (Уровень ${lvl})`,
+          action_type: 'level_complete',
+          time_spent_sec: 80 * lvl,
+          attempt_id: hcAttId,
+          attempt_number: 1,
+          attempt_mode: 'hardcore',
+          is_hardcore: true,
+          success: true
+        },
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    const body = await res.json();
+    const s = body.students[0];
+
+    expect(s.isHardcoreLegend).toBe(true);
+    expect(s.lessonStatus).toBe('hardcore_completed');
+    expect(s.hardcoreStatus).toBe('completed');
+    expect(s.bestHardcoreTimeSec).toBe(240); // 80 * 3
+  });
+
+  test('5. Backward Compatibility: Legacy rows without attempt_id partition cleanly into attempts', async ({ request }) => {
+    const studentFn = `Легаси_${Date.now()}`;
+    const studentLn = 'Попыткин';
+    const sClass = '11-класс_углубленный';
+    const lessonId = '995';
+
+    // Insert directly into SQLite without attempt_id
+    const db = new Database(dbPath);
+    const insert = db.prepare(`
+      INSERT INTO telemetry (
+        first_name, last_name, student_class, class_name, mission_name,
+        action_type, time_spent_sec, is_hardcore, lesson_id, level_number
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // Normal event
+    insert.run(studentFn, studentLn, sClass, sClass, `Урок ${lessonId} (Ур 1)`, 'level_complete', 150, 0, lessonId, 1);
+    // Normal reset -> triggers legacy attempt 2
+    insert.run(studentFn, studentLn, sClass, sClass, `Урок ${lessonId}`, 'normal_reset', 0, 0, lessonId, null);
+    // Hardcore event -> triggers legacy attempt 3
+    insert.run(studentFn, studentLn, sClass, sClass, `Урок ${lessonId} (Ур 1)`, 'level_complete', 120, 1, lessonId, 1);
+    db.close();
+
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    const body = await res.json();
+    const s = body.students[0];
+
+    expect(s).toBeDefined();
+    expect(s.attemptsCount).toBeGreaterThanOrEqual(2);
+    expect(Array.isArray(s.attempts)).toBe(true);
+    expect(s.attempts[0].levels[1].completed).toBe(true);
+  });
+
+  test('6. Browser UI Verification: Teacher modal renders Attempt History with level badges and times', async ({ page }) => {
+    await page.goto(`${baseUrl}/teacher?date=all`);
+    await page.waitForSelector('.view-log-btn');
+
+    // Click on log button for any student
+    await page.locator('.view-log-btn').first().click();
+
+    // Verify modal elements
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await expect(page.locator('#modal-student-name')).toBeVisible();
+    await expect(page.locator('#modal-attempts-container')).toBeVisible();
+    await expect(page.locator('#modal-attempts-list')).toBeVisible();
+
+    const attemptsText = await page.locator('#modal-attempts-list').innerText();
+    expect(attemptsText.length).toBeGreaterThan(0);
+
+    // Verify close
+    await page.locator('#modal-close-btn').click();
+    await expect(page.locator('#detail-modal')).toBeHidden();
+  });
+});
