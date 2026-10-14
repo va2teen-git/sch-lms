@@ -1,0 +1,476 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4 font-monospace" v-cloak>
+        
+        <!-- ========================================== -->
+        <!-- СТАРТОВЫЙ ЭКРАН (БРИФИНГ ХАРДКОРА) -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center shadow-lg">
+            <div class="display-3 text-danger mb-3">⚡ PACKET FLOW ROUTER ⚡</div>
+            <h2 class="text-light mb-2">МАРШРУТИЗАЦИЯ ДВОИЧНОГО ПОТОКА // АРХЕТИП 2</h2>
+            <p class="text-secondary fs-5 mb-4" style="max-width: 720px; margin: 0 auto;">
+                В защищенный крипто-шлюз на высокой скорости поступает непрерывный поток пакетов данных. 
+                Ваша задача: в реальном времени переключать коммутаторы бинарного дерева Фано, 
+                направляя двоичный импульс ровно в целевой терминал декодера.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start small" style="max-width: 650px;">
+                <div class="text-danger fw-bold mb-2">[ПРОТОКОЛ ХАРДКОР-ИСПЫТАНИЯ // 8 ВОЛН]:</div>
+                <div class="text-light mb-1">• <span class="text-warning">Коммутация ветвей:</span> Клик по узлу переключает шлюз (<code class="text-success">0 = ВЛЕВО</code> ↔ <code class="text-danger">1 = ВПРАВО</code>).</div>
+                <div class="text-light mb-1">• <span class="text-warning">Жесткий таймер:</span> На прокладку маршрута каждого пакета отводится жесткое окно времени (от 12 до 6 секунд). Таймер непрерывно убывает!</div>
+                <div class="text-light mb-1">• <span class="text-warning">Кнопка ускорения:</span> Выставив маршрут, жмите <span class="text-light fw-bold">[ПУСК ИМПУЛЬСА]</span> для досрочной доставки.</div>
+                <div class="text-danger fw-bold">• ТОТАЛЬНЫЙ СБРОС (Full Wipeout): Любая ошибка маршрутизации, попадание в тупик или истечение таймера вызывают немедленный сброс на ВОЛНУ 1!</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ МАРШРУТИЗАТОР (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ИГРОВОЙ ЭКРАН (АРКАДНЫЙ ПРОЦЕСС) -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4 shadow-lg">
+            
+            <!-- Информационная панель и таймер -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР МАРШРУТИЗАЦИИ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentWave"></span> ИЗ 8</span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-1">АРХЕТИП 2: FLOW ROUTER</span>
+                    <div class="text-secondary small mt-1">Попытка #<span v-text="attempts + 1"></span></div>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО СРЫВА СИНХРОНИЗАЦИИ:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="progressBarStyle">
+                </div>
+            </div>
+
+            <!-- Текущий входящий пакет данных -->
+            <div class="card bg-dark border-secondary rounded-0 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <span class="text-secondary small d-block">ВХОДЯЩИЙ ПАКЕТ В ПОТОКЕ:</span>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <span class="badge bg-danger text-dark fs-5 rounded-0 px-3 py-2 fw-bold">
+                                СИМВОЛ: «<span v-text="currentWaveData.targetSymbol"></span>»
+                            </span>
+                            <span class="badge bg-black border border-warning text-warning fs-5 rounded-0 px-3 py-2">
+                                ДВОИЧНЫЙ КОД: <code v-text="currentWaveData.targetCode"></code>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="text-secondary small d-block">ТЕКУЩАЯ ТРАЕКТОРИЯ ШЛЮЗОВ:</span>
+                        <span class="fs-4 fw-bold font-monospace" :class="currentRouteMatchesTarget ? 'text-success' : 'text-danger'" v-text="currentPathString || '[НЕ ЗАДАНА]'"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Интерактивное дерево-маршрутизатор (коммутаторы 0 / 1) -->
+            <div class="card bg-black border-danger rounded-0 p-4 mb-4 text-center overflow-auto position-relative">
+                <div class="text-secondary small mb-3 text-start">
+                    КЛИКАЙТЕ ПО ШЛЮЗАМ ДЛЯ ПЕРЕКЛЮЧЕНИЯ НАПРАВЛЕНИЯ [<span class="text-success">0 = ВЛЕВО</span> / <span class="text-danger">1 = ВПРАВО</span>]:
+                </div>
+
+                <div class="d-flex flex-column align-items-center gap-4 py-2" style="min-width: 680px;">
+                    
+                    <!-- Корневой узел -->
+                    <div class="position-relative">
+                        <button class="btn btn-lg rounded-0 px-4 py-2 fw-bold router-node shadow"
+                                :class="switches['root'] === '0' ? 'btn-outline-success border-2' : 'btn-outline-danger border-2'"
+                                @click="toggleSwitch('root')">
+                            <span v-text="switches['root'] === '0' ? 'КОРЕНЬ ➔ ВЛЕВО [0]' : 'КОРЕНЬ ➔ ВПРАВО [1]'"></span>
+                        </button>
+                    </div>
+
+                    <!-- Уровень 1: развилки 0 и 1 -->
+                    <div class="d-flex justify-content-center gap-5 w-100">
+                        <!-- Ветка 0 -->
+                        <div class="tree-branch-col text-center" style="width: 320px;">
+                            <div class="text-success small mb-1">← ВЕТВЬ 0</div>
+                            <div v-if="hasSubnode('0')">
+                                <button class="btn rounded-0 px-3 py-2 fw-bold router-node"
+                                        :class="switches['0'] === '0' ? 'btn-outline-success' : 'btn-outline-danger'"
+                                        @click="toggleSwitch('0')">
+                                    <span v-text="switches['0'] === '0' ? 'ШЛЮЗ [0] ➔ [0]' : 'ШЛЮЗ [0] ➔ [1]'"></span>
+                                </button>
+                            </div>
+                            <div v-else class="badge bg-dark border border-success text-success p-2 rounded-0">
+                                ТЕРМИНАЛ: <span v-text="getTerminalFor('0') || 'ПУСТО'"></span>
+                            </div>
+                        </div>
+
+                        <!-- Ветка 1 -->
+                        <div class="tree-branch-col text-center" style="width: 320px;">
+                            <div class="text-danger small mb-1">ВЕТВЬ 1 →</div>
+                            <div v-if="hasSubnode('1')">
+                                <button class="btn rounded-0 px-3 py-2 fw-bold router-node"
+                                        :class="switches['1'] === '0' ? 'btn-outline-success' : 'btn-outline-danger'"
+                                        @click="toggleSwitch('1')">
+                                    <span v-text="switches['1'] === '0' ? 'ШЛЮЗ [1] ➔ [0]' : 'ШЛЮЗ [1] ➔ [1]'"></span>
+                                </button>
+                            </div>
+                            <div v-else class="badge bg-dark border border-success text-success p-2 rounded-0">
+                                ТЕРМИНАЛ: <span v-text="getTerminalFor('1') || 'ПУСТО'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Уровень 2: развилки 00, 01, 10, 11 (при наличии) -->
+                    <div class="d-flex justify-content-around w-100">
+                        <div v-for="nodeId in ['00', '01', '10', '11']" :key="nodeId" class="text-center" style="width: 150px;">
+                            <div v-if="hasSubnode(nodeId)">
+                                <button class="btn btn-sm rounded-0 px-2 py-1 fw-bold router-node"
+                                        :class="switches[nodeId] === '0' ? 'btn-outline-success' : 'btn-outline-danger'"
+                                        @click="toggleSwitch(nodeId)">
+                                    <span v-text="'[' + nodeId + '] ➔ ' + (switches[nodeId] === '0' ? '0' : '1')"></span>
+                                </button>
+                            </div>
+                            <div v-else-if="getTerminalFor(nodeId)" 
+                                 class="badge p-2 rounded-0 border"
+                                 :class="activeTerminalPath === nodeId ? 'bg-success text-dark border-success fw-bold' : 'bg-dark text-light border-secondary'">
+                                <span v-text="'[' + nodeId + '] ' + getTerminalFor(nodeId)"></span>
+                            </div>
+                            <div v-else class="text-secondary small opacity-25">
+                                <span v-text="'[' + nodeId + ' тупик]'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Уровень 3: терминалы 3-битных и 4-битных кодов -->
+                    <div class="d-flex justify-content-around w-100 flex-wrap gap-2 pt-2 border-top border-secondary">
+                        <div v-for="path in currentTerminals" :key="path.code" 
+                             class="p-2 border rounded-0 text-center"
+                             :class="activeTerminalPath === path.code ? 'border-success bg-dark text-success fw-bold shadow' : 'border-secondary bg-black text-secondary'"
+                             style="min-width: 100px;">
+                            <div class="small font-monospace" v-text="path.code"></div>
+                            <div class="fs-6 text-light" v-text="path.symbol"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Кнопка немедленного пуска импульса -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-secondary small">
+                    Статус шлюза: <span :class="currentRouteMatchesTarget ? 'text-success fw-bold' : 'text-warning'" v-text="currentRouteMatchesTarget ? 'МАРШРУТ ВЕРЕН (ГОТОВ К ПУСКУ)' : 'МАРШРУТ НЕ СОВПАДАЕТ С КОДОМ ПАКЕТА'"></span>
+                </div>
+                <button id="dispatch-btn" @click="dispatchPacket" 
+                        class="btn btn-lg rounded-0 fw-bold px-5 py-2 text-dark"
+                        :class="currentRouteMatchesTarget ? 'btn-success shadow' : 'btn-danger'">
+                    🚀 ПУСК ИМПУЛЬСА В ШЛЮЗ →
+                </button>
+            </div>
+
+            <!-- Аварийное модальное уведомление о сбросе -->
+            <div v-if="crashMessage" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mt-3 p-3 text-center">
+                <div class="fs-5 fw-bold mb-1">🚨 КРИТИЧЕСКИЙ СБОЙ МАРШРУТИЗАЦИИ! СБРОС НА ВОЛНУ 1 🚨</div>
+                <div v-text="crashMessage"></div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ЭКРАН ПОБЕДЫ (ХАРДКОР СДАН) -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'victory'" class="card bg-black border-danger rounded-0 p-5 text-center shadow-lg">
+            <div class="display-1 text-danger mb-3">★ ★ ★</div>
+            <h2 class="text-light font-monospace mb-2">ХАРДКОР-РЕЖИМ ПОЛНОСТЬЮ ПРОЙДЕН!</h2>
+            <p class="fs-5 text-secondary mx-auto max-w-lg mb-4">
+                Все 8 волн непрерывного двоичного потока успешно маршрутизированы без единого сбоя.
+                Принцип префиксного кодирования Фано усвоен на уровне рефлексов!
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-4 mx-auto mb-4 text-start font-monospace small" style="max-width: 600px;">
+                <div class="row g-3">
+                    <div class="col-6 text-secondary">Общее время забега:</div>
+                    <div class="col-6 text-end text-light fw-bold" v-text="formattedFinalTime"></div>
+                    <div class="col-6 text-secondary">Число попыток забега:</div>
+                    <div class="col-6 text-end text-warning fw-bold" v-text="attempts + 1"></div>
+                    <div class="col-6 text-secondary">Статус аттестации:</div>
+                    <div class="col-6 text-end text-danger fw-bold">ХАРДКОР МАСТЕР (100%)</div>
+                </div>
+            </div>
+
+            <div>
+                <button @click="restartGame" class="btn btn-outline-danger btn-lg rounded-0 font-monospace px-5 py-3">
+                    ПРОЙТИ ХАРДКОР ЗАНОВО
+                </button>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                currentWave: 1,
+                totalWaves: 8,
+                attempts: 0,
+                startTime: Date.now(),
+                phaseTimeLeft: 12.0,
+                maxPhaseTime: 12.0,
+                timerInterval: null,
+                crashMessage: null,
+
+                // Состояния переключателей в дереве (0 = влево, 1 = вправо)
+                switches: {
+                    'root': '0',
+                    '0': '0',
+                    '1': '0',
+                    '00': '0',
+                    '01': '0',
+                    '10': '0',
+                    '11': '0'
+                },
+
+                // Текущие параметры волны
+                currentWaveData: {
+                    targetSymbol: 'А',
+                    targetCode: '0',
+                    timeLimit: 12.0,
+                    treeStructure: {} // Карта путей к терминалам
+                }
+            };
+        },
+
+        computed: {
+            progressBarStyle() {
+                const pct = Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
+                return { width: pct + '%' };
+            },
+
+            formattedFinalTime() {
+                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
+                return `${m}:${s}`;
+            },
+
+            // Вычисляем путь, на который в данный момент настроены стрелки
+            activeTerminalPath() {
+                // Начинаем с корня
+                let path = this.switches['root'];
+                if (this.currentWaveData.treeStructure[path]) {
+                    return path; // Достигли листа
+                }
+                // Проверяем 2-й уровень
+                if (this.switches[path] !== undefined) {
+                    path += this.switches[path];
+                    if (this.currentWaveData.treeStructure[path]) {
+                        return path; // Достигли листа
+                    }
+                    // Проверяем 3-й уровень
+                    if (this.switches[path] !== undefined) {
+                        path += this.switches[path];
+                    }
+                }
+                return path;
+            },
+
+            currentPathString() {
+                return this.activeTerminalPath;
+            },
+
+            currentRouteMatchesTarget() {
+                return this.activeTerminalPath === this.currentWaveData.targetCode;
+            },
+
+            currentTerminals() {
+                const list = [];
+                for (const [code, sym] of Object.entries(this.currentWaveData.treeStructure)) {
+                    list.push({ code, symbol: sym });
+                }
+                return list.sort((a, b) => a.code.localeCompare(b.code));
+            }
+        },
+
+        methods: {
+            sendTelemetry(actionType, isSuccess) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 7 :: Двоичное кодирование (Уровень 3)',
+                    action_type: actionType,
+                    status: isSuccess ? 'completed' : 'in_progress',
+                    start_time: new Date(this.startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: this.attempts,
+                    success: isSuccess
+                }, '*');
+            },
+
+            startGame() {
+                this.gameState = 'playing';
+                this.currentWave = 1;
+                this.startTime = Date.now();
+                this.sendTelemetry('in_progress', false);
+                this.initWave(1);
+            },
+
+            restartGame() {
+                this.gameState = 'intro';
+                this.currentWave = 1;
+                clearInterval(this.timerInterval);
+            },
+
+            toggleSwitch(nodeId) {
+                if (this.switches[nodeId] === '0') {
+                    this.switches[nodeId] = '1';
+                } else {
+                    this.switches[nodeId] = '0';
+                }
+            },
+
+            hasSubnode(nodeId) {
+                // Узел существует как развилка, если в структуре есть терминалы, начинающиеся с этого префикса, но не равные ему
+                const terminals = Object.keys(this.currentWaveData.treeStructure);
+                return terminals.some(t => t.startsWith(nodeId) && t.length > nodeId.length);
+            },
+
+            getTerminalFor(code) {
+                return this.currentWaveData.treeStructure[code] || null;
+            },
+
+            initWave(waveNum) {
+                clearInterval(this.timerInterval);
+                this.currentWave = waveNum;
+                this.crashMessage = null;
+
+                // Сброс стрелок в дефолт
+                for (const k in this.switches) {
+                    this.switches[k] = Math.random() > 0.5 ? '1' : '0';
+                }
+
+                // Конфигуратор 8 волн нарастающей сложности:
+                // Волна 1: 3 символа, простой код (длина 1-2 бита), 12 сек
+                // Волна 2: 3 символа, инвертированный префикс, 10 сек
+                // Волна 3: 4 символа (Фано: 0, 10, 110, 111), 9 сек
+                // Волна 4: 4 символа (Фано: 1, 01, 001, 000), 8.5 сек
+                // Волна 5: 5 символов (00, 01, 10, 110, 111), 8 сек
+                // Волна 6: 4 символа, ускоренный таймер, 7.5 сек
+                // Волна 7: 5 символов, глубокое дерево, 7.0 сек
+                // Волна 8: Финальный босс: скоростная кодовая цепь, 6.0 сек
+
+                let tree = {};
+                let time = 10.0;
+
+                switch (waveNum) {
+                    case 1:
+                        tree = { '0': 'А', '10': 'Б', '11': 'В' };
+                        time = 12.0;
+                        break;
+                    case 2:
+                        tree = { '1': 'С', '01': 'Т', '00': 'У' };
+                        time = 10.0;
+                        break;
+                    case 3:
+                        tree = { '0': 'К', '10': 'О', '110': 'Д', '111': 'Ы' };
+                        time = 9.0;
+                        break;
+                    case 4:
+                        tree = { '1': 'Б', '01': 'И', '001': 'Т', '000': 'Ы' };
+                        time = 8.5;
+                        break;
+                    case 5:
+                        tree = { '00': 'M', '01': 'E', '10': 'M', '110': 'O', '111': 'R' };
+                        time = 8.0;
+                        break;
+                    case 6:
+                        tree = { '0': 'Ф', '100': 'А', '101': 'Н', '11': 'О' };
+                        time = 7.5;
+                        break;
+                    case 7:
+                        tree = { '00': 'X', '01': 'Y', '100': 'Z', '101': 'W', '11': 'V' };
+                        time = 7.0;
+                        break;
+                    case 8:
+                        tree = { '000': 'P', '001': 'A', '01': 'C', '10': 'K', '110': 'E', '111': 'T' };
+                        time = 6.0;
+                        break;
+                }
+
+                // Выбираем случайную целевую букву из дерева
+                const codes = Object.keys(tree);
+                const randomCode = codes[Math.floor(Math.random() * codes.length)];
+                
+                this.currentWaveData = {
+                    targetSymbol: tree[randomCode],
+                    targetCode: randomCode,
+                    timeLimit: time,
+                    treeStructure: tree
+                };
+
+                this.maxPhaseTime = time;
+                this.phaseTimeLeft = time;
+
+                // Запуск таймера
+                this.timerInterval = setInterval(() => {
+                    this.phaseTimeLeft -= 0.1;
+                    if (this.phaseTimeLeft <= 0) {
+                        this.phaseTimeLeft = 0;
+                        this.handleFailure('Таймер исчерпан! Пакет сошел с линии задержки в буфере.');
+                    }
+                }, 100);
+            },
+
+            dispatchPacket() {
+                if (this.currentRouteMatchesTarget) {
+                    // Успех текущей волны!
+                    clearInterval(this.timerInterval);
+                    if (this.currentWave >= this.totalWaves) {
+                        // Победа в хардкоре!
+                        this.gameState = 'victory';
+                        this.sendTelemetry('level_complete', true);
+                    } else {
+                        this.initWave(this.currentWave + 1);
+                    }
+                } else {
+                    // Ошибка маршрутизации!
+                    const actualTerm = this.getTerminalFor(this.activeTerminalPath) || 'ТУПИК';
+                    this.handleFailure(`Пакет [${this.currentWaveData.targetSymbol}:${this.currentWaveData.targetCode}] ошибочно направлен в [${actualTerm}:${this.activeTerminalPath}]!`);
+                }
+            },
+
+            handleFailure(reason) {
+                clearInterval(this.timerInterval);
+                this.attempts++;
+                this.crashMessage = reason;
+                this.sendTelemetry('hardcore_reset', false);
+
+                // Задержка 1.5 сек и полный сброс на волну 1!
+                setTimeout(() => {
+                    this.crashMessage = null;
+                    this.initWave(1);
+                }, 1500);
+            }
+        }
+    }).mount('#app');
+</script>
