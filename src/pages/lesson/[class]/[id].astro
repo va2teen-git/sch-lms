@@ -126,7 +126,7 @@ const tasks = [
   const iframes = document.querySelectorAll('iframe');
 
   const HARDCORE_KEY = `school_lms_hardcore_${classSlug}_${lessonId}`;
-  let isHardcore = sessionStorage.getItem(HARDCORE_KEY) === 'true';
+  let isHardcore = sessionStorage.getItem(HARDCORE_KEY) === 'true' || localStorage.getItem('hardcore_mode') === 'true' || localStorage.getItem(HARDCORE_KEY) === 'true';
   let currentUnlockedLevel = 1;
   let isHardcoreCompleted = false;
   let isNormalCompleted = false;
@@ -376,7 +376,8 @@ const tasks = [
         data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
       }
 
-      if (data.action_type === 'hardcore_reset' && isHardcore) {
+      if ((data.action_type === 'hardcore_reset' || data.action_type === 'level_fail') && isHardcore) {
+        data.action_type = 'hardcore_reset';
         alert('💀 ОШИБКА В РЕЖИМЕ ХАРДКОРА! Прогресс сброшен!');
         currentUnlockedLevel = 1;
         updateTabsState();
@@ -388,6 +389,9 @@ const tasks = [
         });
 
         currentAttempt = getOrCreateAttempt(true, 'hardcore');
+      } else if (data.action_type === 'hardcore_reset' && !isHardcore) {
+        // Normal mode safety: if an iframe sent hardcore_reset while in normal mode, downgrade to level_fail
+        data.action_type = 'level_fail';
       }
 
       if (data.action_type === 'level_complete') {

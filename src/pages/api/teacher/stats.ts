@@ -287,7 +287,7 @@ export const GET: APIRoute = async ({ request }) => {
       else if (r.mission_name.includes('Уровень 2')) lvlNum = 2;
       else if (r.mission_name.includes('Уровень 3')) lvlNum = 3;
 
-      const isError = r.action_type === 'hardcore_reset' || (r.action_log && r.action_log.includes('Error'));
+      const isError = r.action_type === 'hardcore_reset' || r.action_type === 'level_fail' || (r.action_log && r.action_log.includes('Error'));
 
       if (isError) {
         s.totalErrors++;
@@ -324,6 +324,10 @@ export const GET: APIRoute = async ({ request }) => {
           if (!aLvl.completed) {
             aLvl.status = att.mode === 'hardcore' ? 'reset' : ((aLvl.rawTimeSpentSec || 0) > 0 || aLvl.errors > 0 ? 'in_progress' : 'not_started');
           }
+        } else if (r.action_type === 'level_fail') {
+          if (!aLvl.completed) {
+            aLvl.status = 'in_progress';
+          }
         } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
           if (!aLvl.completed && (r.time_spent_sec > 0 || (aLvl.rawTimeSpentSec || 0) > 0)) {
             aLvl.status = 'in_progress';
@@ -356,6 +360,10 @@ export const GET: APIRoute = async ({ request }) => {
         } else if (r.action_type === 'hardcore_reset') {
           if (!lvl.completed) {
             lvl.status = r.is_hardcore === 1 ? 'reset' : ((lvl.rawTimeSpentSec || 0) > 0 || lvl.errors > 0 ? 'in_progress' : 'not_started');
+          }
+        } else if (r.action_type === 'level_fail') {
+          if (!lvl.completed) {
+            lvl.status = 'in_progress';
           }
         } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
           if (!lvl.completed && (r.time_spent_sec > 0 || (lvl.rawTimeSpentSec || 0) > 0)) {

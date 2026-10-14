@@ -152,7 +152,7 @@ try {
     else if (r.mission_name.includes('Уровень 2')) lvlNum = 2;
     else if (r.mission_name.includes('Уровень 3')) lvlNum = 3;
 
-    const isError = r.action_type === 'hardcore_reset' || (r.action_log && r.action_log.includes('Error'));
+    const isError = r.action_type === 'hardcore_reset' || r.action_type === 'level_fail' || (r.action_log && r.action_log.includes('Error'));
 
     if (isError) {
       s.totalErrors++;
@@ -184,6 +184,10 @@ try {
         if (!aLvl.completed) {
           aLvl.status = att.mode === 'hardcore' ? 'reset' : ((aLvl.rawTimeSpentSec || 0) > 0 || aLvl.errors > 0 ? 'in_progress' : 'not_started');
         }
+      } else if (r.action_type === 'level_fail') {
+        if (!aLvl.completed) {
+          aLvl.status = 'in_progress';
+        }
       } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
         if (!aLvl.completed && (r.time_spent_sec > 0 || (aLvl.rawTimeSpentSec || 0) > 0)) {
           aLvl.status = 'in_progress';
@@ -213,6 +217,10 @@ try {
       } else if (r.action_type === 'hardcore_reset') {
         if (!lvl.completed) {
           lvl.status = r.is_hardcore === 1 ? 'reset' : ((lvl.rawTimeSpentSec || 0) > 0 || lvl.errors > 0 ? 'in_progress' : 'not_started');
+        }
+      } else if (r.action_type === 'level_fail') {
+        if (!lvl.completed) {
+          lvl.status = 'in_progress';
         }
       } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
         if (!lvl.completed && (r.time_spent_sec > 0 || (lvl.rawTimeSpentSec || 0) > 0)) {
@@ -395,6 +403,10 @@ try {
     s.isHardcore = isHardcoreCompleted;
     s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen.replace(' ', 'T') + 'Z').toISOString() >= fifteenMinutesAgo));
     s.recentEvents.reverse();
+
+    s.normalCompletedLevels = Array.from(s.normalCompletedLevels);
+    s.allHardcoreCompletedLevels = Array.from(s.allHardcoreCompletedLevels);
+    s.hardcoreStreakLevels = Array.from(s.hardcoreStreakLevels);
 
     delete s._attemptsMap;
     delete s._attemptOrder;
@@ -625,9 +637,17 @@ function getAttemptsWord(count: number): string {
               <th class="p-3 text-center">Уровень 1</th>
               <th class="p-3 text-center">Уровень 2</th>
               <th class="p-3 text-center">Уровень 3</th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="time" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Активное время <span id="sort-time-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="time" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">
+                <div class="leading-tight">Время решения</div>
+                <div class="text-[10px] text-gray-500 font-normal normal-case">Активное время</div>
+                <span id="sort-time-icon">↕</span>
+              </th>
               <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="errors" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Ошибки <span id="sort-errors-icon">↕</span></th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="last" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Активность <span id="sort-last-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="last" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">
+                <div class="leading-tight">Был на уроке</div>
+                <div class="text-[10px] text-gray-500 font-normal normal-case">Время ухода</div>
+                <span id="sort-last-icon">↕</span>
+              </th>
               <th class="p-3 text-center w-28">Действия</th>
             </tr>
           </thead>
@@ -642,159 +662,263 @@ function getAttemptsWord(count: number): string {
               </tr>
             ) : (
               initialStudents.map((s, idx) => (
-                <tr class="hover:bg-blue-50/30 transition student-row" data-key={s.key}>
-                  <td class="p-3 text-center font-mono text-xs text-gray-400">{idx + 1}</td>
-                  <td class="p-3 font-semibold text-gray-900">
-                    <div class="flex items-center gap-2">
-                      <span class={`w-2.5 h-2.5 inline-block ${s.isActiveNow ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} title={s.isActiveNow ? 'Активен сейчас' : 'Офлайн'}></span>
-                      <span>{s.displayName}</span>
-                    </div>
-                  </td>
-                  <td class="p-3 text-xs text-gray-600">{s.className}</td>
-                  <td class="p-3 text-center">
-                    {s.lessonStatus === 'hardcore_completed' && (
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300">
-                        💀 Хардкор сдан
-                      </span>
-                    )}
-                    {s.lessonStatus === 'completed' && (
-                      <div class="inline-flex flex-col items-center gap-0.5">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800 border border-green-300">
-                          ✓ Пройден
-                        </span>
-                        {s.hardcoreLevelsConquered > 0 ? (
-                          <span class="text-[10px] text-red-600 font-semibold" title={`Пройдено на хардкоре: ${s.hardcoreLevelsConquered} из 3 уровней`}>
-                            💀 {s.hardcoreLevelsConquered}/3 ур.
-                          </span>
-                        ) : s.hardcoreStatus === 'failed' ? (
-                          <span class="text-[10px] text-red-600 font-medium" title="Была попытка пройти на хардкоре, сброшена на ошибке">
-                            💀 сброс
-                          </span>
-                        ) : s.hardcoreStatus === 'attempting' ? (
-                          <span class="text-[10px] text-amber-600 font-medium" title="Сейчас решает в режиме хардкора">
-                            💀 попытка
-                          </span>
-                        ) : null}
+                <>
+                  <tr class="hover:bg-blue-50/30 transition student-row" data-key={s.key}>
+                    <td class="p-3 text-center font-mono text-xs text-gray-400">{idx + 1}</td>
+                    <td class="p-3 font-semibold text-gray-900">
+                      <div class="flex items-center gap-2">
+                        <span class={`w-2.5 h-2.5 inline-block ${s.isActiveNow ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} title={s.isActiveNow ? 'Активен сейчас' : 'Офлайн'}></span>
+                        <span>{s.displayName}</span>
                       </div>
-                    )}
-                    {s.lessonStatus === 'in_progress' && (
-                      <div class="inline-flex flex-col items-center gap-0.5">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-                          ⏳ В процессе
+                    </td>
+                    <td class="p-3 text-xs text-gray-600">{s.className}</td>
+                    <td class="p-3 text-center">
+                      {s.lessonStatus === 'hardcore_completed' && (
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300">
+                          💀 Хардкор сдан
                         </span>
-                        {s.hardcoreStatus === 'attempting' && (
-                          <span class="text-[10px] text-amber-600 font-medium">
-                            💀 хардкор
+                      )}
+                      {s.lessonStatus === 'completed' && (
+                        <div class="inline-flex flex-col items-center gap-0.5">
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800 border border-green-300">
+                            ✓ Пройден
+                          </span>
+                          {s.hardcoreLevelsConquered > 0 ? (
+                            <span class="text-[10px] text-red-600 font-semibold" title={`Пройдено на хардкоре: ${s.hardcoreLevelsConquered} из 3 уровней`}>
+                              💀 {s.hardcoreLevelsConquered}/3 ур.
+                            </span>
+                          ) : s.hardcoreStatus === 'failed' ? (
+                            <span class="text-[10px] text-red-600 font-medium" title="Была попытка пройти на хардкоре, сброшена на ошибке">
+                              💀 сброс
+                            </span>
+                          ) : s.hardcoreStatus === 'attempting' ? (
+                            <span class="text-[10px] text-amber-600 font-medium" title="Сейчас решает в режиме хардкора">
+                              💀 попытка
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                      {s.lessonStatus === 'in_progress' && (
+                        <div class="inline-flex flex-col items-center gap-0.5">
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                            ⏳ В процессе
+                          </span>
+                          {s.hardcoreStatus === 'attempting' && (
+                            <span class="text-[10px] text-amber-600 font-medium">
+                              💀 хардкор
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {s.lessonStatus === 'not_started' && (
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">
+                          — Не начат
+                        </span>
+                      )}
+                    </td>
+
+                    <!-- Attempts Column with Expand Toggle -->
+                    <td class="p-3 text-center">
+                      <button type="button" class="toggle-attempts-btn inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded hover:bg-blue-100/60 border border-transparent hover:border-blue-200 cursor-pointer transition select-none" data-student-key={s.key} title="Нажмите, чтобы развернуть/свернуть забеги">
+                        <span class="attempt-toggle-icon text-[10px] text-gray-500 font-mono">▶</span>
+                        {s.attemptsCount > 1 || s.hardcoreAttemptsCount > 0 ? (
+                          <div class="inline-flex flex-col items-center gap-0.5">
+                            <span class={`inline-flex items-center gap-1 px-1.5 py-0.2 text-xs font-semibold ${s.hardcoreAttemptsCount > 0 ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`} title={`Всего забегов: ${s.attemptsCount}${s.bestNormalTimeSec ? ` • Лучшее обычное: ${formatSec(s.bestNormalTimeSec)}` : ''}${s.bestHardcoreTimeSec ? ` • Лучшее хардкор: ${formatSec(s.bestHardcoreTimeSec)}` : ''}`}>
+                              {s.attemptsCount} {getAttemptsWord(s.attemptsCount)}
+                            </span>
+                            <span class="text-[10px] text-gray-500 font-medium">
+                              {s.normalAttemptsCount} обычн.{s.hardcoreAttemptsCount > 0 ? ` • ${s.hardcoreAttemptsCount} 💀` : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <span class="inline-flex items-center px-1.5 py-0.2 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                            1 забег
                           </span>
                         )}
-                      </div>
-                    )}
-                    {s.lessonStatus === 'not_started' && (
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">
-                        — Не начат
-                      </span>
-                    )}
-                  </td>
-
-                  <!-- Attempts Column -->
-                  <td class="p-3 text-center">
-                    {s.attemptsCount > 1 || s.hardcoreAttemptsCount > 0 ? (
-                      <div class="inline-flex flex-col items-center gap-0.5">
-                        <span class={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold ${s.hardcoreAttemptsCount > 0 ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`} title={`Всего забегов: ${s.attemptsCount}${s.bestNormalTimeSec ? ` • Лучшее обычное: ${formatSec(s.bestNormalTimeSec)}` : ''}${s.bestHardcoreTimeSec ? ` • Лучшее хардкор: ${formatSec(s.bestHardcoreTimeSec)}` : ''}`}>
-                          {s.attemptsCount} {getAttemptsWord(s.attemptsCount)}
+                      </button>
+                    </td>
+                    
+                    <!-- Level 1 Badge -->
+                    <td class="p-3 text-center">
+                      {s.levels[1].completed ? (
+                        <span class={`inline-block px-2 py-1 text-xs border ${s.levels[1].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                          {s.levels[1].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[1].timeSpentSec)} • {s.levels[1].errors} ош.
                         </span>
-                        <span class="text-[10px] text-gray-500 font-medium">
-                          {s.normalAttemptsCount} обычн.{s.hardcoreAttemptsCount > 0 ? ` • ${s.hardcoreAttemptsCount} 💀` : ''}
+                      ) : s.levels[1].status === 'in_progress' ? (
+                        <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          ⏳ {formatSec(s.levels[1].timeSpentSec)}
                         </span>
-                      </div>
-                    ) : (
-                      <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-                        1 забег
-                      </span>
-                    )}
-                  </td>
-                  
-                  <!-- Level 1 Badge -->
-                  <td class="p-3 text-center">
-                    {s.levels[1].completed ? (
-                      <span class={`inline-block px-2 py-1 text-xs border ${s.levels[1].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                        {s.levels[1].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[1].timeSpentSec)} • {s.levels[1].errors} ош.
-                      </span>
-                    ) : s.levels[1].status === 'in_progress' ? (
-                      <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                        ⏳ {formatSec(s.levels[1].timeSpentSec)}
-                      </span>
-                    ) : s.levels[1].status === 'reset' ? (
-                      <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                        ❌ Сброс
-                      </span>
-                    ) : (
-                      <span class="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
+                      ) : s.levels[1].status === 'reset' ? (
+                        <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                          ❌ Сброс
+                        </span>
+                      ) : (
+                        <span class="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
 
-                  <!-- Level 2 Badge -->
-                  <td class="p-3 text-center">
-                    {s.levels[2].completed ? (
-                      <span class={`inline-block px-2 py-1 text-xs border ${s.levels[2].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                        {s.levels[2].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[2].timeSpentSec)} • {s.levels[2].errors} ош.
-                      </span>
-                    ) : s.levels[2].status === 'in_progress' ? (
-                      <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                        ⏳ {formatSec(s.levels[2].timeSpentSec)}
-                      </span>
-                    ) : s.levels[2].status === 'reset' ? (
-                      <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                        ❌ Сброс
-                      </span>
-                    ) : (
-                      <span class="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
+                    <!-- Level 2 Badge -->
+                    <td class="p-3 text-center">
+                      {s.levels[2].completed ? (
+                        <span class={`inline-block px-2 py-1 text-xs border ${s.levels[2].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                          {s.levels[2].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[2].timeSpentSec)} • {s.levels[2].errors} ош.
+                        </span>
+                      ) : s.levels[2].status === 'in_progress' ? (
+                        <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          ⏳ {formatSec(s.levels[2].timeSpentSec)}
+                        </span>
+                      ) : s.levels[2].status === 'reset' ? (
+                        <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                          ❌ Сброс
+                        </span>
+                      ) : (
+                        <span class="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
 
-                  <!-- Level 3 Badge -->
-                  <td class="p-3 text-center">
-                    {s.levels[3].completed ? (
-                      <span class={`inline-block px-2 py-1 text-xs border ${s.levels[3].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                        {s.levels[3].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[3].timeSpentSec)} • {s.levels[3].errors} ош.
+                    <!-- Level 3 Badge -->
+                    <td class="p-3 text-center">
+                      {s.levels[3].completed ? (
+                        <span class={`inline-block px-2 py-1 text-xs border ${s.levels[3].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                          {s.levels[3].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[3].timeSpentSec)} • {s.levels[3].errors} ош.
+                        </span>
+                      ) : s.levels[3].status === 'in_progress' ? (
+                        <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          ⏳ {formatSec(s.levels[3].timeSpentSec)}
+                        </span>
+                      ) : s.levels[3].status === 'reset' ? (
+                        <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                          ❌ Сброс
+                        </span>
+                      ) : (
+                        <span class="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+
+                    <!-- Total Time -->
+                    <td class="p-3 text-center font-mono font-semibold text-gray-800">
+                      {formatSec(s.totalActiveTimeSec)}
+                    </td>
+
+                    <!-- Total Errors -->
+                    <td class="p-3 text-center">
+                      <span class={`inline-block px-2 py-0.5 text-xs font-bold ${s.totalErrors > 15 ? 'bg-red-100 text-red-800' : s.totalErrors > 3 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
+                        {s.totalErrors}
                       </span>
-                    ) : s.levels[3].status === 'in_progress' ? (
-                      <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                        ⏳ {formatSec(s.levels[3].timeSpentSec)}
-                      </span>
-                    ) : s.levels[3].status === 'reset' ? (
-                      <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                        ❌ Сброс
-                      </span>
-                    ) : (
-                      <span class="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
+                    </td>
 
-                  <!-- Total Time -->
-                  <td class="p-3 text-center font-mono font-semibold text-gray-800">
-                    {formatSec(s.totalActiveTimeSec)}
-                  </td>
+                    <!-- Last Activity -->
+                    <td class="p-3 text-center text-xs text-gray-500 font-mono">
+                      {s.lastSeen ? s.lastSeen.split(' ')[1] : '—'}
+                    </td>
 
-                  <!-- Total Errors -->
-                  <td class="p-3 text-center">
-                    <span class={`inline-block px-2 py-0.5 text-xs font-bold ${s.totalErrors > 15 ? 'bg-red-100 text-red-800' : s.totalErrors > 3 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
-                      {s.totalErrors}
-                    </span>
-                  </td>
+                    <!-- Actions / Details -->
+                    <td class="p-3 text-center">
+                      <button class="px-2 py-1 text-xs font-medium border border-gray-300 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 text-gray-700 view-log-btn" data-student-key={s.key}>
+                        Лог 📋
+                      </button>
+                    </td>
+                  </tr>
 
-                  <!-- Last Activity -->
-                  <td class="p-3 text-center text-xs text-gray-500 font-mono">
-                    {s.lastSeen ? s.lastSeen.split(' ')[1] : '—'}
-                  </td>
-
-                  <!-- Actions / Details -->
-                  <td class="p-3 text-center">
-                    <button class="px-2 py-1 text-xs font-medium border border-gray-300 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 text-gray-700 view-log-btn" data-student-key={s.key}>
-                      Лог 📋
-                    </button>
-                  </td>
-                </tr>
+                  {s.attempts && s.attempts.map((att: any, attIdx: number) => {
+                    const isHc = att.mode === 'hardcore';
+                    return (
+                      <tr class="attempt-subrow hidden bg-slate-50/90 hover:bg-blue-50/40 border-b border-gray-200/60 text-xs transition select-none" data-parent-key={s.key}>
+                        <td class="p-2.5 text-center font-mono text-[11px] text-gray-400">↳</td>
+                        <td class="p-2.5 pl-7 text-xs font-medium text-gray-800">
+                          <div class="flex items-center gap-1.5">
+                            <span class="font-bold text-gray-700">Забег #{att.attemptNumber || (attIdx + 1)}</span>
+                            {isHc ? (
+                              <span class="px-1.5 py-0.2 text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">💀 Хардкор</span>
+                            ) : (
+                              <span class="px-1.5 py-0.2 text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Обычный</span>
+                            )}
+                          </div>
+                        </td>
+                        <td class="p-2.5 text-center text-[11px] text-gray-400 font-mono">—</td>
+                        <td class="p-2.5 text-center">
+                          {att.status === 'completed' ? (
+                            isHc ? (
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-red-100 text-red-800 border border-red-300">👑 Покорен</span>
+                            ) : (
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-green-100 text-green-800 border border-green-300">✓ Завершён</span>
+                            )
+                          ) : att.status === 'failed' ? (
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">❌ Сброс</span>
+                          ) : (
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">⏳ В процессе</span>
+                          )}
+                        </td>
+                        <td class="p-2.5 text-center text-[11px] text-gray-600 font-mono font-medium">
+                          {att.completedLevelsCount}/3 ур.
+                        </td>
+                        <td class="p-2.5 text-center">
+                          {att.levels[1]?.completed ? (
+                            <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                              ✓ {formatSec(att.levels[1].timeSpentSec)} • {att.levels[1].errors} ош.
+                            </span>
+                          ) : att.levels[1]?.status === 'in_progress' ? (
+                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              ⏳ {formatSec(att.levels[1].timeSpentSec)}
+                            </span>
+                          ) : att.levels[1]?.status === 'reset' ? (
+                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                              ❌ Сброс
+                            </span>
+                          ) : (
+                            <span class="text-gray-300 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td class="p-2.5 text-center">
+                          {att.levels[2]?.completed ? (
+                            <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                              ✓ {formatSec(att.levels[2].timeSpentSec)} • {att.levels[2].errors} ош.
+                            </span>
+                          ) : att.levels[2]?.status === 'in_progress' ? (
+                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              ⏳ {formatSec(att.levels[2].timeSpentSec)}
+                            </span>
+                          ) : att.levels[2]?.status === 'reset' ? (
+                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                              ❌ Сброс
+                            </span>
+                          ) : (
+                            <span class="text-gray-300 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td class="p-2.5 text-center">
+                          {att.levels[3]?.completed ? (
+                            <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                              ✓ {formatSec(att.levels[3].timeSpentSec)} • {att.levels[3].errors} ош.
+                            </span>
+                          ) : att.levels[3]?.status === 'in_progress' ? (
+                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              ⏳ {formatSec(att.levels[3].timeSpentSec)}
+                            </span>
+                          ) : att.levels[3]?.status === 'reset' ? (
+                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                              ❌ Сброс
+                            </span>
+                          ) : (
+                            <span class="text-gray-300 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td class="p-2.5 text-center font-mono font-medium text-gray-800 text-xs">
+                          {formatSec(att.totalTimeSec)}
+                        </td>
+                        <td class="p-2.5 text-center">
+                          <span class={`inline-block px-1.5 py-0.2 text-[11px] font-bold ${att.errorsCount > 15 ? 'bg-red-100 text-red-800' : att.errorsCount > 3 ? 'bg-amber-100 text-amber-800' : att.errorsCount > 0 ? 'bg-amber-50 text-amber-700' : 'text-gray-400'}`}>
+                            {att.errorsCount}
+                          </span>
+                        </td>
+                        <td class="p-2.5 text-center text-[11px] text-gray-500 font-mono">
+                          {att.lastActiveAt ? att.lastActiveAt.split(' ')[1] : '—'}
+                        </td>
+                        <td class="p-2.5 text-center text-gray-300 text-[11px]">—</td>
+                      </tr>
+                    );
+                  })}
+                </>
               ))
             )}
           </tbody>
@@ -855,12 +979,13 @@ function getAttemptsWord(count: number): string {
   </div>
 </Layout>
 
-<script is:inline define:vars={{ coursesData }}>
-  let currentStudents = [];
+<script is:inline define:vars={{ coursesData, initialStudents }}>
+  let currentStudents = Array.isArray(initialStudents) ? [...initialStudents] : [];
   let isLive = true;
   let pollingInterval = null;
   let sortRules = [{ col: 'last', asc: false }];
   let activeStudent = null;
+  const expandedStudentKeys = new Set();
 
   const classDropdownBtn = document.getElementById('filter-class');
   const classDropdownMenu = document.getElementById('class-dropdown-menu');
@@ -881,6 +1006,20 @@ function getAttemptsWord(count: number): string {
   const refreshBtn = document.getElementById('refresh-now-btn');
   const exportBtn = document.getElementById('export-btn');
   const modal = document.getElementById('detail-modal');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('date') && dateSelect) {
+    dateSelect.value = urlParams.get('date');
+  }
+  if (urlParams.has('search') && searchInput) {
+    searchInput.value = urlParams.get('search');
+  }
+  if (urlParams.has('course') && courseSelect) {
+    courseSelect.value = urlParams.get('course');
+  }
+  if (urlParams.has('lesson') && lessonSelect) {
+    lessonSelect.value = urlParams.get('lesson');
+  }
 
   function getSelectedClasses() {
     const checked = Array.from(document.querySelectorAll('.class-checkbox:checked'));
@@ -1177,23 +1316,36 @@ function getAttemptsWord(count: number): string {
         statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">— Не начат</span>';
       }
 
+      const isExpanded = expandedStudentKeys.has(s.key);
+      const toggleIcon = isExpanded ? '▼' : '▶';
+
       let attemptsBadge = '';
       if ((s.attemptsCount && s.attemptsCount > 1) || (s.hardcoreAttemptsCount && s.hardcoreAttemptsCount > 0)) {
         const hcClass = s.hardcoreAttemptsCount > 0 ? 'bg-purple-100 text-purple-900 border-purple-200' : 'bg-blue-50 text-blue-800 border-blue-200';
         const bestInfo = `${s.bestNormalTimeSec ? ` • Лучшее обычное: ${formatTime(s.bestNormalTimeSec)}` : ''}${s.bestHardcoreTimeSec ? ` • Лучшее хардкор: ${formatTime(s.bestHardcoreTimeSec)}` : ''}`;
         const hcSub = s.hardcoreAttemptsCount > 0 ? ` • ${s.hardcoreAttemptsCount} 💀` : '';
         attemptsBadge = `
-          <div class="inline-flex flex-col items-center gap-0.5">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold ${hcClass} border" title="Всего забегов: ${s.attemptsCount}${bestInfo}">
-              ${s.attemptsCount} ${getAttemptsWord(s.attemptsCount)}
-            </span>
-            <span class="text-[10px] text-gray-500 font-medium">
-              ${s.normalAttemptsCount || 0} обычн.${hcSub}
-            </span>
-          </div>
+          <button type="button" class="toggle-attempts-btn inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded hover:bg-blue-100/60 border border-transparent hover:border-blue-200 cursor-pointer transition select-none" data-student-key="${s.key}" title="Нажмите, чтобы развернуть/свернуть забеги">
+            <span class="attempt-toggle-icon text-[10px] text-gray-500 font-mono">${toggleIcon}</span>
+            <div class="inline-flex flex-col items-center gap-0.5">
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.2 text-xs font-semibold ${hcClass} border" title="Всего забегов: ${s.attemptsCount}${bestInfo}">
+                ${s.attemptsCount} ${getAttemptsWord(s.attemptsCount)}
+              </span>
+              <span class="text-[10px] text-gray-500 font-medium">
+                ${s.normalAttemptsCount || 0} обычн.${hcSub}
+              </span>
+            </div>
+          </button>
         `;
       } else {
-        attemptsBadge = '<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">1 забег</span>';
+        attemptsBadge = `
+          <button type="button" class="toggle-attempts-btn inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded hover:bg-gray-200/70 border border-transparent hover:border-gray-300 cursor-pointer transition select-none" data-student-key="${s.key}" title="Нажмите, чтобы развернуть/свернуть забег">
+            <span class="attempt-toggle-icon text-[10px] text-gray-500 font-mono">${toggleIcon}</span>
+            <span class="inline-flex items-center px-1.5 py-0.2 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+              1 забег
+            </span>
+          </button>
+        `;
       }
 
       function levelBadge(lvl) {
@@ -1241,19 +1393,99 @@ function getAttemptsWord(count: number): string {
           </td>
         </tr>
       `;
+
+      if (s.attempts && s.attempts.length > 0) {
+        s.attempts.forEach((att, attIdx) => {
+          const isHc = att.mode === 'hardcore';
+          let attStatusBadge = '';
+          if (att.status === 'completed') {
+            attStatusBadge = isHc
+              ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-red-100 text-red-800 border border-red-300">👑 Покорен</span>'
+              : '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-green-100 text-green-800 border border-green-300">✓ Завершён</span>';
+          } else if (att.status === 'failed') {
+            attStatusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">❌ Сброс</span>';
+          } else {
+            attStatusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">⏳ В процессе</span>';
+          }
+
+          function subLevelBadge(lvl) {
+            if (!lvl) return '<span class="text-gray-300 text-[11px]">—</span>';
+            if (lvl.completed) {
+              const hc = isHc ? '💀 ' : '';
+              const hcClass = isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium';
+              return `<span class="inline-block px-1.5 py-0.5 text-[11px] ${hcClass} border">${hc}✓ ${formatTime(lvl.timeSpentSec)} • ${lvl.errors} ош.</span>`;
+            }
+            if (lvl.status === 'in_progress') {
+              return `<span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">⏳ ${formatTime(lvl.timeSpentSec)}</span>`;
+            }
+            if (lvl.status === 'reset') {
+              return `<span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">❌ Сброс</span>`;
+            }
+            return '<span class="text-gray-300 text-[11px]">—</span>';
+          }
+
+          const attErrClass = att.errorsCount > 15 ? 'bg-red-100 text-red-800' : att.errorsCount > 3 ? 'bg-amber-100 text-amber-800' : att.errorsCount > 0 ? 'bg-amber-50 text-amber-700' : 'text-gray-400';
+          const attLastTime = att.lastActiveAt ? att.lastActiveAt.split(' ')[1] : '—';
+          const subHiddenClass = isExpanded ? '' : 'hidden';
+
+          html += `
+            <tr class="attempt-subrow ${subHiddenClass} bg-slate-50/90 hover:bg-blue-50/40 border-b border-gray-200/60 text-xs transition select-none" data-parent-key="${s.key}">
+              <td class="p-2.5 text-center font-mono text-[11px] text-gray-400">↳</td>
+              <td class="p-2.5 pl-7 text-xs font-medium text-gray-800">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-gray-700">Забег #${att.attemptNumber || (attIdx + 1)}</span>
+                  ${isHc ? '<span class="px-1.5 py-0.2 text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">💀 Хардкор</span>' : '<span class="px-1.5 py-0.2 text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Обычный</span>'}
+                </div>
+              </td>
+              <td class="p-2.5 text-center text-[11px] text-gray-400 font-mono">—</td>
+              <td class="p-2.5 text-center">${attStatusBadge}</td>
+              <td class="p-2.5 text-center text-[11px] text-gray-600 font-mono font-medium">${att.completedLevelsCount}/3 ур.</td>
+              <td class="p-2.5 text-center">${subLevelBadge(att.levels[1])}</td>
+              <td class="p-2.5 text-center">${subLevelBadge(att.levels[2])}</td>
+              <td class="p-2.5 text-center">${subLevelBadge(att.levels[3])}</td>
+              <td class="p-2.5 text-center font-mono font-medium text-gray-800 text-xs">${formatTime(att.totalTimeSec)}</td>
+              <td class="p-2.5 text-center"><span class="inline-block px-1.5 py-0.2 text-[11px] font-bold ${attErrClass}">${att.errorsCount}</span></td>
+              <td class="p-2.5 text-center text-[11px] text-gray-500 font-mono">${attLastTime}</td>
+              <td class="p-2.5 text-center text-gray-300 text-[11px]">—</td>
+            </tr>
+          `;
+        });
+      }
     });
 
     tbody.innerHTML = html;
-
-    // Attach click handlers to log buttons
-    tbody.querySelectorAll('.view-log-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const key = btn.getAttribute('data-student-key');
-        const student = currentStudents.find(s => s.key === key);
-        if (student) openModal(student);
-      });
-    });
   }
+
+  // Delegated table clicks for attempt expand/collapse and log modal
+  tableBody.addEventListener('click', (e) => {
+    const toggleBtn = e.target.closest('.toggle-attempts-btn');
+    if (toggleBtn) {
+      e.stopPropagation();
+      const key = toggleBtn.getAttribute('data-student-key');
+      if (!key) return;
+      if (expandedStudentKeys.has(key)) {
+        expandedStudentKeys.delete(key);
+      } else {
+        expandedStudentKeys.add(key);
+      }
+      const isNowExpanded = expandedStudentKeys.has(key);
+      const iconSpan = toggleBtn.querySelector('.attempt-toggle-icon');
+      if (iconSpan) iconSpan.textContent = isNowExpanded ? '▼' : '▶';
+      const subrows = tableBody.querySelectorAll(`.attempt-subrow[data-parent-key="${key}"]`);
+      subrows.forEach(r => {
+        if (isNowExpanded) r.classList.remove('hidden');
+        else r.classList.add('hidden');
+      });
+      return;
+    }
+
+    const logBtn = e.target.closest('.view-log-btn');
+    if (logBtn) {
+      const key = logBtn.getAttribute('data-student-key');
+      const student = currentStudents.find(s => s.key === key) || (Array.isArray(initialStudents) && initialStudents.find(s => s.key === key));
+      if (student) openModal(student);
+    }
+  });
 
   function openModal(student) {
     activeStudent = student;
@@ -1380,7 +1612,7 @@ function getAttemptsWord(count: number): string {
       return;
     }
 
-    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Активное время (сек)', 'Активное время', 'Всего ошибок', 'Хардкор', 'Последняя активность'];
+    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Время решения (сек)', 'Время решения', 'Всего ошибок', 'Хардкор', 'Был на уроке', 'Детали забегов'];
     const rows = currentStudents.map((s, idx) => [
       idx + 1,
       `"${s.displayName}"`,
@@ -1395,7 +1627,8 @@ function getAttemptsWord(count: number): string {
       `"${formatTime(s.totalActiveTimeSec)}"`,
       s.totalErrors,
       s.isHardcore ? 'Да' : 'Нет',
-      `"${s.lastSeen || ''}"`
+      `"${s.lastSeen || ''}"`,
+      `"${(s.attempts || []).map(a => `Забег #${a.attemptNumber} (${a.mode === 'hardcore' ? 'Хардкор' : 'Обычный'}): ${a.status === 'completed' ? 'Сдан' : a.status === 'failed' ? 'Сброс' : 'В процессе'}, ${formatTime(a.totalTimeSec)}`).join(' | ')}"`
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
