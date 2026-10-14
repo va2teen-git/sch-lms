@@ -37,6 +37,10 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     expect(typeof sample.totalActiveTimeSec).toBe('number');
     expect(typeof sample.totalErrors).toBe('number');
     expect(sample.lessonStatus).toBeDefined();
+    expect(sample.attempts).toBeDefined();
+    expect(Array.isArray(sample.attempts)).toBe(true);
+    expect(typeof sample.attemptsCount).toBe('number');
+    expect(typeof sample.isNormalMastered).toBe('boolean');
   });
 
   test('Teacher dashboard page /teacher renders responsive layout, filters and table', async ({ page }) => {
@@ -250,5 +254,22 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     const lessonLinks = await page.locator('#lessons-container a').evaluateAll(links => links.map(a => a.getAttribute('href')));
     expect(lessonLinks.length).toBeGreaterThan(0);
     expect(lessonLinks.some(href => href.includes('/lesson/8-класс/'))).toBe(true);
+  });
+
+  test('Teacher dashboard detail modal displays student attempt history', async ({ page }) => {
+    await page.goto(`${baseUrl}/teacher?date=today`);
+    await page.waitForSelector('.view-log-btn');
+    
+    // Click log on first student
+    await page.locator('.view-log-btn').first().click();
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await expect(page.locator('#modal-attempts-container')).toBeVisible();
+    await expect(page.locator('#modal-attempts-list')).toBeVisible();
+    const attemptsContent = await page.locator('#modal-attempts-list').innerText();
+    expect(attemptsContent.length).toBeGreaterThan(0);
+    
+    // Close modal
+    await page.locator('#modal-close-btn').click();
+    await expect(page.locator('#detail-modal')).toBeHidden();
   });
 });

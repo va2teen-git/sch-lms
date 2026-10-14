@@ -23,6 +23,9 @@ test.describe('Telemetry & Database Contract Integrity', () => {
     expect(columnNames).toContain('course_slug');
     expect(columnNames).toContain('lesson_id');
     expect(columnNames).toContain('level_number');
+    expect(columnNames).toContain('attempt_id');
+    expect(columnNames).toContain('attempt_number');
+    expect(columnNames).toContain('attempt_mode');
     expect(columnNames).toContain('timestamp');
     db.close();
   });
@@ -113,5 +116,37 @@ test.describe('Telemetry & Database Contract Integrity', () => {
       }
     });
     expect([400, 403]).toContain(res.status());
+  });
+
+  test('POST /api/telemetry correctly records attempt_id, attempt_number and attempt_mode', async ({ request }) => {
+    const testMission = `Урок 20 :: Attempt Test [${Date.now()}]`;
+    const payload = {
+      student_firstName: 'Аттемпт',
+      student_lastName: 'Тестовый',
+      student_class: '11-ИТ',
+      mission_name: testMission,
+      action_type: 'level_complete',
+      time_spent_sec: 120,
+      level_number: 1,
+      attempt_id: 'att_test_123',
+      attempt_number: 2,
+      attempt_mode: 'hardcore',
+      is_hardcore: true
+    };
+
+    const res = await request.post('http://localhost:4321/api/telemetry', {
+      data: payload,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    expect(res.status()).toBe(200);
+
+    const db = new Database(dbPath);
+    const row = db.prepare("SELECT * FROM telemetry WHERE mission_name = ?").get(testMission);
+    expect(row).toBeDefined();
+    expect(row.attempt_id).toBe('att_test_123');
+    expect(Number(row.attempt_number)).toBe(2);
+    expect(row.attempt_mode).toBe('hardcore');
+    db.close();
   });
 });
