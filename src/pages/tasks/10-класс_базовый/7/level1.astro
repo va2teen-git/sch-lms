@@ -1,0 +1,858 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Синтез и анализ двоичных кодов (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляции мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Сортировка схем кодирования по условию Фано</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-light">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Описание задания -->
+                <p id="phase-desc" class="text-light mb-3">
+                    Входящий поток таблиц кодирования перехвачен шлюзом. Используя мышь, <strong>распределите карточки по трем функциональным буферам</strong> в зависимости от соблюдения прямого или обратного условия Фано.
+                </p>
+
+                <!-- Окно системных уведомлений / ошибок -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СБОЙ СИНТЕЗА] <span id="feedback-text">Ошибка валидации кодовой схемы!</span> Перегенерация потока...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: СОРТИРОВКА ПО БАКЕТАМ (DRAG-TO-BIN) -->
+                <!-- ========================================== -->
+                <div id="phase1-container" class="phase-section">
+                    <!-- Зона активных карточек -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">НЕРАСПРЕДЕЛЕННЫЕ КОДОВЫЕ СХЕМЫ (ПЕРЕТАЩИТЕ ИЛИ КЛИКНИТЕ ДЛЯ ПЕРЕНОСА):</span>
+                            <button id="p1-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark" style="min-height: 80px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Целевые бакеты -->
+                    <div class="row g-3 mb-4">
+                        <!-- Бакет 1: ПРЕФИКСНЫЙ КОД -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="prefix" id="bucket-prefix">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">1. ПРЕФИКСНЫЙ [Фано]</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Прямое условие Фано: ни одно слово не является префиксом другого. Декодируется слева направо на лету.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2" style="min-height: 140px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: СУФФИКСНЫЙ КОД -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="postfix" id="bucket-postfix">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">2. СУФФИКСНЫЙ [Обратное Фано]</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Обратное условие Фано: ни одно слово не является окончанием другого. Декодируется только справа налево.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2" style="min-height: 140px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 3: НЕОДНОЗНАЧНЫЙ КОД -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-danger rounded-0 h-100 target-bucket" data-category="ambiguous" id="bucket-ambiguous">
+                                <div class="card-header bg-dark border-bottom border-danger text-danger d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">3. НЕОДНОЗНАЧНЫЙ [Коллизия]</span>
+                                    <span class="badge border border-danger text-danger bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Нарушены и прямое, и обратное условие. Однозначное декодирование без разделителей невозможно.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-danger bg-dark d-flex flex-column gap-2" style="min-height: 140px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-submit-btn" class="btn btn-success rounded-0 px-4 py-2 text-dark fw-bold" disabled>
+                            Проверить распределение схем →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: СЛОТ-ПАЗЛ СИНТЕЗА КОДА (SLOT & SNAP) -->
+                <!-- ========================================== -->
+                <div id="phase2-container" class="phase-section d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ПАЛИТРА ДОСТУПНЫХ ДВОИЧНЫХ ТОКЕНОВ (ПРИСУТСТВУЮТ ДИСТРАКТОРЫ):</span>
+                            <button id="p2-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить все токены
+                            </button>
+                        </div>
+                        <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2 p-3 border border-dashed border-secondary bg-dark" style="min-height: 80px;">
+                            <!-- Токены генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- Таблица целевых слотов -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4">
+                        <div class="text-secondary small mb-3">
+                            ЦЕЛЕВЫЕ СЛОТЫ АЛФАВИТА (ПЕРЕТАЩИТЕ ТОКЕНЫ В СООТВЕТСТВУЮЩИЕ ЯЧЕЙКИ):
+                        </div>
+                        <div id="p2-slots-grid" class="row g-3">
+                            <!-- Слоты генерируются JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span id="p2-status-hint" class="text-secondary small">Заполните все 4 слота валидными префиксными кодами.</span>
+                        <button id="p2-submit-btn" class="btn btn-success rounded-0 px-4 py-2 text-dark fw-bold" disabled>
+                            Валидация схемы кодирования →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: ИНТЕРАКТИВНОЕ БИНАРНОЕ ДЕРЕВО ФАНО -->
+                <!-- ========================================== -->
+                <div id="phase3-container" class="phase-section d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-secondary small">НЕРАСПРЕДЕЛЕННЫЕ СИМВОЛЫ (ПЕРЕТАЩИТЕ В СВОБОДНЫЕ ЛИСТЬЯ ДЕРЕВА):</span>
+                            <span class="text-warning small">Правило: символы допустимо размещать ТОЛЬКО в свободных листьях!</span>
+                        </div>
+                        <div id="p3-symbols-pool" class="d-flex gap-3 p-2 border border-dashed border-secondary bg-dark mt-2" style="min-height: 60px;">
+                            <!-- Символы генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- Интерактивный холст / граф дерева -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4 text-center overflow-auto">
+                        <div class="text-secondary small mb-2 text-start">ИНТЕРАКТИВНОЕ КОДОВОЕ ДЕРЕВО [ВЕТВЬ ВЛЕВО = 0, ВЕТВЬ ВПРАВО = 1]:</div>
+                        <div id="p3-tree-container" class="d-flex flex-column align-items-center gap-3 py-2" style="min-width: 650px;">
+                            <!-- Граф генерируется JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span id="p3-status-hint" class="text-secondary small">Разместите все символы так, чтобы условие Фано не нарушилось.</span>
+                        <button id="p3-submit-btn" class="btn btn-success rounded-0 px-4 py-2 text-dark fw-bold" disabled>
+                            Завершить калибровку кодера →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="card bg-black border-success rounded-0 p-5 d-inline-block text-center shadow-lg" style="max-width: 600px;">
+                        <div class="display-1 text-success mb-3">✓</div>
+                        <h3 class="text-success fw-bold font-monospace mb-2">УРОВЕНЬ 1 УСПЕШНО ЗАВЕРШЕН</h3>
+                        <p class="text-light mb-4">
+                            Все три испытания по синтезу и анализу двоичных кодов пройдены безупречно. Прямое условие Фано усвоено на практике.
+                        </p>
+                        <div class="row g-2 mb-4 text-start font-monospace small bg-dark p-3 border border-secondary">
+                            <div class="col-6 text-secondary">Общее время:</div>
+                            <div class="col-6 text-end text-light fw-bold" id="final-time">00:00</div>
+                            <div class="col-6 text-secondary">Количество попыток:</div>
+                            <div class="col-6 text-end text-warning fw-bold" id="final-attempts">1</div>
+                            <div class="col-6 text-secondary">Академический зачет:</div>
+                            <div class="col-6 text-end text-success fw-bold">ЗАЧТЕНО (100%)</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button id="restart-level-btn" class="btn btn-outline-success rounded-0 font-monospace">
+                                Пройти уровень повторно
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+        const startTime = Date.now();
+        let attempts = 0;
+        let currentPhase = 1;
+        let selectedItem = null;
+
+        // Таймер
+        const timerDisplay = document.getElementById('timer-display');
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
+        }, 1000);
+
+        // Телеметрия
+        function sendTelemetry(actionType, isSuccess) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 7 :: Двоичное кодирование (Уровень 1)',
+                action_type: actionType,
+                status: isSuccess ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: isSuccess
+            }, '*');
+        }
+
+        sendTelemetry('in_progress', false);
+
+        // Уведомление об ошибке
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+        const attemptsDisplay = document.getElementById('attempts-display');
+
+        function triggerError(msg, callback) {
+            attempts++;
+            if (attemptsDisplay) attemptsDisplay.textContent = attempts;
+            if (feedbackText) feedbackText.textContent = msg;
+            if (feedbackBox) feedbackBox.classList.remove('d-none');
+            sendTelemetry('hardcore_reset', false);
+
+            setTimeout(() => {
+                if (feedbackBox) feedbackBox.classList.add('d-none');
+                if (callback) callback();
+            }, 1200);
+        }
+
+        // ==========================================
+        // ЛОГИКА ФАЗЫ 1: КЛАССИФИКАЦИЯ (DRAG-TO-BIN)
+        // ==========================================
+        const P1_GENERATOR = {
+            // Генератор пула кодовых схем
+            generate() {
+                const prefixSchemas = [
+                    { codes: { 'A': '0', 'B': '10', 'C': '110', 'D': '111' }, label: 'A:0, B:10, C:110, D:111' },
+                    { codes: { 'A': '1', 'B': '01', 'C': '001', 'D': '000' }, label: 'A:1, B:01, C:001, D:000' },
+                    { codes: { 'A': '00', 'B': '01', 'C': '10', 'D': '11' }, label: 'A:00, B:01, C:10, D:11' },
+                    { codes: { 'A': '0', 'B': '100', 'C': '101', 'D': '11' }, label: 'A:0, B:100, C:101, D:11' },
+                    { codes: { 'A': '11', 'B': '10', 'C': '01', 'D': '00' }, label: 'A:11, B:10, C:01, D:00' }
+                ];
+                const postfixSchemas = [
+                    { codes: { 'A': '0', 'B': '01', 'C': '011', 'D': '111' }, label: 'A:0, B:01, C:011, D:111' },
+                    { codes: { 'A': '1', 'B': '10', 'C': '100', 'D': '000' }, label: 'A:1, B:10, C:100, D:000' },
+                    { codes: { 'A': '1', 'B': '01', 'C': '001', 'D': '101' }, label: 'A:1, B:01, C:001, D:101' },
+                    { codes: { 'A': '0', 'B': '10', 'C': '110', 'D': '010' }, label: 'A:0, B:10, C:110, D:010' }
+                ];
+                const ambiguousSchemas = [
+                    { codes: { 'A': '0', 'B': '01', 'C': '10', 'D': '010' }, label: 'A:0, B:01, C:10, D:010' },
+                    { codes: { 'A': '1', 'B': '10', 'C': '01', 'D': '101' }, label: 'A:1, B:10, C:01, D:101' },
+                    { codes: { 'A': '00', 'B': '0', 'C': '11', 'D': '1' }, label: 'A:00, B:0, C:11, D:1' },
+                    { codes: { 'A': '01', 'B': '10', 'C': '010', 'D': '101' }, label: 'A:01, B:10, C:010, D:101' }
+                ];
+
+                const pick = (arr, n) => arr.slice().sort(() => Math.random() - 0.5).slice(0, n);
+                
+                const selected = [
+                    ...pick(prefixSchemas, 2).map(x => ({ ...x, category: 'prefix' })),
+                    ...pick(postfixSchemas, 2).map(x => ({ ...x, category: 'postfix' })),
+                    ...pick(ambiguousSchemas, 2).map(x => ({ ...x, category: 'ambiguous' }))
+                ];
+
+                return selected.sort(() => Math.random() - 0.5);
+            }
+        };
+
+        function initPhase1() {
+            const pool = document.getElementById('p1-cards-pool');
+            const submitBtn = document.getElementById('p1-submit-btn');
+            const resetBtn = document.getElementById('p1-reset-pool-btn');
+            const buckets = document.querySelectorAll('.target-bucket');
+
+            pool.innerHTML = '';
+            document.querySelectorAll('.bucket-slot').forEach(s => s.innerHTML = '');
+            updateBucketCounters();
+            submitBtn.disabled = true;
+
+            const items = P1_GENERATOR.generate();
+
+            items.forEach((item, idx) => {
+                const card = document.createElement('div');
+                card.className = 'card bg-black border border-secondary text-light p-2 rounded-0 user-select-none draggable-item';
+                card.style.cursor = 'grab';
+                card.draggable = true;
+                card.dataset.id = 'p1_card_' + idx;
+                card.dataset.correctCategory = item.category;
+                card.innerHTML = `<span class="fw-bold text-success font-monospace">[СХЕМА #${idx + 1}]</span> <code class="text-light ms-1">${item.label}</code>`;
+
+                // Drag events
+                card.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', card.dataset.id);
+                    card.classList.add('opacity-50');
+                });
+                card.addEventListener('dragend', () => card.classList.remove('opacity-50'));
+
+                // Click-to-move support
+                card.addEventListener('click', () => {
+                    if (selectedItem === card) {
+                        card.classList.remove('border-warning');
+                        selectedItem = null;
+                    } else {
+                        if (selectedItem) selectedItem.classList.remove('border-warning');
+                        selectedItem = card;
+                        card.classList.add('border-warning');
+                    }
+                });
+
+                pool.appendChild(card);
+            });
+
+            // Настройка дроп-зон
+            buckets.forEach(bucket => {
+                const slot = bucket.querySelector('.bucket-slot');
+                
+                bucket.addEventListener('dragover', (e) => e.preventDefault());
+                bucket.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const cardId = e.dataTransfer.getData('text/plain');
+                    const card = document.querySelector(`[data-id="${cardId}"]`);
+                    if (card) {
+                        slot.appendChild(card);
+                        updateBucketCounters();
+                        checkP1Readiness();
+                    }
+                });
+
+                bucket.addEventListener('click', () => {
+                    if (selectedItem) {
+                        slot.appendChild(selectedItem);
+                        selectedItem.classList.remove('border-warning');
+                        selectedItem = null;
+                        updateBucketCounters();
+                        checkP1Readiness();
+                    }
+                });
+            });
+
+            // Пул тоже может принимать карточки обратно
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const cardId = e.dataTransfer.getData('text/plain');
+                const card = document.querySelector(`[data-id="${cardId}"]`);
+                if (card) {
+                    pool.appendChild(card);
+                    updateBucketCounters();
+                    checkP1Readiness();
+                }
+            });
+            pool.addEventListener('click', () => {
+                if (selectedItem) {
+                    pool.appendChild(selectedItem);
+                    selectedItem.classList.remove('border-warning');
+                    selectedItem = null;
+                    updateBucketCounters();
+                    checkP1Readiness();
+                }
+            });
+
+            resetBtn.onclick = () => {
+                document.querySelectorAll('.draggable-item').forEach(c => pool.appendChild(c));
+                updateBucketCounters();
+                checkP1Readiness();
+            };
+
+            submitBtn.onclick = () => {
+                let hasError = false;
+                buckets.forEach(b => {
+                    const cat = b.dataset.category;
+                    const cards = b.querySelectorAll('.draggable-item');
+                    cards.forEach(c => {
+                        if (c.dataset.correctCategory !== cat) hasError = true;
+                    });
+                });
+
+                if (hasError) {
+                    triggerError('В одном или нескольких буферах обнаружены ошибочно классифицированные схемы!', () => {
+                        initPhase1();
+                    });
+                } else {
+                    goToPhase2();
+                }
+            };
+
+            function updateBucketCounters() {
+                buckets.forEach(b => {
+                    const cnt = b.querySelectorAll('.draggable-item').length;
+                    b.querySelector('.count-badge').textContent = cnt;
+                });
+            }
+
+            function checkP1Readiness() {
+                const remaining = pool.querySelectorAll('.draggable-item').length;
+                submitBtn.disabled = remaining > 0;
+            }
+        }
+
+        // ==========================================
+        // ЛОГИКА ФАЗЫ 2: СЛОТ-ПАЗЛ (SLOT & SNAP)
+        // ==========================================
+        let p2TokensData = [];
+        let p2SlotsData = [];
+
+        function initPhase2() {
+            const pool = document.getElementById('p2-tokens-pool');
+            const slotsGrid = document.getElementById('p2-slots-grid');
+            const submitBtn = document.getElementById('p2-submit-btn');
+            const resetBtn = document.getElementById('p2-reset-pool-btn');
+            const statusHint = document.getElementById('p2-status-hint');
+
+            pool.innerHTML = '';
+            slotsGrid.innerHTML = '';
+            submitBtn.disabled = true;
+            statusHint.textContent = 'Разместите токены в слоты так, чтобы условие Фано не нарушилось.';
+
+            // Процедурный генератор задачи фазы 2:
+            // Символы: А (частый, 1 бит), Б (2 бита), В (3 бита), Г (3 бита)
+            // Токены содержат правильные цепочки + дистракторы (конфликтующие с 0 или 1)
+            const isZeroBased = Math.random() > 0.5;
+            const topBit = isZeroBased ? '0' : '1';
+            const otherBit = isZeroBased ? '1' : '0';
+
+            p2SlotsData = [
+                { symbol: 'А [ЧАСТАЯ]', req: 'Минимальная длина (1 бит)', targetLen: 1 },
+                { symbol: 'Б [СРЕДНЯЯ]', req: 'Длина 2 бита', targetLen: 2 },
+                { symbol: 'В [РЕДКАЯ]', req: 'Длина 3 бита', targetLen: 3 },
+                { symbol: 'Г [РЕДКАЯ]', req: 'Длина 3 бита', targetLen: 3 }
+            ];
+
+            // Набор токенов: правильное подмножество + явные префиксные дистракторы
+            const tokens = [
+                topBit,                                // Верный для A
+                otherBit + '0',                        // Верный кандидат для B
+                otherBit + '10',                       // Верный кандидат для C
+                otherBit + '11',                       // Верный кандидат для D
+                topBit + '1',                          // ДИСТРАКТОР (префикс topBit)
+                topBit + '0',                          // ДИСТРАКТОР (префикс topBit)
+                topBit + '01',                         // ДИСТРАКТОР
+                otherBit + '1',                        // ДИСТРАКТОР (конфликт с другими)
+                otherBit + '01',                       // ДИСТРАКТОР (префикс otherBit+'0')
+                otherBit + '00'                        // Альтернативный кандидат
+            ].sort(() => Math.random() - 0.5);
+
+            // Рендер слотов
+            p2SlotsData.forEach((slotInfo, sIdx) => {
+                const col = document.createElement('div');
+                col.className = 'col-md-3 col-6';
+                col.innerHTML = `
+                    <div class="card bg-dark border border-secondary rounded-0 p-2 text-center h-100">
+                        <div class="fw-bold text-success mb-1">${slotInfo.symbol}</div>
+                        <div class="text-secondary small mb-2" style="font-size: 0.75rem;">${slotInfo.req}</div>
+                        <div class="p2-slot border border-dashed border-success bg-black p-2 d-flex align-items-center justify-content-center" 
+                             data-slot-idx="${sIdx}" style="min-height: 48px; cursor: pointer;">
+                            <span class="text-secondary small placeholder-text">Перетащите токен</span>
+                        </div>
+                    </div>
+                `;
+                slotsGrid.appendChild(col);
+            });
+
+            // Рендер токенов
+            tokens.forEach((val, tIdx) => {
+                const tok = document.createElement('div');
+                tok.className = 'badge bg-black border border-success text-success p-2 rounded-0 fs-6 user-select-none p2-token';
+                tok.style.cursor = 'grab';
+                tok.draggable = true;
+                tok.dataset.tokenVal = val;
+                tok.dataset.tokenId = 'p2_tok_' + tIdx;
+                tok.textContent = val;
+
+                tok.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', tok.dataset.tokenId);
+                    tok.classList.add('opacity-50');
+                });
+                tok.addEventListener('dragend', () => tok.classList.remove('opacity-50'));
+
+                tok.addEventListener('click', () => {
+                    if (selectedItem === tok) {
+                        tok.classList.remove('border-warning');
+                        selectedItem = null;
+                    } else {
+                        if (selectedItem) selectedItem.classList.remove('border-warning');
+                        selectedItem = tok;
+                        tok.classList.add('border-warning');
+                    }
+                });
+
+                pool.appendChild(tok);
+            });
+
+            // Обработка слотов
+            document.querySelectorAll('.p2-slot').forEach(slot => {
+                slot.addEventListener('dragover', (e) => e.preventDefault());
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const tokId = e.dataTransfer.getData('text/plain');
+                    const tok = document.querySelector(`[data-token-id="${tokId}"]`);
+                    if (tok) placeTokenInSlot(tok, slot);
+                });
+                slot.addEventListener('click', () => {
+                    if (selectedItem && selectedItem.classList.contains('p2-token')) {
+                        placeTokenInSlot(selectedItem, slot);
+                        selectedItem.classList.remove('border-warning');
+                        selectedItem = null;
+                    } else {
+                        const existingTok = slot.querySelector('.p2-token');
+                        if (existingTok) {
+                            pool.appendChild(existingTok);
+                            slot.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите токен</span>';
+                            checkP2Readiness();
+                        }
+                    }
+                });
+            });
+
+            function placeTokenInSlot(tok, slot) {
+                const existing = slot.querySelector('.p2-token');
+                if (existing) pool.appendChild(existing);
+                slot.innerHTML = '';
+                slot.appendChild(tok);
+                checkP2Readiness();
+            }
+
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const tokId = e.dataTransfer.getData('text/plain');
+                const tok = document.querySelector(`[data-token-id="${tokId}"]`);
+                if (tok) {
+                    pool.appendChild(tok);
+                    checkP2Readiness();
+                }
+            });
+            pool.addEventListener('click', () => {
+                if (selectedItem && selectedItem.classList.contains('p2-token')) {
+                    pool.appendChild(selectedItem);
+                    selectedItem.classList.remove('border-warning');
+                    selectedItem = null;
+                    checkP2Readiness();
+                }
+            });
+
+            resetBtn.onclick = () => {
+                document.querySelectorAll('.p2-token').forEach(t => pool.appendChild(t));
+                document.querySelectorAll('.p2-slot').forEach(s => {
+                    s.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите токен</span>';
+                });
+                checkP2Readiness();
+            };
+
+            function checkP2Readiness() {
+                const filledSlots = Array.from(document.querySelectorAll('.p2-slot')).filter(s => s.querySelector('.p2-token'));
+                submitBtn.disabled = filledSlots.length < 4;
+            }
+
+            submitBtn.onclick = () => {
+                const slots = Array.from(document.querySelectorAll('.p2-slot'));
+                const chosenCodes = slots.map(s => s.querySelector('.p2-token')?.dataset.tokenVal || '');
+
+                // Проверка условий Фано
+                let fanoViolation = false;
+                for (let i = 0; i < chosenCodes.length; i++) {
+                    for (let j = 0; j < chosenCodes.length; j++) {
+                        if (i !== j) {
+                            if (chosenCodes[j].startsWith(chosenCodes[i])) {
+                                fanoViolation = true;
+                            }
+                        }
+                    }
+                }
+
+                // Проверка длины: слот 0 (частая) должен иметь длину 1
+                const lenCheck = chosenCodes[0].length === 1 && chosenCodes[1].length === 2 && chosenCodes[2].length === 3 && chosenCodes[3].length === 3;
+
+                if (fanoViolation || !lenCheck) {
+                    let errMsg = fanoViolation ? 'Прямое условие Фано нарушено: один из кодов является префиксом другого!' : 'Не соблюдены предписанные длины кодовых слов для частотного распределения!';
+                    triggerError(errMsg, () => initPhase2());
+                } else {
+                    goToPhase3();
+                }
+            };
+        }
+
+        // ==========================================
+        // ЛОГИКА ФАЗЫ 3: ИНТЕРАКТИВНОЕ ДЕРЕВО ФАНО
+        // ==========================================
+        function initPhase3() {
+            const pool = document.getElementById('p3-symbols-pool');
+            const treeContainer = document.getElementById('p3-tree-container');
+            const submitBtn = document.getElementById('p3-submit-btn');
+
+            pool.innerHTML = '';
+            treeContainer.innerHTML = '';
+            submitBtn.disabled = true;
+
+            // Символы для размещения
+            const symbolsToPlace = [
+                { name: 'X', priority: '1-й приоритет' },
+                { name: 'Y', priority: '2-й приоритет' },
+                { name: 'Z', priority: '3-й приоритет' }
+            ];
+
+            symbolsToPlace.forEach((sym, idx) => {
+                const badge = document.createElement('div');
+                badge.className = 'badge bg-black border border-success text-success p-2 rounded-0 fs-6 user-select-none p3-sym-token';
+                badge.style.cursor = 'grab';
+                badge.draggable = true;
+                badge.dataset.sym = sym.name;
+                badge.dataset.symId = 'p3_sym_' + idx;
+                badge.innerHTML = `<span class="fw-bold">СИМВОЛ [${sym.name}]</span>`;
+
+                badge.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', badge.dataset.symId);
+                    badge.classList.add('opacity-50');
+                });
+                badge.addEventListener('dragend', () => badge.classList.remove('opacity-50'));
+
+                badge.addEventListener('click', () => {
+                    if (selectedItem === badge) {
+                        badge.classList.remove('border-warning');
+                        selectedItem = null;
+                    } else {
+                        if (selectedItem) selectedItem.classList.remove('border-warning');
+                        selectedItem = badge;
+                        badge.classList.add('border-warning');
+                    }
+                });
+
+                pool.appendChild(badge);
+            });
+
+            // Процедурный выбор заблокированного системного узла в дереве
+            // Либо узел '0' заблокирован, либо '10' и '110'
+            const treeMode = Math.random() > 0.5 ? 'modeA' : 'modeB';
+            const lockedNodes = treeMode === 'modeA' 
+                ? { '0': 'СИСТЕМА [SYNC]' } 
+                : { '10': 'СИСТЕМА [ACK]', '00': 'СИСТЕМА [START]' };
+
+            // Визуализация 3-уровневого дерева
+            // Уровень 0: Корень
+            // Уровень 1: 0, 1
+            // Уровень 2: 00, 01, 10, 11
+            // Уровень 3: 000, 001, 010, 011, 100, 101, 110, 111
+
+            treeContainer.innerHTML = `
+                <!-- Корень -->
+                <div class="badge bg-secondary text-dark rounded-0 px-3 py-2 fs-6">КОРЕНЬ (Длина 0)</div>
+                <div class="text-secondary small">↓ Влево: бит 0 | Вправо: бит 1 ↓</div>
+
+                <!-- Уровень 1 -->
+                <div class="d-flex justify-content-center gap-5 w-100">
+                    <div class="tree-node-box" data-path="0"></div>
+                    <div class="tree-node-box" data-path="1"></div>
+                </div>
+
+                <!-- Уровень 2 -->
+                <div class="d-flex justify-content-center gap-4 w-100">
+                    <div class="tree-node-box" data-path="00"></div>
+                    <div class="tree-node-box" data-path="01"></div>
+                    <div class="tree-node-box" data-path="10"></div>
+                    <div class="tree-node-box" data-path="11"></div>
+                </div>
+
+                <!-- Уровень 3 -->
+                <div class="d-flex justify-content-center gap-2 w-100 flex-wrap">
+                    <div class="tree-node-box" data-path="000"></div>
+                    <div class="tree-node-box" data-path="001"></div>
+                    <div class="tree-node-box" data-path="010"></div>
+                    <div class="tree-node-box" data-path="011"></div>
+                    <div class="tree-node-box" data-path="100"></div>
+                    <div class="tree-node-box" data-path="101"></div>
+                    <div class="tree-node-box" data-path="110"></div>
+                    <div class="tree-node-box" data-path="111"></div>
+                </div>
+            `;
+
+            document.querySelectorAll('.tree-node-box').forEach(box => {
+                const path = box.dataset.path;
+                const isLocked = lockedNodes[path];
+
+                if (isLocked) {
+                    box.className = 'badge bg-danger text-light border border-danger p-2 rounded-0 fs-6';
+                    box.innerHTML = `🔒 <code>${path}</code><br><small style="font-size: 0.65rem;">${isLocked}</small>`;
+                } else {
+                    box.className = 'tree-slot card bg-black border border-dashed border-secondary p-2 rounded-0 text-center';
+                    box.style.minWidth = '75px';
+                    box.style.cursor = 'pointer';
+                    box.innerHTML = `<span class="text-secondary small font-monospace d-block">${path}</span><span class="slot-content text-muted small" style="font-size: 0.7rem;">[свободно]</span>`;
+
+                    box.addEventListener('dragover', (e) => e.preventDefault());
+                    box.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const symId = e.dataTransfer.getData('text/plain');
+                        const sym = document.querySelector(`[data-sym-id="${symId}"]`);
+                        if (sym) placeSymbolInTreeNode(sym, box);
+                    });
+
+                    box.addEventListener('click', () => {
+                        if (selectedItem && selectedItem.classList.contains('p3-sym-token')) {
+                            placeSymbolInTreeNode(selectedItem, box);
+                            selectedItem.classList.remove('border-warning');
+                            selectedItem = null;
+                        } else {
+                            const existing = box.querySelector('.p3-sym-token');
+                            if (existing) {
+                                pool.appendChild(existing);
+                                box.querySelector('.slot-content').innerHTML = '[свободно]';
+                                box.classList.remove('border-success');
+                                checkP3Readiness();
+                            }
+                        }
+                    });
+                }
+            });
+
+            function placeSymbolInTreeNode(token, box) {
+                const existing = box.querySelector('.p3-sym-token');
+                if (existing) pool.appendChild(existing);
+                box.querySelector('.slot-content').innerHTML = '';
+                box.querySelector('.slot-content').appendChild(token);
+                box.classList.add('border-success');
+                checkP3Readiness();
+            }
+
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const symId = e.dataTransfer.getData('text/plain');
+                const sym = document.querySelector(`[data-sym-id="${symId}"]`);
+                if (sym) {
+                    pool.appendChild(sym);
+                    checkP3Readiness();
+                }
+            });
+            pool.addEventListener('click', () => {
+                if (selectedItem && selectedItem.classList.contains('p3-sym-token')) {
+                    pool.appendChild(selectedItem);
+                    selectedItem.classList.remove('border-warning');
+                    selectedItem = null;
+                    checkP3Readiness();
+                }
+            });
+
+            function checkP3Readiness() {
+                const placed = document.querySelectorAll('.tree-slot .p3-sym-token').length;
+                submitBtn.disabled = placed < 3;
+            }
+
+            submitBtn.onclick = () => {
+                // Валидация дерева Фано:
+                // Собираем все занятые узлы (и системные lockedNodes, и пользовательские)
+                const userNodes = [];
+                document.querySelectorAll('.tree-slot').forEach(slot => {
+                    const tok = slot.querySelector('.p3-sym-token');
+                    if (tok) userNodes.push(slot.dataset.path);
+                });
+
+                const allOccupied = [...Object.keys(lockedNodes), ...userNodes];
+
+                // Проверка: ни один занятый узел не должен быть префиксом другого занятого узла
+                let violation = false;
+                let violationReason = '';
+
+                for (let i = 0; i < allOccupied.length; i++) {
+                    for (let j = 0; j < allOccupied.length; j++) {
+                        if (i !== j) {
+                            if (allOccupied[j].startsWith(allOccupied[i])) {
+                                violation = true;
+                                violationReason = `Узел '${allOccupied[i]}' является префиксом для '${allOccupied[j]}' (нарушение листа дерева Фано)!`;
+                                break;
+                            }
+                        }
+                    }
+                    if (violation) break;
+                }
+
+                if (violation) {
+                    triggerError(`[ОШИБКА ДЕРЕВА] ${violationReason}`, () => initPhase3());
+                } else {
+                    finishLevel();
+                }
+            };
+        }
+
+        // ==========================================
+        // ПЕРЕХОДЫ МЕЖДУ ФАЗАМИ И ПОБЕДА
+        // ==========================================
+        function goToPhase2() {
+            currentPhase = 2;
+            document.getElementById('phase1-container').classList.add('d-none');
+            document.getElementById('phase2-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Синтез префиксной таблицы по частотам символов';
+            document.getElementById('phase-desc').innerHTML = 'Сконструируйте префиксный код, перетаскивая двоичные токены в целевые слоты. <strong>Остерегайтесь лишних токенов-дистракторов</strong>, которые ломают условие Фано!';
+            initPhase2();
+        }
+
+        function goToPhase3() {
+            currentPhase = 3;
+            document.getElementById('phase2-container').classList.add('d-none');
+            document.getElementById('phase3-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Размещение символов в листьях кодового бинарного дерева';
+            document.getElementById('phase-desc').innerHTML = 'Назначьте коды трем символам, перетащив их непосредственно на узлы кодового дерева. Помните: символы могут располагаться <strong>исключительно в свободных листьях</strong> (не на внутренних узлах и не под занятыми вершинами)!';
+            initPhase3();
+        }
+
+        function finishLevel() {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
+            const s = String(timeSpent % 60).padStart(2, '0');
+
+            document.getElementById('phase3-container').classList.add('d-none');
+            document.getElementById('phase-badge').classList.replace('bg-success', 'bg-info');
+            document.getElementById('phase-badge').textContent = 'Пройдено';
+            document.getElementById('phase-title').textContent = 'Аттестация Уровня 1 завершена';
+            document.getElementById('phase-desc').classList.add('d-none');
+
+            document.getElementById('victory-screen').classList.remove('d-none');
+            document.getElementById('final-time').textContent = `${m}:${s}`;
+            document.getElementById('final-attempts').textContent = attempts + 1;
+
+            sendTelemetry('level_complete', true);
+
+            document.getElementById('restart-level-btn').onclick = () => {
+                location.reload();
+            };
+        }
+
+        // Старт с 1 фазы
+        initPhase1();
+    });
+</script>
