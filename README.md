@@ -132,7 +132,7 @@ Get-Process -Name node | Where-Object { $_.Path -like '*node.exe*' } | Stop-Proc
 ## 📚 Документация
 
 Подробная документация разделена по направлениям в папке [`docs/`](file:///D:/school-lms/docs/):
-* [docs/ai-workflow.md](file:///D:/school-lms/docs/ai-workflow.md) — Регламент работы ИИ-агентов, изоляция Worktree и деплой.
+* [docs/ai-workflow.md](file:///D:/school-lms/docs/ai-workflow.md) — Регламент работы ИИ-агентов, изоляция Worktree, оформление багов и деплой.
 * [docs/telemetry-api.md](file:///D:/school-lms/docs/telemetry-api.md) — Спецификация телеметрии, SQLite схемы и дашборда учителя.
 * [docs/testing.md](file:///D:/school-lms/docs/testing.md) — Руководство по автоматическому тестированию и CI/CD.
 * [docs/curriculum.md](file:///D:/school-lms/docs/curriculum.md) — Учебный план и правила оформления формул.
