@@ -1,0 +1,625 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитические расчеты RSA и LSB (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Заголовок и индикатор прогресса -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Расчет модуля n и функции Эйлера φ(n)</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сброса -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА РАСЧЕТА] <span id="feedback-text">Неверно вычисленное значение!</span> Перегенерация параметров...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 1: Расчет модуля n и функции Эйлера φ(n) -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Шаг 1: Вычисление модуля системы и функции Эйлера</h5>
+                    <p class="text-light">
+                        Для генерации криптографической пары RSA выбраны два независимых простых числа <strong>p</strong> и <strong>q</strong>.
+                        Вычислите открытый модуль системы <strong>n = p · q</strong> и секретную функцию Эйлера <strong>φ(n) = (p - 1) · (q - 1)</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ПЕРВОЕ ПРОСТОЕ ЧИСЛО (p):</span>
+                                <span id="p1-prime-p" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ВТОРОЕ ПРОСТОЕ ЧИСЛО (q):</span>
+                                <span id="p1-prime-q" class="fs-4 text-warning fw-bold">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-3">
+                        Введите вычисленные числовые значения в соответствующие поля ввода:
+                    </p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <label for="p1-input-n" class="form-label text-secondary small">Открытый модуль n = p · q:</label>
+                            <input type="number" id="p1-input-n" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Значение n" autocomplete="off">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="p1-input-phi" class="form-label text-secondary small">Функция Эйлера φ(n) = (p - 1)·(q - 1):</label>
+                            <input type="number" id="p1-input-phi" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Значение φ(n)" autocomplete="off">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button id="p1-btn" type="button" class="btn btn-outline-warning rounded-0 w-100 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 2: Нахождение секретной экспоненты d -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 2: Нахождение секретной экспоненты расшифрования d</h5>
+                    <p class="text-light">
+                        Для криптосистемы RSA заданы значение функции Эйлера <strong>φ(n)</strong> и открытая экспонента <strong>e</strong>, удовлетворяющая условию взаимной простоты `НОД(e, φ(n)) = 1`.
+                        Найдите наименьшее положительное значение секретной экспоненты <strong>d</strong>, удовлетворяющее сравнению: 
+                        <strong class="text-warning">(e · d) mod φ(n) = 1</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ОТКРЫТАЯ ЭКСПОНЕНТА (e):</span>
+                                <span id="p2-exp-e" class="fs-4 text-info fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ФУНКЦИЯ ЭЙЛЕРА φ(n):</span>
+                                <span id="p2-phi" class="fs-4 text-warning fw-bold">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-2">
+                        Подсказка: перебирайте кратные `(k · φ(n) + 1)` для k = 1, 2, 3... и делите на e до получения целого числа.
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Секретная экспонента d" autocomplete="off">
+                        <button id="p2-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 3: Вычисление шифротекста RSA -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 3: Модульное возведение в степень (Вычисление шифротекста RSA)</h5>
+                    <p class="text-light">
+                        Отправитель зашифровывает открытое сообщение <strong>M</strong> с помощью открытого ключа получателя <strong>(e, n)</strong>.
+                        Вычислите итоговый шифротекст <strong>C</strong> по формуле: 
+                        <strong class="text-warning">C = M<sup>e</sup> mod n</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">ОТКРЫТОЕ СООБЩЕНИЕ (M):</span>
+                                <span id="p3-msg-m" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">ОТКРЫТАЯ ЭКСПОНЕНТА (e):</span>
+                                <span id="p3-exp-e" class="fs-4 text-info fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">МОДУЛЬ СИСТЕМЫ (n):</span>
+                                <span id="p3-mod-n" class="fs-4 text-warning fw-bold">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Вычислите точное целое значение <strong>C</strong> (в диапазоне от 0 до n - 1):
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Шифротекст C" autocomplete="off">
+                        <button id="p3-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 4: Расчет стеганографической емкости LSB -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 4: Расчет максимальной емкости стеганоконтейнера LSB</h5>
+                    <p class="text-light">
+                        Для сокрытия секретного зашифрованного архива используется 24-битное растровое RGB-изображение (TrueColor, 3 цветовых канала на пиксель).
+                        При использовании метода LSB в каждый цветовой канал пикселя встраивается ровно <strong>1 бит</strong> полезной нагрузки (3 бита на пиксель).
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТРЫ СТЕГАНОКОНТЕЙНЕРА:</div>
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">РАЗРЕШЕНИЕ ИЗОБРАЖЕНИЯ (W × H):</span>
+                                <span id="p4-resolution" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ГЛУБИНА ЦВЕТА И СТЕПЕНЬ LSB:</span>
+                                <span class="fs-4 text-info fw-bold">24 бита RGB (3 бита/пиксель)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Вычислите максимальную емкость полезной нагрузки в <strong>БАЙТАХ</strong> по формуле: <strong>V = (W · H · 3) / 8</strong>. Введите точное целое число байт:
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Объем в байтах" autocomplete="off">
+                        <button id="p4-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 5: Побитовая инъекция LSB в цветовой канал -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 5: Побитовое вычисление модификации цвета при LSB-внедрении</h5>
+                    <p class="text-light">
+                        Стеганографический алгоритм производит побитовую инъекцию секретного бита <strong>b ∈ &#123;0, 1&#125;</strong> в 8-битный байт цветового канала <strong>C</strong> 
+                        по формуле маскирования: <strong class="text-warning">C<sub>stego</sub> = (C & 254) | b</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ИСХОДНЫЙ БАЙТ ЦВЕТА КАНАЛА C:</span>
+                                <span id="p5-byte-dec" class="fs-4 text-light fw-bold">--</span>
+                                <span id="p5-byte-bin" class="text-secondary small d-block font-monospace">Двоичный: --------</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">ВНЕДРЯЕМЫЙ БИТ СООБЩЕНИЯ (b):</span>
+                                <span id="p5-bit-val" class="fs-4 text-warning fw-bold">--</span>
+                                <span class="text-secondary small d-block">Младший разряд 0 (LSB)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small">
+                        Вычислите результирующее десятичное значение байта цвета <strong>C<sub>stego</sub></strong> после внедрения бита (от 0 до 255). Введите целое число:
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Десятичное число (0..255)" autocomplete="off">
+                        <button id="p5-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- Экран победы -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-warning font-monospace display-4">✓ УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light font-monospace mb-3">Аналитические расчеты RSA и стеганографии освоены</h3>
+                    <p class="text-secondary max-w-md mx-auto mb-4">
+                        Вы успешно рассчитали модуль системы и функцию Эйлера, определили секретную экспоненту обратным элементом по модулю, выполнили модульное возведение в степень для шифротекста RSA, рассчитали точную емкость LSB-контейнера и произвели побитовую инъекцию стеганографического бита.
+                    </p>
+                    <div class="badge border border-warning text-warning bg-black p-3 font-monospace fs-6 rounded-0">
+                        Переходите к Уровню 3 (Аркадный боевой режим на реакцию) на верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    // ----------------------------------------------------
+    // СОСТОЯНИЕ И ТЕЛЕМЕТРИЯ
+    // ----------------------------------------------------
+    const MISSION_NAME = 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 2)';
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    let currentPhase = 1;
+    let isProcessingError = false;
+
+    // Таймер
+    setInterval(() => {
+        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        const el = document.getElementById('timer-display');
+        if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+    function updateAttempts() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    function sendTelemetry(actionType, status, success) {
+        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+        if (window.parent) {
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: actionType,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: elapsedSec,
+                attempts_count: attemptsCount,
+                success: success
+            }, '*');
+        }
+    }
+
+    // Первичная телеметрия
+    sendTelemetry('in_progress', 'in_progress', false);
+
+    function triggerError(msg, callback) {
+        if (isProcessingError) return;
+        isProcessingError = true;
+        attemptsCount++;
+        updateAttempts();
+        sendTelemetry('hardcore_reset', 'in_progress', false);
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isProcessingError = false;
+            if (callback) callback();
+        }, 1300);
+    }
+
+    function setPhase(phaseNum) {
+        currentPhase = phaseNum;
+        ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'success-screen'].forEach((id, idx) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (idx + 1 === phaseNum) {
+                el.classList.remove('d-none');
+            } else {
+                el.classList.add('d-none');
+            }
+        });
+
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        const titles = [
+            'Расчет модуля n и функции Эйлера φ(n)',
+            'Нахождение секретной экспоненты d',
+            'Вычисление шифротекста RSA (C = M^e mod n)',
+            'Расчет емкости LSB-контейнера в байтах',
+            'Побитовая инъекция LSB в байт цвета',
+            'Уровень 2 завершен'
+        ];
+
+        if (phaseNum <= 5) {
+            if (badge) badge.textContent = `Шаг ${phaseNum} из 5`;
+            if (title) title.textContent = titles[phaseNum - 1];
+        } else {
+            if (badge) badge.textContent = 'Победа!';
+            if (title) title.textContent = 'Уровень 2 завершен';
+            const screen = document.getElementById('success-screen');
+            if (screen) screen.classList.remove('d-none');
+            sendTelemetry('level_complete', 'completed', true);
+        }
+    }
+
+    // Математические утилиты
+    function gcd(a, b) {
+        while (b !== 0) {
+            const t = b;
+            b = a % b;
+            a = t;
+        }
+        return a;
+    }
+
+    function modInverse(e, m) {
+        // Расширенный алгоритм Евклида для нахождения d, такого что (e * d) mod m = 1
+        let [m0, x0, x1] = [m, 0, 1];
+        if (m === 1) return 0;
+        let a = e;
+        while (a > 1) {
+            const q = Math.floor(a / m0);
+            let t = m0;
+            m0 = a % m0;
+            a = t;
+            t = x0;
+            x0 = x1 - q * x0;
+            x1 = t;
+        }
+        if (x1 < 0) x1 += m;
+        return x1;
+    }
+
+    function modPow(base, exp, mod) {
+        let res = 1;
+        base = base % mod;
+        while (exp > 0) {
+            if (exp % 2 === 1) res = (res * base) % mod;
+            base = (base * base) % mod;
+            exp = Math.floor(exp / 2);
+        }
+        return res;
+    }
+
+    // ----------------------------------------------------
+    // ФАЗА 1: Расчет n и φ(n)
+    // ----------------------------------------------------
+    const P1_PRIMES = [3, 5, 7, 11, 13, 17, 19, 23];
+    let p1P = 11;
+    let p1Q = 13;
+    let p1TargetN = 143;
+    let p1TargetPhi = 120;
+
+    function initPhase1() {
+        // Выбираем два различных случайных простых числа
+        const i1 = Math.floor(Math.random() * P1_PRIMES.length);
+        let i2 = Math.floor(Math.random() * (P1_PRIMES.length - 1));
+        if (i2 >= i1) i2++;
+
+        p1P = P1_PRIMES[i1];
+        p1Q = P1_PRIMES[i2];
+        p1TargetN = p1P * p1Q;
+        p1TargetPhi = (p1P - 1) * (p1Q - 1);
+
+        document.getElementById('p1-prime-p').textContent = String(p1P);
+        document.getElementById('p1-prime-q').textContent = String(p1Q);
+
+        const inN = document.getElementById('p1-input-n');
+        const inPhi = document.getElementById('p1-input-phi');
+        if (inN) inN.value = '';
+        if (inPhi) inPhi.value = '';
+    }
+
+    function verifyPhase1() {
+        if (isProcessingError) return;
+        const valN = parseInt(document.getElementById('p1-input-n')?.value, 10);
+        const valPhi = parseInt(document.getElementById('p1-input-phi')?.value, 10);
+
+        if (isNaN(valN) || isNaN(valPhi)) {
+            triggerError('Заполните оба числовых поля ввода: модуль n и функцию Эйлера φ(n)!');
+            return;
+        }
+
+        if (valN !== p1TargetN || valPhi !== p1TargetPhi) {
+            triggerError('Ошибка в расчетах! n = p · q, а φ(n) = (p - 1) · (q - 1).', () => {
+                initPhase1();
+            });
+            return;
+        }
+
+        setPhase(2);
+        initPhase2();
+    }
+
+    document.getElementById('p1-btn')?.addEventListener('click', verifyPhase1);
+    document.getElementById('p1-input-n')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase1(); });
+    document.getElementById('p1-input-phi')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase1(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 2: Нахождение d
+    // ----------------------------------------------------
+    const P2_CONFIGS = [
+        { p: 5, q: 11, e: 3 },    // phi = 40, d = 27
+        { p: 7, q: 11, e: 13 },   // phi = 60, d = 37
+        { p: 5, q: 13, e: 5 },    // phi = 48, d = 29
+        { p: 3, q: 11, e: 7 },    // phi = 20, d = 3
+        { p: 7, q: 13, e: 5 },    // phi = 72, d = 29
+        { p: 11, q: 13, e: 7 },   // phi = 120, d = 103
+        { p: 5, q: 7, e: 5 },     // phi = 24, d = 5
+        { p: 7, q: 17, e: 5 },    // phi = 96, d = 77
+        { p: 3, q: 17, e: 5 }     // phi = 32, d = 13
+    ];
+
+    let p2TargetE = 13;
+    let p2TargetPhi = 60;
+    let p2TargetD = 37;
+
+    function initPhase2() {
+        const cfg = P2_CONFIGS[Math.floor(Math.random() * P2_CONFIGS.length)];
+        p2TargetPhi = (cfg.p - 1) * (cfg.q - 1);
+        p2TargetE = cfg.e;
+        p2TargetD = modInverse(p2TargetE, p2TargetPhi);
+
+        document.getElementById('p2-exp-e').textContent = String(p2TargetE);
+        document.getElementById('p2-phi').textContent = String(p2TargetPhi);
+
+        const inp = document.getElementById('p2-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase2() {
+        if (isProcessingError) return;
+        const val = parseInt(document.getElementById('p2-input')?.value, 10);
+
+        if (isNaN(val)) {
+            triggerError('Введите целое число — секретную экспоненту d!');
+            return;
+        }
+
+        if (val !== p2TargetD && (val * p2TargetE) % p2TargetPhi !== 1) {
+            triggerError('Неверное значение экспоненты d! Произведение (e · d) при делении на φ(n) должно давать остаток 1.', () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        setPhase(3);
+        initPhase3();
+    }
+
+    document.getElementById('p2-btn')?.addEventListener('click', verifyPhase2);
+    document.getElementById('p2-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase2(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 3: Вычисление C = M^e mod n
+    // ----------------------------------------------------
+    const P3_CONFIGS = [
+        { m: 4, e: 3, n: 55 },    // 4^3 mod 55 = 64 mod 55 = 9
+        { m: 5, e: 3, n: 33 },    // 125 mod 33 = 26
+        { m: 3, e: 5, n: 77 },    // 243 mod 77 = 12
+        { m: 2, e: 5, n: 65 },    // 32 mod 65 = 32
+        { m: 3, e: 5, n: 35 },    // 243 mod 35 = 33
+        { m: 6, e: 3, n: 85 },    // 216 mod 85 = 46
+        { m: 2, e: 5, n: 39 },    // 32 mod 39 = 32
+        { m: 5, e: 3, n: 77 },    // 125 mod 77 = 48
+        { m: 7, e: 3, n: 65 }     // 343 mod 65 = 18
+    ];
+
+    let p3TargetM = 4;
+    let p3TargetE = 3;
+    let p3TargetN = 55;
+    let p3TargetC = 9;
+
+    function initPhase3() {
+        const cfg = P3_CONFIGS[Math.floor(Math.random() * P3_CONFIGS.length)];
+        p3TargetM = cfg.m;
+        p3TargetE = cfg.e;
+        p3TargetN = cfg.n;
+        p3TargetC = modPow(p3TargetM, p3TargetE, p3TargetN);
+
+        document.getElementById('p3-msg-m').textContent = String(p3TargetM);
+        document.getElementById('p3-exp-e').textContent = String(p3TargetE);
+        document.getElementById('p3-mod-n').textContent = String(p3TargetN);
+
+        const inp = document.getElementById('p3-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase3() {
+        if (isProcessingError) return;
+        const val = parseInt(document.getElementById('p3-input')?.value, 10);
+
+        if (isNaN(val)) {
+            triggerError('Введите целое вычисленное число шифротекста C!');
+            return;
+        }
+
+        if (val !== p3TargetC) {
+            triggerError('Ошибка вычисления шифротекста! C = M^e mod n.', () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        setPhase(4);
+        initPhase4();
+    }
+
+    document.getElementById('p3-btn')?.addEventListener('click', verifyPhase3);
+    document.getElementById('p3-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase3(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 4: Расчет емкости контейнера LSB в байтах
+    // ----------------------------------------------------
+    const P4_RESOLUTIONS = [
+        { w: 320, h: 240 },      // 320 * 240 * 3 / 8 = 28800 байт
+        { w: 640, h: 480 },      // 640 * 480 * 3 / 8 = 115200 байт
+        { w: 800, h: 600 },      // 800 * 600 * 3 / 8 = 180000 байт
+        { w: 1024, h: 768 },     // 1024 * 768 * 3 / 8 = 294912 байт
+        { w: 1280, h: 720 },     // 1280 * 720 * 3 / 8 = 345600 байт
+        { w: 500, h: 400 },      // 500 * 400 * 3 / 8 = 75000 байт
+        { w: 1280, h: 1024 }     // 1280 * 1024 * 3 / 8 = 491520 байт
+    ];
+
+    let p4TargetBytes = 115200;
+
+    function initPhase4() {
+        const res = P4_RESOLUTIONS[Math.floor(Math.random() * P4_RESOLUTIONS.length)];
+        p4TargetBytes = Math.floor((res.w * res.h * 3) / 8);
+
+        document.getElementById('p4-resolution').textContent = `${res.w} × ${res.h} пикселей`;
+
+        const inp = document.getElementById('p4-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase4() {
+        if (isProcessingError) return;
+        const val = parseInt(document.getElementById('p4-input')?.value, 10);
+
+        if (isNaN(val)) {
+            triggerError('Введите целое число — емкость контейнера в байтах!');
+            return;
+        }
+
+        if (val !== p4TargetBytes) {
+            triggerError('Неверный расчет емкости! Формула: V = (W · H · 3) / 8 байт.', () => {
+                initPhase4();
+            });
+            return;
+        }
+
+        setPhase(5);
+        initPhase5();
+    }
+
+    document.getElementById('p4-btn')?.addEventListener('click', verifyPhase4);
+    document.getElementById('p4-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase4(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 5: Побитовая инъекция LSB в байт цвета
+    // ----------------------------------------------------
+    let p5ByteDec = 205;
+    let p5BitVal = 0;
+    let p5TargetStego = 204;
+
+    function initPhase5() {
+        p5ByteDec = Math.floor(Math.random() * 190) + 50; // от 50 до 240
+        p5BitVal = Math.random() > 0.5 ? 1 : 0;
+        p5TargetStego = (p5ByteDec & 254) | p5BitVal;
+
+        document.getElementById('p5-byte-dec').textContent = String(p5ByteDec);
+        document.getElementById('p5-byte-bin').textContent = `Двоичный: ${p5ByteDec.toString(2).padStart(8, '0')}`;
+        document.getElementById('p5-bit-val').textContent = String(p5BitVal);
+
+        const inp = document.getElementById('p5-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase5() {
+        if (isProcessingError) return;
+        const val = parseInt(document.getElementById('p5-input')?.value, 10);
+
+        if (isNaN(val)) {
+            triggerError('Введите десятичное число — результирующий байт цвета!');
+            return;
+        }
+
+        if (val !== p5TargetStego) {
+            triggerError('Неверный результат побитовой инъекции! Формула: (C & 254) | b.', () => {
+                initPhase5();
+            });
+            return;
+        }
+
+        setPhase(6); // Успех!
+    }
+
+    document.getElementById('p5-btn')?.addEventListener('click', verifyPhase5);
+    document.getElementById('p5-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase5(); });
+
+    // ----------------------------------------------------
+    // СТАРТ
+    // ----------------------------------------------------
+    initPhase1();
+})();
+</script>
