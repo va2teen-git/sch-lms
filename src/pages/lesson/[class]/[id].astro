@@ -316,11 +316,14 @@ const tasks = [
         }
       }
 
-      const mName = data.mission_name;
-      if (!platformTimers[mName]) {
-        platformTimers[mName] = Date.now();
+      // Preserve pure time spent from iframe if already provided; fallback to platform timer only if missing
+      if (typeof data.time_spent_sec !== 'number') {
+        const mName = data.mission_name;
+        if (!platformTimers[mName]) {
+          platformTimers[mName] = Date.now();
+        }
+        data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
       }
-      data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
 
       if (data.action_type === 'hardcore_reset' && isHardcore) {
         alert('💀 ОШИБКА В РЕЖИМЕ ХАРДКОРА! Прогресс сброшен!');
@@ -390,6 +393,7 @@ const tasks = [
       localStorage.removeItem('student_firstName');
       localStorage.removeItem('student_lastName');
       localStorage.removeItem('student_class');
+      localStorage.removeItem('hardcore_mode');
       window.location.href = '/';
     });
   }

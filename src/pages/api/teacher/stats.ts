@@ -8,6 +8,8 @@ const dbPath = path.join(process.cwd(), 'telemetry.db');
 export interface LevelMetric {
   status: 'not_started' | 'in_progress' | 'completed' | 'reset';
   timeSpentSec: number;
+  rawTimeSpentSec?: number;
+  firstTs?: Date | null;
   errors: number;
   attempts: number;
   completed: boolean;
@@ -24,11 +26,20 @@ export interface StudentMetric {
   firstSeen: string | null;
   lastSeen: string | null;
   isActiveNow: boolean;
+  latestIsHardcore?: number;
   levels: {
     1: LevelMetric;
     2: LevelMetric;
     3: LevelMetric;
   };
+  normalCompletedLevels?: Set<number>;
+  allHardcoreCompletedLevels?: Set<number>;
+  hardcoreStreakLevels?: Set<number>;
+  hardcoreAttempted?: boolean;
+  hardcoreResetsCount?: number;
+  hardcoreLevelsConquered?: number;
+  hardcoreStatus?: 'none' | 'attempting' | 'failed' | 'completed';
+  isHardcoreLegend?: boolean;
   totalActiveTimeSec: number;
   totalErrors: number;
   isHardcore: boolean;
@@ -155,14 +166,15 @@ export const GET: APIRoute = async ({ request }) => {
           lastSeen: r.timestamp,
           isActiveNow: false,
           levels: {
-            1: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, lastUpdated: null },
-            2: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, lastUpdated: null },
-            3: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, lastUpdated: null }
+            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null },
+            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null },
+            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null }
           },
           normalCompletedLevels: new Set<number>(),
           allHardcoreCompletedLevels: new Set<number>(),
           hardcoreStreakLevels: new Set<number>(),
           hardcoreAttempted: false,
+          latestIsHardcore: 0,
           hardcoreResetsCount: 0,
           hardcoreLevelsConquered: 0,
           totalActiveTimeSec: 0,
@@ -177,6 +189,8 @@ export const GET: APIRoute = async ({ request }) => {
 
       const s = studentsMap[canonicalKey];
       s.lastSeen = r.timestamp;
+      s.latestIsHardcore = r.is_hardcore;
+      const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
 
       // Extract Level Number
       let lvlNum: 1 | 2 | 3 | null = null;
@@ -208,9 +222,16 @@ export const GET: APIRoute = async ({ request }) => {
         const lvl = s.levels[lvlNum];
         lvl.attempts++;
         lvl.lastUpdated = r.timestamp;
+        if (lvl.firstTs === null && rTs) {
+          lvl.firstTs = rTs;
+        }
 
         if (isError) {
           lvl.errors++;
+        }
+
+        if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (lvl.rawTimeSpentSec || 0)) {
+          lvl.rawTimeSpentSec = r.time_spent_sec;
         }
 
         if (r.action_type === 'level_complete') {
@@ -222,19 +243,13 @@ export const GET: APIRoute = async ({ request }) => {
           } else {
             s.normalCompletedLevels.add(lvlNum);
           }
-          if (r.time_spent_sec > lvl.timeSpentSec) {
-            lvl.timeSpentSec = r.time_spent_sec;
-          }
         } else if (r.action_type === 'hardcore_reset') {
           if (!lvl.completed) {
-            lvl.status = 'reset';
+            lvl.status = r.is_hardcore === 1 ? 'reset' : 'in_progress';
           }
         } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
           if (!lvl.completed) {
             lvl.status = 'in_progress';
-          }
-          if (r.time_spent_sec > lvl.timeSpentSec) {
-            lvl.timeSpentSec = r.time_spent_sec;
           }
         }
       }
@@ -257,8 +272,39 @@ export const GET: APIRoute = async ({ request }) => {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
     const students = Object.values(studentsMap).map(s => {
-      // Calculate total active time from all 3 levels
-      s.totalActiveTimeSec = s.levels[1].timeSpentSec + s.levels[2].timeSpentSec + s.levels[3].timeSpentSec;
+      const l1Raw = s.levels[1].rawTimeSpentSec || 0;
+      const l2Raw = s.levels[2].rawTimeSpentSec || 0;
+      const l3Raw = s.levels[3].rawTimeSpentSec || 0;
+
+      let l1Pure = l1Raw;
+      let l2Pure = l2Raw;
+      let l3Pure = l3Raw;
+
+      const l1First = s.levels[1].firstTs;
+      const l2First = s.levels[2].firstTs;
+      const l3First = s.levels[3].firstTs;
+
+      // If Level 2 was preloaded concurrently with Level 1 (first timestamps within 60s)
+      // and reports cumulative time from page start (l2Raw >= l1Raw):
+      if (l1First && l2First && l1Raw > 0 && l2Raw >= l1Raw) {
+        if (Math.abs(l2First.getTime() - l1First.getTime()) < 60000) {
+          l2Pure = l2Raw - l1Raw;
+        }
+      }
+
+      // If Level 3 was preloaded concurrently with Level 1/2:
+      if (l1First && l3First && l2Raw > 0 && l3Raw >= l2Raw) {
+        if (Math.abs(l3First.getTime() - l1First.getTime()) < 60000) {
+          l3Pure = l3Raw - l2Raw;
+        }
+      }
+
+      s.levels[1].timeSpentSec = l1Pure;
+      s.levels[2].timeSpentSec = l2Pure;
+      s.levels[3].timeSpentSec = l3Pure;
+
+      // Calculate total active time from pure times of all 3 levels
+      s.totalActiveTimeSec = l1Pure + l2Pure + l3Pure;
 
       const isHardcoreCompleted = s.hardcoreStreakLevels.size >= 3;
       const isNormalCompleted = s.normalCompletedLevels.size >= 3;
@@ -276,11 +322,11 @@ export const GET: APIRoute = async ({ request }) => {
       } else if (isNormalCompleted) {
         s.lessonStatus = 'completed';
         s.isHardcoreLegend = false;
-        s.hardcoreStatus = s.hardcoreAttempted ? (s.hardcoreResetsCount > 0 ? 'failed' : 'attempting') : 'none';
+        s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
       } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].attempts > 0 || s.levels[2].attempts > 0 || s.levels[3].attempts > 0) {
         s.lessonStatus = 'in_progress';
         s.isHardcoreLegend = false;
-        s.hardcoreStatus = s.hardcoreAttempted ? 'attempting' : 'none';
+        s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
       } else {
         s.lessonStatus = 'not_started';
         s.isHardcoreLegend = false;
@@ -288,7 +334,7 @@ export const GET: APIRoute = async ({ request }) => {
       }
 
       s.isHardcore = isHardcoreCompleted;
-      s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen + 'Z').toISOString() >= fifteenMinutesAgo));
+      s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen.replace(' ', 'T') + 'Z').toISOString() >= fifteenMinutesAgo));
 
       // Reverse recent events so newest is first
       s.recentEvents.reverse();

@@ -69,14 +69,15 @@ try {
         firstSeen: r.timestamp,
         lastSeen: r.timestamp,
         levels: {
-          1: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false },
-          2: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false },
-          3: { status: 'not_started', timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false }
+          1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null },
+          2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null },
+          3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null }
         },
         normalCompletedLevels: new Set<number>(),
         allHardcoreCompletedLevels: new Set<number>(),
         hardcoreStreakLevels: new Set<number>(),
         hardcoreAttempted: false,
+        latestIsHardcore: 0,
         hardcoreResetsCount: 0,
         hardcoreLevelsConquered: 0,
         totalActiveTimeSec: 0,
@@ -91,6 +92,8 @@ try {
 
     const s = studentsMap[canonicalKey];
     s.lastSeen = r.timestamp;
+    s.latestIsHardcore = r.is_hardcore;
+    const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
 
     let lvlNum: 1 | 2 | 3 | null = null;
     if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) lvlNum = r.level_number as 1 | 2 | 3;
@@ -114,7 +117,14 @@ try {
     if (lvlNum) {
       const lvl = s.levels[lvlNum];
       lvl.attempts++;
+      if (lvl.firstTs === null && rTs) {
+        lvl.firstTs = rTs;
+      }
       if (isError) lvl.errors++;
+
+      if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (lvl.rawTimeSpentSec || 0)) {
+        lvl.rawTimeSpentSec = r.time_spent_sec;
+      }
 
       if (r.action_type === 'level_complete') {
         lvl.completed = true;
@@ -125,12 +135,10 @@ try {
         } else {
           s.normalCompletedLevels.add(lvlNum);
         }
-        if (r.time_spent_sec > lvl.timeSpentSec) lvl.timeSpentSec = r.time_spent_sec;
       } else if (r.action_type === 'hardcore_reset') {
-        if (!lvl.completed) lvl.status = 'reset';
+        if (!lvl.completed) lvl.status = r.is_hardcore === 1 ? 'reset' : 'in_progress';
       } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
         if (!lvl.completed) lvl.status = 'in_progress';
-        if (r.time_spent_sec > lvl.timeSpentSec) lvl.timeSpentSec = r.time_spent_sec;
       }
     }
 
@@ -148,7 +156,35 @@ try {
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
   initialStudents = Object.values(studentsMap).map(s => {
-    s.totalActiveTimeSec = s.levels[1].timeSpentSec + s.levels[2].timeSpentSec + s.levels[3].timeSpentSec;
+    const l1Raw = s.levels[1].rawTimeSpentSec || 0;
+    const l2Raw = s.levels[2].rawTimeSpentSec || 0;
+    const l3Raw = s.levels[3].rawTimeSpentSec || 0;
+
+    let l1Pure = l1Raw;
+    let l2Pure = l2Raw;
+    let l3Pure = l3Raw;
+
+    const l1First = s.levels[1].firstTs;
+    const l2First = s.levels[2].firstTs;
+    const l3First = s.levels[3].firstTs;
+
+    if (l1First && l2First && l1Raw > 0 && l2Raw >= l1Raw) {
+      if (Math.abs(l2First.getTime() - l1First.getTime()) < 60000) {
+        l2Pure = l2Raw - l1Raw;
+      }
+    }
+
+    if (l1First && l3First && l2Raw > 0 && l3Raw >= l2Raw) {
+      if (Math.abs(l3First.getTime() - l1First.getTime()) < 60000) {
+        l3Pure = l3Raw - l2Raw;
+      }
+    }
+
+    s.levels[1].timeSpentSec = l1Pure;
+    s.levels[2].timeSpentSec = l2Pure;
+    s.levels[3].timeSpentSec = l3Pure;
+
+    s.totalActiveTimeSec = l1Pure + l2Pure + l3Pure;
     
     const isHardcoreCompleted = s.hardcoreStreakLevels.size >= 3;
     const isNormalCompleted = s.normalCompletedLevels.size >= 3;
@@ -165,11 +201,11 @@ try {
     } else if (isNormalCompleted) {
       s.lessonStatus = 'completed';
       s.isHardcoreLegend = false;
-      s.hardcoreStatus = s.hardcoreAttempted ? (s.hardcoreResetsCount > 0 ? 'failed' : 'attempting') : 'none';
+      s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
     } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].attempts > 0 || s.levels[2].attempts > 0 || s.levels[3].attempts > 0) {
       s.lessonStatus = 'in_progress';
       s.isHardcoreLegend = false;
-      s.hardcoreStatus = s.hardcoreAttempted ? 'attempting' : 'none';
+      s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
     } else {
       s.lessonStatus = 'not_started';
       s.isHardcoreLegend = false;
@@ -177,7 +213,7 @@ try {
     }
 
     s.isHardcore = isHardcoreCompleted;
-    s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen + 'Z').toISOString() >= fifteenMinutesAgo));
+    s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen.replace(' ', 'T') + 'Z').toISOString() >= fifteenMinutesAgo));
     s.recentEvents.reverse();
     return s;
   });
