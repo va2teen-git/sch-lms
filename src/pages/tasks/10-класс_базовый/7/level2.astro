@@ -1,0 +1,604 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитика и расчет двоичных кодов (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Расчет минимальной разрядности равномерного кода</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-light">00:00</span>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: РАСЧЕТ РАЗРЯДНОСТИ 2^k >= N -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light">
+                        Для автономной системы телеметрии требуется закодировать <span id="p1-objects-desc" class="text-warning fw-bold"></span> равномерным двоичным кодом минимальной возможной длины.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ТЕКУЩАЯ КОНФИГУРАЦИЯ СИСТЕМЫ:</div>
+                        <div class="fs-5 text-light">
+                            Количество уникальных объектов для кодирования: <span id="p1-n-value" class="text-warning fw-bold"></span>
+                        </div>
+                        <div class="text-secondary small mt-1">
+                            Критерий: минимальное целое число бит <em>k</em>, удовлетворяющее неравенству 2<sup>k</sup> ≥ N.
+                        </div>
+                    </div>
+
+                    <p class="text-light mb-2">Введите минимальную разрядность кода (в битах):</p>
+                    <div class="input-group mb-3" style="max-width: 400px;">
+                        <input type="number" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Количество бит k" autocomplete="off">
+                        <button id="p1-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p1-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Разрядность не покрывает все объекты или превышает минимум! Перегенерация...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: АНАЛИЗ ИЗБЫТОЧНЫХ КОМБИНАЦИЙ (2^k - N) -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light">
+                        В корпоративной сети распределены идентификаторы для <span id="p2-objects-desc" class="text-warning fw-bold"></span>.
+                        Всем объектам присвоены уникальные кодовые слова равномерного двоичного кода минимальной достаточной длины.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТРЫ ПУЛА АДРЕСОВ:</div>
+                        <div class="fs-5 text-light">
+                            Задействовано адресов (<em>N</em>): <span id="p2-n-value" class="text-warning fw-bold"></span>
+                        </div>
+                        <div class="text-secondary small mt-1">
+                            Резервные комбинации: разность между общей емкостью двоичного диапазона 2<sup>k</sup> и количеством занятых адресов <em>N</em>.
+                        </div>
+                    </div>
+
+                    <p class="text-light mb-2">Вычислите, сколько избыточных (свободных) кодовых комбинаций осталось в резерве:</p>
+                    <div class="input-group mb-3" style="max-width: 400px;">
+                        <input type="number" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Резервные комбинации" autocomplete="off">
+                        <button id="p2-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p2-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [СБОЙ РАСЧЕТА ИЗБЫТОЧНОСТИ] Неверное количество неиспользованных комбинаций! Сброс...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: ПОШАГОВОЕ ДЕКОДИРОВАНИЕ ПО ФАНО -->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light">
+                        По каналу связи без разделителей передано зашифрованное кодовое сообщение. Для кодирования букв использовался префиксный код, удовлетворяющий прямому условию Фано.
+                    </p>
+
+                    <!-- Таблица кодов -->
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ТАБЛИЦА ПРЕФИКСНЫХ КОДОВ СИМВОЛОВ:</div>
+                        <div id="p3-codes-display" class="d-flex flex-wrap gap-3 font-monospace fs-5 text-warning">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Переданный поток бит -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПРИНЯТЫЙ ПОТОК БИТ (ДЕКОДИРУЙТЕ СЛЕВА НАПРАВО):</div>
+                        <div id="p3-bitstream-display" class="font-monospace fs-4 text-white letter-spacing-1 text-break"></div>
+                    </div>
+
+                    <p class="text-light mb-2">Введите расшифрованное слово (заглавными русскими буквами):</p>
+                    <div class="input-group mb-3" style="max-width: 400px;">
+                        <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace text-uppercase" placeholder="РАСШИФРОВКА" autocomplete="off">
+                        <button id="p3-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p3-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА ДЕКОДЕРА] Неверно расшифрованное слово! Сбой синхронизации потока...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 4: РАСЧЕТ ИНФОРМАЦИОННОГО ОБЪЕМА -->
+                <!-- ========================================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <p class="text-light">
+                        Рассчитайте информационный объем закодированного текстового сообщения при использовании неравномерного двоичного кода.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ДЛИНЫ КОДОВЫХ СЛОВ АЛФАВИТА:</div>
+                        <div id="p4-lengths-display" class="d-flex flex-wrap gap-3 font-monospace fs-5 text-warning">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПЕРЕДАВАЕМЫЙ ТЕКСТ:</div>
+                        <div id="p4-text-display" class="font-monospace fs-4 text-white text-break"></div>
+                        <div class="text-secondary small mt-1">
+                            Формула: суммарная длина равна сумме длин кодовых слов каждого входящего символа.
+                        </div>
+                    </div>
+
+                    <p class="text-light mb-2">Введите суммарный информационный объем всего сообщения в <strong>битах</strong>:</p>
+                    <div class="input-group mb-3" style="max-width: 400px;">
+                        <input type="number" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Объем в битах" autocomplete="off">
+                        <button id="p4-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p4-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА ОБЪЕМА] Неверная сумма бит! Пересчет сообщения...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 5: КОНТРОЛЬ ЧЕТНОСТИ (EVEN PARITY) -->
+                <!-- ========================================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <p class="text-light">
+                        Контроллер принял 4 блока данных. Каждый блок содержит 7 информационных бит и <strong>1 контрольный бит четности</strong> на конце (режим Even Parity — общее число единиц во всем 8-битном слове должно быть строго <strong>четным</strong>).
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПРИНЯТЫЕ 8-БИТНЫЕ БЛОКИ (ПОСЛЕДНИЙ БИТ — БИТ ЧЕТНОСТИ):</div>
+                        <div id="p5-blocks-display" class="d-flex flex-column gap-2 font-monospace">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <p class="text-light mb-2">В каком из блоков (номер от 1 до 4) произошла ошибка передачи (нарушен паритет)?</p>
+                    <div class="input-group mb-3" style="max-width: 400px;">
+                        <input type="number" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Номер сбойного блока (1–4)" min="1" max="4" autocomplete="off">
+                        <button id="p5-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p5-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА ВАЛИДАЦИИ ПАРИТЕТА] Указан неверный блок данных! Перегенерация кадров...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="card bg-black border-warning rounded-0 p-5 d-inline-block text-center shadow-lg" style="max-width: 600px;">
+                        <div class="display-1 text-warning mb-3">★</div>
+                        <h3 class="text-warning fw-bold font-monospace mb-2">УРОВЕНЬ 2 УСПЕШНО ЗАВЕРШЕН</h3>
+                        <p class="text-light mb-4">
+                            Все 5 аналитических и расчетных испытаний по двоичному кодированию выполнены верно. Контроль четности и математический аппарат освоены.
+                        </p>
+                        <div class="row g-2 mb-4 text-start font-monospace small bg-dark p-3 border border-secondary">
+                            <div class="col-6 text-secondary">Общее время:</div>
+                            <div class="col-6 text-end text-light fw-bold" id="final-time">00:00</div>
+                            <div class="col-6 text-secondary">Количество попыток:</div>
+                            <div class="col-6 text-end text-warning fw-bold" id="final-attempts">1</div>
+                            <div class="col-6 text-secondary">Академический зачет:</div>
+                            <div class="col-6 text-end text-warning fw-bold">ПРОДВИНУТЫЙ (100%)</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button id="restart-level-btn" class="btn btn-outline-warning rounded-0 font-monospace">
+                                Пройти уровень повторно
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+        const startTime = Date.now();
+        let attempts = 0;
+        let currentPhase = 1;
+
+        // Таймер
+        const timerDisplay = document.getElementById('timer-display');
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
+        }, 1000);
+
+        // Телеметрия
+        function sendTelemetry(actionType, isSuccess) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 7 :: Двоичное кодирование (Уровень 2)',
+                action_type: actionType,
+                status: isSuccess ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: isSuccess
+            }, '*');
+        }
+
+        sendTelemetry('in_progress', false);
+
+        // Обработка ошибок
+        function triggerPhaseError(feedbackEl, callback) {
+            attempts++;
+            const attemptsDisplay = document.getElementById('attempts-display');
+            if (attemptsDisplay) attemptsDisplay.textContent = attempts;
+            if (feedbackEl) feedbackEl.classList.remove('d-none');
+            sendTelemetry('hardcore_reset', false);
+
+            setTimeout(() => {
+                if (feedbackEl) feedbackEl.classList.add('d-none');
+                if (callback) callback();
+            }, 1200);
+        }
+
+        // ==========================================
+        // ФАЗА 1: РАСЧЕТ РАЗРЯДНОСТИ 2^k >= N
+        // ==========================================
+        let p1CorrectAns = 0;
+
+        function initPhase1() {
+            const nVariants = [
+                { desc: 'состояний погодного датчика', n: 12 },
+                { desc: 'букв алфавита племени Мумбо-Юмбо', n: 18 },
+                { desc: 'символов национального алфавита', n: 33 },
+                { desc: 'участников олимпиадной сборной', n: 45 },
+                { desc: 'сетевых рабочих станций в школьном классе', n: 28 },
+                { desc: 'исходов комплексного эксперимента', n: 55 },
+                { desc: 'категорий складского учета', n: 70 },
+                { desc: 'уникальных команд роботизированного манипулятора', n: 100 },
+                { desc: 'датчиков давления на нефтепроводе', n: 150 }
+            ];
+
+            const chosen = nVariants[Math.floor(Math.random() * nVariants.length)];
+            const N = chosen.n;
+            p1CorrectAns = Math.ceil(Math.log2(N));
+
+            document.getElementById('p1-objects-desc').textContent = chosen.desc;
+            document.getElementById('p1-n-value').textContent = `${N} объектов`;
+
+            const input = document.getElementById('p1-input');
+            const btn = document.getElementById('p1-btn');
+            const feedback = document.getElementById('p1-feedback');
+
+            input.value = '';
+            input.focus();
+
+            btn.onclick = () => {
+                const userVal = parseInt(input.value.trim(), 10);
+                if (userVal === p1CorrectAns) {
+                    goToPhase2();
+                } else {
+                    triggerPhaseError(feedback, () => initPhase1());
+                }
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') btn.click();
+            };
+        }
+
+        // ==========================================
+        // ФАЗА 2: АНАЛИЗ ИЗБЫТОЧНЫХ КОМБИНАЦИЙ (2^k - N)
+        // ==========================================
+        let p2CorrectAns = 0;
+
+        function initPhase2() {
+            const nVariants = [
+                { desc: 'кабинетов в школьном корпусе', n: 25 },
+                { desc: 'серверных стоек в дата-центре', n: 40 },
+                { desc: 'камер городского видеонаблюдения', n: 50 },
+                { desc: 'устройств умного дома в локальной сети', n: 60 },
+                { desc: 'сотрудников инновационной лаборатории', n: 75 },
+                { desc: 'электронных пропусков на проходной', n: 90 },
+                { desc: 'транспортных маршрутов на табло вокзала', n: 110 }
+            ];
+
+            const chosen = nVariants[Math.floor(Math.random() * nVariants.length)];
+            const N = chosen.n;
+            const k = Math.ceil(Math.log2(N));
+            const capacity = Math.pow(2, k);
+            p2CorrectAns = capacity - N;
+
+            document.getElementById('p2-objects-desc').textContent = chosen.desc;
+            document.getElementById('p2-n-value').textContent = `${N}`;
+
+            const input = document.getElementById('p2-input');
+            const btn = document.getElementById('p2-btn');
+            const feedback = document.getElementById('p2-feedback');
+
+            input.value = '';
+            input.focus();
+
+            btn.onclick = () => {
+                const userVal = parseInt(input.value.trim(), 10);
+                if (userVal === p2CorrectAns) {
+                    goToPhase3();
+                } else {
+                    triggerPhaseError(feedback, () => initPhase2());
+                }
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') btn.click();
+            };
+        }
+
+        // ==========================================
+        // ФАЗА 3: ПОШАГОВОЕ ДЕКОДИРОВАНИЕ ПО ФАНО
+        // ==========================================
+        let p3CorrectWord = '';
+
+        function initPhase3() {
+            const codeSchemes = [
+                {
+                    table: { 'А': '0', 'Б': '10', 'К': '110', 'Т': '111' },
+                    words: ['АББАТ', 'ТАБАК', 'АТАКА', 'БАКТ', 'КАТА', 'КАБАН']
+                },
+                {
+                    table: { 'К': '00', 'О': '01', 'Р': '10', 'Т': '110', 'С': '111' },
+                    words: ['КОТ', 'РОТ', 'СОК', 'ТОК', 'КРОТ', 'ТОРТ', 'СТОК']
+                },
+                {
+                    table: { 'М': '0', 'И': '10', 'Р': '110', 'У': '111' },
+                    words: ['МИР', 'УМ', 'РИМ', 'МИРУ', 'МУР']
+                }
+            ];
+
+            const scheme = codeSchemes[Math.floor(Math.random() * codeSchemes.length)];
+            const chosenWord = scheme.words[Math.floor(Math.random() * scheme.words.length)];
+            p3CorrectWord = chosenWord;
+
+            // Кодируем слово в битовую цепочку
+            let bitstream = '';
+            for (const ch of chosenWord) {
+                bitstream += scheme.table[ch];
+            }
+
+            // Рендер таблицы кодов
+            const tableDisplay = document.getElementById('p3-codes-display');
+            tableDisplay.innerHTML = '';
+            for (const [sym, code] of Object.entries(scheme.table)) {
+                const span = document.createElement('span');
+                span.className = 'border border-secondary px-2 py-1 bg-dark';
+                span.innerHTML = `<strong>${sym}</strong>: <code>${code}</code>`;
+                tableDisplay.appendChild(span);
+            }
+
+            document.getElementById('p3-bitstream-display').textContent = bitstream;
+
+            const input = document.getElementById('p3-input');
+            const btn = document.getElementById('p3-btn');
+            const feedback = document.getElementById('p3-feedback');
+
+            input.value = '';
+            input.focus();
+
+            btn.onclick = () => {
+                const userVal = input.value.trim().toUpperCase();
+                if (userVal === p3CorrectWord) {
+                    goToPhase4();
+                } else {
+                    triggerPhaseError(feedback, () => initPhase3());
+                }
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') btn.click();
+            };
+        }
+
+        // ==========================================
+        // ФАЗА 4: РАСЧЕТ ИНФОРМАЦИОННОГО ОБЪЕМА
+        // ==========================================
+        let p4CorrectBits = 0;
+
+        function initPhase4() {
+            const tableVariants = [
+                {
+                    lengths: { 'А': 1, 'Б': 2, 'В': 3, 'Г': 3 },
+                    text: 'АБВАГБААВ'
+                },
+                {
+                    lengths: { 'К': 2, 'О': 2, 'Л': 3, 'О': 2, 'С': 3 },
+                    text: 'КОЛОСОК'
+                },
+                {
+                    lengths: { 'П': 2, 'О': 2, 'Р': 3, 'Т': 3 },
+                    text: 'ПРОТОТИП'
+                },
+                {
+                    lengths: { 'С': 1, 'Е': 2, 'Т': 3, 'Ь': 4 },
+                    text: 'СЕТЬ'
+                },
+                {
+                    lengths: { 'Д': 2, 'А': 1, 'Т': 3, 'А': 1 },
+                    text: 'ДАТАДАТА'
+                }
+            ];
+
+            const chosen = tableVariants[Math.floor(Math.random() * tableVariants.length)];
+            
+            // Расчет суммы бит
+            let totalBits = 0;
+            for (const ch of chosen.text) {
+                totalBits += chosen.lengths[ch] || 2;
+            }
+            p4CorrectBits = totalBits;
+
+            const lengthsDisplay = document.getElementById('p4-lengths-display');
+            lengthsDisplay.innerHTML = '';
+            for (const [sym, len] of Object.entries(chosen.lengths)) {
+                const span = document.createElement('span');
+                span.className = 'border border-secondary px-2 py-1 bg-dark';
+                span.innerHTML = `<strong>${sym}</strong>: <code>${len} бит</code>`;
+                lengthsDisplay.appendChild(span);
+            }
+
+            document.getElementById('p4-text-display').textContent = `«${chosen.text}»`;
+
+            const input = document.getElementById('p4-input');
+            const btn = document.getElementById('p4-btn');
+            const feedback = document.getElementById('p4-feedback');
+
+            input.value = '';
+            input.focus();
+
+            btn.onclick = () => {
+                const userVal = parseInt(input.value.trim(), 10);
+                if (userVal === p4CorrectBits) {
+                    goToPhase5();
+                } else {
+                    triggerPhaseError(feedback, () => initPhase4());
+                }
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') btn.click();
+            };
+        }
+
+        // ==========================================
+        // ФАЗА 5: КОНТРОЛЬ ЧЕТНОСТИ (EVEN PARITY)
+        // ==========================================
+        let p5FaultyBlockIdx = 1;
+
+        function initPhase5() {
+            // Генерируем 4 8-битных блока
+            // В режиме Even Parity общее число единиц во всем блоке должно быть четным
+            const blocks = [];
+            const faultyIdx = Math.floor(Math.random() * 4) + 1; // 1 to 4
+            p5FaultyBlockIdx = faultyIdx;
+
+            for (let i = 1; i <= 4; i++) {
+                // 7 информационных бит
+                const infoBits = [];
+                let onesCount = 0;
+                for (let b = 0; b < 7; b++) {
+                    const bit = Math.random() > 0.5 ? 1 : 0;
+                    infoBits.push(bit);
+                    if (bit === 1) onesCount++;
+                }
+
+                // Корректный бит четности: если onesCount нечетный, то 1, иначе 0
+                let parityBit = (onesCount % 2 === 1) ? 1 : 0;
+
+                // Если это сбойный блок, инвертируем бит четности (или один из бит данных)
+                if (i === faultyIdx) {
+                    parityBit = parityBit === 1 ? 0 : 1; // Делаем сумму нечетной!
+                }
+
+                const fullBlock = infoBits.join('') + ' ' + parityBit;
+                blocks.push({ id: i, str: fullBlock });
+            }
+
+            const blocksContainer = document.getElementById('p5-blocks-display');
+            blocksContainer.innerHTML = '';
+            blocks.forEach(b => {
+                const div = document.createElement('div');
+                div.className = 'd-flex justify-content-between align-items-center bg-dark p-2 border border-secondary';
+                div.innerHTML = `
+                    <span>Блок #${b.id}: <code class="fs-5 text-light">${b.str}</code></span>
+                    <span class="text-secondary small">(7 бит данных + 1 бит четности)</span>
+                `;
+                blocksContainer.appendChild(div);
+            });
+
+            const input = document.getElementById('p5-input');
+            const btn = document.getElementById('p5-btn');
+            const feedback = document.getElementById('p5-feedback');
+
+            input.value = '';
+            input.focus();
+
+            btn.onclick = () => {
+                const userVal = parseInt(input.value.trim(), 10);
+                if (userVal === p5FaultyBlockIdx) {
+                    finishLevel();
+                } else {
+                    triggerPhaseError(feedback, () => initPhase5());
+                }
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') btn.click();
+            };
+        }
+
+        // ==========================================
+        // ПЕРЕХОДЫ МЕЖДУ ФАЗАМИ И ПОБЕДА
+        // ==========================================
+        function goToPhase2() {
+            currentPhase = 2;
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+            document.getElementById('phase-title').textContent = 'Анализ избыточных (свободных) комбинаций кода';
+            initPhase2();
+        }
+
+        function goToPhase3() {
+            currentPhase = 3;
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+            document.getElementById('phase-title').textContent = 'Пошаговое декодирование битовой строки по префиксному коду';
+            initPhase3();
+        }
+
+        function goToPhase4() {
+            currentPhase = 4;
+            document.getElementById('phase3').classList.add('d-none');
+            document.getElementById('phase4').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+            document.getElementById('phase-title').textContent = 'Расчет информационного объема неравномерного сообщения';
+            initPhase4();
+        }
+
+        function goToPhase5() {
+            currentPhase = 5;
+            document.getElementById('phase4').classList.add('d-none');
+            document.getElementById('phase5').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+            document.getElementById('phase-title').textContent = 'Контроль четности и обнаружение ошибок в блоках данных';
+            initPhase5();
+        }
+
+        function finishLevel() {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
+            const s = String(timeSpent % 60).padStart(2, '0');
+
+            document.getElementById('phase5').classList.add('d-none');
+            document.getElementById('phase-badge').classList.replace('bg-warning', 'bg-info');
+            document.getElementById('phase-badge').textContent = 'Пройдено';
+            document.getElementById('phase-title').textContent = 'Аттестация Уровня 2 завершена';
+
+            document.getElementById('success-screen').classList.remove('d-none');
+            document.getElementById('final-time').textContent = `${m}:${s}`;
+            document.getElementById('final-attempts').textContent = attempts + 1;
+
+            sendTelemetry('level_complete', true);
+
+            document.getElementById('restart-level-btn').onclick = () => {
+                location.reload();
+            };
+        }
+
+        // Старт с 1 фазы
+        initPhase1();
+    });
+</script>
