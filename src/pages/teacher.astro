@@ -181,9 +181,13 @@ try {
         aLvl.completed = true;
         aLvl.status = 'completed';
       } else if (r.action_type === 'hardcore_reset') {
-        if (!aLvl.completed) aLvl.status = att.mode === 'hardcore' ? 'reset' : 'in_progress';
+        if (!aLvl.completed) {
+          aLvl.status = att.mode === 'hardcore' ? 'reset' : ((aLvl.rawTimeSpentSec || 0) > 0 || aLvl.errors > 0 ? 'in_progress' : 'not_started');
+        }
       } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
-        if (!aLvl.completed) aLvl.status = 'in_progress';
+        if (!aLvl.completed && (r.time_spent_sec > 0 || (aLvl.rawTimeSpentSec || 0) > 0)) {
+          aLvl.status = 'in_progress';
+        }
       }
 
       const lvl = s.levels[lvlNum];
@@ -207,9 +211,13 @@ try {
           s.normalCompletedLevels.add(lvlNum);
         }
       } else if (r.action_type === 'hardcore_reset') {
-        if (!lvl.completed) lvl.status = r.is_hardcore === 1 ? 'reset' : 'in_progress';
+        if (!lvl.completed) {
+          lvl.status = r.is_hardcore === 1 ? 'reset' : ((lvl.rawTimeSpentSec || 0) > 0 || lvl.errors > 0 ? 'in_progress' : 'not_started');
+        }
       } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
-        if (!lvl.completed) lvl.status = 'in_progress';
+        if (!lvl.completed && (r.time_spent_sec > 0 || (lvl.rawTimeSpentSec || 0) > 0)) {
+          lvl.status = 'in_progress';
+        }
       }
     }
 
@@ -257,14 +265,35 @@ try {
       att.levels[3].timeSpentSec = a3Pure;
       att.totalTimeSec = a1Pure + a2Pure + a3Pure;
 
-      const compCount = [1, 2, 3].filter(num => att.levels[num].completed).length;
+      ([1, 2, 3] as const).forEach(n => {
+        const l = att.levels[n];
+        if (l.completed) {
+          l.status = 'completed';
+        } else if (l.status === 'reset' && att.mode === 'hardcore') {
+          l.status = 'reset';
+        } else if (l.timeSpentSec > 0 || l.errors > 0) {
+          l.status = 'in_progress';
+        } else {
+          l.status = 'not_started';
+        }
+      });
+
+      const compCount = ([1, 2, 3] as const).filter(num => att.levels[num].completed).length;
       att.completedLevelsCount = compCount;
       if (compCount >= 3) {
         att.status = 'completed';
       }
     });
 
-    s.attempts = s._attemptOrder.map((id: string) => s._attemptsMap[id]);
+    // FILTER OUT GHOST/EMPTY ATTEMPTS:
+    // An attempt is real if it has active time > 0, errors > 0, completed levels > 0, or is completed/failed.
+    const allAttempts = s._attemptOrder.map((id: string) => s._attemptsMap[id]);
+    const realAttempts = allAttempts.filter((a: any) =>
+      a.totalTimeSec > 0 || a.errorsCount > 0 || a.completedLevelsCount > 0 || a.status === 'completed' || a.status === 'failed'
+    );
+    // If no attempts passed filter (e.g. brand new user with 0s), keep the latest 1 attempt
+    s.attempts = realAttempts.length > 0 ? realAttempts : (allAttempts.length > 0 ? [allAttempts[allAttempts.length - 1]] : []);
+
     s.attemptsCount = s.attempts.length;
     s.normalAttemptsCount = s.attempts.filter((a: any) => a.mode === 'normal').length;
     s.hardcoreAttemptsCount = s.attempts.filter((a: any) => a.mode === 'hardcore').length;
@@ -310,13 +339,26 @@ try {
     s.levels[2].timeSpentSec = l2Pure;
     s.levels[3].timeSpentSec = l3Pure;
 
+    ([1, 2, 3] as const).forEach(n => {
+      const l = s.levels[n];
+      if (l.completed) {
+        l.status = 'completed';
+      } else if (l.status === 'reset' && (s.isHardcoreLegend || s.hardcoreAttemptsCount > 0)) {
+        l.status = 'reset';
+      } else if (l.timeSpentSec > 0 || l.errors > 0) {
+        l.status = 'in_progress';
+      } else {
+        l.status = 'not_started';
+      }
+    });
+
     s.totalActiveTimeSec = Math.max(attemptsTotalTime, l1Pure + l2Pure + l3Pure);
     
     const isHardcoreCompleted = s.isHardcoreLegend || s.hardcoreStreakLevels.size >= 3;
     const isNormalCompleted = s.isNormalMastered || s.normalCompletedLevels.size >= 3;
     s.hardcoreLevelsConquered = s.allHardcoreCompletedLevels.size;
 
-    [1, 2, 3].forEach(num => {
+    ([1, 2, 3] as const).forEach(num => {
       s.levels[num].hardcore = s.allHardcoreCompletedLevels.has(num);
     });
 
@@ -327,15 +369,23 @@ try {
     } else if (isNormalCompleted) {
       s.lessonStatus = 'completed';
       s.isHardcoreLegend = false;
-      if (s.currentAttempt && s.currentAttempt.mode === 'hardcore') {
-        s.hardcoreStatus = s.currentAttempt.status === 'failed' ? 'failed' : 'attempting';
+      const realHcAttempts = s.attempts.filter((a: any) => a.mode === 'hardcore');
+      if (realHcAttempts.length > 0) {
+        const lastHc = realHcAttempts[realHcAttempts.length - 1];
+        s.hardcoreStatus = lastHc.status === 'failed' ? 'failed' : (lastHc.status === 'completed' ? 'completed' : 'attempting');
       } else {
-        s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
+        s.hardcoreStatus = 'none';
       }
-    } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].attempts > 0 || s.levels[2].attempts > 0 || s.levels[3].attempts > 0) {
+    } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].status !== 'not_started' || s.levels[2].status !== 'not_started' || s.levels[3].status !== 'not_started') {
       s.lessonStatus = 'in_progress';
       s.isHardcoreLegend = false;
-      s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
+      const realHcAttempts = s.attempts.filter((a: any) => a.mode === 'hardcore');
+      if (realHcAttempts.length > 0) {
+        const lastHc = realHcAttempts[realHcAttempts.length - 1];
+        s.hardcoreStatus = lastHc.status === 'failed' ? 'failed' : 'attempting';
+      } else {
+        s.hardcoreStatus = 'none';
+      }
     } else {
       s.lessonStatus = 'not_started';
       s.isHardcoreLegend = false;
@@ -382,6 +432,15 @@ function formatSec(sec: number): string {
   const s = sec % 60;
   if (m === 0) return `${s}с`;
   return `${m}м ${s}с`;
+}
+
+function getAttemptsWord(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 19) return 'забегов';
+  if (mod10 === 1) return 'забег';
+  if (mod10 >= 2 && mod10 <= 4) return 'забега';
+  return 'забегов';
 }
 ---
 
@@ -562,6 +621,7 @@ function formatSec(sec: number): string {
               <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="name" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Ученик <span id="sort-name-icon">↕</span></th>
               <th class="p-3 cursor-pointer hover:bg-gray-200 transition" data-sort="class" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Класс <span id="sort-class-icon">↕</span></th>
               <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="status" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Статус урока <span id="sort-status-icon">↕</span></th>
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="attempts" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">Забеги <span id="sort-attempts-icon">↕</span></th>
               <th class="p-3 text-center">Уровень 1</th>
               <th class="p-3 text-center">Уровень 2</th>
               <th class="p-3 text-center">Уровень 3</th>
@@ -574,7 +634,7 @@ function formatSec(sec: number): string {
           <tbody id="table-body" class="divide-y divide-gray-100">
             {initialStudents.length === 0 ? (
               <tr>
-                <td colspan="11" class="p-12 text-center text-gray-500">
+                <td colspan="12" class="p-12 text-center text-gray-500">
                   <div class="text-3xl mb-2">📋</div>
                   <div class="text-base font-semibold">Нет данных телеметрии по выбранным фильтрам</div>
                   <div class="text-xs text-gray-400 mt-1">Попробуйте выбрать другой класс, урок или период «За всё время»</div>
@@ -632,6 +692,24 @@ function formatSec(sec: number): string {
                     {s.lessonStatus === 'not_started' && (
                       <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">
                         — Не начат
+                      </span>
+                    )}
+                  </td>
+
+                  <!-- Attempts Column -->
+                  <td class="p-3 text-center">
+                    {s.attemptsCount > 1 || s.hardcoreAttemptsCount > 0 ? (
+                      <div class="inline-flex flex-col items-center gap-0.5">
+                        <span class={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold ${s.hardcoreAttemptsCount > 0 ? 'bg-purple-100 text-purple-900 border border-purple-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`} title={`Всего забегов: ${s.attemptsCount}${s.bestNormalTimeSec ? ` • Лучшее обычное: ${formatSec(s.bestNormalTimeSec)}` : ''}${s.bestHardcoreTimeSec ? ` • Лучшее хардкор: ${formatSec(s.bestHardcoreTimeSec)}` : ''}`}>
+                          {s.attemptsCount} {getAttemptsWord(s.attemptsCount)}
+                        </span>
+                        <span class="text-[10px] text-gray-500 font-medium">
+                          {s.normalAttemptsCount} обычн.{s.hardcoreAttemptsCount > 0 ? ` • ${s.hardcoreAttemptsCount} 💀` : ''}
+                        </span>
+                      </div>
+                    ) : (
+                      <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                        1 забег
                       </span>
                     )}
                   </td>
@@ -923,6 +1001,15 @@ function formatSec(sec: number): string {
     return `${m}м ${s}с`;
   }
 
+  function getAttemptsWord(count) {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod100 >= 11 && mod100 <= 19) return 'забегов';
+    if (mod10 === 1) return 'забег';
+    if (mod10 >= 2 && mod10 <= 4) return 'забега';
+    return 'забегов';
+  }
+
   // Fetch telemetry from server API
   async function fetchTelemetry() {
     const cls = getSelectedClassesParam();
@@ -963,8 +1050,8 @@ function formatSec(sec: number): string {
   }
 
   function updateSortIcons() {
-    const cols = ['name', 'class', 'status', 'time', 'errors', 'last'];
-    const superscripts = ['¹', '²', '³', '⁴', '⁵', '⁶'];
+    const cols = ['name', 'class', 'status', 'attempts', 'time', 'errors', 'last'];
+    const superscripts = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷'];
 
     cols.forEach(col => {
       const icon = document.getElementById(`sort-${col}-icon`);
@@ -1031,6 +1118,8 @@ function formatSec(sec: number): string {
         'not_started': 1
       };
       diff = (statusWeight[a.lessonStatus] || 0) - (statusWeight[b.lessonStatus] || 0);
+    } else if (col === 'attempts') {
+      diff = (a.attemptsCount || 1) - (b.attemptsCount || 1);
     } else if (col === 'time') {
       diff = (a.totalActiveTimeSec || 0) - (b.totalActiveTimeSec || 0);
     } else if (col === 'errors') {
@@ -1051,7 +1140,7 @@ function formatSec(sec: number): string {
     if (currentStudents.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="11" class="p-12 text-center text-gray-500">
+          <td colspan="12" class="p-12 text-center text-gray-500">
             <div class="text-3xl mb-2">📋</div>
             <div class="text-base font-semibold">Нет данных телеметрии по выбранным фильтрам</div>
             <div class="text-xs text-gray-400 mt-1">Попробуйте выбрать другой класс, урок или период «За всё время»</div>
@@ -1073,21 +1162,38 @@ function formatSec(sec: number): string {
     let html = '';
     sorted.forEach((s, idx) => {
       let statusBadge = '';
-      const attBadge = s.attemptsCount > 1 ? `<div class="text-[10px] text-gray-500 font-medium mt-0.5">${s.attemptsCount} забега (${s.normalAttemptsCount} обычн.${s.hardcoreAttemptsCount > 0 ? `, ${s.hardcoreAttemptsCount} 💀` : ''})</div>` : '';
-
       if (s.lessonStatus === 'hardcore_completed') {
-        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300">💀 Хардкор сдан</span>${attBadge}</div>`;
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300">💀 Хардкор сдан</span>';
       } else if (s.lessonStatus === 'completed') {
         let extra = '';
         if (s.hardcoreLevelsConquered > 0) extra = `<span class="text-[10px] text-red-600 font-semibold" title="Пройдено на хардкоре: ${s.hardcoreLevelsConquered} из 3 уровней">💀 ${s.hardcoreLevelsConquered}/3 ур.</span>`;
         else if (s.hardcoreStatus === 'failed') extra = '<span class="text-[10px] text-red-600 font-medium" title="Была попытка пройти на хардкоре, сброшена на ошибке">💀 сброс</span>';
         else if (s.hardcoreStatus === 'attempting') extra = '<span class="text-[10px] text-amber-600 font-medium" title="Сейчас решает в режиме хардкора">💀 попытка</span>';
-        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800 border border-green-300">✓ Пройден</span>${extra}${attBadge}</div>`;
+        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800 border border-green-300">✓ Пройден</span>${extra}</div>`;
       } else if (s.lessonStatus === 'in_progress') {
         let extra = s.hardcoreStatus === 'attempting' ? '<span class="text-[10px] text-amber-600 font-medium">💀 хардкор</span>' : '';
-        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">⏳ В процессе</span>${extra}${attBadge}</div>`;
+        statusBadge = `<div class="inline-flex flex-col items-center gap-0.5"><span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">⏳ В процессе</span>${extra}</div>`;
       } else {
         statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">— Не начат</span>';
+      }
+
+      let attemptsBadge = '';
+      if ((s.attemptsCount && s.attemptsCount > 1) || (s.hardcoreAttemptsCount && s.hardcoreAttemptsCount > 0)) {
+        const hcClass = s.hardcoreAttemptsCount > 0 ? 'bg-purple-100 text-purple-900 border-purple-200' : 'bg-blue-50 text-blue-800 border-blue-200';
+        const bestInfo = `${s.bestNormalTimeSec ? ` • Лучшее обычное: ${formatTime(s.bestNormalTimeSec)}` : ''}${s.bestHardcoreTimeSec ? ` • Лучшее хардкор: ${formatTime(s.bestHardcoreTimeSec)}` : ''}`;
+        const hcSub = s.hardcoreAttemptsCount > 0 ? ` • ${s.hardcoreAttemptsCount} 💀` : '';
+        attemptsBadge = `
+          <div class="inline-flex flex-col items-center gap-0.5">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold ${hcClass} border" title="Всего забегов: ${s.attemptsCount}${bestInfo}">
+              ${s.attemptsCount} ${getAttemptsWord(s.attemptsCount)}
+            </span>
+            <span class="text-[10px] text-gray-500 font-medium">
+              ${s.normalAttemptsCount || 0} обычн.${hcSub}
+            </span>
+          </div>
+        `;
+      } else {
+        attemptsBadge = '<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">1 забег</span>';
       }
 
       function levelBadge(lvl) {
@@ -1121,6 +1227,7 @@ function formatSec(sec: number): string {
           </td>
           <td class="p-3 text-xs text-gray-600">${s.className}</td>
           <td class="p-3 text-center">${statusBadge}</td>
+          <td class="p-3 text-center">${attemptsBadge}</td>
           <td class="p-3 text-center">${levelBadge(s.levels[1])}</td>
           <td class="p-3 text-center">${levelBadge(s.levels[2])}</td>
           <td class="p-3 text-center">${levelBadge(s.levels[3])}</td>
@@ -1273,12 +1380,14 @@ function formatSec(sec: number): string {
       return;
     }
 
-    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Активное время (сек)', 'Активное время', 'Всего ошибок', 'Хардкор', 'Последняя активность'];
+    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Активное время (сек)', 'Активное время', 'Всего ошибок', 'Хардкор', 'Последняя активность'];
     const rows = currentStudents.map((s, idx) => [
       idx + 1,
       `"${s.displayName}"`,
       `"${s.className}"`,
       `"${s.lessonStatus}"`,
+      s.attemptsCount || 1,
+      s.hardcoreAttemptsCount || 0,
       `"${formatTime(s.levels[1]?.timeSpentSec)} / ${s.levels[1]?.errors || 0} ош."`,
       `"${formatTime(s.levels[2]?.timeSpentSec)} / ${s.levels[2]?.errors || 0} ош."`,
       `"${formatTime(s.levels[3]?.timeSpentSec)} / ${s.levels[3]?.errors || 0} ош."`,

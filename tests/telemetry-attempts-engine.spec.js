@@ -322,4 +322,107 @@ test.describe('Comprehensive Telemetry & Attempt Lifecycle Engine Suite', () => 
     await page.locator('#modal-close-btn').click();
     await expect(page.locator('#detail-modal')).toBeHidden();
   });
+
+  test('7. Anti-Ghost Engine: Zero-second locked level pings and empty attempts are not registered as in_progress or extra runs', async ({ request }) => {
+    const studentFn = `АнтиПризрак_${Date.now()}`;
+    const studentLn = 'Чистый';
+    const sClass = '8-класс';
+    const lessonId = '997';
+    const missionPrefix = `Урок ${lessonId} :: Задача`;
+    const realAttId = `att_real_${Date.now()}`;
+
+    // Level 1: real active work
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 1,
+        mission_name: `${missionPrefix} (Уровень 1)`,
+        action_type: 'in_progress',
+        time_spent_sec: 45,
+        attempt_id: realAttId,
+        attempt_number: 1,
+        attempt_mode: 'normal'
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Level 2 & 3: automated 0s pings from background iframes (should be discarded from in_progress)
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 2,
+        mission_name: `${missionPrefix} (Уровень 2)`,
+        action_type: 'in_progress',
+        time_spent_sec: 0,
+        attempt_id: realAttId,
+        attempt_number: 1,
+        attempt_mode: 'normal'
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Ghost attempt with 0s and no errors (e.g. spurious reload or hardcore toggle)
+    const ghostAttId = `att_ghost_${Date.now()}`;
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 1,
+        mission_name: `${missionPrefix} (Уровень 1)`,
+        action_type: 'in_progress',
+        time_spent_sec: 0,
+        attempt_id: ghostAttId,
+        attempt_number: 2,
+        attempt_mode: 'hardcore',
+        is_hardcore: false
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    const body = await res.json();
+    const s = body.students[0];
+
+    // Level 1 is in_progress (45s)
+    expect(s.levels[1].status).toBe('in_progress');
+    expect(s.levels[1].timeSpentSec).toBe(45);
+
+    // Level 2 and 3 remain not_started (0s) despite the 0s ping
+    expect(s.levels[2].status).toBe('not_started');
+    expect(s.levels[2].timeSpentSec).toBe(0);
+    expect(s.levels[3].status).toBe('not_started');
+
+    // Ghost attempt with 0s was filtered out: exactly 1 attempt remains
+    expect(s.attemptsCount).toBe(1);
+    expect(s.hardcoreStatus).toBe('none');
+  });
+
+  test('8. Dedicated Attempts Table Column: Renders header, attempts badge and supports sorting', async ({ page }) => {
+    await page.goto(`${baseUrl}/teacher?date=all`);
+    await page.waitForSelector('#progress-table');
+
+    // Verify header exists
+    const attemptsTh = page.locator('th[data-sort="attempts"]');
+    await expect(attemptsTh).toBeVisible();
+    await expect(attemptsTh).toContainText('Забеги');
+
+    // Verify sort icon toggle
+    await attemptsTh.click();
+    const sortIcon = page.locator('#sort-attempts-icon');
+    const iconText = await sortIcon.innerText();
+    expect(iconText === '↑' || iconText === '↓' || iconText.includes('↑') || iconText.includes('↓')).toBe(true);
+
+    // Verify that student rows contain the attempts column (column 5)
+    const attemptsCells = await page.locator('.student-row td:nth-child(5)').allTextContents();
+    expect(attemptsCells.length).toBeGreaterThan(0);
+    expect(attemptsCells[0]).toMatch(/забег|попытка/i);
+  });
 });

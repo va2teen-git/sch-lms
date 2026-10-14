@@ -321,9 +321,13 @@ export const GET: APIRoute = async ({ request }) => {
           aLvl.completed = true;
           aLvl.status = 'completed';
         } else if (r.action_type === 'hardcore_reset') {
-          if (!aLvl.completed) aLvl.status = att.mode === 'hardcore' ? 'reset' : 'in_progress';
+          if (!aLvl.completed) {
+            aLvl.status = att.mode === 'hardcore' ? 'reset' : ((aLvl.rawTimeSpentSec || 0) > 0 || aLvl.errors > 0 ? 'in_progress' : 'not_started');
+          }
         } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
-          if (!aLvl.completed) aLvl.status = 'in_progress';
+          if (!aLvl.completed && (r.time_spent_sec > 0 || (aLvl.rawTimeSpentSec || 0) > 0)) {
+            aLvl.status = 'in_progress';
+          }
         }
 
         // Global student level tracking
@@ -351,10 +355,10 @@ export const GET: APIRoute = async ({ request }) => {
           }
         } else if (r.action_type === 'hardcore_reset') {
           if (!lvl.completed) {
-            lvl.status = r.is_hardcore === 1 ? 'reset' : 'in_progress';
+            lvl.status = r.is_hardcore === 1 ? 'reset' : ((lvl.rawTimeSpentSec || 0) > 0 || lvl.errors > 0 ? 'in_progress' : 'not_started');
           }
         } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
-          if (!lvl.completed) {
+          if (!lvl.completed && (r.time_spent_sec > 0 || (lvl.rawTimeSpentSec || 0) > 0)) {
             lvl.status = 'in_progress';
           }
         }
@@ -409,14 +413,35 @@ export const GET: APIRoute = async ({ request }) => {
         att.levels[3].timeSpentSec = a3Pure;
         att.totalTimeSec = a1Pure + a2Pure + a3Pure;
 
-        const compCount = [1, 2, 3].filter(num => att.levels[num as 1 | 2 | 3].completed).length;
+        ([1, 2, 3] as const).forEach(n => {
+          const l = att.levels[n];
+          if (l.completed) {
+            l.status = 'completed';
+          } else if (l.status === 'reset' && att.mode === 'hardcore') {
+            l.status = 'reset';
+          } else if (l.timeSpentSec > 0 || l.errors > 0) {
+            l.status = 'in_progress';
+          } else {
+            l.status = 'not_started';
+          }
+        });
+
+        const compCount = ([1, 2, 3] as const).filter(num => att.levels[num].completed).length;
         att.completedLevelsCount = compCount;
         if (compCount >= 3) {
           att.status = 'completed';
         }
       });
 
-      s.attempts = s._attemptOrder.map(id => s._attemptsMap[id]);
+      // FILTER OUT GHOST/EMPTY ATTEMPTS:
+      // An attempt is real if it has active time > 0, errors > 0, completed levels > 0, or is completed/failed.
+      const allAttempts = s._attemptOrder.map(id => s._attemptsMap[id]);
+      const realAttempts = allAttempts.filter(a =>
+        a.totalTimeSec > 0 || a.errorsCount > 0 || a.completedLevelsCount > 0 || a.status === 'completed' || a.status === 'failed'
+      );
+      // If no attempts passed filter (e.g. brand new user with 0s), keep the latest 1 attempt
+      s.attempts = realAttempts.length > 0 ? realAttempts : (allAttempts.length > 0 ? [allAttempts[allAttempts.length - 1]] : []);
+
       s.attemptsCount = s.attempts.length;
       s.normalAttemptsCount = s.attempts.filter(a => a.mode === 'normal').length;
       s.hardcoreAttemptsCount = s.attempts.filter(a => a.mode === 'hardcore').length;
@@ -459,6 +484,19 @@ export const GET: APIRoute = async ({ request }) => {
       s.levels[2].timeSpentSec = l2Pure;
       s.levels[3].timeSpentSec = l3Pure;
 
+      ([1, 2, 3] as const).forEach(n => {
+        const l = s.levels[n];
+        if (l.completed) {
+          l.status = 'completed';
+        } else if (l.status === 'reset' && (s.isHardcoreLegend || s.hardcoreAttemptsCount > 0)) {
+          l.status = 'reset';
+        } else if (l.timeSpentSec > 0 || l.errors > 0) {
+          l.status = 'in_progress';
+        } else {
+          l.status = 'not_started';
+        }
+      });
+
       s.totalActiveTimeSec = Math.max(attemptsTotalTime, l1Pure + l2Pure + l3Pure);
 
       const isHardcoreCompleted = s.isHardcoreLegend || s.hardcoreStreakLevels.size >= 3;
@@ -466,8 +504,8 @@ export const GET: APIRoute = async ({ request }) => {
       s.hardcoreLevelsConquered = s.allHardcoreCompletedLevels.size;
 
       // Update level hardcore badges
-      [1, 2, 3].forEach(num => {
-        s.levels[num as 1 | 2 | 3].hardcore = s.allHardcoreCompletedLevels.has(num);
+      ([1, 2, 3] as const).forEach(num => {
+        s.levels[num].hardcore = s.allHardcoreCompletedLevels.has(num);
       });
 
       if (isHardcoreCompleted) {
@@ -477,15 +515,23 @@ export const GET: APIRoute = async ({ request }) => {
       } else if (isNormalCompleted) {
         s.lessonStatus = 'completed';
         s.isHardcoreLegend = false;
-        if (s.currentAttempt && s.currentAttempt.mode === 'hardcore') {
-          s.hardcoreStatus = s.currentAttempt.status === 'failed' ? 'failed' : 'attempting';
+        const realHcAttempts = s.attempts.filter(a => a.mode === 'hardcore');
+        if (realHcAttempts.length > 0) {
+          const lastHc = realHcAttempts[realHcAttempts.length - 1];
+          s.hardcoreStatus = lastHc.status === 'failed' ? 'failed' : (lastHc.status === 'completed' ? 'completed' : 'attempting');
         } else {
-          s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
+          s.hardcoreStatus = 'none';
         }
-      } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].attempts > 0 || s.levels[2].attempts > 0 || s.levels[3].attempts > 0) {
+      } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].status !== 'not_started' || s.levels[2].status !== 'not_started' || s.levels[3].status !== 'not_started') {
         s.lessonStatus = 'in_progress';
         s.isHardcoreLegend = false;
-        s.hardcoreStatus = (s.latestIsHardcore === 1) ? 'attempting' : 'none';
+        const realHcAttempts = s.attempts.filter(a => a.mode === 'hardcore');
+        if (realHcAttempts.length > 0) {
+          const lastHc = realHcAttempts[realHcAttempts.length - 1];
+          s.hardcoreStatus = lastHc.status === 'failed' ? 'failed' : 'attempting';
+        } else {
+          s.hardcoreStatus = 'none';
+        }
       } else {
         s.lessonStatus = 'not_started';
         s.isHardcoreLegend = false;
