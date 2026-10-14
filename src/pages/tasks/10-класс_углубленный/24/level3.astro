@@ -1,0 +1,463 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">⚠️ КРИПТОАНАЛИТИЧЕСКИЙ РУБЕЖ ⚠️</div>
+            <h2 class="text-light mb-3">HAMMING ENTROPY DECRYPTOR: STEGO-CRACKER</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                Активирован протокол сканирования сетевого трафика. В зашумленном потоке данных скрыты асимметричные ключи RSA и стеганографические LSB-вложения.
+                Ваша задача: используя <span class="text-danger fw-bold">детектор энтропии и метрику расстояния Хэмминга</span>, 
+                выявить истинные крипто-мишени и преодолеть <span class="text-danger fw-bold">8 нарастающих волн перехвата</span> в реальном времени.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-4 mx-auto mb-4 text-start small" style="max-width: 650px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ БОЯ В ХАРДКОР-РЕЖИМЕ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Архетип 10:</span> Взлом на основе расстояния Хэмминга (число несовпадающих бит) и откликов энтропии.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Убывающий таймер:</span> Жесткие <span class="text-danger fw-bold">10–7 секунд</span> на каждый рубеж! Скорость нарастает.</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">ТОТАЛЬНЫЙ СБРОС:</span> Любая ошибка или истечение таймера вызывают сброс на <span class="text-danger fw-bold">Волну 1</span>!</div>
+                <div class="text-light">• <span class="text-info fw-bold">Горячие клавиши:</span> Выбор цели клавишами <strong>1, 2, 3, 4</strong> на клавиатуре.</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ДЕТЕКТОР ЭНТРОПИИ →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс (Бой на 8 волнах) -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4 shadow">
+            
+            <!-- Хедер со статусом волны и обратным отсчетом -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="text-secondary small d-block">РУБЕЖ КРИПТОАНАЛИЗА:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">
+                        ВОЛНА <span v-text="currentWaveIdx + 1"></span> ИЗ 8
+                    </span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark px-3 py-1 fs-6 rounded-0" v-text="currentWave.waveTitle"></span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО БЛОКИРОВКИ КАНАЛА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / currentWave.timeLimit) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Панель анализатора текущей волны -->
+            <div class="card bg-dark border-danger rounded-0 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <span class="badge bg-danger text-black rounded-0 font-monospace fw-bold px-3 py-1" v-text="currentWave.badge"></span>
+                    <span class="text-secondary small">
+                        Метрика: <span class="text-info fw-bold" v-text="currentWave.metricType"></span>
+                    </span>
+                </div>
+
+                <h4 class="text-light fs-5 mb-3" v-text="currentWave.question"></h4>
+
+                <!-- Эталонный крипто-паттерн / Дамп контейнера -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-secondary small">ЭТАЛОННЫЙ ВЕКТОР СКАНЕРА:</span>
+                        <span class="badge border border-info text-info bg-black rounded-0" v-text="currentWave.vectorLabel"></span>
+                    </div>
+                    <div class="fs-4 text-warning fw-bold tracking-widest text-center" v-text="currentWave.referenceStream"></div>
+                    <div class="text-secondary small text-center mt-1" v-text="currentWave.referenceDesc"></div>
+                </div>
+
+                <!-- Подсказка аналитика -->
+                <div class="p-2 bg-black border border-secondary text-secondary small d-flex justify-content-between">
+                    <span>💡 <span class="text-light" v-text="currentWave.hint"></span></span>
+                    <span class="text-warning">Критерий: <strong v-text="currentWave.criteria"></strong></span>
+                </div>
+            </div>
+
+            <!-- Сетка карточек-кандидатов (Архетип 10: Hamming / Entropy Matcher) -->
+            <div class="row g-3">
+                <div v-for="(candidate, cIdx) in currentWave.candidates" :key="cIdx" class="col-md-6">
+                    <div class="card bg-dark border-secondary rounded-0 p-3 h-100 cursor-pointer candidate-card"
+                         :class="{ 'border-danger': candidate.isSelected, 'border-2': candidate.isSelected }"
+                         @click="selectCandidate(cIdx)"
+                         :id="'candidate-' + cIdx"
+                         style="cursor: pointer;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-danger text-light rounded-0">
+                                ВАРИАНТ #<span v-text="cIdx + 1"></span>
+                            </span>
+                            <!-- Метрика детектора Хэмминга / Энтропии -->
+                            <span class="badge border rounded-0" :class="getMetricBadgeClass(candidate)">
+                                <span v-text="candidate.metricLabel"></span>
+                            </span>
+                        </div>
+
+                        <div class="fs-5 text-light fw-bold font-monospace mb-2 text-truncate" v-text="candidate.stream"></div>
+
+                        <div class="text-secondary small mb-3" style="font-size: 0.8rem;" v-text="candidate.desc"></div>
+
+                        <button @click.stop="selectCandidate(cIdx)"
+                                type="button"
+                                :id="'btn-select-' + cIdx"
+                                class="btn btn-outline-danger btn-sm rounded-0 w-100 fw-bold font-monospace">
+                            [<span v-text="cIdx + 1"></span>] ВЫБРАТЬ ЭТОТ ВЕКТОР →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Экран сбоя (Fatal Error / Hardcore Collapse) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-5 text-center shadow">
+            <h1 id="fail-title" class="display-2 text-danger fw-bold mb-3">⚠️ КОЛЛАПС ДЕТЕКТОРА ⚠️</h1>
+            <h3 class="text-light mb-3">Срыв криптоанализа и потеря синхронизации</h3>
+            <p class="text-secondary fs-5 mb-4" v-text="failMessage"></p>
+            <div class="badge bg-danger text-black p-3 font-monospace fs-6 rounded-0 mb-4">
+                Прогресс сброшен на Волну 1. Реинициализация датчиков энтропии...
+            </div>
+            <div>
+                <span class="spinner-border text-danger" role="status"></span>
+            </div>
+        </div>
+
+        <!-- Экран триумфальной победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-5 text-center shadow">
+            <div id="success-title" class="display-3 text-success mb-3">★ СТЕГАНО-КРИПТОСИСТЕМА ВЗЛОМАНА ★</div>
+            <h2 class="text-light mb-3">ПОЛНЫЙ ПЕРЕХВАТ RSA И LSB УСПЕШЕН</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 700px;">
+                Все 8 критических рубежей преодолены безупречно без единого сбоя. Вы продемонстрировали выдающийся уровень владения метриками расстояния Хэмминга, анализом энтропии, факторизацией RSA и стеганоанализом LSB!
+            </p>
+            <div class="badge border border-success text-success bg-black p-3 fs-6 rounded-0">
+                Урок 24 полностью пройден! Все три уровня освоены.
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script src="/static/vue.global.js" is:inline></script>
+
+<script is:inline>
+(() => {
+    const { createApp } = Vue;
+
+    // ----------------------------------------------------
+    // КОНФИГУРАЦИЯ 8 ВОЛН (АРХЕТИП 10: HAMMING & ENTROPY)
+    // ----------------------------------------------------
+    const WAVE_CONFIGS = [
+        // Волна 1: LSB Entropy Probe
+        {
+            waveTitle: 'РУБЕЖ 1: ДЕТЕКЦИЯ LSB-ОКТЕТА',
+            badge: 'LSB PROBE',
+            metricType: 'Hamming Distance (d)',
+            question: 'В перехваченном RGB-пикселе обнаружен подозрительный 8-битный LSB-срез. Сканер энтропии зафиксировал эталонный вектор скрытого символа. Найдите вектор-кандидат с минимальным расстоянием Хэмминга (d = 1):',
+            vectorLabel: 'ЭТАЛОН ПОЛЕЗНОЙ НАГРУЗКИ',
+            referenceStream: '0 1 0 1 0 0 1 0',
+            referenceDesc: 'Секретный ASCII-символ "R" (82 в десятичной системе)',
+            hint: 'Расстояние Хэмминга — это количество несовпадающих позиций бит между двумя битовыми строками.',
+            criteria: 'Минимальное расстояние Хэмминга d = 1',
+            timeLimit: 10.0,
+            candidates: [
+                { stream: '0 1 1 1 0 0 1 0', desc: 'Различие в бите 2 (0111... вместо 0101...)', metricLabel: 'Hamming d = 1 (MATCH)', isCorrect: true },
+                { stream: '1 1 0 1 0 1 1 0', desc: 'Различие в битах 0 и 5', metricLabel: 'Hamming d = 2', isCorrect: false },
+                { stream: '0 0 1 0 1 1 0 1', desc: 'Высокая энтропия шума (инверсия 6 бит)', metricLabel: 'Hamming d = 6', isCorrect: false },
+                { stream: '1 0 1 0 1 1 0 1', desc: 'Некоррелированный дамп памяти', metricLabel: 'Hamming d = 7', isCorrect: false }
+            ],
+            explanation: 'Кандидат #1 отличается от эталона ровно в одной битовой позиции (d = 1).'
+        },
+
+        // Волна 2: RSA Modulus Factor Match
+        {
+            waveTitle: 'РУБЕЖ 2: ФАКТОРИЗАЦИЯ МОДУЛЯ RSA',
+            badge: 'RSA FACTOR SEARCH',
+            metricType: 'Divisibility & Entropy',
+            question: 'Перехвачен открытый модуль криптосистемы RSA: n = 1147. Сканер делителей выдал 4 кандидата в простой множитель p. Найдите истинный множитель p, делящий модуль n нацело:',
+            vectorLabel: 'ОТКРЫТЫЙ МОДУЛЬ RSA',
+            referenceStream: 'n = 1147  (длина 11 бит)',
+            referenceDesc: 'Составное число n = p · q, где p и q — простые числа',
+            hint: 'Проверьте деление нацело: 1147 / p. Частное q также должно быть простым числом.',
+            criteria: '1147 mod p == 0',
+            timeLimit: 10.0,
+            candidates: [
+                { stream: 'p = 29', desc: '1147 / 29 = ? (проверка делимости)', metricLabel: '1147 / 29 = ?', isCorrect: false },
+                { stream: 'p = 31', desc: '1147 / 31 = 37 (нацело! q = 37 — простое)', metricLabel: 'ОСТАТОК: 0 (MATCH)', isCorrect: true },
+                { stream: 'p = 23', desc: '1147 / 23 = 49.86 (остаток 20)', metricLabel: 'ОСТАТОК: 20', isCorrect: false },
+                { stream: 'p = 33', desc: 'Число 33 не является простым (33 = 3 · 11)', metricLabel: 'НЕ ПРОСТОЕ', isCorrect: false }
+            ],
+            explanation: '1147 = 31 · 37. Число 31 делит 1147 нацело, а частное 37 также является простым числом.'
+        },
+
+        // Волна 3: Euler Inversion Scan
+        {
+            waveTitle: 'РУБЕЖ 3: СЕКРЕТНАЯ ЭКСПОНЕНТА RSA',
+            badge: 'MODULAR INVERSE',
+            metricType: 'Congruence (e · d mod φ = 1)',
+            question: 'Для криптосистемы с функцией Эйлера φ(n) = 120 и открытой экспонентой e = 7 требуется мгновенно перехватить валидную секретную экспоненту d:',
+            vectorLabel: 'ПАРАМЕТРЫ СИСТЕМЫ',
+            referenceStream: 'e = 7  |  φ(n) = 120',
+            referenceDesc: 'Условие Безу: (7 · d) mod 120 = 1',
+            hint: 'Проверьте: 7 · 103 = 721 = 6 · 120 + 1 ≡ 1 (mod 120).',
+            criteria: '(7 · d) mod 120 == 1',
+            timeLimit: 9.0,
+            candidates: [
+                { stream: 'd = 103', desc: '7 · 103 = 721 = 6 · 120 + 1 ≡ 1 (mod 120)', metricLabel: 'MOD MATCH: 1 (MATCH)', isCorrect: true },
+                { stream: 'd = 43', desc: '7 · 43 = 301 = 2 · 120 + 61 ≡ 61', metricLabel: 'MOD: 61', isCorrect: false },
+                { stream: 'd = 71', desc: '7 · 71 = 497 = 4 · 120 + 17 ≡ 17', metricLabel: 'MOD: 17', isCorrect: false },
+                { stream: 'd = 17', desc: '7 · 17 = 119 = 120 - 1 ≡ 119', metricLabel: 'MOD: 119', isCorrect: false }
+            ],
+            explanation: '(7 · 103) mod 120 = 721 mod 120 = 1.'
+        },
+
+        // Волна 4: Stego-Carrier Bit Plane Defect
+        {
+            waveTitle: 'РУБЕЖ 4: СТЕГАНОАНАЛИЗ БИТОВОЙ ПЛОСКОСТИ',
+            badge: 'BIT-PLANE SLICING',
+            metricType: 'Entropy Anomaly',
+            question: 'Сканер битовых плоскостей проанализировал 4 контейнера BMP. В трех из них нулевая плоскость содержит естественный белый шум, а в одном — регулярный скрытый крипто-паттерн. Найдите аномальный контейнер:',
+            vectorLabel: 'НОРМА: ЕСТЕСТВЕННЫЙ БЕЛЫЙ ШУМ',
+            referenceStream: 'H_norm ≈ 0.999 (Случайное распределение LSB)',
+            referenceDesc: 'Природные пиксели не имеют жестких повторов в LSB',
+            hint: 'Скрытое незашифрованное вложение снижает энтропию и образует периодические битовые кластеры.',
+            criteria: 'Аномальное падение энтропии (H < 0.65)',
+            timeLimit: 9.0,
+            candidates: [
+                { stream: 'КОНТЕЙНЕР #1 [H = 0.998]', desc: 'Хаотичный шум датчика матрицы (чистое фото)', metricLabel: 'ШУМ (CLEAN)', isCorrect: false },
+                { stream: 'КОНТЕЙНЕР #2 [H = 0.540]', desc: 'Аномальные цепочки нулей и масок: LSB Payload Detected!', metricLabel: 'ANOMALY (MATCH)', isCorrect: true },
+                { stream: 'КОНТЕЙНЕР #3 [H = 0.995]', desc: 'Тепловой шум полутонового градиента', metricLabel: 'ШУМ (CLEAN)', isCorrect: false },
+                { stream: 'КОНТЕЙНЕР #4 [H = 0.991]', desc: 'Высокочастотный текстурный шум травы', metricLabel: 'ШУМ (CLEAN)', isCorrect: false }
+            ],
+            explanation: 'Контейнер #2 имеет аномально низкую энтропию H=0.540 из-за внедрения структурированного сообщения.'
+        },
+
+        // Волна 5: Digital Signature Digest Collider
+        {
+            waveTitle: 'РУБЕЖ 5: ВЕРИФИКАЦИЯ ЭЦП (SHA-256)',
+            badge: 'DIGITAL SIGNATURE',
+            metricType: 'Hash Matching',
+            question: 'Сервер получил подписанный документ M и цифровую подпись S. После расшифрования открытым ключом e получен дайджест: H_sign = 0x9F4C... Найдите хэш документа H_calc с нулевым расстоянием Хэмминга (полное совпадение):',
+            vectorLabel: 'РАСШИФРОВАННЫЙ ДАЙДЖЕСТ ЭЦП',
+            referenceStream: '0x9F 0x4C 0x1A 0xB8',
+            referenceDesc: 'S^e mod n = H_sign (контрольный отпечаток автора)',
+            hint: 'Подлинность подтверждается только при полном побитном совпадении H_calc и H_sign (d = 0).',
+            criteria: 'Полное совпадение дайджеста (d = 0)',
+            timeLimit: 8.5,
+            candidates: [
+                { stream: '0x9F 0x4C 0x1A 0xB8', desc: '100% совпадение всех байтов: подпись валидна, документ подлинный!', metricLabel: 'MATCH d = 0 (MATCH)', isCorrect: true },
+                { stream: '0x9F 0x4D 0x1A 0xB8', desc: 'Коллизия в байте 2 (4D вместо 4C) — документ подделан', metricLabel: 'MISMATCH d = 1', isCorrect: false },
+                { stream: '0x8F 0x4C 0x1A 0xB8', desc: 'Искажение старшего байта (8F вместо 9F)', metricLabel: 'MISMATCH d = 2', isCorrect: false },
+                { stream: '0x9F 0x4C 0x2A 0xB8', desc: 'Повреждение байта 3 (2A вместо 1A)', metricLabel: 'MISMATCH d = 2', isCorrect: false }
+            ],
+            explanation: 'Только первый кандидат совпадает с дайджестом подписи по всем 32 битам контрольной суммы.'
+        },
+
+        // Волна 6: TrueColor 24-bit LSB Triad
+        {
+            waveTitle: 'РУБЕЖ 6: ПОБИТОВАЯ LSB-ТРИАДА RGB',
+            badge: '24-BIT LSB TRIAD',
+            metricType: 'Hamming Triad Match',
+            question: 'Требуется внедрить 3 бита secret = 1, 0, 1 в каналы пикселя RGB. Исходные значения каналов: R=180 (10110100), G=95 (01011111), B=210 (11010010). Найдите результирующую тройку цветов:',
+            vectorLabel: 'ЦЕЛЕВАЯ LSB-ТРОЙКА: [1, 0, 1]',
+            referenceStream: 'R[LSB]=1 | G[LSB]=0 | B[LSB]=1',
+            referenceDesc: 'Формула: (C & 254) | bit',
+            hint: 'R: 180 (четное) + 1 = 181. G: 95 (нечетное) - 1 = 94. B: 210 (четное) + 1 = 211.',
+            criteria: 'R=181, G=94, B=211',
+            timeLimit: 8.5,
+            candidates: [
+                { stream: 'R=181, G=94, B=211', desc: 'R(LSB=1): 181, G(LSB=0): 94, B(LSB=1): 211 — точное совпадение!', metricLabel: 'LSB MATCH (MATCH)', isCorrect: true },
+                { stream: 'R=181, G=95, B=211', desc: 'В канале G остался бит 1 (95 нечетное)', metricLabel: 'G ERROR', isCorrect: false },
+                { stream: 'R=180, G=94, B=211', desc: 'В канале R остался бит 0 (180 четное)', metricLabel: 'R ERROR', isCorrect: false },
+                { stream: 'R=181, G=94, B=210', desc: 'В канале B остался бит 0 (210 четное)', metricLabel: 'B ERROR', isCorrect: false }
+            ],
+            explanation: '180 & 254 | 1 = 181; 95 & 254 | 0 = 94; 210 & 254 | 1 = 211.'
+        },
+
+        // Волна 7: Chi-Square Frequency Anomaly
+        {
+            waveTitle: 'РУБЕЖ 7: СТАТИСТИЧЕСКИЙ ТЕСТ ХИ-КВАДРАТ',
+            badge: 'CHI-SQUARE ATTACK',
+            metricType: 'PoV Statistical Anomaly',
+            question: 'Детектор пар значений (Pairs of Values) анализирует гистограмму изображения. Стеганография LSB принудительно выравнивает частоты соседних уровней яркости (2k и 2k+1). Определите контейнер с положительным тестом Хи-квадрат (p < 0.01):',
+            vectorLabel: 'КРИТЕРИЙ ВЕСТФЕЛЬДА: p < 0.01',
+            referenceStream: 'p_value = P(χ² ≥ χ²_набл)',
+            referenceDesc: 'Критическое выравнивание частот пар значений (PoV)',
+            hint: 'Если p < 0.01, гипотеза о случайном распределении отвергается — обнаружено скрытое вложение LSB!',
+            criteria: 'Критическое p < 0.01 (Высокая достоверность стеганограммы)',
+            timeLimit: 8.0,
+            candidates: [
+                { stream: 'КОНТЕЙНЕР A [p = 0.850]', desc: 'Естественная неравномерность гистограммы (чистое фото)', metricLabel: 'p = 0.85 (ЧИСТО)', isCorrect: false },
+                { stream: 'КОНТЕЙНЕР B [p = 0.002]', desc: 'Аномальное выравнивание частот пар 2k и 2k+1: LSB DETECTED!', metricLabel: 'p = 0.002 (MATCH)', isCorrect: true },
+                { stream: 'КОНТЕЙНЕР C [p = 0.620]', desc: 'Стандартный контрастный снимок пейзажа', metricLabel: 'p = 0.62 (ЧИСТО)', isCorrect: false },
+                { stream: 'КОНТЕЙНЕР D [p = 0.410]', desc: 'Нормальное распределение пикселей сканирования', metricLabel: 'p = 0.41 (ЧИСТО)', isCorrect: false }
+            ],
+            explanation: 'При p = 0.002 < 0.01 тест Хи-квадрат со 99.8% вероятностью фиксирует искусственное выравнивание частот пар значений.'
+        },
+
+        // Волна 8: RSA-4096 Master Key Breach
+        {
+            waveTitle: 'РУБЕЖ 8: ФИНАЛЬНЫЙ ПЕРЕХВАТ RSA-4096',
+            badge: 'MASTER SECRET BREACH',
+            metricType: 'Hamming Entropy Lock',
+            question: 'Финальный криптографический барьер: перехвачен шифротекст C = M^e mod n. Для параметров M=5, e=3, n=77 вычислите точный шифротекст C и выберите вектор с идеальным откликом детектора:',
+            vectorLabel: 'ЦЕЛЕВОЙ ШИФРОТЕКСТ RSA',
+            referenceStream: 'C = 5³ mod 77 = 125 mod 77 = ?',
+            referenceDesc: '125 = 1 · 77 + 48 ≡ 48 (mod 77)',
+            hint: '125 mod 77 = 48. В двоичном виде 48 = 00110000_2.',
+            criteria: 'C = 48  (Двоичный код: 00110000)',
+            timeLimit: 7.5,
+            candidates: [
+                { stream: 'C = 48 [00110000_2]', desc: '125 mod 77 = 48 — точный математический результат шифрования!', metricLabel: 'MASTER LOCK (MATCH)', isCorrect: true },
+                { stream: 'C = 52 [00110100_2]', desc: 'Ошибка вычисления остатка (остаток завышен на 4)', metricLabel: 'DIFF d = 1', isCorrect: false },
+                { stream: 'C = 41 [00101001_2]', desc: 'Ошибка модульного деления', metricLabel: 'DIFF d = 3', isCorrect: false },
+                { stream: 'C = 26 [00011010_2]', desc: 'Результат для e=13, а не e=3', metricLabel: 'DIFF d = 4', isCorrect: false }
+            ],
+            explanation: '5^3 = 125. 125 mod 77 = 48.'
+        }
+    ];
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'failed', 'success'
+                currentWaveIdx: 0,
+                phaseTimeLeft: 10.0,
+                timerInterval: null,
+                sessionStartTime: 0,
+                attempts: 0,
+                failMessage: ''
+            };
+        },
+        computed: {
+            currentWave() {
+                return WAVE_CONFIGS[this.currentWaveIdx] || WAVE_CONFIGS[0];
+            }
+        },
+        mounted() {
+            // Горячие клавиши 1, 2, 3, 4
+            window.addEventListener('keydown', (e) => {
+                if (this.gameState !== 'playing') return;
+                const key = e.key;
+                if (['1', '2', '3', '4'].includes(key)) {
+                    const idx = parseInt(key, 10) - 1;
+                    if (idx < this.currentWave.candidates.length) {
+                        this.selectCandidate(idx);
+                    }
+                }
+            });
+
+            // Первичная телеметрия
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
+                action_type: 'in_progress',
+                status: 'in_progress',
+                start_time: new Date().toISOString(),
+                time_spent_sec: 0,
+                attempts_count: 0,
+                success: false
+            }, '*');
+        },
+        methods: {
+            startGame() {
+                this.currentWaveIdx = 0;
+                this.gameState = 'playing';
+                this.sessionStartTime = Date.now();
+                this.startWave();
+            },
+            startWave() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.phaseTimeLeft = this.currentWave.timeLimit;
+
+                // Перемешать порядок кандидатов для исключения подбора
+                this.currentWave.candidates.sort(() => Math.random() - 0.5);
+
+                this.timerInterval = setInterval(() => {
+                    this.phaseTimeLeft -= 0.1;
+                    if (this.phaseTimeLeft <= 0.05) {
+                        this.handleTimeout();
+                    }
+                }, 100);
+            },
+            selectCandidate(idx) {
+                if (this.gameState !== 'playing') return;
+
+                const candidate = this.currentWave.candidates[idx];
+                if (candidate.isCorrect) {
+                    // Успех на рубеже
+                    if (this.currentWaveIdx < WAVE_CONFIGS.length - 1) {
+                        this.currentWaveIdx++;
+                        this.startWave();
+                    } else {
+                        this.handleVictory();
+                    }
+                } else {
+                    // Ошибка: тотальный хардкор-сброс
+                    const err = `СБОЙ ДЕТЕКТОРА НА РУБЕЖЕ ${this.currentWaveIdx + 1}: ${this.currentWave.explanation}`;
+                    this.triggerHardcoreFailure(err);
+                }
+            },
+            handleTimeout() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.triggerHardcoreFailure(`ТАЙМ-АУТ ДЕТЕКТОРА: Время на анализ рубежа ${this.currentWaveIdx + 1} истекло! Защитный шлюз заблокировал сессию!`);
+            },
+            triggerHardcoreFailure(msg) {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.attempts++;
+                this.failMessage = msg;
+                this.gameState = 'failed';
+
+                // Телеметрия: hardcore_reset
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
+                    action_type: 'hardcore_reset'
+                }, '*');
+
+                // Автоматический тотальный сброс на Волну 1 через 1.6 сек
+                setTimeout(() => {
+                    this.currentWaveIdx = 0;
+                    this.gameState = 'playing';
+                    this.startWave();
+                }, 1600);
+            },
+            handleVictory() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.gameState = 'success';
+                const elapsedSec = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+
+                // Телеметрия: level_complete
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
+                    action_type: 'level_complete',
+                    status: 'completed',
+                    start_time: new Date(this.sessionStartTime).toISOString(),
+                    time_spent_sec: elapsedSec,
+                    attempts_count: this.attempts,
+                    success: true
+                }, '*');
+            },
+            getMetricBadgeClass(c) {
+                if (c.metricLabel.includes('MATCH')) return 'border-success text-success bg-black';
+                if (c.metricLabel.includes('ERROR') || c.metricLabel.includes('d = 0')) return 'border-danger text-danger bg-black';
+                return 'border-secondary text-secondary bg-black';
+            }
+        }
+    }).mount('#app');
+})();
+</script>
