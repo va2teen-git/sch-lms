@@ -1,0 +1,395 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг миссии) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">⚠️ КРИТИЧЕСКАЯ УГРОЗА ЯДРУ ⚠️</div>
+            <h2 class="text-light mb-3">RICE GATEWAY: KERNEL FIREWALL DEFENSE</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 700px;">
+                Согласно теоремам Тьюринга, Райса и Коэна, идеального статического анализатора и идеального антивируса существовать не может.
+                На шлюз ядра ОС поступает поток скомпилированных процессов. 
+                Вам необходимо отразить <span class="text-danger fw-bold">8 нарастающих волн угроз</span> в реальном времени.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-4 mx-auto mb-4 text-start small" style="max-width: 650px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ АКТИВНОЙ ОБОРОНЫ ШЛЮЗА]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Жесткий убывающий таймер:</span> От 10 до 6 секунд на волну с нарастанием скорости!</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">Тотальный сброс:</span> Любая ошибка (False Positive, False Negative) или тайм-аут сбрасывают весь прогресс на Волну 1!</div>
+                <div class="text-light mb-1">• <span class="text-success fw-bold">[1] ALLOW:</span> Пропуск доказанно корректного кода с функцией спуска.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">[2] SANDBOX:</span> Изоляция в песочницу непредсказуемых функций (недоказанная остановка, Коллатц 3n+1).</div>
+                <div class="text-light">• <span class="text-danger fw-bold">[3] BLOCK:</span> Немедленный сброс гарантированных зависаний (`while True`), вирусов и парадоксов Тьюринга.</div>
+                <div class="text-secondary mt-2 border-top border-secondary pt-2">
+                    💡 <em>Поддерживаются горячие клавиши: <strong>1</strong> (Allow), <strong>2</strong> (Sandbox), <strong>3</strong> (Block).</em>
+                </div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ШЛЮЗ РАЙСА →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс (Бой на волнах) -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4 shadow">
+            
+            <!-- Хедер со статусом волны и обратным отсчетом -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="text-secondary small d-block">РУБЕЖ ШЛЮЗА:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">
+                        ВОЛНА <span v-text="currentWaveIdx + 1"></span> ИЗ 8
+                    </span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark px-3 py-1 fs-6 rounded-0" v-text="currentWave.waveTitle"></span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО ПРОРЫВА ШЛЮЗА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / currentWave.timeLimit) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Карточка атакующего процесса -->
+            <div class="card bg-dark border-danger rounded-0 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <div>
+                        <span class="text-secondary small d-block">ПЕРЕХВАЧЕННЫЙ ИСПОЛНЯЕМЫЙ ПРОЦЕСС:</span>
+                        <span class="text-warning fw-bold fs-5" v-text="currentWave.processName"></span>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-danger text-black rounded-0 fw-bold px-2 py-1">УГРОЗА ОСТАНОВА</span>
+                    </div>
+                </div>
+
+                <!-- Блок эвристического сканера -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                    <div class="text-secondary small mb-1">[ДАННЫЕ ЭВРИСТИЧЕСКОГО СЕНСОРА ЯДРА]:</div>
+                    <div class="text-light" v-text="currentWave.heuristics"></div>
+                </div>
+
+                <!-- Листинг микрокода процесса -->
+                <div class="card bg-black border-danger rounded-0 p-3 mb-2">
+                    <div class="text-secondary small mb-2">[ДИЗАССЕМБЛИРОВАННЫЙ ЛИСТИНГ ПОТОКА]:</div>
+                    <pre class="text-warning mb-0 fs-6" style="white-space: pre-wrap;" v-text="currentWave.codeSnippet"></pre>
+                </div>
+            </div>
+
+            <!-- Аркадные кнопки шлюза перехвата -->
+            <div class="row g-3">
+                <!-- Кнопка 1: ALLOW -->
+                <div class="col-md-4">
+                    <button id="btn-allow" 
+                            @click="handleDefenseAction('ALLOW')" 
+                            class="btn btn-outline-success w-100 py-3 rounded-0 text-start h-100 border-2">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge bg-success text-dark fs-6 rounded-0">[1] ALLOW</span>
+                            <span class="text-secondary small">Клавиша 1 / A</span>
+                        </div>
+                        <div class="text-light small">
+                            Пропустить легитимный код (доказанный останов, штатный системный алгоритм)
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Кнопка 2: SANDBOX -->
+                <div class="col-md-4">
+                    <button id="btn-sandbox" 
+                            @click="handleDefenseAction('SANDBOX')" 
+                            class="btn btn-outline-warning w-100 py-3 rounded-0 text-start h-100 border-2">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge bg-warning text-dark fs-6 rounded-0">[2] SANDBOX</span>
+                            <span class="text-secondary small">Клавиша 2 / S</span>
+                        </div>
+                        <div class="text-light small">
+                            Изолировать в песочницу (недоказанная сходимость, Коллатц 3n+1, динамический цикл)
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Кнопка 3: BLOCK -->
+                <div class="col-md-4">
+                    <button id="btn-block" 
+                            @click="handleDefenseAction('BLOCK')" 
+                            class="btn btn-outline-danger w-100 py-3 rounded-0 text-start h-100 border-2">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge bg-danger text-light fs-6 rounded-0">[3] BLOCK</span>
+                            <span class="text-secondary small">Клавиша 3 / D</span>
+                        </div>
+                        <div class="text-light small">
+                            Заблокировать угрозу (гарантированный вечный цикл, вирус, парадокс Тьюринга)
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Экран сбоя (Kernel Panic / Hardcore Reset) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-5 text-center shadow">
+            <h1 id="fail-title" class="display-3 text-danger fw-bold mb-3">⚠️ KERNEL PANIC ⚠️</h1>
+            <h3 class="text-light mb-3">ПРОРЫВ ШЛЮЗА БЕЗОПАСНОСТИ РАЙСА</h3>
+            <p class="text-secondary fs-5 mb-4" v-text="failMessage"></p>
+            <div class="alert alert-danger bg-dark border-danger rounded-0 d-inline-block px-4 py-2 font-monospace fs-6 mb-4">
+                ТОТАЛЬНЫЙ СБРОС ХАРДКОР-РЕЖИМА: Прогресс сброшен на Волну 1!
+            </div>
+            <div>
+                <div class="spinner-border text-danger" role="status"></div>
+                <div class="text-secondary small mt-2">Реконфигурация квантового шлюза...</div>
+            </div>
+        </div>
+
+        <!-- Экран абсолютной победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-5 text-center shadow">
+            <div id="success-title" class="display-3 text-success mb-3">★ ШЛЮЗ РАЙСА СТАБИЛИЗИРОВАН ★</div>
+            <h2 class="text-light mb-3">RICE FIREWALL: ПОЛНАЯ ПОБЕДА НАД ХАОСОМ</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 650px;">
+                Все 8 критических волн алгоритмических атак успешно нейтрализованы. 
+                Вы в совершенстве овладели принципами теоремы Райса, проблемы останова и практическими границами кибербезопасности!
+            </p>
+
+            <div class="card bg-dark border-success rounded-0 p-4 d-inline-block mb-4 text-start font-monospace">
+                <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">[ФИНАЛЬНЫЙ ПРОТОКОЛ БОЯ]</div>
+                <div class="text-light mb-1">Статус ядра: <span class="text-success fw-bold">ONLINE // SECURE</span></div>
+                <div class="text-light mb-1">Отражено волн: <span class="text-success fw-bold">8 из 8</span></div>
+                <div class="text-light mb-1">Число сбоев хардкора: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+                <div class="text-light">Затраченное время: <span class="text-info fw-bold" v-text="formattedSessionTime"></span></div>
+            </div>
+
+            <div>
+                <button id="btn-replay" @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold">
+                    Пройти испытание заново
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Подключение локального Vue 3 -->
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const { createApp } = Vue;
+
+        const WAVE_CONFIGS = [
+            {
+                waveNum: 1,
+                timeLimit: 10.0,
+                waveTitle: "ВОЛНА 1: ВХОДНОЙ АУДИТ ПОТОКА",
+                processName: "proc_trivial_halt_0x01.elf",
+                heuristics: "Эвристика: Линейный цикл с функцией спуска V = count. Монотонное убывание до 0.",
+                codeSnippet: "count = 10\nwhile count > 0:\n    count -= 1\nreturn count",
+                correctAction: "ALLOW",
+                explanation: "Программа гарантированно останавливается за 10 шагов. Это легитимный код (ALLOW)."
+            },
+            {
+                waveNum: 2,
+                timeLimit: 9.0,
+                waveTitle: "ВОЛНА 2: ИНВАРИАНТНАЯ ЛОВУШКА",
+                processName: "trap_parity_infinite_0x02.bin",
+                heuristics: "Эвристика: Начало в 1, шаг +2. Переменная всегда нечетная. Терминал 10 недостижим!",
+                codeSnippet: "n = 1\nwhile n != 10:\n    n = n + 2\nreturn 'DONE'",
+                correctAction: "BLOCK",
+                explanation: "Инвариант нечетности не позволяет достичь числа 10. Цикл бесконечен! Требуется BLOCK."
+            },
+            {
+                waveNum: 3,
+                timeLimit: 8.5,
+                waveTitle: "ВОЛНА 3: НЕРАЗРЕШИМАЯ СХОДИМОСТЬ",
+                processName: "syracuse_collatz_probe_0x03.py",
+                heuristics: "Эвристика: Гипотеза Коллатца 3n + 1. Общий алгоритм остановки отсутствует!",
+                codeSnippet: "while n != 1:\n    if n % 2 == 0: n = n // 2\n    else: n = 3 * n + 1",
+                correctAction: "SANDBOX",
+                explanation: "Сходимость Коллатца не доказана статически. Модуль обязан быть отправлен в песочницу (SANDBOX)."
+            },
+            {
+                waveNum: 4,
+                timeLimit: 8.0,
+                waveTitle: "ВОЛНА 4: ВРЕДОНОСНЫЙ ВЫЗОВ",
+                processName: "ransom_mbr_encryptor_0x04.sys",
+                heuristics: "Эвристика: Попытка прямого шифрования Master Boot Record без пользовательского диалога.",
+                codeSnippet: "def payload():\n    raw_disk = open(r'\\\\.\\PhysicalDrive0', 'wb')\n    raw_disk.write(b'\\x00' * 512)\n    while True: pass",
+                correctAction: "BLOCK",
+                explanation: "Деструктивное воздействие на файловую систему и зацикливание. Немедленный BLOCK!"
+            },
+            {
+                waveNum: 5,
+                timeLimit: 7.5,
+                waveTitle: "ВОЛНА 5: КЛАССИЧЕСКИЙ АЛГОРИТМ",
+                processName: "euclid_gcd_kernel_service_0x05.so",
+                heuristics: "Эвристика: Алгоритм Евклида. Значение b строго убывает по модулю до 0.",
+                codeSnippet: "def gcd(a, b):\n    while b != 0:\n        a, b = b, a % b\n    return a",
+                correctAction: "ALLOW",
+                explanation: "Классический алгоритм Евклида математически доказан на остановку. Пропускаем (ALLOW)."
+            },
+            {
+                waveNum: 6,
+                timeLimit: 7.0,
+                waveTitle: "ВОЛНА 6: ПАРАДОКС ТЬЮРИНГА",
+                processName: "turing_inverter_disruptor_0x06.bin",
+                heuristics: "Эвристика: Диагональная программа D(D). Прямой опрос оракула с инверсией поведения.",
+                codeSnippet: "if H(D, D) == True:\n    while True:\n        pass\nelse:\n    return",
+                correctAction: "BLOCK",
+                explanation: "Инвертор Тьюринга создает логический парадокс останова. Опасная аномалия — BLOCK!"
+            },
+            {
+                waveNum: 7,
+                timeLimit: 6.5,
+                waveTitle: "ВОЛНА 7: ДИНАМИЧЕСКИЙ ПАКЕТ",
+                processName: "packet_parser_stream_0x07.so",
+                heuristics: "Эвристика: Сетевой парсер с динамическим размером пакета. Вариант цикла зависит от сети.",
+                codeSnippet: "while has_network_chunks():\n    chunk = read_chunk()\n    if chunk == EOF: break",
+                correctAction: "SANDBOX",
+                explanation: "Поведение зависит от внешнего потока данных сети. Требуется анализ в песочнице (SANDBOX)."
+            },
+            {
+                waveNum: 8,
+                timeLimit: 6.0,
+                waveTitle: "ВОЛНА 8: ФИНАЛЬНЫЙ БОСС // СЕМАНТИЧЕСКИЙ ШТОРМ",
+                processName: "rice_apex_polymorphic_boss_0x08.exe",
+                heuristics: "Эвристика: Полиморфный вирус, скрывающий бесконечный цикл через переполнение регистра.",
+                codeSnippet: "reg_32 = 0xFFFFFFFF\nwhile reg_32 > 0:\n    reg_32 = (reg_32 * 2 + 1) & 0xFFFFFFFF\n    trigger_exploit()",
+                correctAction: "BLOCK",
+                explanation: "Полиморфный эксплойт с вечным побитовым зацикливанием! Финальный BLOCK отражен!"
+            }
+        ];
+
+        createApp({
+            data() {
+                return {
+                    gameState: 'intro', // 'intro', 'playing', 'failed', 'success'
+                    currentWaveIdx: 0,
+                    phaseTimeLeft: 10.0,
+                    timerInterval: null,
+                    sessionStartTime: Date.now(),
+                    attempts: 0,
+                    failMessage: '',
+                    totalPhases: 8
+                };
+            },
+            computed: {
+                currentWave() {
+                    return WAVE_CONFIGS[this.currentWaveIdx] || WAVE_CONFIGS[0];
+                },
+                formattedSessionTime() {
+                    const elapsed = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+                    const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                    const secs = String(elapsed % 60).padStart(2, '0');
+                    return `${mins}:${secs}`;
+                }
+            },
+            mounted() {
+                // Глобальный перехват горячих клавиш клавиатуры 1, 2, 3
+                window.addEventListener('keydown', (e) => {
+                    if (this.gameState !== 'playing') return;
+                    if (e.key === '1' || e.key === 'a' || e.key === 'A') {
+                        this.handleDefenseAction('ALLOW');
+                    } else if (e.key === '2' || e.key === 's' || e.key === 'S') {
+                        this.handleDefenseAction('SANDBOX');
+                    } else if (e.key === '3' || e.key === 'd' || e.key === 'D') {
+                        this.handleDefenseAction('BLOCK');
+                    }
+                });
+            },
+            methods: {
+                startGame() {
+                    this.currentWaveIdx = 0;
+                    this.gameState = 'playing';
+                    this.sessionStartTime = Date.now();
+                    this.startWave();
+                },
+                startWave() {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.phaseTimeLeft = this.currentWave.timeLimit;
+
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft -= 0.1;
+                        if (this.phaseTimeLeft <= 0.05) {
+                            this.handleTimeout();
+                        }
+                    }, 100);
+                },
+                handleDefenseAction(action) {
+                    if (this.gameState !== 'playing') return;
+
+                    const expected = this.currentWave.correctAction;
+                    if (action === expected) {
+                        // Успех на волне
+                        if (this.currentWaveIdx < WAVE_CONFIGS.length - 1) {
+                            this.currentWaveIdx++;
+                            this.startWave();
+                        } else {
+                            this.handleVictory();
+                        }
+                    } else {
+                        // Ошибка: False Positive или False Negative
+                        let errorDetail = '';
+                        if (expected === 'ALLOW' && action === 'BLOCK') {
+                            errorDetail = 'FALSE POSITIVE: Вы заблокировали легитимный системный процесс ядра!';
+                        } else if (expected === 'BLOCK' && action === 'ALLOW') {
+                            errorDetail = 'FALSE NEGATIVE: Вы пропустили деструктивный вирус или бесконечный цикл в ядро!';
+                        } else {
+                            errorDetail = `ОШИБКА КЛАССИФИКАЦИИ ШЛЮЗА: ${this.currentWave.explanation}`;
+                        }
+                        this.triggerHardcoreFailure(errorDetail);
+                    }
+                },
+                handleTimeout() {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.triggerHardcoreFailure('ТАЙМ-АУТ ШЛЮЗА: Время вышло! Процесс успел проникнуть в защищенную память ядра!');
+                },
+                triggerHardcoreFailure(msg) {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.attempts++;
+                    this.failMessage = msg;
+                    this.gameState = 'failed';
+
+                    // Отправка сигнала телеметрии hardcore_reset
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 3)',
+                        action_type: 'hardcore_reset'
+                    }, '*');
+
+                    // Автоматический тотальный сброс на шаг 1 через 1.6 сек
+                    setTimeout(() => {
+                        this.currentWaveIdx = 0;
+                        this.gameState = 'playing';
+                        this.startWave();
+                    }, 1600);
+                },
+                handleVictory() {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.gameState = 'success';
+                    const elapsedSec = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+
+                    // Телеметрия: успешное прохождение уровня 3
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 3)',
+                        action_type: 'level_complete',
+                        status: 'completed',
+                        start_time: new Date(this.sessionStartTime).toISOString(),
+                        time_spent_sec: elapsedSec,
+                        attempts_count: this.attempts,
+                        success: true
+                    }, '*');
+                }
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>

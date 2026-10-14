@@ -1,0 +1,967 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 text-success mb-0">Тренажер: Алгоритмическая неразрешимость (Уровень 1)</h2>
+                <div class="text-secondary small">Урок 24 // Технологический профиль (углубленный курс)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Манипуляция мышью // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-4">
+
+                <!-- Индикатор прогресса и таймер -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация свойств программ по теореме Райса</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ЛОГИЧЕСКИЙ СБОЙ]</strong> <span id="feedback-text">Неверное распределение!</span> 
+                            Регенерация параметров...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: Классификация свойств (Бакеты) -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-3">
+                        Согласно <strong>теореме Райса</strong>, всякое нетривиальное семантическое (поведенческое) свойство программы алгоритмически неразрешимо, 
+                        в то время как синтаксические свойства текста программы разрешимы тривиальными парсерами.
+                        <br>
+                        <strong>Манипуляция мышью:</strong> перетащите карточки в соответствующие контейнеры (или кликните по карточке, затем по нужному контейнеру).
+                    </p>
+
+                    <!-- Пул карточек -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">АНАЛИТИЧЕСКИЕ КАРТОЧКИ (ПЕРЕТАЩИТЕ В КОНТЕЙНЕРЫ НИЖЕ):</span>
+                            <button id="p1-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-3 border border-secondary bg-dark" style="min-height: 80px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Контейнеры (Бакеты) -->
+                    <div class="row g-3 mb-4">
+                        <!-- Бакет 1: Синтаксические свойства -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="syntax" id="bucket-syntax">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">1. СИНТАКСИЧЕСКИЕ СВОЙСТВА (РАЗРЕШИМЫЕ)</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">
+                                        Анализ формы текста исходного кода, грамматики и токенов без исполнения программы (парсеры, линтеры, подсчет строк).
+                                    </p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2" style="min-height: 180px;">
+                                        <!-- Карточки синтаксиса -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: Семантические свойства -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="semantic" id="bucket-semantic">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">2. СЕМАНТИЧЕСКИЕ СВОЙСТВА (НЕРАЗРЕШИМЫЕ ПО РАЙСУ)</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">
+                                        Анализ поведения функции, соответствия «входные данные ➔ выходные данные», останова или аварийных ситуаций во время выполнения.
+                                    </p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2" style="min-height: 180px;">
+                                        <!-- Карточки семантики -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold font-monospace">
+                            ПРОВЕРИТЬ КЛАССИФИКАЦИЮ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: Коммутация схемы парадокса Тьюринга -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Для строгого доказательства неразрешимости проблемы останова Алан Тьюринг сконструировал парадоксальную диагональную программу <strong>D(P)</strong>, 
+                        которая опрашивает гипотетический оракул останова <strong>H(P, P)</strong> и совершает <strong>строго противоположное действие</strong>.
+                        <br>
+                        <strong>Манипуляция мышью:</strong> соедините исходящие порты слева с целевыми приемниками справа, чтобы собрать инвертор парадокса.
+                        Кликните по исходящему порту, затем по целевому узлу.
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Источники сигналов -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border-success rounded-0 p-3 h-100">
+                                <div class="text-success small fw-bold mb-3 border-bottom border-secondary pb-1">
+                                    [ИСТОЧНИКИ СИГНАЛОВ И ВЕРДИКТОВ ОРАКУЛА]
+                                </div>
+                                <div id="p2-sources" class="d-flex flex-column gap-3">
+                                    <!-- Источники генерируются JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Приемники и исполнительные блоки -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border-warning rounded-0 p-3 h-100">
+                                <div class="text-warning small fw-bold mb-3 border-bottom border-secondary pb-1">
+                                    [ЦЕЛЕВЫЕ ПРИЕМНИКИ И ИНВЕРТОРЫ (С ДИСТРАКТОРАМИ)]
+                                </div>
+                                <div id="p2-targets" class="d-flex flex-column gap-3">
+                                    <!-- Приемники генерируются JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button id="p2-reset-btn" class="btn btn-outline-secondary rounded-0 font-monospace">
+                            СБРОСИТЬ СОЕДИНЕНИЯ
+                        </button>
+                        <button id="p2-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold font-monospace">
+                            ПРОВЕРИТЬ ЦЕПЬ ПАРАДОКСА →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: Слот-пазл домино Поста (ПСП) -->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        <strong>Проблема соответствий Поста (ПСП):</strong> даны пары слов (доминошки). Необходимо составить такую последовательность доминошек, 
+                        чтобы слово, составленное из верхних половинок, в точности совпало со словом из нижних половинок: 
+                        <code class="text-warning">u<sub>1</sub>...u<sub>k</sub> = v<sub>1</sub>...v<sub>k</sub></code>.
+                        <br>
+                        <strong>Манипуляция мышью:</strong> перетащите доминошки из палитры в целевые слоты последовательности сборки.
+                    </p>
+
+                    <!-- Палитра доступных доминошек -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="text-secondary small mb-2">ДОСТУПНЫЕ ДОМИНОШКИ (ПЕРЕТАЩИТЕ В СЛОТЫ РЕШЕНИЯ):</div>
+                        <div id="p3-tiles-palette" class="d-flex flex-wrap gap-3 p-3 bg-dark border border-secondary" style="min-height: 90px;">
+                            <!-- Генерируется JS -->
+                        </div>
+                    </div>
+
+                    <!-- Слоты сборки последовательности -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-success small fw-bold">СЛОТЫ ПОСЛЕДОВАТЕЛЬНОСТИ РЕШЕНИЯ:</span>
+                            <button id="p3-clear-slots-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Очистить слоты
+                            </button>
+                        </div>
+                        <div id="p3-slots-container" class="d-flex gap-3 justify-content-center p-3 bg-dark border border-success mb-3">
+                            <!-- Слоты генерируются JS -->
+                        </div>
+
+                        <!-- Индикатор составных слов в реальном времени -->
+                        <div class="card bg-black border-secondary rounded-0 p-3">
+                            <div class="text-secondary small mb-1">КОНТРОЛЬ СОВПАДЕНИЯ СЛОВ В РЕАЛЬНОМ ВРЕМЕНИ:</div>
+                            <div class="d-flex align-items-center gap-2 mb-2 font-monospace">
+                                <span class="badge bg-secondary rounded-0" style="width: 130px;">Верхний ряд U:</span>
+                                <span id="p3-word-u" class="text-warning fs-5 fw-bold tracking-wider">---</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-2 font-monospace">
+                                <span class="badge bg-secondary rounded-0" style="width: 130px;">Нижний ряд V:</span>
+                                <span id="p3-word-v" class="text-info fs-5 fw-bold tracking-wider">---</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 font-monospace border-top border-secondary pt-2">
+                                <span class="badge bg-dark border border-secondary rounded-0" style="width: 130px;">Статус баланса:</span>
+                                <span id="p3-match-status" class="text-secondary small">Заполните все целевые слоты</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold font-monospace">
+                            ПРОВЕРИТЬ СООТВЕТСТВИЕ ПОСТА →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="display-3 text-success mb-3">✓</div>
+                    <h3 class="h2 text-success font-monospace mb-2">УРОВЕНЬ 1 УСПЕШНО ЗАВЕРШЕН!</h3>
+                    <p class="text-light mb-4">
+                        Вы успешно классифицировали свойства программ по теореме Райса, собрали инвертор парадокса Тьюринга 
+                        и нашли разрешимую цепочку соответствий в комбинаторике Поста.
+                    </p>
+
+                    <div class="card bg-black border-success rounded-0 d-inline-block p-4 mb-4 text-start font-monospace">
+                        <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">[ФИНАЛЬНЫЙ ПРОТОКОЛ ТЕЛЕМЕТРИИ]</div>
+                        <div class="text-light mb-1">Статус миссии: <span class="text-success fw-bold">COMPLETED</span></div>
+                        <div class="text-light mb-1">Число ошибок / сбросов: <span id="final-attempts" class="text-warning">0</span></div>
+                        <div class="text-light mb-1">Затраченное время: <span id="final-time" class="text-info">00:00</span></div>
+                        <div class="text-light">Режим проверки: <span class="text-success">Zero Multiple Choice OK</span></div>
+                    </div>
+
+                    <div>
+                        <button id="btn-restart-level" class="btn btn-outline-success rounded-0 px-4 py-2 font-monospace">
+                            Пройти уровень заново
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    // --- Состояние игры и метрики ---
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Таймер
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            const el = document.getElementById('timer-display');
+            if (el) el.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+    startTimer();
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Телеметрия: Ошибка / Сброс
+    function triggerErrorReset(msg, callback) {
+        attemptsCount++;
+        updateAttemptsDisplay();
+        isLocked = true;
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        // Отправка сигнала телеметрии hardcore_reset
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 1)',
+            action_type: 'hardcore_reset'
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1300);
+    }
+
+    // Телеметрия: Завершение уровня
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+        const secs = String(elapsedSec % 60).padStart(2, '0');
+
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Финиш';
+        document.getElementById('phase-title').textContent = 'Все фазы успешно пройдены';
+
+        document.getElementById('final-attempts').textContent = String(attemptsCount);
+        document.getElementById('final-time').textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 1)',
+            action_type: 'level_complete',
+            status: 'completed',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: elapsedSec,
+            attempts_count: attemptsCount,
+            success: true
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Классификация свойств (Бакеты)
+    // =========================================================================
+    const ALL_SYNTAX_CARDS = [
+        { id: 'syn-1', text: 'Проверка баланса и парности круглых скобок () в коде', category: 'syntax' },
+        { id: 'syn-2', text: 'Подсчет общего числа строк кода и символов в исходном файле', category: 'syntax' },
+        { id: 'syn-3', text: 'Поиск необъявленных переменных (статический контроль типов)', category: 'syntax' },
+        { id: 'syn-4', text: 'Проверка наличия директивы import math в заголовке модуля', category: 'syntax' },
+        { id: 'syn-5', text: 'Поиск зарезервированного ключевого слова while в тексте программы', category: 'syntax' },
+        { id: 'syn-6', text: 'Проверка длины идентификаторов по стандарту PEP 8 (не более 79 знаков)', category: 'syntax' },
+        { id: 'syn-7', text: 'Поиск недопустимых спецсимволов в именах переменных', category: 'syntax' }
+    ];
+
+    const ALL_SEMANTIC_CARDS = [
+        { id: 'sem-1', text: 'Определение, завершится ли выполнение программы на всех натуральных n', category: 'semantic' },
+        { id: 'sem-2', text: 'Проверка, выведет ли когда-нибудь программа на экран строку "OK"', category: 'semantic' },
+        { id: 'sem-3', text: 'Выяснение, равен ли возвращаемый результат функции числу 0', category: 'semantic' },
+        { id: 'sem-4', text: 'Детектирование мертвого кода (функция никогда не выполнится)', category: 'semantic' },
+        { id: 'sem-5', text: 'Гарантированное выявление деления на ноль при произвольных входных данных', category: 'semantic' },
+        { id: 'sem-6', text: 'Проверка функциональной эквивалентности двух различных программ', category: 'semantic' },
+        { id: 'sem-7', text: 'Выяснение, освободит ли программа всю динамически выделенную память', category: 'semantic' }
+    ];
+
+    let p1SelectedCard = null;
+
+    function shuffle(arr) {
+        return arr.slice().sort(() => Math.random() - 0.5);
+    }
+
+    function initPhase1() {
+        const poolEl = document.getElementById('p1-cards-pool');
+        const bucketSyntaxSlot = document.querySelector('#bucket-syntax .bucket-slot');
+        const bucketSemanticSlot = document.querySelector('#bucket-semantic .bucket-slot');
+        if (!poolEl || !bucketSyntaxSlot || !bucketSemanticSlot) return;
+
+        poolEl.innerHTML = '';
+        bucketSyntaxSlot.innerHTML = '';
+        bucketSemanticSlot.innerHTML = '';
+        updateBucketCounts();
+
+        // Берем случайные 3 синтаксических и 3 семантических карточки
+        const chosenSyntax = shuffle(ALL_SYNTAX_CARDS).slice(0, 3);
+        const chosenSemantic = shuffle(ALL_SEMANTIC_CARDS).slice(0, 3);
+        const chosenCards = shuffle([...chosenSyntax, ...chosenSemantic]);
+
+        chosenCards.forEach(cardData => {
+            const card = document.createElement('div');
+            card.className = 'card bg-black border border-secondary text-light p-2 font-monospace small user-select-none p1-item';
+            card.style.cursor = 'grab';
+            card.setAttribute('draggable', 'true');
+            card.dataset.id = cardData.id;
+            card.dataset.category = cardData.category;
+            card.textContent = cardData.text;
+
+            // Drag & Drop
+            card.addEventListener('dragstart', (e) => {
+                if (isLocked) return;
+                e.dataTransfer.setData('text/plain', cardData.id);
+                card.classList.add('opacity-50');
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-50');
+            });
+
+            // Click to select fallback
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isLocked) return;
+                document.querySelectorAll('.p1-item').forEach(c => c.classList.remove('border-primary', 'bg-dark'));
+                if (p1SelectedCard === card) {
+                    p1SelectedCard = null;
+                } else {
+                    p1SelectedCard = card;
+                    card.classList.add('border-primary', 'bg-dark');
+                }
+            });
+
+            poolEl.appendChild(card);
+        });
+    }
+
+    function updateBucketCounts() {
+        document.querySelectorAll('.target-bucket').forEach(bucket => {
+            const count = bucket.querySelectorAll('.p1-item').length;
+            const badge = bucket.querySelector('.count-badge');
+            if (badge) badge.textContent = String(count);
+        });
+    }
+
+    function setupBucketDropZone(zoneEl, targetCategory) {
+        zoneEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zoneEl.classList.add('bg-black');
+        });
+        zoneEl.addEventListener('dragleave', () => {
+            zoneEl.classList.remove('bg-black');
+        });
+        zoneEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zoneEl.classList.remove('bg-black');
+            if (isLocked) return;
+            const cardId = e.dataTransfer.getData('text/plain');
+            const card = document.querySelector(`.p1-item[data-id="${cardId}"]`);
+            if (card) {
+                zoneEl.appendChild(card);
+                updateBucketCounts();
+            }
+        });
+
+        // Click fallback
+        zoneEl.addEventListener('click', () => {
+            if (isLocked || !p1SelectedCard) return;
+            zoneEl.appendChild(p1SelectedCard);
+            p1SelectedCard.classList.remove('border-primary', 'bg-dark');
+            p1SelectedCard = null;
+            updateBucketCounts();
+        });
+    }
+
+    const bSyntaxSlot = document.querySelector('#bucket-syntax .bucket-slot');
+    const bSemanticSlot = document.querySelector('#bucket-semantic .bucket-slot');
+    const cardsPool = document.getElementById('p1-cards-pool');
+    if (bSyntaxSlot) setupBucketDropZone(bSyntaxSlot, 'syntax');
+    if (bSemanticSlot) setupBucketDropZone(bSemanticSlot, 'semantic');
+    if (cardsPool) {
+        cardsPool.addEventListener('click', () => {
+            if (isLocked || !p1SelectedCard) return;
+            cardsPool.appendChild(p1SelectedCard);
+            p1SelectedCard.classList.remove('border-primary', 'bg-dark');
+            p1SelectedCard = null;
+            updateBucketCounts();
+        });
+    }
+
+    document.getElementById('p1-reset-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        document.querySelectorAll('.p1-item').forEach(c => cardsPool.appendChild(c));
+        updateBucketCounts();
+    });
+
+    document.getElementById('p1-verify-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const poolItems = cardsPool.querySelectorAll('.p1-item').length;
+        if (poolItems > 0) {
+            triggerErrorReset('Не все карточки распределены по контейнерам!');
+            return;
+        }
+
+        const syntaxItems = Array.from(bSyntaxSlot.querySelectorAll('.p1-item'));
+        const semanticItems = Array.from(bSemanticSlot.querySelectorAll('.p1-item'));
+
+        const syntaxErrors = syntaxItems.filter(item => item.dataset.category !== 'syntax').length;
+        const semanticErrors = semanticItems.filter(item => item.dataset.category !== 'semantic').length;
+
+        if (syntaxErrors === 0 && semanticErrors === 0) {
+            // Переход на Фазу 2
+            currentPhase = 2;
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Коммутация логики парадокса Тьюринга';
+            initPhase2();
+        } else {
+            triggerErrorReset('Ошибка классификации! По теореме Райса свойства поведения неразрешимы.', initPhase1);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: Коммутация схемы парадокса Тьюринга (Wire Patching)
+    // =========================================================================
+    const SOURCES_DATA = [
+        { id: 'src-code', label: '1. Исходный код анализируемой программы P', correctTarget: 'tgt-dup' },
+        { id: 'src-dup', label: '2. Выход блока дубликатора: Пара аргументов (P, P)', correctTarget: 'tgt-oracle' },
+        { id: 'src-true', label: '3. Вердикт оракула: H(P, P) == True (завершается)', correctTarget: 'tgt-loop' },
+        { id: 'src-false', label: '4. Вердикт оракула: H(P, P) == False (зацикливается)', correctTarget: 'tgt-stop' }
+    ];
+
+    const TARGETS_DATA = [
+        { id: 'tgt-dup', label: 'Блок A: Дубликатор входов [формирует пару (P, P)]' },
+        { id: 'tgt-oracle', label: 'Блок B: Анализатор останова H(программа, входные_данные)' },
+        { id: 'tgt-loop', label: 'Блок C: Инвертор реакции ➔ Вход в вечный цикл [while True: pass]' },
+        { id: 'tgt-stop', label: 'Блок D: Инвертор реакции ➔ Мгновенный останов [return / q0]' },
+        { id: 'tgt-dist1', label: 'Блок X (Дистрактор): Аварийный сброс процессора [SIGSEGV]' },
+        { id: 'tgt-dist2', label: 'Блок Y (Дистрактор): Прямой останов при True [без инверсии]' }
+    ];
+
+    const CABLE_COLORS = [
+        { badge: 'bg-success text-dark', border: 'border-success', label: 'Кабель 1 (Зеленый)' },
+        { badge: 'bg-info text-dark', border: 'border-info', label: 'Кабель 2 (Голубой)' },
+        { badge: 'bg-warning text-dark', border: 'border-warning', label: 'Кабель 3 (Желтый)' },
+        { badge: 'bg-danger text-light', border: 'border-danger', label: 'Кабель 4 (Красный)' }
+    ];
+
+    let p2ActiveSource = null;
+    let p2Connections = {}; // sourceId -> targetId
+
+    function initPhase2() {
+        const srcContainer = document.getElementById('p2-sources');
+        const tgtContainer = document.getElementById('p2-targets');
+        if (!srcContainer || !tgtContainer) return;
+
+        srcContainer.innerHTML = '';
+        tgtContainer.innerHTML = '';
+        p2ActiveSource = null;
+        p2Connections = {};
+
+        // Источники
+        SOURCES_DATA.forEach((s, idx) => {
+            const item = document.createElement('div');
+            item.className = 'card bg-dark border border-secondary p-3 p2-node-source user-select-none';
+            item.style.cursor = 'pointer';
+            item.dataset.sourceId = s.id;
+            item.dataset.cableIdx = idx;
+
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-light fw-bold">${s.label}</span>
+                        <div class="text-secondary small connection-status mt-1">Кликните, чтобы протянуть кабель...</div>
+                    </div>
+                    <span class="badge bg-secondary rounded-0 connection-badge">ОТКЛЮЧЕНО</span>
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                if (isLocked) return;
+                // Снять выделение с остальных источников
+                document.querySelectorAll('.p2-node-source').forEach(el => el.classList.remove('border-primary', 'bg-black'));
+                if (p2ActiveSource === s.id) {
+                    p2ActiveSource = null;
+                } else {
+                    p2ActiveSource = s.id;
+                    item.classList.add('border-primary', 'bg-black');
+                }
+            });
+
+            srcContainer.appendChild(item);
+        });
+
+        // Приемники (перемешиваем с дистракторами)
+        const shuffledTargets = shuffle(TARGETS_DATA);
+        shuffledTargets.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'card bg-dark border border-secondary p-3 p2-node-target user-select-none';
+            item.style.cursor = 'pointer';
+            item.dataset.targetId = t.id;
+
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-light fw-bold">${t.label}</span>
+                        <div class="text-secondary small connection-status mt-1">Ожидание подключения кабеля...</div>
+                    </div>
+                    <span class="badge bg-secondary rounded-0 connection-badge">СВОБОДЕН</span>
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                if (isLocked) return;
+                if (!p2ActiveSource) return;
+
+                // Если целевой порт уже кем-то занят — очистить старое соединение
+                for (const [src, tgt] of Object.entries(p2Connections)) {
+                    if (tgt === t.id) delete p2Connections[src];
+                }
+
+                p2Connections[p2ActiveSource] = t.id;
+                p2ActiveSource = null;
+                document.querySelectorAll('.p2-node-source').forEach(el => el.classList.remove('border-primary', 'bg-black'));
+                updatePhase2Visuals();
+            });
+
+            tgtContainer.appendChild(item);
+        });
+
+        updatePhase2Visuals();
+    }
+
+    function updatePhase2Visuals() {
+        // Сброс визуалов источников
+        SOURCES_DATA.forEach((s, idx) => {
+            const sEl = document.querySelector(`.p2-node-source[data-source-id="${s.id}"]`);
+            if (!sEl) return;
+            const targetId = p2Connections[s.id];
+            const badgeEl = sEl.querySelector('.connection-badge');
+            const statusEl = sEl.querySelector('.connection-status');
+            const cableInfo = CABLE_COLORS[idx];
+
+            if (targetId) {
+                const targetObj = TARGETS_DATA.find(t => t.id === targetId);
+                sEl.className = `card bg-dark border ${cableInfo.border} p-3 p2-node-source user-select-none`;
+                badgeEl.className = `badge rounded-0 ${cableInfo.badge}`;
+                badgeEl.textContent = `ПОДКЛЮЧЕН (${idx + 1})`;
+                statusEl.textContent = `Соединен с: ${targetObj ? targetObj.label.split(':')[0] : targetId}`;
+            } else {
+                sEl.className = 'card bg-dark border border-secondary p-3 p2-node-source user-select-none';
+                badgeEl.className = 'badge bg-secondary rounded-0 connection-badge';
+                badgeEl.textContent = 'ОТКЛЮЧЕНО';
+                statusEl.textContent = 'Кликните, чтобы протянуть кабель...';
+            }
+        });
+
+        // Сброс визуалов приемников
+        TARGETS_DATA.forEach(t => {
+            const tEl = document.querySelector(`.p2-node-target[data-target-id="${t.id}"]`);
+            if (!tEl) return;
+            const badgeEl = tEl.querySelector('.connection-badge');
+            const statusEl = tEl.querySelector('.connection-status');
+
+            // Найти, какой источник подключен
+            let connectedSourceId = null;
+            for (const [src, tgt] of Object.entries(p2Connections)) {
+                if (tgt === t.id) {
+                    connectedSourceId = src;
+                    break;
+                }
+            }
+
+            if (connectedSourceId) {
+                const srcIdx = SOURCES_DATA.findIndex(s => s.id === connectedSourceId);
+                const cableInfo = CABLE_COLORS[srcIdx] || CABLE_COLORS[0];
+                tEl.className = `card bg-dark border ${cableInfo.border} p-3 p2-node-target user-select-none`;
+                badgeEl.className = `badge rounded-0 ${cableInfo.badge}`;
+                badgeEl.textContent = `КАБЕЛЬ ${srcIdx + 1}`;
+                statusEl.textContent = `Входной сигнал от Источника ${srcIdx + 1}`;
+            } else {
+                tEl.className = 'card bg-dark border border-secondary p-3 p2-node-target user-select-none';
+                badgeEl.className = 'badge bg-secondary rounded-0 connection-badge';
+                badgeEl.textContent = 'СВОБОДЕН';
+                statusEl.textContent = 'Ожидание подключения кабеля...';
+            }
+        });
+    }
+
+    document.getElementById('p2-reset-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        p2Connections = {};
+        p2ActiveSource = null;
+        updatePhase2Visuals();
+    });
+
+    document.getElementById('p2-verify-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+
+        // Проверяем, все ли 4 источника подключены
+        const connectedCount = Object.keys(p2Connections).length;
+        if (connectedCount < 4) {
+            triggerErrorReset('Не все сигналы скоммутированы! Соедините все 4 порта.');
+            return;
+        }
+
+        // Проверяем правильность соединений
+        let hasError = false;
+        SOURCES_DATA.forEach(s => {
+            if (p2Connections[s.id] !== s.correctTarget) {
+                hasError = true;
+            }
+        });
+
+        if (!hasError) {
+            // Переход на Фазу 3
+            currentPhase = 3;
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Слот-пазл Проблемы соответствий Поста (ПСП)';
+            initPhase3();
+        } else {
+            triggerErrorReset('Парадокс нарушен! Сигнал True обязан вести в вечный цикл, а False — к остановке.', () => {
+                p2Connections = {};
+                p2ActiveSource = null;
+                updatePhase2Visuals();
+            });
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: Слот-пазл домино Поста (ПСП)
+    // =========================================================================
+    // Банк разрешимых наборов ПСП
+    const PCP_PUZZLES = [
+        {
+            name: 'Конфигурация Альфа',
+            slotCount: 3,
+            tiles: [
+                { id: 't1', top: 'a', bottom: 'ab' },
+                { id: 't2', top: 'b', bottom: 'a' },
+                { id: 't3', top: 'ab', bottom: 'b' },
+                { id: 't4', top: 'ba', bottom: 'a' } // Дистрактор
+            ],
+            // Решение: [t1, t2, t3] -> Top: a + b + ab = abab; Bottom: ab + a + b = abab
+            solution: ['t1', 't2', 't3']
+        },
+        {
+            name: 'Конфигурация Бета',
+            slotCount: 3,
+            tiles: [
+                { id: 't1', top: 'b', bottom: 'ba' },
+                { id: 't2', top: 'a', bottom: 'b' },
+                { id: 't3', top: 'ba', bottom: 'a' },
+                { id: 't4', top: 'ab', bottom: 'b' } // Дистрактор
+            ],
+            // Решение: [t1, t2, t3] -> Top: b + a + ba = baba; Bottom: ba + b + a = baba
+            solution: ['t1', 't2', 't3']
+        },
+        {
+            name: 'Конфигурация Гамма (Двоичная)',
+            slotCount: 3,
+            tiles: [
+                { id: 't1', top: '1', bottom: '10' },
+                { id: 't2', top: '0', bottom: '1' },
+                { id: 't3', top: '10', bottom: '0' },
+                { id: 't4', top: '01', bottom: '1' } // Дистрактор
+            ],
+            // Решение: [t1, t2, t3] -> Top: 1 + 0 + 10 = 1010; Bottom: 10 + 1 + 0 = 1010
+            solution: ['t1', 't2', 't3']
+        }
+    ];
+
+    let currentPuzzle = null;
+    let p3Slots = []; // массив tileId для каждого слота
+    let p3SelectedTile = null;
+
+    function initPhase3() {
+        // Случайный выбор пазла
+        currentPuzzle = shuffle(PCP_PUZZLES)[0];
+        p3Slots = new Array(currentPuzzle.slotCount).fill(null);
+        p3SelectedTile = null;
+
+        const paletteEl = document.getElementById('p3-tiles-palette');
+        const slotsContainerEl = document.getElementById('p3-slots-container');
+        if (!paletteEl || !slotsContainerEl) return;
+
+        paletteEl.innerHTML = '';
+        slotsContainerEl.innerHTML = '';
+
+        // Создаем палитру доминошек
+        shuffle(currentPuzzle.tiles).forEach(t => {
+            const tileEl = createTileElement(t);
+            paletteEl.appendChild(tileEl);
+        });
+
+        // Создаем слоты
+        for (let i = 0; i < currentPuzzle.slotCount; i++) {
+            const slotEl = document.createElement('div');
+            slotEl.className = 'border border-dashed border-secondary bg-black d-flex flex-column justify-content-center align-items-center p-2 p3-slot user-select-none';
+            slotEl.style.width = '120px';
+            slotEl.style.minHeight = '100px';
+            slotEl.dataset.slotIdx = String(i);
+
+            slotEl.innerHTML = `<span class="text-secondary small font-monospace">СЛОТ ${i + 1}</span>`;
+
+            // Drag and drop в слот
+            slotEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slotEl.classList.add('border-success');
+            });
+            slotEl.addEventListener('dragleave', () => {
+                slotEl.classList.remove('border-success');
+            });
+            slotEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slotEl.classList.remove('border-success');
+                if (isLocked) return;
+                const tileId = e.dataTransfer.getData('text/plain');
+                placeTileInSlot(tileId, i);
+            });
+
+            // Click fallback
+            slotEl.addEventListener('click', () => {
+                if (isLocked) return;
+                if (p3SelectedTile) {
+                    placeTileInSlot(p3SelectedTile.dataset.tileId, i);
+                    p3SelectedTile.classList.remove('border-primary');
+                    p3SelectedTile = null;
+                } else if (p3Slots[i]) {
+                    // Клик по заполненному слоту — очистить его
+                    p3Slots[i] = null;
+                    renderSlots();
+                    updateP3WordPreview();
+                }
+            });
+
+            slotsContainerEl.appendChild(slotEl);
+        }
+
+        renderSlots();
+        updateP3WordPreview();
+    }
+
+    function createTileElement(t) {
+        const tile = document.createElement('div');
+        tile.className = 'card bg-black border border-secondary text-center p2-tile user-select-none p-2 p3-tile';
+        tile.style.width = '100px';
+        tile.style.cursor = 'grab';
+        tile.setAttribute('draggable', 'true');
+        tile.dataset.tileId = t.id;
+
+        tile.innerHTML = `
+            <div class="text-warning fw-bold fs-5 border-bottom border-secondary pb-1 font-monospace">${t.top}</div>
+            <div class="text-info fw-bold fs-5 pt-1 font-monospace">${t.bottom}</div>
+        `;
+
+        tile.addEventListener('dragstart', (e) => {
+            if (isLocked) return;
+            e.dataTransfer.setData('text/plain', t.id);
+        });
+
+        // Click fallback
+        tile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isLocked) return;
+            document.querySelectorAll('.p3-tile').forEach(el => el.classList.remove('border-primary', 'bg-dark'));
+            if (p3SelectedTile === tile) {
+                p3SelectedTile = null;
+            } else {
+                p3SelectedTile = tile;
+                tile.classList.add('border-primary', 'bg-dark');
+            }
+        });
+
+        return tile;
+    }
+
+    function placeTileInSlot(tileId, slotIdx) {
+        p3Slots[slotIdx] = tileId;
+        renderSlots();
+        updateP3WordPreview();
+    }
+
+    function renderSlots() {
+        const slotEls = document.querySelectorAll('.p3-slot');
+        slotEls.forEach((slotEl, idx) => {
+            const tileId = p3Slots[idx];
+            if (tileId) {
+                const tileData = currentPuzzle.tiles.find(t => t.id === tileId);
+                slotEl.innerHTML = `
+                    <div class="card bg-dark border border-success p-2 w-100 text-center font-monospace">
+                        <div class="text-warning fw-bold border-bottom border-secondary pb-1">${tileData.top}</div>
+                        <div class="text-info fw-bold pt-1">${tileData.bottom}</div>
+                    </div>
+                `;
+            } else {
+                slotEl.innerHTML = `<span class="text-secondary small font-monospace">СЛОТ ${idx + 1}</span>`;
+            }
+        });
+    }
+
+    function updateP3WordPreview() {
+        let wordU = '';
+        let wordV = '';
+
+        p3Slots.forEach(tileId => {
+            if (tileId) {
+                const tileData = currentPuzzle.tiles.find(t => t.id === tileId);
+                if (tileData) {
+                    wordU += tileData.top;
+                    wordV += tileData.bottom;
+                }
+            }
+        });
+
+        const uEl = document.getElementById('p3-word-u');
+        const vEl = document.getElementById('p3-word-v');
+        const statusEl = document.getElementById('p3-match-status');
+
+        if (uEl) uEl.textContent = wordU || '---';
+        if (vEl) vEl.textContent = wordV || '---';
+
+        if (!statusEl) return;
+
+        if (p3Slots.some(s => s === null)) {
+            statusEl.className = 'text-secondary small';
+            statusEl.textContent = 'Заполните все слоты доминошками...';
+        } else if (wordU === wordV) {
+            statusEl.className = 'text-success fw-bold small';
+            statusEl.textContent = `ПОЛНОЕ СОВПАДЕНИЕ! U === V (${wordU})`;
+        } else {
+            statusEl.className = 'text-danger fw-bold small';
+            statusEl.textContent = `НЕСОВПАДЕНИЕ: Верх [${wordU}] ≠ Низ [${wordV}]`;
+        }
+    }
+
+    document.getElementById('p3-clear-slots-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        p3Slots = new Array(currentPuzzle.slotCount).fill(null);
+        renderSlots();
+        updateP3WordPreview();
+    });
+
+    document.getElementById('p3-verify-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        if (p3Slots.some(s => s === null)) {
+            triggerErrorReset('Заполните все слоты последовательности перед проверкой!');
+            return;
+        }
+
+        let wordU = '';
+        let wordV = '';
+        p3Slots.forEach(tileId => {
+            const tileData = currentPuzzle.tiles.find(t => t.id === tileId);
+            if (tileData) {
+                wordU += tileData.top;
+                wordV += tileData.bottom;
+            }
+        });
+
+        if (wordU === wordV && wordU.length > 0) {
+            completeLevel();
+        } else {
+            triggerErrorReset('Слова не совпали! В ПСП верхнее и нижнее слово должны быть идентичны.', initPhase3);
+        }
+    });
+
+    // Кнопка перезапуска уровня
+    document.getElementById('btn-restart-level')?.addEventListener('click', () => {
+        currentPhase = 1;
+        attemptsCount = 0;
+        startTime = Date.now();
+        startTimer();
+        updateAttemptsDisplay();
+
+        document.getElementById('victory-screen').classList.add('d-none');
+        document.getElementById('phase1').classList.remove('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 1 из 3';
+        document.getElementById('phase-title').textContent = 'Классификация свойств программ по теореме Райса';
+
+        initPhase1();
+    });
+
+    // Инициализация при загрузке
+    initPhase1();
+})();
+</script>
