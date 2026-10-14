@@ -20,7 +20,10 @@ const columnsToAdd = [
   { name: 'student_class', type: 'TEXT' },
   { name: 'course_slug', type: 'TEXT' },
   { name: 'lesson_id', type: 'TEXT' },
-  { name: 'level_number', type: 'INTEGER' }
+  { name: 'level_number', type: 'INTEGER' },
+  { name: 'attempt_id', type: 'TEXT' },
+  { name: 'attempt_number', type: 'INTEGER DEFAULT 1' },
+  { name: 'attempt_mode', type: 'TEXT DEFAULT "normal"' }
 ];
 
 for (const col of columnsToAdd) {
@@ -36,6 +39,8 @@ for (const col of columnsToAdd) {
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_telemetry_student_cohort ON telemetry(student_class, timestamp);
   CREATE INDEX IF NOT EXISTS idx_telemetry_course_lesson ON telemetry(course_slug, lesson_id, timestamp);
+  CREATE INDEX IF NOT EXISTS idx_telemetry_attempt ON telemetry(attempt_id);
+  CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, lesson_id, attempt_id);
 `);
 console.log('Indexes created/verified.');
 
