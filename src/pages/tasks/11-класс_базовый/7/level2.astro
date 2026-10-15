@@ -1,0 +1,534 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитика и расследование инцидентов Malware (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Заголовок и счетчик попыток -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="level-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="level-title" class="text-light fw-bold fs-6">Анализ контрольных сумм и хешей (Цифровой отпечаток)</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: КРИПТОГРАФИЧЕСКИЕ ХЕШИ ================= -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Шаг 1: Анализ длины криптографического отпечатка файла (MD5 / SHA-1 / SHA-256)</h5>
+                    <p class="text-light">
+                        Для однозначной идентификации вредоносной программы антивирусный сканер вычислил криптографический хеш подозрительного файла.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ВЫЧИСЛЕННЫЙ ЦИФРОВОЙ ОТПЕЧАТОК ОБЪЕКТА:</div>
+                        <div id="p1-hash-display" class="text-warning fs-6 text-break p-2 bg-dark border border-secondary mb-2"></div>
+                        <div class="text-secondary small">
+                            Длина строки: ровно <span id="p1-hex-length" class="text-info fw-bold"></span> шестнадцатеричных символов.
+                        </div>
+                    </div>
+
+                    <p class="text-light mb-2" id="p1-prompt-question">
+                        Рассчитайте битовую разрядность данного криптографического отпечатка. Учитывая, что каждый шестнадцатеричный символ кодирует 4 бита информации, введите длину хеша в битах (число):
+                    </p>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p1-input" class="form-label text-light small mb-2">
+                            Введите рассчитанную разрядность хеша (например: 128, 160 или 256):
+                        </label>
+                        <div class="input-group w-50">
+                            <input type="text" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 fs-5" placeholder="Введите число..." autocomplete="off">
+                            <button id="p1-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+
+                    <div id="p1-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА РАСЧЕТА] Неверная разрядность хеша! Пересчет нового цифрового отпечатка...
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: ДЕТЕКТИРОВАНИЕ ТАЙПСКВОТТИНГА ПРОЦЕССОВ ================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 2: Выявление маскировки процессов (Тайпсквоттинг и нелегитимные пути)</h5>
+                    <p class="text-light">
+                        В диспетчере задач сервера зафиксирован снимок активных системных процессов. Один из процессов является троянской программой, маскирующейся под легитимную службу Windows.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ТАБЛИЦА АКТИВНЫХ ПРОЦЕССОВ СИСТЕМЫ:</div>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-bordered border-secondary small text-start align-middle mb-0">
+                                <thead>
+                                    <tr class="table-secondary text-dark">
+                                        <th style="width: 15%;">PID</th>
+                                        <th style="width: 30%;">Имя процесса</th>
+                                        <th style="width: 55%;">Исполняемый путь к файлу</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p2-process-table">
+                                    <!-- Генерируется JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-secondary small mt-2">
+                            * Помните: подлинные системные службы Windows запускаются строго из каталога <code class="text-info">C:\Windows\System32\</code> и не содержат опечаток в именах.
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-light small mb-2">
+                            Найдите вредоносный процесс и введите его системный номер <strong class="text-warning">PID</strong> (только цифры):
+                        </label>
+                        <div class="input-group w-50">
+                            <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 fs-5" placeholder="PID процесса..." autocomplete="off">
+                            <button id="p2-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+
+                    <div id="p2-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА ДЕТЕКТИРОВАНИЯ] Выбран легитимный процесс либо неверный PID! Генерация новой таблицы...
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: ТЕХНИКА ДВОЙНЫХ РАСШИРЕНИЙ ================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 3: Распознавание маскировки файлов (Double Extension Technique)</h5>
+                    <p class="text-light">
+                        Пользователь получил письмо от сомнительного адресата со списком файлов во вложении. Злоумышленник пытается скрыть истинное исполняемое расширение вредоносного скрипта.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ИМЯ ПОДОЗРИТЕЛЬНОГО ФАЙЛА ВО ВЛОЖЕНИИ:</div>
+                        <div id="p3-filename-display" class="fs-5 text-warning fw-bold p-2 bg-dark border border-secondary mb-2"></div>
+                        <div class="text-secondary small">
+                            В операционных системах с включенным сокрытием зарегистрированных типов файлов последнее расширение часто прячется, обманывая пользователя.
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-light small mb-2">
+                            Каково истинное расширение данного файла, определяющее запуск вредоносного интерпретатора? (введите расширение без точки, строчными буквами, например: <code class="text-warning">exe</code>, <code class="text-warning">vbs</code> или <code class="text-warning">js</code>):
+                        </label>
+                        <div class="input-group w-50">
+                            <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 fs-5" placeholder="Истинное расширение..." autocomplete="off">
+                            <button id="p3-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+
+                    <div id="p3-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА АНАЛИЗА] Неверно определено исполняемое расширение! Новый файл...
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 4: РАССЛЕДОВАНИЕ АВТОЗАГРУЗКИ (Persistence) ================= -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 4: Поиск механизма персистентности (Ветка реестра Run)</h5>
+                    <p class="text-light">
+                        Антивирусный ревизор проанализировал системный реестр Windows на предмет закрепления вредоносных программ при старте ОС.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ДАМП ВЕТКИ РЕЕСТРА HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run:</div>
+                        <div class="bg-dark p-3 border border-secondary text-light small" id="p4-registry-dump">
+                            <!-- Генерируется JS -->
+                        </div>
+                        <div class="text-secondary small mt-2">
+                            * Легитимные программы хранятся в <code class="text-info">C:\Program Files\</code>. Вредоносные программы обычно прописываются во временные пользовательские папки (<code class="text-info">%TEMP%</code>, <code class="text-info">%APPDATA%</code>) или используют подозрительные аргументы запуска скриптов.
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-light small mb-2">
+                            Найдите подозрительный параметр автозапуска и введите <strong class="text-warning">ИМЯ КЛЮЧА</strong> (параметра слева от знака «=»):
+                        </label>
+                        <div class="input-group w-50">
+                            <input type="text" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 fs-5" placeholder="Имя параметра реестра..." autocomplete="off">
+                            <button id="p4-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+
+                    <div id="p4-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА АВТОЗАГРУЗКИ] Указан легитимный ключ реестра либо опечатка! Новая ветка автозапуска...
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 5: РАСЧЕТ ЕМКОСТИ СТРАТЕГИИ «3-2-1» ================= -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 5: Аналитический расчет инфраструктуры резервного копирования «3-2-1»</h5>
+                    <p class="text-light">
+                        Предприятие защищает базу данных бухгалтерского учета объемом <span id="p5-data-size" class="text-warning fw-bold fs-5"></span> Гбайт от вирусов-вымогателей (Ransomware) в строгом соответствии с правилом «3-2-1».
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">СПЕЦИФИКАЦИЯ ИНФРАСТРУКТУРЫ:</div>
+                        <ul class="text-light small mb-0 ps-3">
+                            <li>Экземпляр 1: Основная рабочая база данных на сервере.</li>
+                            <li>Экземпляр 2: Локальная резервная копия на сетевом хранилище NAS (другой тип носителя).</li>
+                            <li>Экземпляр 3: Автономная резервная копия на переносном диске в изолированном сейфе («холодный бэкап», офлайн).</li>
+                        </ul>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-light small mb-2">
+                            1. Какой суммарный объем дискового пространства (в Гбайтах) потребуется для хранения всех <strong class="text-warning">3 экземпляров</strong> данных? (введите только число):
+                        </label>
+                        <div class="input-group w-50">
+                            <input type="number" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 fs-5" placeholder="Объем в Гб..." autocomplete="off">
+                            <button id="p5-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+
+                    <div id="p5-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА РАСЧЕТА] Неверный расчет суммарного объема бэкапа! Пересчет задачи...
+                    </div>
+                </div>
+
+                <!-- ================= ЭКРАН ПОБЕДЫ ================= -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="border border-warning bg-black p-4 d-inline-block text-center" style="max-width: 600px;">
+                        <h3 class="text-warning mb-3">[ ВЕРИФИКАЦИЯ ПРОЙДЕНА // УРОВЕНЬ 2 ВЫПОЛНЕН ]</h3>
+                        <p class="text-light mb-4">
+                            Вы успешно решили все аналитические задачи расследования инцидентов информационной безопасности: идентификацию хешей, выявление тайпсквоттинга, анализ расширений, аудит автозапуска и расчет стратегии бэкапа.
+                        </p>
+                        <div class="bg-dark border border-secondary p-3 mb-4 text-start font-monospace small">
+                            <div class="text-secondary">ТЕЛЕМЕТРИЯ СЕССИИ:</div>
+                            <div class="text-light">Затраченное время: <span id="final-time" class="text-warning">0</span> сек.</div>
+                            <div class="text-light">Количество ошибок: <span id="final-errors" class="text-warning">0</span></div>
+                            <div class="text-warning mt-1">Статус: УСПЕШНО ЗАВЕРШЕНО (ПРОДВИНУТЫЙ РЕЖИМ)</div>
+                        </div>
+                        <div class="alert alert-warning bg-dark text-warning border-warning rounded-0 mb-0">
+                            Результаты зафиксированы в едином журнале телеметрии LMS.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    const missionName = 'Урок 7 :: Вредоносное программное обеспечение (Уровень 2)';
+
+    function sendTelemetry(actionType, status, success) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success
+        }, '*');
+    }
+
+    function recordError(feedbackId, msg, retryFn) {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+        sendTelemetry('hardcore_reset', 'failed', false);
+        const fb = document.getElementById(feedbackId);
+        if (msg) fb.textContent = msg;
+        fb.classList.remove('d-none');
+        setTimeout(() => {
+            fb.classList.add('d-none');
+            retryFn();
+        }, 1300);
+    }
+
+    function advancePhase(currNum, nextNum, nextSetupFn, nextTitle) {
+        document.getElementById(`phase${currNum}`).classList.add('d-none');
+        document.getElementById(`phase${nextNum}`).classList.remove('d-none');
+        document.getElementById('level-badge').textContent = `Шаг ${nextNum} из 5`;
+        document.getElementById('level-title').textContent = nextTitle;
+        nextSetupFn();
+    }
+
+    // =========================================================================
+    // ФАЗА 1: КРИПТОГРАФИЧЕСКИЕ ХЕШИ И РАЗРЯДНОСТЬ
+    // =========================================================================
+
+    let p1CorrectAnswer = '';
+
+    function genHex(charsCount) {
+        const chars = '0123456789abcdef';
+        let res = '';
+        for (let i = 0; i < charsCount; i++) {
+            res += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return res;
+    }
+
+    function setupPhase1() {
+        const hashTypes = [
+            { name: 'MD5', hexLen: 32, bits: 128 },
+            { name: 'SHA-1', hexLen: 40, bits: 160 },
+            { name: 'SHA-256', hexLen: 64, bits: 256 }
+        ];
+
+        const chosen = hashTypes[Math.floor(Math.random() * hashTypes.length)];
+        const hashStr = genHex(chosen.hexLen);
+
+        document.getElementById('p1-hash-display').textContent = hashStr;
+        document.getElementById('p1-hex-length').textContent = chosen.hexLen;
+        p1CorrectAnswer = chosen.bits.toString();
+
+        const input = document.getElementById('p1-input');
+        input.value = '';
+        input.focus();
+    }
+
+    function checkPhase1() {
+        const val = document.getElementById('p1-input').value.trim();
+        if (val === p1CorrectAnswer) {
+            advancePhase(1, 2, setupPhase2, 'Выявление маскировки процессов');
+        } else {
+            recordError('p1-feedback', '[ОШИБКА РАСЧЕТА] Неверная битовая длина хеша! Пересчет...', setupPhase1);
+        }
+    }
+
+    document.getElementById('p1-btn').addEventListener('click', checkPhase1);
+    document.getElementById('p1-input').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') checkPhase1();
+    });
+
+    // =========================================================================
+    // ФАЗА 2: ТАЙПСКВОТТИНГ И ЛОКАЦИЯ ПРОЦЕССОВ
+    // =========================================================================
+
+    let p2MaliciousPID = '';
+
+    function setupPhase2() {
+        const legitimateProcesses = [
+            { name: 'explorer.exe', path: 'C:\\Windows\\explorer.exe' },
+            { name: 'lsass.exe', path: 'C:\\Windows\\System32\\lsass.exe' },
+            { name: 'services.exe', path: 'C:\\Windows\\System32\\services.exe' },
+            { name: 'csrss.exe', path: 'C:\\Windows\\System32\\csrss.exe' },
+            { name: 'smss.exe', path: 'C:\\Windows\\System32\\smss.exe' },
+            { name: 'svchost.exe', path: 'C:\\Windows\\System32\\svchost.exe' }
+        ];
+
+        const malwareTemplates = [
+            { name: 'scvhost.exe', path: 'C:\\Windows\\System32\\scvhost.exe', reason: 'Опечатка в имени (scvhost вместо svchost)' },
+            { name: 'svch0st.exe', path: 'C:\\Windows\\System32\\svch0st.exe', reason: 'Использование цифры 0 вместо буквы o' },
+            { name: 'svchost.exe', path: 'C:\\Users\\Student\\AppData\\Local\\Temp\\svchost.exe', reason: 'Запуск из временной папки пользователя' },
+            { name: 'csrsss.exe', path: 'C:\\Windows\\System32\\csrsss.exe', reason: 'Лишняя буква s в имени процесса' },
+            { name: 'lsass.exe', path: 'C:\\ProgramData\\lsass.exe', reason: 'Запуск из каталога ProgramData' }
+        ];
+
+        // Случайно выбираем 3 легитимных процесса и 1 вредоносный
+        const shuffledLegit = [...legitimateProcesses].sort(() => 0.5 - Math.random()).slice(0, 3);
+        const malware = malwareTemplates[Math.floor(Math.random() * malwareTemplates.length)];
+
+        const usedPids = new Set();
+        function getPid() {
+            let p;
+            do {
+                p = Math.floor(Math.random() * 8000) + 1000;
+            } while (usedPids.has(p));
+            usedPids.add(p);
+            return p.toString();
+        }
+
+        const tableData = [];
+        shuffledLegit.forEach(item => {
+            tableData.push({ pid: getPid(), name: item.name, path: item.path, isMalware: false });
+        });
+
+        p2MaliciousPID = getPid();
+        tableData.push({ pid: p2MaliciousPID, name: malware.name, path: malware.path, isMalware: true });
+
+        // Перемешать порядок строк
+        tableData.sort(() => 0.5 - Math.random());
+
+        const tbody = document.getElementById('p2-process-table');
+        tbody.innerHTML = '';
+        tableData.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-warning fw-bold font-monospace">${row.pid}</td>
+                <td class="text-light font-monospace">${row.name}</td>
+                <td class="text-secondary font-monospace">${row.path}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const input = document.getElementById('p2-input');
+        input.value = '';
+        input.focus();
+    }
+
+    function checkPhase2() {
+        const val = document.getElementById('p2-input').value.trim();
+        if (val === p2MaliciousPID) {
+            advancePhase(2, 3, setupPhase3, 'Распознавание маскировки расширений');
+        } else {
+            recordError('p2-feedback', '[ОШИБКА ДЕТЕКТИРОВАНИЯ] Неверный PID вредоносного процесса! Перезапуск...', setupPhase2);
+        }
+    }
+
+    document.getElementById('p2-btn').addEventListener('click', checkPhase2);
+    document.getElementById('p2-input').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') checkPhase2();
+    });
+
+    // =========================================================================
+    // ФАЗА 3: ТЕХНИКА ДВОЙНЫХ РАСШИРЕНИЙ (DOUBLE EXTENSIONS)
+    // =========================================================================
+
+    let p3CorrectExt = '';
+
+    function setupPhase3() {
+        const templates = [
+            { base: 'Договор_поставки_2026', fake: '.pdf', real: 'exe' },
+            { base: 'Бухгалтерский_баланс_Q3', fake: '.xlsx', real: 'vbs' },
+            { base: 'Список_задолженностей', fake: '.docx', real: 'js' },
+            { base: 'Скан_паспорта_руководителя', fake: '.jpg', real: 'exe' },
+            { base: 'Служебная_записка_премия', fake: '.pdf', real: 'wsf' },
+            { base: 'Обновление_системы_безопасности', fake: '.txt', real: 'bat' },
+            { base: 'Прайс_лист_оборудования', fake: '.xlsx', real: 'ps1' }
+        ];
+
+        const chosen = templates[Math.floor(Math.random() * templates.length)];
+        const fullFileName = `${chosen.base}${chosen.fake}.${chosen.real}`;
+
+        document.getElementById('p3-filename-display').textContent = fullFileName;
+        p3CorrectExt = chosen.real.toLowerCase();
+
+        const input = document.getElementById('p3-input');
+        input.value = '';
+        input.focus();
+    }
+
+    function checkPhase3() {
+        const val = document.getElementById('p3-input').value.trim().toLowerCase().replace(/^\./, '');
+        if (val === p3CorrectExt) {
+            advancePhase(3, 4, setupPhase4, 'Поиск персистентности в реестре');
+        } else {
+            recordError('p3-feedback', '[ОШИБКА АНАЛИЗА] Неверное исполняемое расширение! Новый файл...', setupPhase3);
+        }
+    }
+
+    document.getElementById('p3-btn').addEventListener('click', checkPhase3);
+    document.getElementById('p3-input').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') checkPhase3();
+    });
+
+    // =========================================================================
+    // ФАЗА 4: РАССЛЕДОВАНИЕ АВТОЗАГРУЗКИ (REGISTRY PERSISTENCE)
+    // =========================================================================
+
+    let p4CorrectKey = '';
+
+    function setupPhase4() {
+        const legitKeys = [
+            { key: 'RealtekHD', val: '"C:\\Program Files\\Realtek\\Audio\\RtkNGUI64.exe" -s' },
+            { key: 'WindowsDefender', val: '"C:\\Program Files\\Windows Defender\\MSASCui.exe"' },
+            { key: 'GoogleUpdate', val: '"C:\\Program Files (x86)\\Google\\Update\\GoogleUpdate.exe" /c' },
+            { key: 'SynapticsTouch', val: '"C:\\Program Files\\Synaptics\\Syntp\\SynTPEnh.exe"' }
+        ];
+
+        const malwareKeys = [
+            { key: 'WinUpdateService', val: '"C:\\Users\\User\\AppData\\Local\\Temp\\update.vbs"' },
+            { key: 'ChromeSecurityPatch', val: 'powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -Enc aQBmACgA...' },
+            { key: 'SvchostBackup', val: '"C:\\ProgramData\\svchost.exe" --silent' },
+            { key: 'SysHealthCheck', val: 'cmd.exe /c "C:\\Users\\Public\\client.bat"' },
+            { key: 'DriverHelper32', val: '"C:\\Users\\User\\AppData\\Roaming\\driver.exe"' }
+        ];
+
+        const chosenLegit = [...legitKeys].sort(() => 0.5 - Math.random()).slice(0, 3);
+        const chosenMalware = malwareKeys[Math.floor(Math.random() * malwareKeys.length)];
+        p4CorrectKey = chosenMalware.key;
+
+        const allEntries = [...chosenLegit, chosenMalware].sort(() => 0.5 - Math.random());
+
+        const dumpDiv = document.getElementById('p4-registry-dump');
+        dumpDiv.innerHTML = '';
+        allEntries.forEach(item => {
+            const line = document.createElement('div');
+            line.className = 'font-monospace text-break py-1';
+            line.innerHTML = `<span class="text-warning fw-bold">"${item.key}"</span> = <span class="text-secondary">${item.val}</span>`;
+            dumpDiv.appendChild(line);
+        });
+
+        const input = document.getElementById('p4-input');
+        input.value = '';
+        input.focus();
+    }
+
+    function checkPhase4() {
+        const val = document.getElementById('p4-input').value.trim().replace(/^["']|["']$/g, '');
+        if (val.toLowerCase() === p4CorrectKey.toLowerCase()) {
+            advancePhase(4, 5, setupPhase5, 'Расчет инфраструктуры бэкапа «3-2-1»');
+        } else {
+            recordError('p4-feedback', '[ОШИБКА АВТОЗАГРУЗКИ] Указан неверный параметр реестра! Перегенерация дампа...', setupPhase4);
+        }
+    }
+
+    document.getElementById('p4-btn').addEventListener('click', checkPhase4);
+    document.getElementById('p4-input').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') checkPhase4();
+    });
+
+    // =========================================================================
+    // ФАЗА 5: АНАЛИТИЧЕСКИЙ РАСЧЕТ БЭКАПА «3-2-1»
+    // =========================================================================
+
+    let p5CorrectAnswer = 0;
+
+    function setupPhase5() {
+        const sizes = [50, 80, 120, 150, 200, 250, 300, 400, 500];
+        const chosenSize = sizes[Math.floor(Math.random() * sizes.length)];
+        document.getElementById('p5-data-size').textContent = chosenSize;
+
+        // Требуется хранить 3 экземпляра -> chosenSize * 3
+        p5CorrectAnswer = chosenSize * 3;
+
+        const input = document.getElementById('p5-input');
+        input.value = '';
+        input.focus();
+    }
+
+    function checkPhase5() {
+        const val = parseInt(document.getElementById('p5-input').value.trim(), 10);
+        if (val === p5CorrectAnswer) {
+            // Успех всего Уровня 2!
+            document.getElementById('phase5').classList.add('d-none');
+            document.getElementById('victory-screen').classList.remove('d-none');
+            document.getElementById('level-badge').textContent = 'Финиш';
+            document.getElementById('level-title').textContent = 'Уровень 2 успешно завершен';
+
+            const totalTime = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+            document.getElementById('final-time').textContent = totalTime;
+            document.getElementById('final-errors').textContent = attemptsCount;
+
+            sendTelemetry('level_complete', 'completed', true);
+        } else {
+            recordError('p5-feedback', '[ОШИБКА РАСЧЕТА] Неверный расчет суммарного объема бэкапа! Пересчет...', setupPhase5);
+        }
+    }
+
+    document.getElementById('p5-btn').addEventListener('click', checkPhase5);
+    document.getElementById('p5-input').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') checkPhase5();
+    });
+
+    // Инициализация при старте
+    setupPhase1();
+})();
+</script>

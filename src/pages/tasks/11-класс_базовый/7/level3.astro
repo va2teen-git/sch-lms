@@ -1,0 +1,857 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid min-vh-100 p-3 bg-black text-light font-monospace" v-cloak>
+        
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ ХАРДКОРА)       -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow-lg my-4 mx-auto" style="max-width: 900px;">
+            <div class="display-4 text-danger mb-3 fw-bold">⚠️ SUBNET ICE DEFENDER ⚠️</div>
+            <h2 class="text-light mb-3">ОСТАНОВКА ЭПИДЕМИИ СЕТЕВОГО ЧЕРВЯ // АРХЕТИП 7</h2>
+            
+            <p class="text-secondary fs-5 mb-4 mx-auto" style="max-width: 760px;">
+                В корпоративную сеть проник самораспространяющийся сетевой червь (Network Worm), использующий уязвимости сетевых служб.
+                Он стартует с зараженного узла и в реальном времени распространяется по каналам связи, 
+                пытаясь захватить и зашифровать <span class="text-info fw-bold">Резервное хранилище «3-2-1»</span>.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 p-md-4 mx-auto mb-4 text-start small" style="max-width: 750px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ ХАРДКОР-ОБОРОНЫ // 8 НАРАСТАЮЩИХ ВОЛН]:</div>
+                <div class="text-light mb-2">• <span class="text-warning fw-bold">Топологический граф:</span> На экране отображается реальная схема сегментов сети (компьютеры, коммутаторы, шлюзы, серверы).</div>
+                <div class="text-light mb-2">• <span class="text-danger fw-bold">Распространение червя:</span> Червь каждую секунду пробивает незащищенные сетевые каналы (красные импульсы инфекции).</div>
+                <div class="text-light mb-2">• <span class="text-info fw-bold">Тактические контрмеры:</span>
+                    <ul class="mb-1 ps-3 text-secondary">
+                        <li><span class="text-warning fw-bold">Клик по каналу связи:</span> Разорвать сетевой провод (<code class="text-warning">VLAN CUT</code>) и изолировать вектор атаки червя.</li>
+                        <li><span class="text-success fw-bold">Клик по узлу:</span> Активировать защитный экран (<code class="text-success">HIPS / ПАТЧ УЯЗВИМОСТИ</code>) — червь не сможет захватить этот узел.</li>
+                        <li><span class="text-info fw-bold">Клик по хранилищу 3-2-1:</span> Включить режим <code class="text-info">Air-Gap Lock</code> (автономная изоляция бэкапа).</li>
+                    </ul>
+                </div>
+                <div class="text-light mb-2">• <span class="text-warning fw-bold">Убывающий таймер:</span> От 14 до 6.5 секунд на волну с непрерывным ускорением фронта червя.</div>
+                <div class="text-danger fw-bold">• ТОТАЛЬНЫЙ СБРОС (Full Wipeout): Если червь прорвется к Резервному хранилищу или таймер истечет — весь прогресс немедленно СБРАСЫВАЕТСЯ НА ВОЛНУ 1!</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ СИСТЕМУ КИБЕРЗАЩИТЫ (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (ТОПОЛОГИЧЕСКАЯ ГОНКА)    -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-3 p-md-4 shadow-lg my-2 mx-auto" style="max-width: 1100px;">
+            
+            <!-- Шапка: Номер волны, название архетипа, таймер -->
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР ОБОРОНЫ:</span>
+                    <span id="wave-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentWave"></span> ИЗ 8</span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-1">АРХЕТИП 7: ICE NODE RACE</span>
+                    <div class="text-secondary small mt-1">Попытка #<span id="attempts-display" v-text="attempts + 1"></span></div>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ДО КРИТИЧЕСКОЙ ЭКСПАНСИИ:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-3 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="progressBarStyle">
+                </div>
+            </div>
+
+            <!-- Информационная сводка волны -->
+            <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <span class="text-danger fw-bold me-2">[УГРОЗА]:</span>
+                        <span class="text-light" v-text="currentWaveData.threatTitle"></span>
+                    </div>
+                    <div class="small">
+                        <span class="text-secondary me-2">Статус периметра:</span>
+                        <span v-if="isTargetBreached" class="badge bg-danger text-black fw-bold">ХРАНИЛИЩЕ ПОРАЖЕНО</span>
+                        <span v-else-if="isWormIsolated" class="badge bg-success text-black fw-bold">ОЧАГ ЛОКАЛИЗОВАН</span>
+                        <span v-else class="badge bg-warning text-black fw-bold">ЧЕРВЬ РАСПРОСТРАНЯЕТСЯ</span>
+                    </div>
+                </div>
+                <div class="text-secondary small mt-1" v-text="currentWaveData.threatDesc"></div>
+            </div>
+
+            <!-- Интерактивная SVG-карта топологии сети -->
+            <div class="card bg-black border border-secondary rounded-0 p-2 mb-3 text-center position-relative overflow-hidden" style="min-height: 420px;">
+                <svg id="network-canvas" viewBox="0 0 800 420" class="w-100 h-100" style="max-height: 440px;">
+                    <!-- Сетка фона -->
+                    <defs>
+                        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#161b22" stroke-width="1"/>
+                        </pattern>
+                        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="5" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                    </defs>
+                    <rect width="800" height="420" fill="url(#grid)" />
+
+                    <!-- 1. РЕБРА СЕТИ (СВЯЗИ) -->
+                    <g id="edges-group">
+                        <g v-for="edge in currentWaveData.edges" :key="edge.id" :id="'edge-' + edge.id" class="cursor-pointer" style="pointer-events: all; cursor: pointer;" @click="toggleEdge(edge)">
+                            <!-- Фоновая невидимая широкая линия для надежного клика мышью (36px) -->
+                            <line :x1="getNode(edge.from).x" :y1="getNode(edge.from).y"
+                                  :x2="getNode(edge.to).x" :y2="getNode(edge.to).y"
+                                  stroke="#ffffff" stroke-opacity="0.01" stroke-width="36" style="pointer-events: stroke; cursor: pointer;" />
+
+                            <!-- Видимая линия ребра -->
+                            <line :x1="getNode(edge.from).x" :y1="getNode(edge.from).y"
+                                  :x2="getNode(edge.to).x" :y2="getNode(edge.to).y"
+                                  :stroke="getEdgeColor(edge)"
+                                  :stroke-width="edge.status === 'cut' ? 2 : 4"
+                                  :stroke-dasharray="edge.status === 'cut' ? '4 4' : (edge.status === 'infected' ? '8 4' : 'none')"
+                                  :class="{ 'pulse-line': edge.status === 'infected' }"
+                                  style="pointer-events: stroke; cursor: pointer;" />
+
+                            <!-- Интерактивная плашка-переключатель VLAN в центре кабеля -->
+                            <rect :x="(getNode(edge.from).x + getNode(edge.to).x) / 2 - 28"
+                                  :y="(getNode(edge.from).y + getNode(edge.to).y) / 2 - 12"
+                                  width="56" height="24" rx="4"
+                                  :fill="edge.status === 'cut' ? '#200505' : '#051525'"
+                                  :stroke="edge.status === 'cut' ? '#dc3545' : '#0d6efd'"
+                                  stroke-width="1.5"
+                                  style="pointer-events: all; cursor: pointer;" />
+                            <text :x="(getNode(edge.from).x + getNode(edge.to).x) / 2"
+                                  :y="(getNode(edge.from).y + getNode(edge.to).y) / 2 + 4"
+                                  :fill="edge.status === 'cut' ? '#dc3545' : '#0dcaf0'"
+                                  font-size="10" text-anchor="middle" font-weight="bold"
+                                  pointer-events="none"
+                                  v-text="edge.status === 'cut' ? '✕ РАЗРЫВ' : '✂ VLAN'"></text>
+                        </g>
+                    </g>
+
+                    <!-- 2. УЗЛЫ СЕТИ -->
+                    <g id="nodes-group">
+                        <g v-for="node in currentWaveData.nodes" :key="node.id"
+                           :id="'node-' + node.id"
+                           class="cursor-pointer"
+                           @click="selectOrToggleNode(node)">
+                            
+                            <!-- Внешнее кольцо пульсации для зараженных узлов -->
+                            <circle v-if="node.status === 'infected'"
+                                    :cx="node.x" :cy="node.y" r="28"
+                                    fill="none" stroke="#dc3545" stroke-width="2" opacity="0.6" class="pulse-ring" />
+
+                            <!-- Базовый круг узла -->
+                            <circle :cx="node.x" :cy="node.y" r="22"
+                                    :fill="getNodeFill(node)"
+                                    :stroke="getNodeStroke(node)"
+                                    :stroke-width="selectedNode && selectedNode.id === node.id ? 4 : 2"
+                                    :filter="node.status === 'infected' ? 'url(#glow-red)' : (node.status === 'fortified' ? 'url(#glow-green)' : (node.role === 'target' ? 'url(#glow-cyan)' : 'none'))" />
+
+                            <!-- Иконка/символ узла -->
+                            <text :x="node.x" :y="node.y + 5"
+                                  fill="#ffffff" font-size="14" text-anchor="middle" font-weight="bold" pointer-events="none">
+                                <tspan v-if="node.status === 'infected'">☣</tspan>
+                                <tspan v-else-if="node.status === 'fortified'">🛡</tspan>
+                                <tspan v-else-if="node.role === 'target'">💾</tspan>
+                                <tspan v-else>💻</tspan>
+                            </text>
+
+                            <!-- Текстовая подпись под узлом -->
+                            <text :x="node.x" :y="node.y + 36"
+                                  :fill="getNodeTextColor(node)" font-size="11" text-anchor="middle" font-weight="bold"
+                                  v-text="node.label">
+                            </text>
+                            
+                            <!-- Дополнительный бейдж роли -->
+                            <text :x="node.x" :y="node.y - 26"
+                                  :fill="node.role === 'target' ? '#0dcaf0' : (node.status === 'infected' ? '#dc3545' : '#adb5bd')" font-size="9" text-anchor="middle"
+                                  v-text="'[' + getNodeRoleLabel(node) + ']'">
+                            </text>
+                        </g>
+                    </g>
+                </svg>
+
+                <!-- Оповещение об аварии / сбросе -->
+                <div v-if="crashMessage" class="position-absolute top-50 start-50 translate-middle w-75 p-4 bg-danger text-black border border-white text-center shadow-lg" style="z-index: 10;">
+                    <div class="h3 fw-bold mb-2">⚡ СБОЙ КИБЕРЗАЩИТЫ // ТОТАЛЬНЫЙ СБРОС ⚡</div>
+                    <div class="fs-6 fw-bold" v-text="crashMessage"></div>
+                    <div class="small mt-2 text-dark font-monospace">Перезапуск системы... Возврат на Волну 1.</div>
+                </div>
+            </div>
+
+            <!-- Панель быстрого управления сетевыми каналами (Сегментация VLAN) -->
+            <div class="card bg-dark border-secondary rounded-0 p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-secondary small fw-bold text-uppercase">[Сетевые каналы связи // Сегментация VLAN]:</span>
+                    <span class="text-secondary small">Кликните по кнопке канала или по проводу на карте:</span>
+                </div>
+                <div class="d-flex flex-wrap gap-2 justify-content-start">
+                    <button v-for="edge in currentWaveData.edges" :key="edge.id"
+                            :id="'btn-edge-' + edge.id"
+                            @click="toggleEdge(edge)"
+                            class="btn btn-sm rounded-0 fw-bold px-3 py-1 text-nowrap"
+                            :class="edge.status === 'cut' ? 'btn-danger' : (edge.status === 'infected' ? 'btn-outline-danger' : 'btn-outline-primary')">
+                        <span v-if="edge.status === 'cut'" v-text="'✕ РАЗРЫВ: ' + getNode(edge.from).label + ' ⚡ ' + getNode(edge.to).label"></span>
+                        <span v-else v-text="'✂ СЕГМЕНТИРОВАТЬ: ' + getNode(edge.from).label + ' ↔ ' + getNode(edge.to).label"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. ТАКТИЧЕСКАЯ ПАНЕЛЬ ДЕЙСТВИЙ И УПРАВЛЕНИЯ -->
+            <div class="card bg-dark border-secondary rounded-0 p-3">
+                <div class="row g-3 align-items-center">
+                    
+                    <!-- Выбранный узел и доступные контрмеры -->
+                    <div class="col-lg-7">
+                        <div v-if="selectedNode" class="d-flex align-items-center flex-wrap gap-2">
+                            <span class="text-secondary small">Выбран узел:</span>
+                            <span class="text-warning fw-bold me-2" v-text="selectedNode.label"></span>
+                            
+                            <!-- Кнопка укрепления узла (HIPS / Патч) -->
+                            <button id="btn-fortify-node" v-if="selectedNode.role !== 'target' && selectedNode.status !== 'infected'"
+                                    @click="toggleNodeFortify(selectedNode)"
+                                    class="btn btn-sm rounded-0 fw-bold px-3"
+                                    :class="selectedNode.status === 'fortified' ? 'btn-outline-success' : 'btn-success'">
+                                <span v-if="selectedNode.status === 'fortified'">✓ ЭКРАН HIPS АКТИВЕН (СНЯТЬ)</span>
+                                <span v-else>🛡 АКТИВИРОВАТЬ HIPS / ПАТЧ</span>
+                            </button>
+
+                            <!-- Кнопка Air-Gap для 3-2-1 хранилища -->
+                            <button id="btn-airgap-target" v-if="selectedNode.role === 'target'"
+                                    @click="toggleNodeFortify(selectedNode)"
+                                    class="btn btn-sm rounded-0 fw-bold px-3"
+                                    :class="selectedNode.status === 'fortified' ? 'btn-outline-info' : 'btn-info'">
+                                <span v-if="selectedNode.status === 'fortified'">✓ AIR-GAP ЗАЩИТА 3-2-1 ВКЛЮЧЕНА</span>
+                                <span v-else>🔒 ВКЛЮЧИТЬ AIR-GAP LOCK (3-2-1)</span>
+                            </button>
+
+                            <span v-if="selectedNode.status === 'infected'" class="badge bg-danger text-black fw-bold p-2">
+                                ☣ УЗЕЛ ЗАХВАЧЕН ЧЕРВЕМ — ТОЛЬКО СЕГМЕНТАЦИЯ СВЯЗЕЙ!
+                            </span>
+                        </div>
+                        <div v-else class="text-secondary small">
+                            💡 <span class="text-light">Подсказка:</span> Кликайте по каналам связи (<code class="text-warning">VLAN CUT</code>) для изоляции червя и по узлам для установки <code class="text-success">HIPS</code> защиты.
+                        </div>
+                    </div>
+
+                    <!-- Кнопка немедленной ликвидации червя / проверки изоляции -->
+                    <div class="col-lg-5 text-lg-end">
+                        <button id="contain-btn" @click="verifyAndContainWorm"
+                                class="btn btn-lg rounded-0 fw-bold px-4 w-100 w-lg-auto shadow"
+                                :class="isWormIsolated ? 'btn-success' : 'btn-outline-danger'">
+                            <span v-if="isWormIsolated">✓ ОЧАГ ИЗОЛИРОВАН: ЛИКВИДИРОВАТЬ ЧЕРВЯ [ПРОРЫВ]</span>
+                            <span v-else>⚡ СКАНИРОВАТЬ ПЕРИМЕТР И ЛИКВИДИРОВАТЬ</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ (ХАРДКОР-ТРИУМФ)           -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'victory'" id="victory-screen" class="card bg-black border-success rounded-0 p-5 text-center shadow-lg my-4 mx-auto" style="max-width: 800px;">
+            <div class="display-3 text-success mb-3 fw-bold">🏆 ПЕРИМЕТР СЕТИ СПАСЕН 🏆</div>
+            <h2 class="text-light mb-2">ЭПИДЕМИЯ СЕТЕВОГО ЧЕРВЯ ПОЛНОСТЬЮ ЛИКВИДИРОВАНА</h2>
+            <p class="text-secondary fs-5 mb-4">
+                Все 8 волн масштабной экспансии сетевых червей и вымогателей успешно отражены! 
+                Хранилище «3-2-1» не скомпрометировано, уязвимости закрыты, топология сети защищена.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-4 mx-auto mb-4 text-start font-monospace small" style="max-width: 600px;">
+                <div class="row g-3">
+                    <div class="col-6 text-secondary">Отражено волн червя:</div>
+                    <div class="col-6 text-end text-success fw-bold">8 ИЗ 8 (100%)</div>
+                    <div class="col-6 text-secondary">Общее время операции:</div>
+                    <div class="col-6 text-end text-light fw-bold" v-text="formattedFinalTime"></div>
+                    <div class="col-6 text-secondary">Попыток забега:</div>
+                    <div class="col-6 text-end text-warning fw-bold" v-text="attempts + 1"></div>
+                    <div class="col-6 text-secondary">Статус аттестации:</div>
+                    <div class="col-6 text-end text-info fw-bold">АРКАДА: МАСТЕР ICE RACE</div>
+                </div>
+            </div>
+
+            <div>
+                <button @click="restartGame" class="btn btn-outline-success btn-lg rounded-0 font-monospace px-5 py-3">
+                    ПРОЙТИ ИСПЫТАНИЕ СНОВА
+                </button>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<style>
+    .transition-none {
+        transition: none !important;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .pulse-ring {
+        animation: pulseRing 1.2s infinite;
+        transform-origin: center;
+    }
+    @keyframes pulseRing {
+        0% { r: 24; opacity: 0.9; }
+        50% { r: 32; opacity: 0.3; }
+        100% { r: 24; opacity: 0.9; }
+    }
+    .pulse-line {
+        animation: dash 1s linear infinite;
+    }
+    @keyframes dash {
+        to {
+            stroke-dashoffset: -24;
+        }
+    }
+    .animate-bounce {
+        animation: bounceBtn 0.8s infinite alternate;
+    }
+    @keyframes bounceBtn {
+        from { transform: scale(1); }
+        to { transform: scale(1.03); }
+    }
+</style>
+
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                currentWave: 1,
+                totalWaves: 8,
+                attempts: 0,
+                startTime: Date.now(),
+                phaseTimeLeft: 14.0,
+                maxPhaseTime: 14.0,
+                timerInterval: null,
+                wormInterval: null,
+                crashMessage: null,
+                selectedNode: null,
+
+                currentWaveData: {
+                    threatTitle: '',
+                    threatDesc: '',
+                    timeLimit: 14.0,
+                    wormStepInterval: 4.0,
+                    targetNodeId: 'target',
+                    nodes: [],
+                    edges: []
+                }
+            };
+        },
+
+        computed: {
+            progressBarStyle() {
+                const pct = Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
+                return { width: pct + '%' };
+            },
+
+            formattedFinalTime() {
+                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
+                return `${m}:${s}`;
+            },
+
+            isTargetBreached() {
+                const targetNode = this.getNode(this.currentWaveData.targetNodeId);
+                return targetNode && targetNode.status === 'infected';
+            },
+
+            // Проверяем, существует ли хотя бы один открытый путь от ЛЮБОГО зараженного узла к целевому узлу
+            isWormIsolated() {
+                const infectedNodes = this.currentWaveData.nodes.filter(n => n.status === 'infected').map(n => n.id);
+                if (infectedNodes.length === 0) return true;
+
+                const targetId = this.currentWaveData.targetNodeId;
+                const targetNode = this.getNode(targetId);
+                if (!targetNode || targetNode.status === 'infected') return false;
+
+                // Если целевой узел укреплен режимом 3-2-1 Air-Gap (fortified), он защищен от сетевого заражения
+                if (targetNode.status === 'fortified') {
+                    // Но проверим, чтобы червь также не мог бесконечно распространяться по оставшейся сети
+                    // Если все выходы из очагов либо перерезаны, либо укреплены HIPS, либо Air-Gap
+                    return true;
+                }
+
+                // Поиск в ширину (BFS) от всех зараженных узлов
+                const visited = new Set(infectedNodes);
+                const queue = [...infectedNodes];
+
+                while (queue.length > 0) {
+                    const currentId = queue.shift();
+
+                    if (currentId === targetId) {
+                        return false; // Нашли путь к цели!
+                    }
+
+                    // Ищем все доступные ребра из currentId
+                    for (const edge of this.currentWaveData.edges) {
+                        if (edge.status === 'cut') continue; // Ребро перерезано
+
+                        let neighborId = null;
+                        if (edge.from === currentId) neighborId = edge.to;
+                        else if (edge.to === currentId) neighborId = edge.from;
+
+                        if (neighborId && !visited.has(neighborId)) {
+                            const neighborNode = this.getNode(neighborId);
+                            if (neighborNode) {
+                                // Если сосед укреплен экраном HIPS, червь не может через него пройти
+                                if (neighborNode.status === 'fortified') {
+                                    continue;
+                                }
+                                visited.add(neighborId);
+                                queue.push(neighborId);
+                            }
+                        }
+                    }
+                }
+
+                return true; // Путь к цели заблокирован!
+            }
+        },
+
+        methods: {
+            sendTelemetry(actionType, status, isSuccess) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 7 :: Вредоносное программное обеспечение (Уровень 3)',
+                    action_type: actionType,
+                    status: status,
+                    time_spent: timeSpent,
+                    attempts: this.attempts,
+                    score: isSuccess ? 100 : Math.round((this.currentWave / this.totalWaves) * 80)
+                }, '*');
+            },
+
+            startGame() {
+                this.gameState = 'playing';
+                this.currentWave = 1;
+                this.startTime = Date.now();
+                this.sendTelemetry('in_progress', 'in_progress', false);
+                this.initWave(1);
+            },
+
+            restartGame() {
+                this.gameState = 'intro';
+                this.currentWave = 1;
+                clearInterval(this.timerInterval);
+                clearInterval(this.wormInterval);
+            },
+
+            getNode(id) {
+                return this.currentWaveData.nodes.find(n => n.id === id) || { x: 0, y: 0, label: '', role: '', status: '' };
+            },
+
+            getNodeFill(node) {
+                if (node.status === 'infected') return '#dc3545';
+                if (node.status === 'fortified') return '#198754';
+                if (node.role === 'target') return '#0d6efd';
+                return '#212529';
+            },
+
+            getNodeStroke(node) {
+                if (node.status === 'infected') return '#ff6b6b';
+                if (node.status === 'fortified') return '#75b798';
+                if (node.role === 'target') return '#0dcaf0';
+                return '#6c757d';
+            },
+
+            getNodeTextColor(node) {
+                if (node.status === 'infected') return '#dc3545';
+                if (node.status === 'fortified') return '#75b798';
+                if (node.role === 'target') return '#0dcaf0';
+                return '#adb5bd';
+            },
+
+            getNodeRoleLabel(node) {
+                if (node.role === 'target') return 'ЦЕЛЬ: 3-2-1';
+                if (node.role === 'zero') return 'ОЧАГ';
+                if (node.status === 'fortified') return 'HIPS ЭКРАН';
+                if (node.status === 'infected') return 'ИНФЕКЦИЯ';
+                return 'ТЕРМИНАЛ';
+            },
+
+            getEdgeColor(edge) {
+                if (edge.status === 'cut') return '#6c757d';
+                if (edge.status === 'infected') return '#dc3545';
+                return '#0d6efd';
+            },
+
+            selectOrToggleNode(node) {
+                this.selectedNode = node;
+            },
+
+            toggleNodeFortify(node) {
+                if (node.status === 'infected') return;
+                if (node.status === 'fortified') {
+                    node.status = 'vulnerable';
+                } else {
+                    node.status = 'fortified';
+                }
+            },
+
+            toggleEdge(edge) {
+                if (edge.status === 'cut') {
+                    edge.status = 'normal';
+                } else {
+                    edge.status = 'cut';
+                }
+                console.log('toggleEdge called on', edge.id, 'new status:', edge.status, 'isWormIsolated:', this.isWormIsolated);
+            },
+
+            stepWorm() {
+                // Если очаг уже изолирован, червю некуда двигаться
+                if (this.isWormIsolated) return;
+
+                const infectedNodes = this.currentWaveData.nodes.filter(n => n.status === 'infected').map(n => n.id);
+                let newlyInfected = [];
+
+                for (const infId of infectedNodes) {
+                    for (const edge of this.currentWaveData.edges) {
+                        if (edge.status === 'cut') continue;
+
+                        let targetId = null;
+                        if (edge.from === infId) targetId = edge.to;
+                        else if (edge.to === infId) targetId = edge.from;
+
+                        if (targetId) {
+                            const targetNode = this.getNode(targetId);
+                            if (targetNode && targetNode.status !== 'infected') {
+                                if (targetNode.status === 'fortified') {
+                                    // HIPS / Air-gap экран отражает заражение!
+                                    continue;
+                                }
+
+                                if (targetNode.role === 'target') {
+                                    // Критический прорыв к 3-2-1 хранилищу!
+                                    targetNode.status = 'infected';
+                                    edge.status = 'infected';
+                                    this.handleFailure('КРИТИЧЕСКИЙ ПРОРЫВ! Червь проник в Резервное хранилище 3-2-1 и зашифровал данные!');
+                                    return;
+                                }
+
+                                newlyInfected.push({ node: targetNode, edge: edge });
+                            }
+                        }
+                    }
+                }
+
+                // Заражаем следующий эшелон
+                for (const item of newlyInfected) {
+                    item.node.status = 'infected';
+                    item.edge.status = 'infected';
+                }
+            },
+
+            verifyAndContainWorm() {
+                console.log('verifyAndContainWorm called, isWormIsolated:', this.isWormIsolated, 'currentWave:', this.currentWave);
+                if (this.isWormIsolated) {
+                    // Успех! Очаг полностью изолирован
+                    clearInterval(this.timerInterval);
+                    clearInterval(this.wormInterval);
+
+                    if (this.currentWave >= this.totalWaves) {
+                        this.gameState = 'victory';
+                        this.sendTelemetry('level_complete', 'completed', true);
+                    } else {
+                        this.initWave(this.currentWave + 1);
+                    }
+                } else {
+                    // Игрок попытался досрочно запустить ликвидацию, но путь к цели открыт!
+                    this.handleFailure('ОШИБКА ИЗОЛЯЦИИ! Сетевой червь имеет открытый маршрут к Резервному хранилищу 3-2-1!');
+                }
+            },
+
+            handleFailure(reason) {
+                console.log('handleFailure called, reason:', reason, 'attempts:', this.attempts);
+                clearInterval(this.timerInterval);
+                clearInterval(this.wormInterval);
+                this.attempts++;
+                this.crashMessage = reason;
+                this.sendTelemetry('hardcore_reset', 'failed', false);
+
+                // Задержка 1.5 сек и полный сброс на волну 1!
+                setTimeout(() => {
+                    this.crashMessage = null;
+                    this.initWave(1);
+                }, 1600);
+            },
+
+            initWave(waveNum) {
+                clearInterval(this.timerInterval);
+                clearInterval(this.wormInterval);
+                this.currentWave = waveNum;
+                this.crashMessage = null;
+                this.selectedNode = null;
+
+                // Генератор 8 волн нарастающей сложности по топологиям сетей
+                switch (waveNum) {
+                    case 1:
+                        this.currentWaveData = {
+                            threatTitle: 'ПЕРВИЧНЫЙ ВСПЛЕСК: ЛИНЕЙНЫЙ ВЕКТОР ЧЕРВЯ',
+                            threatDesc: 'Сотрудник открыл вложение со скриптом-дроппером. Червь пытается пройти по цепочке к бэкапу.',
+                            timeLimit: 14.0,
+                            wormStepInterval: 4.2,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero', label: 'ПК-Бухгалтер', role: 'zero', status: 'infected', x: 120, y: 210 },
+                                { id: 'ws1', label: 'Коммутатор-1', role: 'node', status: 'vulnerable', x: 320, y: 210 },
+                                { id: 'gw', label: 'Шлюз Ядра', role: 'node', status: 'vulnerable', x: 520, y: 210 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 700, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero', to: 'ws1', status: 'infected' },
+                                { id: 'e2', from: 'ws1', to: 'gw', status: 'normal' },
+                                { id: 'e3', from: 'gw', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 2:
+                        this.currentWaveData = {
+                            threatTitle: 'ТОПОЛОГИЯ «ЗВЕЗДА»: АТАКА НА ЦЕНТРАЛЬНЫЙ ХАБ',
+                            threatDesc: 'Червь проник через Wi-Fi ноутбук гостя и сканирует порт SMB центрального свитча.',
+                            timeLimit: 12.5,
+                            wormStepInterval: 3.8,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero', label: 'Ноутбук-Гость', role: 'zero', status: 'infected', x: 140, y: 120 },
+                                { id: 'sw', label: 'Центральный Свитч', role: 'node', status: 'vulnerable', x: 400, y: 210 },
+                                { id: 'ws1', label: 'Терминал-Кадры', role: 'node', status: 'vulnerable', x: 140, y: 300 },
+                                { id: 'srv', label: 'Файловый Сервер', role: 'node', status: 'vulnerable', x: 660, y: 120 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 660, y: 300 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero', to: 'sw', status: 'infected' },
+                                { id: 'e2', from: 'ws1', to: 'sw', status: 'normal' },
+                                { id: 'e3', from: 'srv', to: 'sw', status: 'normal' },
+                                { id: 'e4', from: 'sw', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 3:
+                        this.currentWaveData = {
+                            threatTitle: 'ДВОЙНОЙ ВЕКТОР ОБХОДА: СЕТЕВОЙ ТРЕУГОЛЬНИК',
+                            threatDesc: 'Червь атакует параллельно через почтовый и веб-сервер. Перекройте оба фланга!',
+                            timeLimit: 11.5,
+                            wormStepInterval: 3.4,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero', label: 'Очаг-Инфекции', role: 'zero', status: 'infected', x: 120, y: 210 },
+                                { id: 'mail', label: 'Почтовый Сервер', role: 'node', status: 'vulnerable', x: 360, y: 110 },
+                                { id: 'web', label: 'Веб-Шлюз', role: 'node', status: 'vulnerable', x: 360, y: 310 },
+                                { id: 'gw', label: 'Маршрутизатор', role: 'node', status: 'vulnerable', x: 560, y: 210 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 720, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero', to: 'mail', status: 'infected' },
+                                { id: 'e2', from: 'zero', to: 'web', status: 'infected' },
+                                { id: 'e3', from: 'mail', to: 'gw', status: 'normal' },
+                                { id: 'e4', from: 'web', to: 'gw', status: 'normal' },
+                                { id: 'e5', from: 'gw', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 4:
+                        this.currentWaveData = {
+                            threatTitle: 'СЕГМЕНТАЦИЯ СЕТИ: УЯЗВИМЫЙ МОСТ (VLAN BRIDGE)',
+                            threatDesc: 'Червь захватил сегмент разработки и движется через мостовой роутер к серверной.',
+                            timeLimit: 10.5,
+                            wormStepInterval: 3.0,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero', label: 'Dev-Станция', role: 'zero', status: 'infected', x: 100, y: 130 },
+                                { id: 'ws1', label: 'Git-Сервер', role: 'node', status: 'vulnerable', x: 100, y: 290 },
+                                { id: 'sw1', label: 'Свитч Dev', role: 'node', status: 'vulnerable', x: 280, y: 210 },
+                                { id: 'router', label: 'Мостовой Роутер', role: 'node', status: 'vulnerable', x: 460, y: 210 },
+                                { id: 'sw2', label: 'Свитч Серверной', role: 'node', status: 'vulnerable', x: 620, y: 210 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 740, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero', to: 'sw1', status: 'infected' },
+                                { id: 'e2', from: 'ws1', to: 'sw1', status: 'normal' },
+                                { id: 'e3', from: 'sw1', to: 'router', status: 'normal' },
+                                { id: 'e4', from: 'router', to: 'sw2', status: 'normal' },
+                                { id: 'e5', from: 'sw2', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 5:
+                        this.currentWaveData = {
+                            threatTitle: 'RANSOMWARE OUTBREAK: ШИФРОВАЛЬЩИК В MESH-СЕТИ',
+                            threatDesc: 'Вымогатель использует множественные обходные пути. Активируйте Air-Gap Lock на 3-2-1 хранилище!',
+                            timeLimit: 9.5,
+                            wormStepInterval: 2.8,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero', label: 'Patient-Zero', role: 'zero', status: 'infected', x: 100, y: 210 },
+                                { id: 'nA', label: 'Узел-Альфа', role: 'node', status: 'vulnerable', x: 260, y: 110 },
+                                { id: 'nB', label: 'Узел-Бета', role: 'node', status: 'vulnerable', x: 260, y: 310 },
+                                { id: 'core', label: 'Ядро Маршрутизации', role: 'node', status: 'vulnerable', x: 440, y: 210 },
+                                { id: 'nC', label: 'Узел-Гамма', role: 'node', status: 'vulnerable', x: 600, y: 110 },
+                                { id: 'nD', label: 'Узел-Дельта', role: 'node', status: 'vulnerable', x: 600, y: 310 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 740, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero', to: 'nA', status: 'infected' },
+                                { id: 'e2', from: 'zero', to: 'nB', status: 'infected' },
+                                { id: 'e3', from: 'nA', to: 'core', status: 'normal' },
+                                { id: 'e4', from: 'nB', to: 'core', status: 'normal' },
+                                { id: 'e5', from: 'core', to: 'nC', status: 'normal' },
+                                { id: 'e6', from: 'core', to: 'nD', status: 'normal' },
+                                { id: 'e7', from: 'nC', to: 'target', status: 'normal' },
+                                { id: 'e8', from: 'nD', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 6:
+                        this.currentWaveData = {
+                            threatTitle: 'РАСПРЕДЕЛЕННАЯ ЭПИДЕМИЯ: ДВА НЕЗАВИСИМЫХ ОЧАГА',
+                            threatDesc: 'Два компьютера в разных отделах заражены одновременно. Изолируйте оба крыла!',
+                            timeLimit: 8.5,
+                            wormStepInterval: 2.5,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero1', label: 'Очаг-1 (Склад)', role: 'zero', status: 'infected', x: 100, y: 100 },
+                                { id: 'zero2', label: 'Очаг-2 (Офис)', role: 'zero', status: 'infected', x: 100, y: 320 },
+                                { id: 'ws1', label: 'ПК-Оператор', role: 'node', status: 'vulnerable', x: 260, y: 100 },
+                                { id: 'ws2', label: 'ПК-Менеджер', role: 'node', status: 'vulnerable', x: 260, y: 320 },
+                                { id: 'swA', label: 'Свитч-Север', role: 'node', status: 'vulnerable', x: 430, y: 140 },
+                                { id: 'swB', label: 'Свитч-Юг', role: 'node', status: 'vulnerable', x: 430, y: 280 },
+                                { id: 'fw', label: 'Центральный Firewall', role: 'node', status: 'vulnerable', x: 600, y: 210 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 740, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero1', to: 'ws1', status: 'infected' },
+                                { id: 'e2', from: 'zero2', to: 'ws2', status: 'infected' },
+                                { id: 'e3', from: 'ws1', to: 'swA', status: 'normal' },
+                                { id: 'e4', from: 'ws2', to: 'swB', status: 'normal' },
+                                { id: 'e5', from: 'swA', to: 'fw', status: 'normal' },
+                                { id: 'e6', from: 'swB', to: 'fw', status: 'normal' },
+                                { id: 'e7', from: 'fw', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 7:
+                        this.currentWaveData = {
+                            threatTitle: 'WORM OVERDRIVE: ЭКСПЛУАТАЦИЯ SMB И RDP ПОРТОВ',
+                            threatDesc: 'Сверхскоростной червь. Укрепляйте шлюзы экраном HIPS и отсекайте магистрали!',
+                            timeLimit: 7.5,
+                            wormStepInterval: 2.2,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero', label: 'Нулевой-Вектор', role: 'zero', status: 'infected', x: 80, y: 210 },
+                                { id: 'n1', label: 'RDP-Шлюз', role: 'node', status: 'vulnerable', x: 220, y: 110 },
+                                { id: 'n2', label: 'SMB-Файлообмен', role: 'node', status: 'vulnerable', x: 220, y: 310 },
+                                { id: 'swCore', label: 'Core-Switch', role: 'node', status: 'vulnerable', x: 380, y: 210 },
+                                { id: 'n3', label: 'AD-Контроллер', role: 'node', status: 'vulnerable', x: 520, y: 110 },
+                                { id: 'n4', label: 'Proxy-Сервер', role: 'node', status: 'vulnerable', x: 520, y: 310 },
+                                { id: 'dmz', label: 'DMZ-Шлюз', role: 'node', status: 'vulnerable', x: 640, y: 210 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 750, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero', to: 'n1', status: 'infected' },
+                                { id: 'e2', from: 'zero', to: 'n2', status: 'infected' },
+                                { id: 'e3', from: 'n1', to: 'swCore', status: 'normal' },
+                                { id: 'e4', from: 'n2', to: 'swCore', status: 'normal' },
+                                { id: 'e5', from: 'swCore', to: 'n3', status: 'normal' },
+                                { id: 'e6', from: 'swCore', to: 'n4', status: 'normal' },
+                                { id: 'e7', from: 'n3', to: 'dmz', status: 'normal' },
+                                { id: 'e8', from: 'n4', to: 'dmz', status: 'normal' },
+                                { id: 'e9', from: 'dmz', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+
+                    case 8:
+                        this.currentWaveData = {
+                            threatTitle: 'ФИНАЛЬНЫЙ БОСС: «STUXNET-OMEGA CORE INVASION»',
+                            threatDesc: 'Максимальный темп атаки! Червь атакует ядро. Мгновенно перережьте каналы к DMZ и включите Air-Gap!',
+                            timeLimit: 6.5,
+                            wormStepInterval: 1.8,
+                            targetNodeId: 'target',
+                            nodes: [
+                                { id: 'zero1', label: 'Атака-Альфа', role: 'zero', status: 'infected', x: 70, y: 110 },
+                                { id: 'zero2', label: 'Атака-Омега', role: 'zero', status: 'infected', x: 70, y: 310 },
+                                { id: 'wA', label: 'SCADA-1', role: 'node', status: 'vulnerable', x: 210, y: 110 },
+                                { id: 'wB', label: 'SCADA-2', role: 'node', status: 'vulnerable', x: 210, y: 310 },
+                                { id: 'bridge', label: 'Ядерный Мост', role: 'node', status: 'vulnerable', x: 360, y: 210 },
+                                { id: 'secRouter', label: 'SOC-Роутер', role: 'node', status: 'vulnerable', x: 500, y: 210 },
+                                { id: 'backupGate', label: 'Шлюз Резерва', role: 'node', status: 'vulnerable', x: 630, y: 210 },
+                                { id: 'target', label: 'Хранилище 3-2-1', role: 'target', status: 'vulnerable', x: 750, y: 210 }
+                            ],
+                            edges: [
+                                { id: 'e1', from: 'zero1', to: 'wA', status: 'infected' },
+                                { id: 'e2', from: 'zero2', to: 'wB', status: 'infected' },
+                                { id: 'e3', from: 'wA', to: 'bridge', status: 'normal' },
+                                { id: 'e4', from: 'wB', to: 'bridge', status: 'normal' },
+                                { id: 'e5', from: 'bridge', to: 'secRouter', status: 'normal' },
+                                { id: 'e6', from: 'secRouter', to: 'backupGate', status: 'normal' },
+                                { id: 'e7', from: 'backupGate', to: 'target', status: 'normal' }
+                            ]
+                        };
+                        break;
+                }
+
+                this.maxPhaseTime = this.currentWaveData.timeLimit;
+                this.phaseTimeLeft = this.currentWaveData.timeLimit;
+
+                // Запуск убывающего таймера
+                this.timerInterval = setInterval(() => {
+                    this.phaseTimeLeft -= 0.1;
+                    if (this.phaseTimeLeft <= 0) {
+                        this.phaseTimeLeft = 0;
+                        this.handleFailure('ВРЕМЯ ИСТЕКЛО! Червь перегрузил полосу пропускания и захватил контроль над сегментом!');
+                    }
+                }, 100);
+
+                // Запуск тактов распространения червя
+                this.wormInterval = setInterval(() => {
+                    this.stepWorm();
+                }, this.currentWaveData.wormStepInterval * 1000);
+            }
+        }
+    }).mount('#app');
+</script>
