@@ -1,0 +1,979 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Таксономия Malware и Антивирусные Технологии (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Шапка и индикаторы текущей фазы -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификационный шлюз SOC: Сортировка инцидентов</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках / калибровке -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА АНАЛИЗА] <span id="feedback-text">Неверное распределение угроз!</span> Перекалибровка данных...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: СОРТИРОВКА ПО БАКЕТАМ (Interactive Bucket Sorting) ================= -->
+                <div id="phase-1-container">
+                    <p class="text-light mb-2">
+                        Центр мониторинга безопасности (SOC) перехватил 4 инцидента активности вредоносного ПО.
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        <strong>Манипуляция мышью:</strong> перетащите карточки инцидентов в соответствующие функциональные шлюзы внизу (или кликните по карточке, а затем по целевому шлюзу).
+                    </p>
+
+                    <!-- Пул поступивших карточек инцидентов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ОЧЕРЕДЬ НЕРАЗОБРАННЫХ ИНЦИДЕНТОВ (ПЕРЕТАЩИТЕ В ШЛЮЗЫ НИЖЕ):</span>
+                            <button id="p1-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Вернуть все карточки
+                            </button>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3 целевых шлюза-бакета классификации Полякова -->
+                    <div class="row g-3 mb-4">
+                        <!-- Шлюз 1: Вирусы -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100 bucket-container" data-bucket="virus">
+                                <div class="card-header bg-dark border-bottom border-success text-success py-2 fw-bold d-flex justify-content-between align-items-center">
+                                    <span>КОМПЬЮТЕРНЫЕ ВИРУСЫ</span>
+                                    <span class="badge bg-black text-success border border-success rounded-0 bucket-count">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">
+                                        Внедрение в код файлов (.exe, .dll) / макровирусы в документах / загрузочные MBR / требуют запуска пользователем
+                                    </div>
+                                    <div class="bucket-dropzone p-2 border border-dashed border-secondary bg-dark flex-grow-1 d-flex flex-column gap-2" style="min-height: 140px;">
+                                        <!-- Сюда сбрасываются карточки -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Шлюз 2: Сетевые черви -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-info rounded-0 h-100 bucket-container" data-bucket="worm">
+                                <div class="card-header bg-dark border-bottom border-info text-info py-2 fw-bold d-flex justify-content-between align-items-center">
+                                    <span>СЕТЕВЫЕ ЧЕРВИ</span>
+                                    <span class="badge bg-black text-info border border-info rounded-0 bucket-count">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">
+                                        Автономные программы / самостоятельное распространение по сети без участия человека / уязвимости портов / спам
+                                    </div>
+                                    <div class="bucket-dropzone p-2 border border-dashed border-secondary bg-dark flex-grow-1 d-flex flex-column gap-2" style="min-height: 140px;">
+                                        <!-- Сюда сбрасываются карточки -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Шлюз 3: Трояны -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100 bucket-container" data-bucket="trojan">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning py-2 fw-bold d-flex justify-content-between align-items-center">
+                                    <span>ТРОЯНСКИЕ ПРОГРАММЫ</span>
+                                    <span class="badge bg-black text-warning border border-warning rounded-0 bucket-count">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">
+                                        Маскировка под легитимное ПО / не размножаются сами / бэкдоры (RAT), кейлоггеры, шифровальщики (Ransomware)
+                                    </div>
+                                    <div class="bucket-dropzone p-2 border border-dashed border-secondary bg-dark flex-grow-1 d-flex flex-column gap-2" style="min-height: 140px;">
+                                        <!-- Сюда сбрасываются карточки -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-secondary small">* Для возврата ошибочно размещенной карточки кликните по ней в шлюзе.</span>
+                        <button id="p1-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ПРОВЕРИТЬ КЛАССИФИКАЦИЮ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: СЛОТ-ПАЗЛ АНТИВИРУСНОГО ДВИЖКА (Slot & Snap) ================= -->
+                <div id="phase-2-container" class="d-none">
+                    <p class="text-light mb-2">
+                        Для нейтрализации обнаруженных угроз необходимо сконструировать ядро антивирусного комплекса.
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        <strong>Манипуляция мышью:</strong> перетащите строительные токены из палитры в целевые слоты каждого защитного модуля (или используйте клик по токену, затем клик по целевому слоту).
+                    </p>
+
+                    <!-- Палитра доступных токенов с дистракторами -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ПУЛ ТОКЕНОВ ДВИЖКА (СОДЕРЖИТ ДИСТРАКТОРЫ):</span>
+                            <button id="p2-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить слоты
+                            </button>
+                        </div>
+                        <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2 p-3 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3 модуля антивирусной защиты -->
+                    <div class="row g-3 mb-4">
+                        <!-- Модуль 1: Сигнатурный -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100">
+                                <div class="card-header bg-dark border-bottom border-success text-success py-2 fw-bold d-flex justify-content-between">
+                                    <span>МОДУЛЬ 1: ИЗВЕСТНЫЕ УГРОЗЫ</span>
+                                    <span class="badge bg-black text-success border border-success rounded-0">БАЗА</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    <div>
+                                        <div class="text-secondary small mb-1">МЕТОД АНАЛИЗА:</div>
+                                        <div class="slot-target p-2 border border-dashed border-success bg-dark text-center" data-expected="сигнатурный" data-slot="m1-method" style="min-height: 48px;">
+                                            <span class="placeholder-text text-muted small">[Перетащите метод]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">ЦЕЛЕВОЙ АРТЕФАКТ:</div>
+                                        <div class="slot-target p-2 border border-dashed border-success bg-dark text-center" data-expected="хеш" data-slot="m1-artifact" style="min-height: 48px;">
+                                            <span class="placeholder-text text-muted small">[Перетащите артефакт]</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-secondary small mt-auto border-top border-secondary pt-2">
+                                        Назначение: мгновенное нахождение известных вирусов без ложных тревог.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Модуль 2: Эвристический -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-info rounded-0 h-100">
+                                <div class="card-header bg-dark border-bottom border-info text-info py-2 fw-bold d-flex justify-content-between">
+                                    <span>МОДУЛЬ 2: НОВЫЕ МУТАЦИИ</span>
+                                    <span class="badge bg-black text-info border border-info rounded-0">ЭВРИСТИКА</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    <div>
+                                        <div class="text-secondary small mb-1">МЕТОД АНАЛИЗА:</div>
+                                        <div class="slot-target p-2 border border-dashed border-info bg-dark text-center" data-expected="эвристический" data-slot="m2-method" style="min-height: 48px;">
+                                            <span class="placeholder-text text-muted small">[Перетащите метод]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">МЕХАНИЗМ РАСПАКОВКИ:</div>
+                                        <div class="slot-target p-2 border border-dashed border-info bg-dark text-center" data-expected="эмуляция" data-slot="m2-artifact" style="min-height: 48px;">
+                                            <span class="placeholder-text text-muted small">[Перетащите механизм]</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-secondary small mt-auto border-top border-secondary pt-2">
+                                        Назначение: распаковка полиморфных тел вирусов в безопасной памяти.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Модуль 3: Поведенческий -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning py-2 fw-bold d-flex justify-content-between">
+                                    <span>МОДУЛЬ 3: ПРОАКТИВНЫЙ КОНТРОЛЬ</span>
+                                    <span class="badge bg-black text-warning border border-warning rounded-0">HIPS</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    <div>
+                                        <div class="text-secondary small mb-1">МЕТОД АНАЛИЗА:</div>
+                                        <div class="slot-target p-2 border border-dashed border-warning bg-dark text-center" data-expected="поведенческий" data-slot="m3-method" style="min-height: 48px;">
+                                            <span class="placeholder-text text-muted small">[Перетащите метод]</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small mb-1">КОНТРОЛИРУЕМОЕ ДЕЙСТВИЕ:</div>
+                                        <div class="slot-target p-2 border border-dashed border-warning bg-dark text-center" data-expected="шифрование" data-slot="m3-artifact" style="min-height: 48px;">
+                                            <span class="placeholder-text text-muted small">[Перетащите действие]</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-secondary small mt-auto border-top border-secondary pt-2">
+                                        Назначение: остановка программ-вымогателей и несанкционированных инъекций.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-secondary small">* Для освобождения слота кликните по токену внутри него.</span>
+                        <button id="p2-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            СМОНТИРОВАТЬ ДВИЖОК
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: КАЛИБРАТОР ПОЛИТИКИ «3-2-1» И ПРИВИЛЕГИЙ ================= -->
+                <div id="phase-3-container" class="d-none">
+                    <p class="text-light mb-2">
+                        <strong>Финальная настройка контура безопасности:</strong>
+                        сконфигурируйте политику резервного копирования от вирусов-вымогателей по золотому правилу «3-2-1» и выставите системные привилегии по академическому стандарту Полякова.
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        <strong>Манипуляция мышью:</strong> передвигайте ползунки калибраторов (слайдеры) и кликайте по тумблерам для изменения состояния политик.
+                    </p>
+
+                    <!-- Интерактивные слайдеры правила 3-2-1 -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4">
+                        <h6 class="text-success border-bottom border-secondary pb-2 mb-3">
+                            СТРАТЕГИЯ РЕЗЕРВНОГО КОПИРОВАНИЯ ДАННЫХ «3-2-1»
+                        </h6>
+
+                        <!-- Калибратор 1: Экземпляры -->
+                        <div class="row align-items-center mb-3">
+                            <div class="col-md-5">
+                                <label for="slider-copies" class="form-label text-light mb-0">
+                                    1. Общее количество экземпляров критических данных:
+                                </label>
+                                <div class="text-secondary small">(Основной рабочий экземпляр + копии)</div>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="range" class="form-range" id="slider-copies" min="1" max="6" step="1" value="1">
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <span id="val-copies" class="badge bg-dark border border-secondary text-warning fs-5 px-3 py-1">1</span>
+                            </div>
+                        </div>
+
+                        <!-- Калибратор 2: Носители -->
+                        <div class="row align-items-center mb-3">
+                            <div class="col-md-5">
+                                <label for="slider-media" class="form-label text-light mb-0">
+                                    2. Количество различных типов физических носителей:
+                                </label>
+                                <div class="text-secondary small">(Например: внутренний диск + переносной SSD / NAS)</div>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="range" class="form-range" id="slider-media" min="1" max="5" step="1" value="1">
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <span id="val-media" class="badge bg-dark border border-secondary text-warning fs-5 px-3 py-1">1</span>
+                            </div>
+                        </div>
+
+                        <!-- Калибратор 3: Офлайн копия -->
+                        <div class="row align-items-center">
+                            <div class="col-md-5">
+                                <label for="slider-offline" class="form-label text-light mb-0">
+                                    3. Количество изолированных офлайн-хранилищ вне сети («холодный бэкап»):
+                                </label>
+                                <div class="text-secondary small">(Полная физическая изоляция от локальной сети и шифровальщиков)</div>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="range" class="form-range" id="slider-offline" min="0" max="4" step="1" value="0">
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <span id="val-offline" class="badge bg-dark border border-secondary text-warning fs-5 px-3 py-1">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Интерактивные тумблеры системных политик -->
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-4">
+                        <h6 class="text-warning border-bottom border-secondary pb-2 mb-3">
+                            РЕГЛАМЕНТ ПРИВИЛЕГИЙ И КОНТРОЛЯ НОСИТЕЛЕЙ
+                        </h6>
+
+                        <div class="row g-3">
+                            <!-- Тумблер 1: Учетная запись -->
+                            <div class="col-md-6">
+                                <div class="border border-secondary bg-dark p-3 h-100 d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="text-secondary small mb-1">УЧЕТНАЯ ЗАПИСЬ ДЛЯ ПОВСЕДНЕВНОЙ РАБОТЫ:</div>
+                                        <div class="text-light small mb-3">Кликните по тумблеру для переключения политики учетной записи:</div>
+                                    </div>
+                                    <button id="toggle-account-btn" class="btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold" data-state="admin">
+                                        <span class="d-block small text-secondary">ТЕКУЩИЙ РЕЖИМ:</span>
+                                        <span class="status-label">Администратор системы (Высокий риск заражения)</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Тумблер 2: AutoRun USB -->
+                            <div class="col-md-6">
+                                <div class="border border-secondary bg-dark p-3 h-100 d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="text-secondary small mb-1">СЛУЖБА АВТОЗАПУСКА СЪЕМНЫХ НОСИТЕЛЕЙ (USB):</div>
+                                        <div class="text-light small mb-3">Кликните по тумблеру для переключения состояния службы:</div>
+                                    </div>
+                                    <button id="toggle-autorun-btn" class="btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold" data-state="enabled">
+                                        <span class="d-block small text-secondary">ТЕКУЩИЙ РЕЖИМ:</span>
+                                        <span class="status-label">Служба AutoRun: ВКЛЮЧЕНА (Уязвимость для червей)</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Статусный монитор готовности -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 font-monospace small">
+                            <span class="text-secondary">СОСТОЯНИЕ КОНТУРА БЕЗОПАСНОСТИ:</span>
+                            <span id="p3-ind-copies" class="badge bg-secondary text-light rounded-0">Копии: Не откалибровано</span>
+                            <span id="p3-ind-media" class="badge bg-secondary text-light rounded-0">Носители: Не откалибровано</span>
+                            <span id="p3-ind-offline" class="badge bg-secondary text-light rounded-0">Офлайн: Не откалибровано</span>
+                            <span id="p3-ind-priv" class="badge bg-secondary text-light rounded-0">Привилегии: Не настроены</span>
+                            <span id="p3-ind-autorun" class="badge bg-secondary text-light rounded-0">AutoRun: Не настроен</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" class="btn btn-outline-success btn-lg rounded-0 px-4 py-2">
+                            АКТИВИРОВАТЬ ЭШЕЛОНИРОВАННУЮ ЗАЩИТУ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ЭКРАН ПОБЕДЫ ================= -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="border border-success bg-black p-4 d-inline-block text-center" style="max-width: 600px;">
+                        <h3 class="text-success mb-3">[ ДОСТУП РАЗРЕШЕН // УРОВЕНЬ 1 ПРОЙДЕН ]</h3>
+                        <p class="text-light mb-4">
+                            Вы успешно освоили классификацию вредоносного ПО по методике К.Ю. Полякова, сконструировали модули антивирусного движка и настроили эшелонированный контур безопасности.
+                        </p>
+                        <div class="bg-dark border border-secondary p-3 mb-4 text-start font-monospace small">
+                            <div class="text-secondary">ТЕЛЕМЕТРИЯ СЕССИИ:</div>
+                            <div class="text-light">Затраченное время: <span id="final-time" class="text-warning">0</span> сек.</div>
+                            <div class="text-light">Количество ошибок: <span id="final-errors" class="text-warning">0</span></div>
+                            <div class="text-success mt-1">Статус: УСПЕШНО ЗАВЕРШЕНО</div>
+                        </div>
+                        <div class="alert alert-success bg-dark text-success border-success rounded-0 mb-0">
+                            Результаты зафиксированы в едином журнале телеметрии LMS.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    // --- Состояние сессии и телеметрия ---
+    const startTime = Date.now();
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let selectedTokenElement = null;
+    let selectedIncidentCard = null;
+
+    const missionName = 'Урок 7 :: Вредоносное программное обеспечение (Уровень 1)';
+
+    function sendTelemetry(actionType, status, success) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success
+        }, '*');
+    }
+
+    function showFeedback(message) {
+        const box = document.getElementById('feedback-box');
+        const text = document.getElementById('feedback-text');
+        text.textContent = message;
+        box.classList.remove('d-none');
+        setTimeout(() => {
+            box.classList.add('d-none');
+        }, 2200);
+    }
+
+    // =========================================================================
+    // ФАЗА 1: СОРТИРОВКА ПО БАКЕТАМ (Интерактивная классификация)
+    // =========================================================================
+
+    const incidentDatabase = [
+        // Вирусы (virus)
+        { id: 'v1', type: 'virus', title: 'Заражение calc.exe', desc: 'Внедрение кода в PE-секцию исполняемого файла с возвратом управления хосту.', log: 'PE Header modified: EntryPoint hijacked -> 0x0040A120' },
+        { id: 'v2', type: 'virus', title: 'Макрос в отчете Word', desc: 'Документ .docm содержит вредоносный VBA-макрос, срабатывающий при событии AutoOpen.', log: 'VBA.AutoOpen invoked: Drops payload to %TEMP%' },
+        { id: 'v3', type: 'virus', title: 'Подмена MBR сектора', desc: 'Заражение главной загрузочной записи накопителя, запуск до старта операционной системы.', log: 'BIOS INT 13h hooked at 0000:7C00h' },
+        { id: 'v4', type: 'virus', title: 'Скрипт в HTML-странице', desc: 'Скриптовый вирус на JavaScript, дописывающий теги сценария во все локальные веб-файлы.', log: 'DOM modification: injected script <script src="mal.js">' },
+        
+        // Черви (worm)
+        { id: 'w1', type: 'worm', title: 'Эксплойт порта 445 (SMB)', desc: 'Автономное сетевое сканирование диапазона адресов и переполнение буфера службы SMB.', log: 'Inbound packet on TCP/445: Buffer overflow payload detected' },
+        { id: 'w2', type: 'worm', title: 'Почтовая рассылка Mass-mailer', desc: 'Программа автоматически считывает контакты почтового клиента и рассылает свои копии.', log: 'MAPI AddressBook dumped -> 250 outbound SMTP connections' },
+        { id: 'w3', type: 'worm', title: 'Репликация на флеш-карты', desc: 'Самостоятельное создание скрытых копий и ярлыков на всех подключенных USB-накопителях.', log: 'Removable media mounted: autorun.inf & payload.exe written' },
+        { id: 'w4', type: 'worm', title: 'Сетевой скан RDP (порт 3389)', desc: 'Автономный сканер уязвимостей удаленного рабочего стола для проникновения в локальную сеть.', log: 'RCE exploit triggered on TermService -> Autonomous worm spawned' },
+
+        // Трояны (trojan)
+        { id: 't1', type: 'trojan', title: 'Бэкдор под видом утилиты', desc: 'Программа маскируется под CleanDisk.exe, открывая скрытый порт для удаленного управления (RAT).', log: 'Process started by user -> Established reverse shell to C2' },
+        { id: 't2', type: 'trojan', title: 'Шифровальщик Ransomware', desc: 'Маскировался под PDF-документ, зашифровал файлы пользователя алгоритмом AES и требует выкуп.', log: 'CryptoAPI: AES-256 batch encryption of /Documents/ -> Ransom note' },
+        { id: 't3', type: 'trojan', title: 'Клавиатурный шпион (Keylogger)', desc: 'Скрытно перехватывает ввод паролей и данных банковских карт через хуки клавиатуры.', log: 'SetWindowsHookEx(WH_KEYBOARD_LL) active -> Logging keystrokes' },
+        { id: 't4', type: 'trojan', title: 'Шпионское ПО Spyware', desc: 'Утилита оптимизации, скрытно похищающая сохраненные пароли и куки браузера.', log: 'Unauthorized read: %LOCALAPPDATA%/Google/Chrome/User Data/Default/Cookies' }
+    ];
+
+    let currentPhase1Incidents = [];
+
+    function setupPhase1() {
+        const pool = document.getElementById('p1-cards-pool');
+        pool.innerHTML = '';
+
+        // Очистить все шлюзы
+        document.querySelectorAll('.bucket-dropzone').forEach(dz => dz.innerHTML = '');
+        document.querySelectorAll('.bucket-count').forEach(bc => bc.textContent = '0');
+        document.getElementById('p1-verify-btn').disabled = true;
+
+        // Выбрать по 1-2 случайных представителя из каждого класса так, чтобы суммарно было ровно 4 карточки
+        const viruses = incidentDatabase.filter(i => i.type === 'virus').sort(() => 0.5 - Math.random());
+        const worms = incidentDatabase.filter(i => i.type === 'worm').sort(() => 0.5 - Math.random());
+        const trojans = incidentDatabase.filter(i => i.type === 'trojan').sort(() => 0.5 - Math.random());
+
+        // Баланс: 1 вирус, 1 червь, 1 троян, плюс еще один случайный
+        const extraPool = [viruses[1], worms[1], trojans[1]].sort(() => 0.5 - Math.random());
+        currentPhase1Incidents = [viruses[0], worms[0], trojans[0], extraPool[0]].sort(() => 0.5 - Math.random());
+
+        currentPhase1Incidents.forEach(item => {
+            const card = createIncidentCard(item);
+            pool.appendChild(card);
+        });
+
+        setupDragAndDropPhase1();
+    }
+
+    function createIncidentCard(item) {
+        const card = document.createElement('div');
+        card.className = 'incident-card p-2 bg-black border border-secondary text-light cursor-grab user-select-none';
+        card.style.cursor = 'grab';
+        card.style.width = '100%';
+        card.draggable = true;
+        card.dataset.id = item.id;
+        card.dataset.type = item.type;
+
+        card.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-warning fw-bold small">[ИНЦИДЕНТ: ${item.title}]</span>
+                <span class="badge bg-dark border border-secondary text-secondary" style="font-size: 10px;">ПЕРЕТАЩИТЬ</span>
+            </div>
+            <div class="small text-light mb-1">${item.desc}</div>
+            <div class="font-monospace small text-secondary bg-dark px-1 py-1 border border-secondary" style="font-size: 11px;">
+                LOG: ${item.log}
+            </div>
+        `;
+
+        // Клик-выбор (для доступности и планшетов без мыши)
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Если УЖЕ выбрана другая карточка из пула, и мы кликнули по карточке в шлюзе:
+            if (selectedIncidentCard && selectedIncidentCard !== card && card.parentElement && card.parentElement.classList.contains('bucket-dropzone')) {
+                const dropzone = card.parentElement;
+                dropzone.appendChild(selectedIncidentCard);
+                selectedIncidentCard.classList.remove('border-warning', 'border-2');
+                selectedIncidentCard = null;
+                updatePhase1UI();
+                return;
+            }
+
+            // Если карточка уже в шлюзе — возвращаем её в пул
+            if (card.parentElement && card.parentElement.classList.contains('bucket-dropzone')) {
+                document.getElementById('p1-cards-pool').appendChild(card);
+                updatePhase1UI();
+                return;
+            }
+
+            // Иначе выделяем для переноса
+            if (selectedIncidentCard === card) {
+                card.classList.remove('border-warning', 'border-2');
+                selectedIncidentCard = null;
+            } else {
+                if (selectedIncidentCard) {
+                    selectedIncidentCard.classList.remove('border-warning', 'border-2');
+                }
+                selectedIncidentCard = card;
+                card.classList.add('border-warning', 'border-2');
+            }
+        });
+
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', item.id);
+            card.classList.add('opacity-50');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('opacity-50');
+        });
+
+        return card;
+    }
+
+    let p1ListenersAttached = false;
+    function setupDragAndDropPhase1() {
+        if (p1ListenersAttached) return;
+        p1ListenersAttached = true;
+
+        document.querySelectorAll('.bucket-container').forEach(bucket => {
+            const dropzone = bucket.querySelector('.bucket-dropzone');
+
+            bucket.addEventListener('click', () => {
+                if (selectedIncidentCard) {
+                    dropzone.appendChild(selectedIncidentCard);
+                    selectedIncidentCard.classList.remove('border-warning', 'border-2');
+                    selectedIncidentCard = null;
+                    updatePhase1UI();
+                }
+            });
+
+            dropzone.addEventListener('click', (e) => {
+                if (selectedIncidentCard) {
+                    e.stopPropagation();
+                    dropzone.appendChild(selectedIncidentCard);
+                    selectedIncidentCard.classList.remove('border-warning', 'border-2');
+                    selectedIncidentCard = null;
+                    updatePhase1UI();
+                }
+            });
+
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-success', 'bg-black');
+            });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('border-success', 'bg-black');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-success', 'bg-black');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const card = document.querySelector(`.incident-card[data-id="${cardId}"]`);
+                if (card) {
+                    dropzone.appendChild(card);
+                    if (selectedIncidentCard === card) {
+                        selectedIncidentCard.classList.remove('border-warning', 'border-2');
+                        selectedIncidentCard = null;
+                    }
+                    updatePhase1UI();
+                }
+            });
+        });
+
+        // Сброс всех карточек обратно в пул
+        document.getElementById('p1-reset-pool-btn').addEventListener('click', () => {
+            const pool = document.getElementById('p1-cards-pool');
+            document.querySelectorAll('.incident-card').forEach(card => pool.appendChild(card));
+            if (selectedIncidentCard) {
+                selectedIncidentCard.classList.remove('border-warning', 'border-2');
+                selectedIncidentCard = null;
+            }
+            updatePhase1UI();
+        });
+    }
+
+    function updatePhase1UI() {
+        let placedCount = 0;
+        document.querySelectorAll('.bucket-container').forEach(b => {
+            const count = b.querySelectorAll('.incident-card').length;
+            b.querySelector('.bucket-count').textContent = count;
+            placedCount += count;
+        });
+
+        const verifyBtn = document.getElementById('p1-verify-btn');
+        verifyBtn.disabled = (placedCount < 4);
+    }
+
+    document.getElementById('p1-verify-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        document.querySelectorAll('.bucket-container').forEach(b => {
+            const expectedType = b.dataset.bucket;
+            const cards = b.querySelectorAll('.incident-card');
+            cards.forEach(card => {
+                if (card.dataset.type !== expectedType) {
+                    allCorrect = false;
+                }
+            });
+        });
+
+        if (allCorrect) {
+            // Переход на фазу 2
+            currentPhase = 2;
+            document.getElementById('phase-1-container').classList.add('d-none');
+            document.getElementById('phase-2-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Слот-пазл: Конструирование антивирусного движка';
+            setupPhase2();
+        } else {
+            attemptsCount++;
+            document.getElementById('attempts-display').textContent = attemptsCount;
+            sendTelemetry('hardcore_reset', 'failed', false);
+            showFeedback('Неверная таксономия угроз! Перекалибровка инцидентов...');
+            setTimeout(setupPhase1, 1200);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: СЛОТ-ПАЗЛ (Конструирование антивирусного движка)
+    // =========================================================================
+
+    const phase2TokensList = [
+        // Правильные токены
+        { id: 't_sig', text: 'Сигнатурный анализ', match: 'сигнатурный', category: 'method', color: 'border-success text-success' },
+        { id: 't_hash', text: 'Хеш SHA-256 / Байтовая маска', match: 'хеш', category: 'artifact', color: 'border-success text-success' },
+        { id: 't_heur', text: 'Эвристический анализ', match: 'эвристический', category: 'method', color: 'border-info text-info' },
+        { id: 't_emu', text: 'Эмуляция кода в вирт. процессоре', match: 'эмуляция', category: 'artifact', color: 'border-info text-info' },
+        { id: 't_hips', text: 'Поведенческий анализ (HIPS)', match: 'поведенческий', category: 'method', color: 'border-warning text-warning' },
+        { id: 't_hook', text: 'Перехват вызовов системных API', match: 'шифрование', category: 'artifact', color: 'border-warning text-warning' },
+
+        // Дистракторы
+        { id: 'd_spam', text: 'Блокировка спама по черным спискам', match: 'none', category: 'distractor', color: 'border-secondary text-secondary' },
+        { id: 'd_fw', text: 'Фильтрация сетевых пакетов брандмауэра', match: 'none', category: 'distractor', color: 'border-secondary text-secondary' },
+        { id: 'd_321', text: 'Резервное копирование по схеме 3-2-1', match: 'none', category: 'distractor', color: 'border-secondary text-secondary' },
+        { id: 'd_rev', text: 'Периодический ревизор контрольных сумм', match: 'none', category: 'distractor', color: 'border-secondary text-secondary' }
+    ];
+
+    function setupPhase2() {
+        const pool = document.getElementById('p2-tokens-pool');
+        pool.innerHTML = '';
+
+        // Очистить слоты
+        document.querySelectorAll('.slot-target').forEach(slot => {
+            slot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+            slot.removeAttribute('data-placed-id');
+        });
+
+        document.getElementById('p2-verify-btn').disabled = true;
+
+        // Перемешать все 10 токенов (6 верных + 4 дистрактора)
+        const shuffled = [...phase2TokensList].sort(() => 0.5 - Math.random());
+        shuffled.forEach(t => {
+            const tokenEl = createTokenElement(t);
+            pool.appendChild(tokenEl);
+        });
+
+        setupDragAndDropPhase2();
+    }
+
+    function createTokenElement(t) {
+        const el = document.createElement('div');
+        el.className = `puzzle-token p-2 bg-black border ${t.color} rounded-0 cursor-grab user-select-none small font-monospace`;
+        el.style.cursor = 'grab';
+        el.draggable = true;
+        el.dataset.id = t.id;
+        el.dataset.match = t.match;
+        el.textContent = t.text;
+
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Если у нас УЖЕ выбран другой токен из пула, и мы кликаем по токену в слоте:
+            if (selectedTokenElement && selectedTokenElement !== el && el.parentElement && el.parentElement.classList.contains('slot-target')) {
+                const parentSlot = el.parentElement;
+                document.getElementById('p2-tokens-pool').appendChild(el);
+                parentSlot.innerHTML = '';
+                parentSlot.appendChild(selectedTokenElement);
+                parentSlot.dataset.placedId = selectedTokenElement.dataset.id;
+                selectedTokenElement.classList.remove('border-white', 'border-2');
+                selectedTokenElement = null;
+                updatePhase2UI();
+                return;
+            }
+
+            // Если токен в слоте — возвращаем в пул
+            if (el.parentElement && el.parentElement.classList.contains('slot-target')) {
+                const parentSlot = el.parentElement;
+                document.getElementById('p2-tokens-pool').appendChild(el);
+                parentSlot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+                parentSlot.removeAttribute('data-placed-id');
+                updatePhase2UI();
+                return;
+            }
+
+            // Выделение токена для клик-переноса
+            if (selectedTokenElement === el) {
+                el.classList.remove('border-white', 'border-2');
+                selectedTokenElement = null;
+            } else {
+                if (selectedTokenElement) {
+                    selectedTokenElement.classList.remove('border-white', 'border-2');
+                }
+                selectedTokenElement = el;
+                el.classList.add('border-white', 'border-2');
+            }
+        });
+
+        el.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', t.id);
+            el.classList.add('opacity-50');
+        });
+
+        el.addEventListener('dragend', () => {
+            el.classList.remove('opacity-50');
+        });
+
+        return el;
+    }
+
+    let p2ListenersAttached = false;
+    function setupDragAndDropPhase2() {
+        if (p2ListenersAttached) return;
+        p2ListenersAttached = true;
+
+        document.querySelectorAll('.slot-target').forEach(slot => {
+            // Клик по слоту для размещения выбранного токена
+            slot.addEventListener('click', () => {
+                if (selectedTokenElement) {
+                    // Если в слоте уже был токен — вернуть его в пул
+                    const existingToken = slot.querySelector('.puzzle-token');
+                    if (existingToken) {
+                        document.getElementById('p2-tokens-pool').appendChild(existingToken);
+                    }
+                    slot.innerHTML = '';
+                    slot.appendChild(selectedTokenElement);
+                    slot.dataset.placedId = selectedTokenElement.dataset.id;
+                    selectedTokenElement.classList.remove('border-white', 'border-2');
+                    selectedTokenElement = null;
+                    updatePhase2UI();
+                }
+            });
+
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('border-white');
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('border-white');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('border-white');
+                const tokenId = e.dataTransfer.getData('text/plain');
+                const token = document.querySelector(`.puzzle-token[data-id="${tokenId}"]`);
+                if (token) {
+                    const existingToken = slot.querySelector('.puzzle-token');
+                    if (existingToken) {
+                        document.getElementById('p2-tokens-pool').appendChild(existingToken);
+                    }
+                    slot.innerHTML = '';
+                    slot.appendChild(token);
+                    slot.dataset.placedId = token.dataset.id;
+                    if (selectedTokenElement === token) {
+                        selectedTokenElement.classList.remove('border-white', 'border-2');
+                        selectedTokenElement = null;
+                    }
+                    updatePhase2UI();
+                }
+            });
+        });
+
+        document.getElementById('p2-reset-pool-btn').addEventListener('click', () => {
+            const pool = document.getElementById('p2-tokens-pool');
+            document.querySelectorAll('.slot-target .puzzle-token').forEach(t => pool.appendChild(t));
+            document.querySelectorAll('.slot-target').forEach(slot => {
+                slot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+                slot.removeAttribute('data-placed-id');
+            });
+            if (selectedTokenElement) {
+                selectedTokenElement.classList.remove('border-white', 'border-2');
+                selectedTokenElement = null;
+            }
+            updatePhase2UI();
+        });
+    }
+
+    function updatePhase2UI() {
+        const filledSlots = document.querySelectorAll('.slot-target[data-placed-id]').length;
+        document.getElementById('p2-verify-btn').disabled = (filledSlots < 6);
+    }
+
+    document.getElementById('p2-verify-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        document.querySelectorAll('.slot-target').forEach(slot => {
+            const expectedMatch = slot.dataset.expected;
+            const token = slot.querySelector('.puzzle-token');
+            if (!token || token.dataset.match !== expectedMatch) {
+                allCorrect = false;
+            }
+        });
+
+        if (allCorrect) {
+            currentPhase = 3;
+            document.getElementById('phase-2-container').classList.add('d-none');
+            document.getElementById('phase-3-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Калибратор политики «3-2-1» и привилегий';
+            setupPhase3();
+        } else {
+            attemptsCount++;
+            document.getElementById('attempts-display').textContent = attemptsCount;
+            sendTelemetry('hardcore_reset', 'failed', false);
+            showFeedback('Неверная конфигурация модулей антивируса! Перекалибровка токенов...');
+            setTimeout(setupPhase2, 1200);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: КАЛИБРАТОР ПОЛИТИКИ «3-2-1» И СИСТЕМНЫХ НАСТРОЕК
+    // =========================================================================
+
+    function setupPhase3() {
+        const sCopies = document.getElementById('slider-copies');
+        const sMedia = document.getElementById('slider-media');
+        const sOffline = document.getElementById('slider-offline');
+
+        // Процедурная инициализация слайдеров (заведомо неверные стартовые позиции)
+        sCopies.value = [1, 5, 6][Math.floor(Math.random() * 3)];
+        sMedia.value = [1, 4, 5][Math.floor(Math.random() * 3)];
+        sOffline.value = [0, 3, 4][Math.floor(Math.random() * 3)];
+
+        document.getElementById('val-copies').textContent = sCopies.value;
+        document.getElementById('val-media').textContent = sMedia.value;
+        document.getElementById('val-offline').textContent = sOffline.value;
+
+        // Тумблеры
+        const btnAccount = document.getElementById('toggle-account-btn');
+        btnAccount.dataset.state = 'admin';
+        btnAccount.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+        btnAccount.querySelector('.status-label').textContent = 'Администратор системы (Высокий риск заражения)';
+
+        const btnAutorun = document.getElementById('toggle-autorun-btn');
+        btnAutorun.dataset.state = 'enabled';
+        btnAutorun.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+        btnAutorun.querySelector('.status-label').textContent = 'Служба AutoRun: ВКЛЮЧЕНА (Уязвимость для червей)';
+
+        updatePhase3Indicators();
+    }
+
+    // Слушатели слайдеров
+    document.getElementById('slider-copies').addEventListener('input', (e) => {
+        document.getElementById('val-copies').textContent = e.target.value;
+        updatePhase3Indicators();
+    });
+
+    document.getElementById('slider-media').addEventListener('input', (e) => {
+        document.getElementById('val-media').textContent = e.target.value;
+        updatePhase3Indicators();
+    });
+
+    document.getElementById('slider-offline').addEventListener('input', (e) => {
+        document.getElementById('val-offline').textContent = e.target.value;
+        updatePhase3Indicators();
+    });
+
+    // Слушатель тумблера учетной записи
+    document.getElementById('toggle-account-btn').addEventListener('click', function() {
+        if (this.dataset.state === 'admin') {
+            this.dataset.state = 'user';
+            this.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'Обычный пользователь (Принцип Least Privilege)';
+        } else {
+            this.dataset.state = 'admin';
+            this.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'Администратор системы (Высокий риск заражения)';
+        }
+        updatePhase3Indicators();
+    });
+
+    // Слушатель тумблера AutoRun
+    document.getElementById('toggle-autorun-btn').addEventListener('click', function() {
+        if (this.dataset.state === 'enabled') {
+            this.dataset.state = 'disabled';
+            this.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'Служба AutoRun: ОТКЛЮЧЕНА (Безопасный режим)';
+        } else {
+            this.dataset.state = 'enabled';
+            this.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'Служба AutoRun: ВКЛЮЧЕНА (Уязвимость для червей)';
+        }
+        updatePhase3Indicators();
+    });
+
+    function updatePhase3Indicators() {
+        const copies = parseInt(document.getElementById('slider-copies').value, 10);
+        const media = parseInt(document.getElementById('slider-media').value, 10);
+        const offline = parseInt(document.getElementById('slider-offline').value, 10);
+        const account = document.getElementById('toggle-account-btn').dataset.state;
+        const autorun = document.getElementById('toggle-autorun-btn').dataset.state;
+
+        setIndicator('p3-ind-copies', copies === 3, 'Копии: 3 (Норма)', `Копии: ${copies} (Ожидается 3)`);
+        setIndicator('p3-ind-media', media === 2, 'Носители: 2 типа (Норма)', `Носители: ${media} (Ожидается 2)`);
+        setIndicator('p3-ind-offline', offline === 1, 'Офлайн: 1 копия (Норма)', `Офлайн: ${offline} (Ожидается 1)`);
+        setIndicator('p3-ind-priv', account === 'user', 'Привилегии: Пользователь (OK)', 'Привилегии: Администратор (Риск)');
+        setIndicator('p3-ind-autorun', autorun === 'disabled', 'AutoRun: Отключен (OK)', 'AutoRun: Включен (Риск)');
+    }
+
+    function setIndicator(elementId, isValid, okText, badText) {
+        const el = document.getElementById(elementId);
+        if (isValid) {
+            el.className = 'badge bg-success text-dark rounded-0';
+            el.textContent = okText;
+        } else {
+            el.className = 'badge bg-secondary text-light rounded-0';
+            el.textContent = badText;
+        }
+    }
+
+    document.getElementById('p3-verify-btn').addEventListener('click', () => {
+        const copies = parseInt(document.getElementById('slider-copies').value, 10);
+        const media = parseInt(document.getElementById('slider-media').value, 10);
+        const offline = parseInt(document.getElementById('slider-offline').value, 10);
+        const account = document.getElementById('toggle-account-btn').dataset.state;
+        const autorun = document.getElementById('toggle-autorun-btn').dataset.state;
+
+        const isCopiesOk = (copies === 3);
+        const isMediaOk = (media === 2);
+        const isOfflineOk = (offline === 1);
+        const isAccountOk = (account === 'user');
+        const isAutorunOk = (autorun === 'disabled');
+
+        if (isCopiesOk && isMediaOk && isOfflineOk && isAccountOk && isAutorunOk) {
+            // Успех всего Уровня 1!
+            document.getElementById('phase-3-container').classList.add('d-none');
+            document.getElementById('victory-screen').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Финиш';
+            document.getElementById('phase-title').textContent = 'Уровень 1 успешно завершен';
+
+            const totalTime = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+            document.getElementById('final-time').textContent = totalTime;
+            document.getElementById('final-errors').textContent = attemptsCount;
+
+            sendTelemetry('level_complete', 'completed', true);
+        } else {
+            attemptsCount++;
+            document.getElementById('attempts-display').textContent = attemptsCount;
+            sendTelemetry('hardcore_reset', 'failed', false);
+            showFeedback('Сбой политики безопасности! Неверная конфигурация параметров «3-2-1» или привилегий.');
+            setTimeout(setupPhase3, 1200);
+        }
+    });
+
+    // Инициализация при загрузке
+    setupPhase1();
+})();
+</script>
