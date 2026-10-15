@@ -115,4 +115,41 @@ test.describe('Lesson 8-6 Level 3: RAID Defragmentation (Vue)', () => {
     expect(row).toBeDefined();
     expect(row.is_hardcore).toBe(1);
   });
+
+  test('should initialize timer at 60s and add 10s on correct click', async ({ page }) => {
+    await page.goto('http://localhost:4321/lesson/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6');
+    
+    // Force show iframe-3
+    await page.evaluate(() => {
+      document.getElementById('iframe-1').classList.remove('block');
+      document.getElementById('iframe-1').classList.add('hidden');
+      const iframe3 = document.getElementById('iframe-3');
+      iframe3.classList.remove('hidden');
+      iframe3.classList.add('block');
+      iframe3.style.position = 'relative';
+      iframe3.style.height = '800px';
+      iframe3.style.width = '1000px';
+    });
+    
+    const frame = page.frameLocator('#iframe-3');
+    await frame.locator('#start-btn').click();
+    
+    // Timer should be visible and around 01:00 or 00:59
+    const timer = frame.locator('#timer');
+    await expect(timer).toBeVisible();
+    const timerText = await timer.innerText();
+    expect(timerText === '01:00' || timerText === '00:59').toBe(true);
+    
+    // Find correct cell and click
+    const cells = await frame.locator('.cell-btn').all();
+    for (const cell of cells) {
+      if (await cell.getAttribute('data-is-correct') === 'true') {
+        await cell.click();
+        break;
+      }
+    }
+    
+    // Bonus indicator +10с should be visible
+    await expect(frame.locator('text=+10с')).toBeVisible();
+  });
 });
