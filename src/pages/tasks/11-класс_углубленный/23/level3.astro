@@ -1,0 +1,404 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг миссии) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">⚠️ КРИТИЧЕСКИЙ СБОЙ СИНТАКСИЧЕСКОГО РЕАКТОРА ⚠️</div>
+            <h2 class="text-light mb-3">MARKOV REACTOR: DYNAMIC RULE MORPHING // АРХЕТИП 12</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 750px;">
+                В ассоциативном сопроцессоре Маркова произошел фатальный перегрев правил подстановки.
+                Через реактор непрерывно движется высокоскоростной поток нестабильных символьных строк.
+                Вам необходимо на лету модифицировать правила схемы (мутировать образцы, переключать терминаторы и рокировать приоритеты) и отразить <span class="text-danger fw-bold">8 нарастающих волн сингулярности</span>.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-4 mx-auto mb-4 text-start small" style="max-width: 680px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ ХАРДКОР-УПРАВЛЕНИЯ РЕАКТОРОМ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Жесткий таймер:</span> От 10 до 6.5 секунд на волну с нарастающим ускорением!</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">Тотальный сброс:</span> Любая ошибка мутации или истечение таймера вызывают взрыв реактора и <span class="text-danger fw-bold">СБРАСЫВАЮТ ВСЕ НА ВОЛНУ 1</span>!</div>
+                <div class="text-light mb-1">• <span class="text-success fw-bold">Динамическая мутация:</span> На лету подменяйте образцы α, активируйте терминальные точки (→ ·) и меняйте приоритеты строк до столкновения потока.</div>
+                <div class="text-light">• <span class="text-info fw-bold">Горячие клавиши:</span> Для молниеносной реакции используйте цифровые клавиши <span class="badge bg-danger text-light rounded-0">1</span>, <span class="badge bg-danger text-light rounded-0">2</span>, <span class="badge bg-danger text-light rounded-0">3</span>.</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    ЗАПУСТИТЬ МУТАГЕННЫЙ РЕАКТОР →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс (Бой на волнах) -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4 shadow">
+            
+            <!-- Хедер со статусом волны и обратным отсчетом -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="text-secondary small d-block">РУБЕЖ РЕАКТОРА:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">
+                        ВОЛНА <span v-text="currentWaveIdx + 1"></span> ИЗ 8
+                    </span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark px-3 py-1 fs-6 rounded-0" v-text="currentWave.waveTitle"></span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО ВЗРЫВА ЯДРА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / currentWave.timeLimit) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Панель реактора и активного потока -->
+            <div class="card bg-dark border-danger rounded-0 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <div>
+                        <span class="text-secondary small d-block">ПОТОК СИМВОЛОВ В РЕАКТОРЕ:</span>
+                        <span class="text-warning fw-bold fs-3" v-text="currentWave.streamWord"></span>
+                    </div>
+                    <div class="text-end">
+                        <span class="text-secondary small d-block">ЦЕЛЕВОЙ РЕЗУЛЬТАТ РЕДУКЦИИ:</span>
+                        <span class="text-success fw-bold fs-4" v-text="currentWave.targetWord"></span>
+                    </div>
+                </div>
+
+                <!-- Состояние активной схемы подстановок до мутации -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                    <div class="text-secondary small mb-1">[АКТИВНАЯ СХЕМА ПОДСТАНОВОК В РЕАКТОРЕ]:</div>
+                    <div class="text-light fs-5 py-1" v-html="currentWave.schemeSnippet"></div>
+                </div>
+
+                <!-- Диагностика угрозы -->
+                <div class="card bg-black border-danger rounded-0 p-3 mb-2">
+                    <div class="text-secondary small mb-1">[ДИАГНОСТИКА СИНТАКСИЧЕСКОЙ АНОМАЛИИ]:</div>
+                    <div class="text-danger fs-6" v-text="currentWave.threatWarning"></div>
+                </div>
+            </div>
+
+            <!-- Панель динамической мутации правил (3 аркадных действия) -->
+            <div class="mb-3 text-secondary small">
+                ВЫБЕРИТЕ ДЕЙСТВИЕ МУТАЦИИ ПРАВИЛ ДО ИСТЕЧЕНИЯ ТАЙМЕРА (КЛАВИШИ 1, 2, 3):
+            </div>
+            <div class="row g-3">
+                <div v-for="(opt, oIdx) in currentWave.options" :key="'opt-' + oIdx" class="col-md-4">
+                    <button :id="'btn-morph-' + (oIdx + 1)"
+                            @click="handleMorphAction(oIdx)" 
+                            class="btn btn-outline-danger w-100 py-3 rounded-0 text-start h-100 border-2">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-danger text-light fs-6 rounded-0" v-text="'[' + (oIdx + 1) + '] ' + opt.actionTag"></span>
+                            <span class="text-secondary small" v-text="'Клавиша ' + (oIdx + 1)"></span>
+                        </div>
+                        <div class="text-warning fw-bold fs-5 mb-1" v-text="opt.rulePatch"></div>
+                        <div class="text-light small" v-text="opt.description"></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Блок фидбека при ошибке -->
+            <div v-if="errorMessage" class="alert alert-danger rounded-0 border-danger font-monospace mt-3 py-2 text-center" role="alert">
+                <span v-text="errorMessage"></span>
+            </div>
+        </div>
+
+        <!-- Экран поражения (Хардкор-сброс) -->
+        <div v-else-if="gameState === 'gameover'" class="card bg-black border-danger rounded-0 p-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">💥 ВЗРЫВ СИНТАКСИЧЕСКОГО РЕАКТОРА 💥</div>
+            <h2 class="text-light mb-3">REACTOR MELTDOWN // ХАРДКОР-СБРОС</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 650px;">
+                <span class="text-danger fw-bold" v-text="failReason"></span>
+            </p>
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 450px;">
+                <div class="text-danger fw-bold mb-1">[ДИАГНОСТИКА АВАРИИ]:</div>
+                <div class="text-light mb-1">Откат прогресса: <span class="text-danger">Волна 1</span></div>
+                <div class="text-light mb-1">Число аварий хардкора: <span class="text-warning" v-text="attempts"></span></div>
+                <div class="text-light">Телеметрия: <span class="text-secondary">hardcore_reset отправлен</span></div>
+            </div>
+            <div>
+                <button id="btn-restart" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    ПЕРЕЗАПУСТИТЬ РЕАКТОР С ВОЛНЫ 1
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран триумфа (Победа над всеми 8 волнами) -->
+        <div id="success-screen" v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-5 text-center shadow">
+            <div class="display-3 text-success mb-3">★ СИНТАКСИЧЕСКИЙ РЕАКТОР СТАБИЛИЗИРОВАН ★</div>
+            <h2 class="text-light mb-3">АРХЕТИП 12: DYNAMIC RULE MORPHING ПОКОРЕН!</h2>
+            <p class="fs-5 text-light mx-auto mb-4" style="max-width: 650px;">
+                Вы выдержали 8 волн экстремальной мутации правил нормальных алгорифмов Маркова под давлением обратного отсчета времени без единой ошибки!
+            </p>
+
+            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 500px;">
+                <div class="text-success fw-bold mb-2">[ИТОГОВАЯ ТЕЛЕМЕТРИЯ ХАРДКОР-ЗАБЕГА]:</div>
+                <div class="text-light mb-1">Статус миссии: <span class="text-success fw-bold">COMPLETED (100% SUCCESS)</span></div>
+                <div class="text-light mb-1">Число сбоев хардкора: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+                <div class="text-light">Чистое время забега: <span id="final-time" class="text-info fw-bold" v-text="formattedSessionTime"></span></div>
+            </div>
+
+            <div>
+                <button id="btn-replay" @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold">
+                    Пройти испытание заново
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Подключение локального Vue 3 -->
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const { createApp } = Vue;
+
+        const WAVES_DATA = [
+            {
+                waveNum: 1,
+                timeLimit: 10.0,
+                waveTitle: "ВОЛНА 1: ПАРАЗИТНЫЙ МАРКЕР",
+                streamWord: "###DATA",
+                targetWord: "DATA",
+                schemeSnippet: "1. [ ? ] → λ<br>2. DATA → · DATA",
+                threatWarning: "Префикс содержит паразитные маркеры '#', блокирующие обработку данных.",
+                correctIndex: 0,
+                options: [
+                    { actionTag: "МУТАЦИЯ ОБРАЗЦА", rulePatch: "1. # → λ", description: "Заменить образец на маркер '#' для стирания префикса." },
+                    { actionTag: "МУТАЦИЯ ОБРАЗЦА", rulePatch: "1. DATA → λ", description: "Стереть полезные данные DATA (фатальная потеря данных)." },
+                    { actionTag: "МУТАЦИЯ ОБРАЗЦА", rulePatch: "1. * → λ", description: "Стереть маркер '*' которого нет в потоке (зацикливание)." }
+                ]
+            },
+            {
+                waveNum: 2,
+                timeLimit: 9.5,
+                waveTitle: "ВОЛНА 2: ОСЦИЛЛЯЦИОННАЯ ЛОВУШКА",
+                streamWord: "ab",
+                targetWord: "ac",
+                schemeSnippet: "1. b [ ? ] c<br>2. c → b",
+                threatWarning: "В реакторе заложена обратная связь 'c → b'. Если применить простую стрелку, возникнет бесконечный пинг-понг!",
+                correctIndex: 1,
+                options: [
+                    { actionTag: "ПРОСТАЯ СТРЕЛКА", rulePatch: "1. b → c", description: "Простая подстановка вызовет осцилляцию с правилом 2 (LOOP)." },
+                    { actionTag: "ТЕРМИНАЛЬНАЯ ТОЧКА", rulePatch: "1. b → · c", description: "Активировать терминальную точку '→ ·' для мгновенного останова." },
+                    { actionTag: "СТИРАНИЕ", rulePatch: "1. b → · λ", description: "Удалить символ 'b' вместо замены на 'c' (ошибка результата)." }
+                ]
+            },
+            {
+                waveNum: 3,
+                timeLimit: 9.0,
+                waveTitle: "ВОЛНА 3: ЭКРАНИРОВАНИЕ ПРИОРИТЕТОВ",
+                streamWord: "abba",
+                targetWord: "yba",
+                schemeSnippet: "Строка 1: a → x<br>Строка 2: ab → y",
+                threatWarning: "Общее правило 'a → x' экранирует частное правило 'ab → y'! 'ab' никогда не сработает.",
+                correctIndex: 2,
+                options: [
+                    { actionTag: "БЕЗ ИЗМЕНЕНИЙ", rulePatch: "Оставить как есть", description: "Первое правило заменит 'a' на 'x', дав ошибочную строку 'xbba'." },
+                    { actionTag: "УДАЛИТЬ СТРОКУ 2", rulePatch: "Стереть 'ab → y'", description: "Полностью исключить целевое преобразование (сбой миссии)." },
+                    { actionTag: "РОКИРОВКА СТРОК", rulePatch: "1. ab → y | 2. a → x", description: "Поставить частное правило 'ab' выше общего 'a' (ликвидация экранирования)." }
+                ]
+            },
+            {
+                waveNum: 4,
+                timeLimit: 8.5,
+                waveTitle: "ВОЛНА 4: ГАШЕНИЕ ПЕРЕНОСА В ДВОИЧНОЙ СИСТЕМЕ",
+                streamWord: "10#",
+                targetWord: "11",
+                schemeSnippet: "1. 0# → [ ? ]<br>2. 1# → #0",
+                threatWarning: "Волна переноса '#' достигла бита '0'. Требуется поглотить перенос с записью 1 и остановкой.",
+                correctIndex: 0,
+                options: [
+                    { actionTag: "ТЕРМИНАЛ ПЕРЕНОСА", rulePatch: "1. 0# → · 1", description: "Поглотить перенос, записать '1' и завершить вычисления." },
+                    { actionTag: "РАСПРОСТРАНЕНИЕ", rulePatch: "1. 0# → #0", description: "Ошибочно протолкнуть маркер дальше влево (разрушение бита)." },
+                    { actionTag: "СТИРАНИЕ НУЛЯ", rulePatch: "1. 0# → λ", description: "Стереть разряд числа (потеря старшинства регистра)." }
+                ]
+            },
+            {
+                waveNum: 5,
+                timeLimit: 8.0,
+                waveTitle: "ВОЛНА 5: БЕЗУСЛОВНЫЙ ЛЯМБДА-ШТОРМ",
+                streamWord: "x",
+                targetWord: "#x",
+                schemeSnippet: "1. [ ? ]<br>2. # → · #",
+                threatWarning: "Необходимо вставить маркер '#' в начало слова строго один раз и не вызвать лавину бесконечных вставок.",
+                correctIndex: 1,
+                options: [
+                    { actionTag: "ПРОСТАЯ ВСТАВКА", rulePatch: "1. λ → #", description: "Простая лямбда будет бесконечно добавлять '#' в начало (LOOP)." },
+                    { actionTag: "ТЕРМИНАЛЬНАЯ ВСТАВКА", rulePatch: "1. λ → · #", description: "Вставить '#' перед словом и немедленно остановиться." },
+                    { actionTag: "СТИРАНИЕ СЛОВА", rulePatch: "1. x → λ", description: "Очистить исходный символ (ошибка результата)." }
+                ]
+            },
+            {
+                waveNum: 6,
+                timeLimit: 7.5,
+                waveTitle: "ВОЛНА 6: ПЕРЕОРИЕНТАЦИЯ БЕГУЩЕГО МАРКЕРА",
+                streamWord: "*11",
+                targetWord: "11*",
+                schemeSnippet: "1. [ ? ]<br>2. * → · END",
+                threatWarning: "Маркер '*' должен переместиться через единицы на правый край строки.",
+                correctIndex: 0,
+                options: [
+                    { actionTag: "СДВИГ ВПРАВО", rulePatch: "1. *1 → 1*", description: "Переместить маркер на одну позицию вправо через символ '1'." },
+                    { actionTag: "СДВИГ ВЛЕВО", rulePatch: "1. 1* → *1", description: "Маркер уже слева, правило неприменимо (преждевременный останов)." },
+                    { actionTag: "ПОГЛОЩЕНИЕ", rulePatch: "1. *1 → *", description: "Уничтожить единицу вместо перемещения (потеря разряда)." }
+                ]
+            },
+            {
+                waveNum: 7,
+                timeLimit: 7.0,
+                waveTitle: "ВОЛНА 7: УНАРНЫЙ КОЛЛАПС ПЛЮСА",
+                streamWord: "||+|||",
+                targetWord: "|||||",
+                schemeSnippet: "1. + → [ ? ]",
+                threatWarning: "Два унарных слагаемых разделены оператором '+'. Требуется слить их в единый массив.",
+                correctIndex: 2,
+                options: [
+                    { actionTag: "ЗАМЕНА НА ПАЛОЧКУ", rulePatch: "1. + → |", description: "Замена '+' на '|' даст 6 палочек вместо 5 (ошибка суммы)." },
+                    { actionTag: "ПРОСТОЕ УДАЛЕНИЕ", rulePatch: "1. + → λ", description: "Сотрет '+', но без точки продолжит поиск правил (зацикливание при наличии других правил)." },
+                    { actionTag: "ТЕРМИНАЛЬНОЕ СТИРАНИЕ", rulePatch: "1. + → · λ", description: "Стереть знак '+' и мгновенно остановиться, объединив палочки (2+3=5)." }
+                ]
+            },
+            {
+                waveNum: 8,
+                timeLimit: 6.5,
+                waveTitle: "ВОЛНА 8: СИНГУЛЯРНОСТЬ СОРТИРОВКИ",
+                streamWord: "110",
+                targetWord: "011",
+                schemeSnippet: "1. 10 → [ ? ]",
+                threatWarning: "Финальный такт! Требуется активировать пузырьковую перестановку для упорядочивания инвертированной пары.",
+                correctIndex: 1,
+                options: [
+                    { actionTag: "ИНВЕРСИЯ ПАРЫ", rulePatch: "1. 10 → 10", description: "Тождественная замена вызовет немедленный бесконечный цикл (LOOP)." },
+                    { actionTag: "ПУЗЫРЬКОВЫЙ СДВИГ", rulePatch: "1. 10 → 01", description: "Заменить '10' на '01' до полного вытеснения нуля в начало строки." },
+                    { actionTag: "ТЕРМИНАЛЬНАЯ ЗАМЕНА", rulePatch: "1. 10 → · 01", description: "Заменит лишь одну пару и остановится, оставив '101' вместо '011'." }
+                ]
+            }
+        ];
+
+        createApp({
+            data() {
+                return {
+                    gameState: 'intro',
+                    currentWaveIdx: 0,
+                    phaseTimeLeft: 10.0,
+                    timerInterval: null,
+                    sessionStartTime: null,
+                    attempts: 0,
+                    errorMessage: '',
+                    failReason: ''
+                };
+            },
+            computed: {
+                currentWave() {
+                    return WAVES_DATA[this.currentWaveIdx] || WAVES_DATA[0];
+                },
+                formattedSessionTime() {
+                    if (!this.sessionStartTime) return '0 сек';
+                    const sec = Math.max(1, Math.floor((Date.now() - this.sessionStartTime) / 1000));
+                    return `${sec} сек`;
+                }
+            },
+            methods: {
+                startGame() {
+                    this.gameState = 'playing';
+                    this.currentWaveIdx = 0;
+                    this.errorMessage = '';
+                    this.failReason = '';
+                    if (!this.sessionStartTime) {
+                        this.sessionStartTime = Date.now();
+                        this.sendTelemetryEvent('in_progress');
+                    }
+                    this.startWave();
+                },
+                startWave() {
+                    clearInterval(this.timerInterval);
+                    this.errorMessage = '';
+                    this.phaseTimeLeft = this.currentWave.timeLimit;
+
+                    const stepMs = 100;
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft -= (stepMs / 1000);
+                        if (this.phaseTimeLeft <= 0) {
+                            this.phaseTimeLeft = 0;
+                            clearInterval(this.timerInterval);
+                            this.triggerMeltdown('ВРЕМЯ ВОЛНЫ ИСТЕКЛО! Символьный поток переполнил буфер реактора.');
+                        }
+                    }, stepMs);
+                },
+                handleMorphAction(selectedIdx) {
+                    if (this.gameState !== 'playing') return;
+
+                    if (selectedIdx === this.currentWave.correctIndex) {
+                        // Успешная мутация
+                        clearInterval(this.timerInterval);
+                        if (this.currentWaveIdx < WAVES_DATA.length - 1) {
+                            this.currentWaveIdx++;
+                            this.startWave();
+                        } else {
+                            // Победа над всеми 8 волнами
+                            this.gameState = 'victory';
+                            this.sendTelemetryEvent('level_complete', true);
+                        }
+                    } else {
+                        // Фатальная ошибка мутации
+                        clearInterval(this.timerInterval);
+                        const chosenOpt = this.currentWave.options[selectedIdx];
+                        this.triggerMeltdown(`ОШИБКА МУТАЦИИ: [${chosenOpt.rulePatch}]. ${chosenOpt.description}`);
+                    }
+                },
+                triggerMeltdown(reason) {
+                    this.attempts++;
+                    this.failReason = reason;
+                    this.gameState = 'gameover';
+                    this.sendTelemetryEvent('hardcore_reset', false);
+                },
+                sendTelemetryEvent(actionType, isSuccess = false) {
+                    const timeSpent = this.sessionStartTime 
+                        ? Math.max(1, Math.floor((Date.now() - this.sessionStartTime) / 1000))
+                        : 1;
+
+                    const payload = {
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 3)',
+                        action_type: actionType,
+                        status: isSuccess ? 'completed' : (actionType === 'hardcore_reset' ? 'failed' : 'in_progress'),
+                        start_time: new Date(this.sessionStartTime || Date.now()).toISOString(),
+                        time_spent_sec: timeSpent,
+                        attempts_count: this.attempts,
+                        success: isSuccess
+                    };
+
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage(payload, '*');
+                    }
+                },
+                handleKeydown(e) {
+                    if (this.gameState !== 'playing') return;
+                    if (e.key === '1') {
+                        this.handleMorphAction(0);
+                    } else if (e.key === '2') {
+                        this.handleMorphAction(1);
+                    } else if (e.key === '3') {
+                        this.handleMorphAction(2);
+                    }
+                }
+            },
+            mounted() {
+                window.addEventListener('keydown', this.handleKeydown);
+            },
+            beforeUnmount() {
+                clearInterval(this.timerInterval);
+                window.removeEventListener('keydown', this.handleKeydown);
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>
