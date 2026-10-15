@@ -53,6 +53,11 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('close-prince-btn');
     expect(content).toContain('prince-reload-btn');
     expect(content).toContain('prince-fullscreen-btn');
+    expect(content).toContain('prince-victory-modal');
+    expect(content).toContain('prince-continue-btn');
+    expect(content).toContain('prince-victory-close-btn');
+    expect(content).toContain('ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ');
+    expect(content).toContain('PRINCE_EVENT');
   });
 
   test('4. Curriculum catalog courses.json supports princeBonusLevel on lessons', () => {
@@ -74,6 +79,13 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
       if (hasPrinceLesson) break;
     }
     expect(hasPrinceLesson).toBeTruthy();
+
+    // Verify specifically that 9th grade lesson 7 has princeBonusLevel === 1
+    const grade9Course = courses.find(c => c.slug === '9-класс');
+    expect(grade9Course).toBeDefined();
+    const lesson7 = grade9Course.lessons.find(l => l.id === '7');
+    expect(lesson7).toBeDefined();
+    expect(lesson7.princeBonusLevel).toBe(1);
   });
 
   test('5. Documentation docs/components.md covers PrinceEmulator and hardcore unlock mechanism', () => {
@@ -84,5 +96,15 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('princeBonusLevel');
     expect(content).toContain('Zero-Dependency');
     expect(content).toContain('/static/prince/');
+  });
+
+  test('6. Persian Victory Celebration text adheres to oriental style and praise requirements', () => {
+    const lessonPagePath = path.join(rootDir, 'src', 'pages', 'lesson', '[class]', '[id].astro');
+    const content = fs.readFileSync(lessonPagePath, 'utf-8');
+
+    expect(content).toContain('солнцеподобный витязь');
+    expect(content).toContain('визиря Джаффара');
+    expect(content).toContain('лепестками дамасских роз');
+    expect(content).toContain('Песков Времени');
   });
 });
