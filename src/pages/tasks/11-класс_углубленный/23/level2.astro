@@ -1,0 +1,707 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning font-monospace mb-0">Тренажер: Нормальные алгорифмы Маркова (Уровень 2: Продвинутый)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2 font-monospace">Продвинутый режим (Ручной ввод)</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Фаза 1: Инъекция формулы подстановки -->
+                <div id="phase1" class="phase-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 1 из 5: Синтаксис и инъекция формулы подстановки</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 1</span>
+                    </div>
+                    <p class="text-light">
+                        Для управления нормальным алгорифмом Маркова требуется составить точную текстовую запись формулы подстановки по заданной спецификации.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="text-secondary small mb-2">ТЕХНИЧЕСКОЕ ЗАДАНИЕ ДЛЯ ПРАВИЛА:</div>
+                        <div id="p1-task-desc" class="text-light fs-6 mb-2"></div>
+                        <div class="small text-secondary">
+                            Справка по синтаксису: простая подстановка — <span class="text-warning">α -> β</span> (или <span class="text-warning">α → β</span>), заключительная подстановка с точкой останова — <span class="text-warning">α -> . β</span> (или <span class="text-warning">α → · β</span>). Для пустого слова используйте символ <span class="text-warning">λ</span> или слово <span class="text-warning">пусто</span>.
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p1-input" class="form-label text-light font-monospace small mb-2">
+                            Введите формулу подстановки целиком (например: <span class="text-warning">*0 -> 0*</span> или <span class="text-warning">0# -> . 1</span> или <span class="text-warning">+ -> . λ</span>):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: *0 -> 0*" autocomplete="off">
+                            <button id="p1-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p1-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [СИНТАКСИЧЕСКАЯ ОШИБКА] Неверная формула подстановки! Генерация нового задания...
+                    </div>
+                </div>
+
+                <!-- Фаза 2: Построчная строковая трассировка слова -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 2 из 5: Построчная трассировка слова</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 2</span>
+                    </div>
+                    <p class="text-light">
+                        Выполните мысленную пошаговую трассировку нормального алгорифма Маркова от первого такта до полного останова (помните: после каждой простой подстановки происходит возврат к первой строке схемы!). Введите итоговое слово, которое получится после завершения работы алгорифма.
+                    </p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="card bg-black border-warning rounded-0 p-3 h-100 font-monospace">
+                                <div class="text-secondary small mb-2">СХЕМА АЛГОРИФМА:</div>
+                                <div id="p2-rules-display" class="text-light fs-5"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100 font-monospace text-center">
+                                <div class="text-secondary small mb-2">ИСХОДНОЕ ВХОДНОЕ СЛОВО:</div>
+                                <div id="p2-word-display" class="text-warning fw-bold fs-3 mb-2 py-2"></div>
+                                <div class="small text-secondary">
+                                    Алгорифм гарантированно останавливается за конечное число шагов.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-light font-monospace small mb-2">
+                            Введите итоговое результирующее слово:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: aaaa" autocomplete="off">
+                            <button id="p2-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p2-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [ОШИБКА ТРАССИРОВКИ] Неверное итоговое слово! Новая схема алгорифма...
+                    </div>
+                </div>
+
+                <!-- Фаза 3: Расчет количества машинных тактов -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 3 из 5: Аналитический расчет машинных тактов</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 3</span>
+                    </div>
+                    <p class="text-light">
+                        Каждая примененная формула подстановки считается за 1 неделимый машинный такт.
+                        Рассчитайте точное общее количество выполненных тактов до остановки алгорифма. Если алгорифм входит в бесконечный цикл и никогда не останавливается, введите число <code class="text-warning">-1</code>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="text-secondary small mb-2">СХЕМА АЛГОРИФМА:</div>
+                                <div id="p3-rules-display" class="text-light fs-5"></div>
+                            </div>
+                            <div class="col-md-6 border-start border-secondary ps-md-3 mt-3 mt-md-0">
+                                <div class="text-secondary small mb-1">ВХОДНЫЕ ДАННЫЕ:</div>
+                                <div class="mb-2">Входное слово: <span id="p3-word-display" class="text-warning fw-bold fs-4"></span></div>
+                                <div id="p3-info-desc" class="small text-secondary">
+                                    Внимательно отслеживайте возвраты на первую строку после каждого шага!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-light font-monospace small mb-2">
+                            Сколько тактов (шагов замены) выполнит нормальный алгорифм? Введите целое число (или <span class="text-warning">-1</span> при зацикливании):
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: 4" autocomplete="off">
+                            <button id="p3-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p3-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА ТАКТОВ] Неверное количество выполненных тактов! Новая конфигурация...
+                    </div>
+                </div>
+
+                <!-- Фаза 4: Арифметика в НАМ (Унарная и Двоичная) -->
+                <div id="phase4" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 4 из 5: Арифметика нормальных алгорифмов</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 4</span>
+                    </div>
+                    <p class="text-light">
+                        В учебнике К.Ю. Полякова рассматриваются базовые арифметические операторы на НАМ: унарное вычитание (<code class="text-warning">a - b</code>), унарное сложение и двоичный инкремент.
+                        Проанализируйте арифметическую схему и входные данные и введите числовое значение результата.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="text-secondary small mb-2">АРИФМЕТИЧЕСКАЯ СХЕМА:</div>
+                                <div id="p4-rules-display" class="text-light fs-5"></div>
+                            </div>
+                            <div class="col-md-6 border-start border-secondary ps-md-3 mt-3 mt-md-0">
+                                <div class="text-secondary small mb-1">ВХОДНОЕ ВЫРАЖЕНИЕ:</div>
+                                <div id="p4-expr-display" class="text-warning fw-bold fs-4 mb-2"></div>
+                                <div id="p4-desc-display" class="small text-secondary"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-light font-monospace small mb-2">
+                            Введите десятичное число — результат арифметической операции:
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="например: 3" autocomplete="off">
+                            <button id="p4-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p4-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [АРИФМЕТИЧЕСКИЙ СБОЙ] Неверный результат арифметического расчета! Новые параметры...
+                    </div>
+                </div>
+
+                <!-- Фаза 5: Предиктивный статический анализ (Останов vs Зацикливание) -->
+                <div id="phase5" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-warning font-monospace mb-0">Шаг 5 из 5: Предиктивный анализ останова (Halting & Loop)</h4>
+                        <span class="badge bg-warning text-dark rounded-0">Фаза 5</span>
+                    </div>
+                    <p class="text-light">
+                        Проанализируйте схему нормального алгорифма и входное слово без запуска. Определите математический исход выполнения:
+                        штатное завершение за конечное число тактов (<code class="text-success">OK</code>) или бесконечный цикл / осцилляция (<code class="text-warning">LOOP</code>).
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3 font-monospace">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="text-secondary small mb-2">ИССЛЕДУЕМАЯ СХЕМА:</div>
+                                <div id="p5-rules-display" class="text-light fs-5"></div>
+                            </div>
+                            <div class="col-md-6 border-start border-secondary ps-md-3 mt-3 mt-md-0">
+                                <div class="text-secondary small mb-1">ВХОДНОЕ СЛОВО:</div>
+                                <div id="p5-word-display" class="text-warning fw-bold fs-4 mb-2"></div>
+                                <div class="small text-secondary">
+                                    Обратите внимание на возможность взаимной осцилляции (пинг-понг замен) и наличие/отсутствие терминальных точек останова.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-light font-monospace small mb-2">
+                            Введите вердикт анализа: <span class="text-success fw-bold">OK</span> (нормальный останов) или <span class="text-warning fw-bold">LOOP</span> (бесконечный цикл):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace fs-5" placeholder="OK или LOOP" autocomplete="off">
+                            <button id="p5-btn" class="btn btn-outline-warning rounded-0 font-monospace px-4">ВВОД</button>
+                        </div>
+                    </div>
+
+                    <div id="p5-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [ОШИБКА ДИАГНОСТИКИ] Неверный вердикт останова! Новая исследуемая схема...
+                    </div>
+                </div>
+
+                <!-- Экран триумфа / завершения -->
+                <div id="success-screen" class="phase-container d-none text-center py-4">
+                    <div class="display-5 text-warning font-monospace mb-3">✓ УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы продемонстрировали блестящие аналитические навыки ручной трассировки, синтеза формул, вычисления тактов и предсказания бесконечных циклов в нормальных алгорифмах Маркова.
+                    </p>
+                    <div class="card bg-black border-warning rounded-0 p-3 mx-auto mb-4" style="max-width: 500px;">
+                        <div class="text-secondary small font-monospace mb-2">ИТОГОВАЯ ТЕЛЕМЕТРИЯ СЕССИИ:</div>
+                        <div class="d-flex justify-content-around text-light font-monospace">
+                            <div>Чистое время: <span id="final-time" class="text-warning fw-bold"></span> сек</div>
+                            <div>Ошибок / штрафов: <span id="final-errors" class="text-danger fw-bold">0</span></div>
+                        </div>
+                    </div>
+                    <div class="text-secondary small font-monospace">
+                        Академический зачет зафиксирован. Уровень 2 успешно сдан!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        const startTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(actionType, isSuccess = false) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            const payload = {
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 2)',
+                action_type: actionType,
+                status: isSuccess ? 'completed' : (actionType === 'hardcore_reset' ? 'failed' : 'in_progress'),
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: isSuccess
+            };
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage(payload, '*');
+            }
+        }
+
+        // Вспомогательная функция нормализации ввода формулы
+        function normalizeRule(str) {
+            if (!str) return '';
+            return str
+                .replace(/пусто|lambda/gi, 'λ')
+                .replace(/->/g, '→')
+                .replace(/·/g, '.')
+                .replace(/\s+/g, '')
+                .toLowerCase();
+        }
+
+        // ==========================================
+        // ФАЗА 1: Инъекция формулы подстановки
+        // ==========================================
+        let p1CurrentTask = null;
+        const p1Tasks = [
+            {
+                desc: 'Сконструируйте правило продвижения маркера "*" через символ "0" без останова алгорифма.',
+                validAnswers: ['*0->0*', '*0→0*']
+            },
+            {
+                desc: 'Сконструируйте заключительную формулу подстановки сложения двух унарных чисел путем стирания знака плюс "+".',
+                validAnswers: ['+->.λ', '+→.λ', '+->.', '+→.', '+->.пусто', '+→·λ', '+->·λ']
+            },
+            {
+                desc: 'Сконструируйте заключительную формулу гашения переноса в двоичной арифметике при встрече маркера переноса "#" с нулем "0".',
+                validAnswers: ['0#->.1', '0#→.1', '0#->·1', '0#→·1']
+            },
+            {
+                desc: 'Сконструируйте простое правило удаления маркера "#" из слова с продолжением работы алгорифма.',
+                validAnswers: ['#->λ', '#→λ', '#->', '#→', '#->пусто']
+            },
+            {
+                desc: 'Сконструируйте правило пузырьковой перестановки инвертированной пары "10" в правильный порядок "01".',
+                validAnswers: ['10->01', '10→01']
+            }
+        ];
+        let p1Index = 0;
+
+        function initPhase1() {
+            p1CurrentTask = p1Tasks[p1Index % p1Tasks.length];
+            p1Index++;
+            document.getElementById('p1-task-desc').textContent = p1CurrentTask.desc;
+            document.getElementById('p1-input').value = '';
+            document.getElementById('p1-input').focus();
+        }
+
+        document.getElementById('p1-btn').addEventListener('click', checkPhase1);
+        document.getElementById('p1-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase1();
+        });
+
+        function checkPhase1() {
+            const rawVal = document.getElementById('p1-input').value.trim();
+            const normVal = normalizeRule(rawVal);
+            const isValid = p1CurrentTask.validAnswers.some(ans => normalizeRule(ans) === normVal);
+
+            if (isValid) {
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                initPhase2();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                const feedback = document.getElementById('p1-feedback');
+                feedback.classList.remove('d-none');
+                document.getElementById('p1-btn').disabled = true;
+
+                setTimeout(() => {
+                    initPhase1();
+                    feedback.classList.add('d-none');
+                    document.getElementById('p1-btn').disabled = false;
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 2: Построчная строковая трассировка
+        // ==========================================
+        let p2CurrentTask = null;
+        const p2Tasks = [
+            {
+                word: 'bbab',
+                rules: ['1. b → a'],
+                expected: 'aaaa'
+            },
+            {
+                word: '1010',
+                rules: ['1. 10 → 01'],
+                expected: '0011'
+            },
+            {
+                word: '*ab',
+                rules: [
+                    '1. *a → a*',
+                    '2. *b → b*',
+                    '3. * → · c'
+                ],
+                expected: 'abc'
+            },
+            {
+                word: '||+|||',
+                rules: ['1. + → · λ'],
+                expected: '|||||'
+            },
+            {
+                word: '#101',
+                rules: [
+                    '1. #0 → 0#',
+                    '2. #1 → 1#',
+                    '3. # → · λ'
+                ],
+                expected: '101'
+            }
+        ];
+        let p2Index = 0;
+
+        function initPhase2() {
+            p2CurrentTask = p2Tasks[p2Index % p2Tasks.length];
+            p2Index++;
+
+            document.getElementById('p2-word-display').textContent = `"${p2CurrentTask.word}"`;
+            const rulesContainer = document.getElementById('p2-rules-display');
+            rulesContainer.innerHTML = p2CurrentTask.rules.map(r => `<div class="py-1">${r}</div>`).join('');
+            document.getElementById('p2-input').value = '';
+            document.getElementById('p2-input').focus();
+        }
+
+        document.getElementById('p2-btn').addEventListener('click', checkPhase2);
+        document.getElementById('p2-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase2();
+        });
+
+        function checkPhase2() {
+            const rawVal = document.getElementById('p2-input').value.trim();
+            const cleanVal = rawVal.replace(/["']/g, '');
+
+            if (cleanVal === p2CurrentTask.expected) {
+                document.getElementById('phase2').classList.add('d-none');
+                document.getElementById('phase3').classList.remove('d-none');
+                initPhase3();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                const feedback = document.getElementById('p2-feedback');
+                feedback.classList.remove('d-none');
+                document.getElementById('p2-btn').disabled = true;
+
+                setTimeout(() => {
+                    initPhase2();
+                    feedback.classList.add('d-none');
+                    document.getElementById('p2-btn').disabled = false;
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 3: Расчет машинных тактов
+        // ==========================================
+        let p3CurrentTask = null;
+        const p3Tasks = [
+            {
+                word: '1100',
+                rules: ['1. 10 → 01'],
+                // 1100 -> 1010 (1) -> 0110 (2) -> 0101 (3) -> 0011 (4)
+                expectedSteps: 4
+            },
+            {
+                word: 'bbab',
+                rules: ['1. b → a'],
+                // bbab -> abab (1) -> aaab (2) -> aaaa (3)
+                expectedSteps: 3
+            },
+            {
+                word: 'ab',
+                rules: [
+                    '1. *a → a*',
+                    '2. * → · c',
+                    '3. λ → *'
+                ],
+                // ab -> *ab (шаг 1: правило 3) -> a*b (шаг 2: правило 1) -> a* (шаг 3: правило 2 остановит и заменит * на c -> ac)
+                // Итого шагов: 3
+                expectedSteps: 3
+            },
+            {
+                word: 'aba',
+                rules: [
+                    '1. a → b',
+                    '2. b → a'
+                ],
+                // Бесконечная осцилляция!
+                expectedSteps: -1
+            },
+            {
+                word: '10',
+                rules: [
+                    '1. 0# → · 1',
+                    '2. 1# → #0',
+                    '3. λ → #'
+                ],
+                // 10 -> #10 (1: правило 3) -> неприменимо 1 и 2, снова 3 -> ##10 -> бесконечный цикл!
+                expectedSteps: -1
+            }
+        ];
+        let p3Index = 0;
+
+        function initPhase3() {
+            p3CurrentTask = p3Tasks[p3Index % p3Tasks.length];
+            p3Index++;
+
+            document.getElementById('p3-word-display').textContent = `"${p3CurrentTask.word}"`;
+            const rulesContainer = document.getElementById('p3-rules-display');
+            rulesContainer.innerHTML = p3CurrentTask.rules.map(r => `<div class="py-1">${r}</div>`).join('');
+            document.getElementById('p3-input').value = '';
+            document.getElementById('p3-input').focus();
+        }
+
+        document.getElementById('p3-btn').addEventListener('click', checkPhase3);
+        document.getElementById('p3-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase3();
+        });
+
+        function checkPhase3() {
+            const rawVal = document.getElementById('p3-input').value.trim();
+            const intVal = parseInt(rawVal, 10);
+
+            if (intVal === p3CurrentTask.expectedSteps) {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('phase4').classList.remove('d-none');
+                initPhase4();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                const feedback = document.getElementById('p3-feedback');
+                feedback.classList.remove('d-none');
+                document.getElementById('p3-btn').disabled = true;
+
+                setTimeout(() => {
+                    initPhase3();
+                    feedback.classList.add('d-none');
+                    document.getElementById('p3-btn').disabled = false;
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 4: Арифметика в НАМ
+        // ==========================================
+        let p4CurrentTask = null;
+        const p4Tasks = [
+            {
+                type: 'subtraction',
+                a: 5,
+                b: 2,
+                rules: [
+                    '1. |-| → λ',
+                    '2. - → · λ'
+                ],
+                desc: 'Унарное вычитание чисел: a - b'
+            },
+            {
+                type: 'subtraction',
+                a: 6,
+                b: 4,
+                rules: [
+                    '1. |-| → λ',
+                    '2. - → · λ'
+                ],
+                desc: 'Унарное вычитание чисел: a - b'
+            },
+            {
+                type: 'addition',
+                a: 4,
+                b: 3,
+                rules: [
+                    '1. + → · λ'
+                ],
+                desc: 'Унарное сложение чисел: a + b'
+            },
+            {
+                type: 'increment',
+                a: 11, // 1011 в двоичной
+                binaryStr: '1011',
+                rules: [
+                    '1. *0 → 0*',
+                    '2. *1 → 1*',
+                    '3. * → #',
+                    '4. 0# → · 1',
+                    '5. 1# → #0',
+                    '6. # → · 1',
+                    '7. λ → *'
+                ],
+                desc: 'Двоичный инкремент: к двоичному числу 1011₂ прибавляется 1 (ответ в десятичной системе)'
+            }
+        ];
+        let p4Index = 0;
+
+        function initPhase4() {
+            p4CurrentTask = p4Tasks[p4Index % p4Tasks.length];
+            p4Index++;
+
+            const rulesContainer = document.getElementById('p4-rules-display');
+            rulesContainer.innerHTML = p4CurrentTask.rules.map(r => `<div class="py-1">${r}</div>`).join('');
+
+            if (p4CurrentTask.type === 'subtraction') {
+                const expr = `${'|'.repeat(p4CurrentTask.a)} - ${'|'.repeat(p4CurrentTask.b)}`;
+                document.getElementById('p4-expr-display').textContent = expr;
+                document.getElementById('p4-desc-display').textContent = `${p4CurrentTask.desc} (${p4CurrentTask.a} - ${p4CurrentTask.b})`;
+            } else if (p4CurrentTask.type === 'addition') {
+                const expr = `${'|'.repeat(p4CurrentTask.a)} + ${'|'.repeat(p4CurrentTask.b)}`;
+                document.getElementById('p4-expr-display').textContent = expr;
+                document.getElementById('p4-desc-display').textContent = `${p4CurrentTask.desc} (${p4CurrentTask.a} + ${p4CurrentTask.b})`;
+            } else {
+                document.getElementById('p4-expr-display').textContent = `${p4CurrentTask.binaryStr}₂ + 1`;
+                document.getElementById('p4-desc-display').textContent = p4CurrentTask.desc;
+            }
+
+            document.getElementById('p4-input').value = '';
+            document.getElementById('p4-input').focus();
+        }
+
+        document.getElementById('p4-btn').addEventListener('click', checkPhase4);
+        document.getElementById('p4-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase4();
+        });
+
+        function checkPhase4() {
+            const rawVal = document.getElementById('p4-input').value.trim();
+            const intVal = parseInt(rawVal, 10);
+            let expectedVal = 0;
+
+            if (p4CurrentTask.type === 'subtraction') {
+                expectedVal = p4CurrentTask.a - p4CurrentTask.b;
+            } else if (p4CurrentTask.type === 'addition') {
+                expectedVal = p4CurrentTask.a + p4CurrentTask.b;
+            } else {
+                expectedVal = p4CurrentTask.a + 1; // 11 + 1 = 12
+            }
+
+            if (intVal === expectedVal) {
+                document.getElementById('phase4').classList.add('d-none');
+                document.getElementById('phase5').classList.remove('d-none');
+                initPhase5();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                const feedback = document.getElementById('p4-feedback');
+                feedback.classList.remove('d-none');
+                document.getElementById('p4-btn').disabled = true;
+
+                setTimeout(() => {
+                    initPhase4();
+                    feedback.classList.add('d-none');
+                    document.getElementById('p4-btn').disabled = false;
+                }, 1200);
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 5: Предиктивный статический анализ
+        // ==========================================
+        let p5CurrentTask = null;
+        const p5Tasks = [
+            {
+                word: 'ab',
+                rules: [
+                    '1. a → b',
+                    '2. b → a'
+                ],
+                verdict: 'LOOP' // взаимная осцилляция
+            },
+            {
+                word: '1010',
+                rules: [
+                    '1. 10 → 01'
+                ],
+                verdict: 'OK' // завершится, когда 0 встанут слева
+            },
+            {
+                word: 'x',
+                rules: [
+                    '1. λ → #'
+                ],
+                verdict: 'LOOP' // безусловное приписывание маркера в начало
+            },
+            {
+                word: '||+||',
+                rules: [
+                    '1. + → · λ'
+                ],
+                verdict: 'OK' // заключительное правило остановит алгорифм
+            },
+            {
+                word: '111',
+                rules: [
+                    '1. 1 → 11'
+                ],
+                verdict: 'LOOP' // неограниченный рост длины строки
+            }
+        ];
+        let p5Index = 0;
+
+        function initPhase5() {
+            p5CurrentTask = p5Tasks[p5Index % p5Tasks.length];
+            p5Index++;
+
+            document.getElementById('p5-word-display').textContent = `"${p5CurrentTask.word}"`;
+            const rulesContainer = document.getElementById('p5-rules-display');
+            rulesContainer.innerHTML = p5CurrentTask.rules.map(r => `<div class="py-1">${r}</div>`).join('');
+            document.getElementById('p5-input').value = '';
+            document.getElementById('p5-input').focus();
+        }
+
+        document.getElementById('p5-btn').addEventListener('click', checkPhase5);
+        document.getElementById('p5-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase5();
+        });
+
+        function checkPhase5() {
+            const rawVal = document.getElementById('p5-input').value.trim().toUpperCase();
+
+            if (rawVal === p5CurrentTask.verdict) {
+                document.getElementById('phase5').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+
+                const totalSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                document.getElementById('final-time').textContent = totalSec;
+                document.getElementById('final-errors').textContent = attempts;
+
+                sendTelemetry('level_complete', true);
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                const feedback = document.getElementById('p5-feedback');
+                feedback.classList.remove('d-none');
+                document.getElementById('p5-btn').disabled = true;
+
+                setTimeout(() => {
+                    initPhase5();
+                    feedback.classList.add('d-none');
+                    document.getElementById('p5-btn').disabled = false;
+                }, 1200);
+            }
+        }
+
+        // Старт
+        sendTelemetry('in_progress');
+        initPhase1();
+    </script>
+</TaskLayout>
