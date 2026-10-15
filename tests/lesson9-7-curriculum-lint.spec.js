@@ -72,5 +72,35 @@ test.describe('Curriculum & Architecture Linting Suite (9th Grade - Lesson 7: Mo
     expect(code).toContain('currentPhase < 3');
     expect(code).toContain('Шаг 1 из 3');
   });
+
+  test('Level 2 adheres to architectural requirements (5 procedural phases and manual input)', async () => {
+    const tasksPath = path.join(process.cwd(), 'src/pages/tasks/9-класс/7');
+    const level2File = path.join(tasksPath, 'level2.astro');
+    expect(fs.existsSync(level2File)).toBe(true);
+
+    const code = fs.readFileSync(level2File, 'utf-8');
+    // TaskLayout component usage with level 2
+    expect(code).toContain('import TaskLayout');
+    expect(code).toContain('<TaskLayout');
+    // Must contain 5 procedural phases
+    expect(code).toContain('id="phase1"');
+    expect(code).toContain('id="phase2"');
+    expect(code).toContain('id="phase3"');
+    expect(code).toContain('id="phase4"');
+    expect(code).toContain('id="phase5"');
+    // Telemetry events
+    expect(code).toContain('TELEMETRY_EVENT');
+    expect(code).toContain('level_complete');
+    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('Урок 7');
+    // No forbidden style tags
+    expect(code.includes('<style>')).toBe(false);
+    expect(code.includes('<style ')).toBe(false);
+    // Zero Multiple Choice Policy: strictly text/number inputs
+    expect(code.includes('type="radio"')).toBe(false);
+    expect(code.includes('<select')).toBe(false);
+    expect(code).toMatch(/<input[^>]+type="(text|number)"/);
+  });
 });
+
 
