@@ -31,14 +31,15 @@ test.describe('Grade 9 Lesson 7 Prince of Persia Hardcore Bonus & Persian Victor
     // Overlay elements
     expect(content).toContain('id="prince-overlay"');
     expect(content).toContain('id="prince-game-iframe"');
-    expect(content).toContain('/static/prince/index.html?level=${princeBonusLevel}&skipTitle=true');
+    expect(content).toContain('/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true');
 
     // Persian victory modal elements
     expect(content).toContain('id="prince-victory-modal"');
     expect(content).toContain('id="prince-victory-level"');
     expect(content).toContain('ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ!');
     expect(content).toContain('ДАР ВЕЛИКОГО ПАДИШАХА');
-    expect(content).toContain('id="prince-continue-btn"');
+    expect(content).toContain('ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ');
+    expect(content).toContain('id="prince-retry-btn"');
     expect(content).toContain('id="prince-victory-close-btn"');
 
     // Authentic Persian grand praise phrases
@@ -60,7 +61,7 @@ test.describe('Grade 9 Lesson 7 Prince of Persia Hardcore Bonus & Persian Victor
     expect(content).toContain("victoryModal.classList.add('flex')");
 
     // Interactive button listeners
-    expect(content).toContain('princeContinueBtn.addEventListener');
+    expect(content).toContain('princeRetryBtn.addEventListener');
     expect(content).toContain('princeVictoryCloseBtn.addEventListener');
     expect(content).toContain('princeReloadBtn.addEventListener');
     expect(content).toContain('closePrinceBtn.addEventListener');

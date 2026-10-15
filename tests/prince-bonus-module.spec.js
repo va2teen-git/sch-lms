@@ -33,6 +33,7 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     const content = fs.readFileSync(componentPath, 'utf-8');
     expect(content).toContain('export interface Props');
     expect(content).toContain('level?: number');
+    expect(content).toContain('maxLevel?: number');
     expect(content).toContain('missionName?: string');
     expect(content).toContain('skipTitle?: boolean');
     expect(content).toContain('/static/prince/index.html');
@@ -41,12 +42,13 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('prince-fs-btn');
   });
 
-  test('3. Lesson page template [id].astro integrates princeBonusLevel reward', () => {
+  test('3. Lesson page template [id].astro integrates princeBonusLevel reward and Level 1 lock', () => {
     const lessonPagePath = path.join(rootDir, 'src', 'pages', 'lesson', '[class]', '[id].astro');
     expect(fs.existsSync(lessonPagePath)).toBeTruthy();
 
     const content = fs.readFileSync(lessonPagePath, 'utf-8');
     expect(content).toContain('princeBonusLevel');
+    expect(content).toContain('maxLevel=${princeBonusLevel}');
     expect(content).toContain('prince-bonus-card');
     expect(content).toContain('prince-overlay');
     expect(content).toContain('open-prince-btn');
@@ -54,8 +56,9 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('prince-reload-btn');
     expect(content).toContain('prince-fullscreen-btn');
     expect(content).toContain('prince-victory-modal');
-    expect(content).toContain('prince-continue-btn');
+    expect(content).toContain('prince-retry-btn');
     expect(content).toContain('prince-victory-close-btn');
+    expect(content).toContain('ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ');
     expect(content).toContain('ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ');
     expect(content).toContain('PRINCE_EVENT');
   });
@@ -106,5 +109,18 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('визиря Джаффара');
     expect(content).toContain('лепестками дамасских роз');
     expect(content).toContain('Песков Времени');
+  });
+
+  test('7. Engine enforces maxLevel boundary preventing progression past level 1', () => {
+    const utilsPath = path.join(rootDir, 'public/static/prince/src/Utils.js');
+    const gamePath = path.join(rootDir, 'public/static/prince/src/Game.js');
+
+    const utilsContent = fs.readFileSync(utilsPath, 'utf-8');
+    expect(utilsContent).toContain('PrinceJS.maxLevel = queryMaxLevel');
+    expect(utilsContent).toContain('PrinceJS.currentLevel > PrinceJS.maxLevel');
+
+    const gameContent = fs.readFileSync(gamePath, 'utf-8');
+    expect(gameContent).toContain('completedLvl >= PrinceJS.maxLevel');
+    expect(gameContent).toContain('this.game.paused = true');
   });
 });
