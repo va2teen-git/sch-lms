@@ -1,0 +1,702 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success font-monospace mb-0">Тренажер: Нормальные алгорифмы Маркова (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2 font-monospace">Базовый режим</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Фаза 1: Моделирование такта подстановки на слове -->
+                <div id="phase1" class="phase-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-success font-monospace mb-0">Шаг 1 из 3: Моделирование одиночной подстановки</h4>
+                        <span class="badge bg-success text-dark rounded-0">Фаза 1</span>
+                    </div>
+                    <p class="text-light">
+                        Проанализируйте исходное слово и выполняемую формулу подстановки нормального алгорифма Маркова.
+                        Своими руками приведите интерактивное слово в состояние <strong>после ровно одного такта подстановки</strong> (помните: заменяется <strong>самое левое</strong> вхождение образца!), либо зафиксируйте, что правило неприменимо.
+                    </p>
+
+                    <!-- Исходное слово -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3 text-center">
+                        <div class="text-secondary small font-monospace mb-2">ИСХОДНОЕ ВХОДНОЕ СЛОВО:</div>
+                        <div id="p1-initial-word" class="d-flex justify-content-center align-items-center gap-1 font-monospace fs-4"></div>
+                    </div>
+
+                    <!-- Карточка выполняемой формулы -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="text-secondary font-monospace small d-block">ВЫПОЛНЯЕМАЯ ФОРМУЛА ПОДСТАНОВКИ:</span>
+                                <span id="p1-rule-display" class="font-monospace fs-4 text-warning fw-bold"></span>
+                            </div>
+                            <div class="text-end text-secondary small font-monospace">
+                                Принцип: <span class="text-light">Самое левое вхождение</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Интерактивное рабочее слово -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3 text-center">
+                        <div class="text-success small font-monospace mb-2">ВАШЕ РАБОЧЕЕ СЛОВО (КЛИКАЙТЕ ПО БУКВЕ ДЛЯ ЦИКЛИЧЕСКОЙ СМЕНЫ СИМВОЛА):</div>
+                        <div id="p1-work-word" class="d-flex justify-content-center align-items-center gap-1 font-monospace fs-4 mb-3"></div>
+                        <div class="d-flex justify-content-center align-items-center gap-2">
+                            <button id="p1-btn-add-char" class="btn btn-outline-secondary font-monospace rounded-0 btn-sm px-3">+ Добавить символ в конец</button>
+                            <button id="p1-btn-del-char" class="btn btn-outline-secondary font-monospace rounded-0 btn-sm px-3">- Удалить последний символ</button>
+                            <button id="p1-btn-reset-word" class="btn btn-outline-secondary font-monospace rounded-0 btn-sm px-3">Сбросить слово</button>
+                        </div>
+                    </div>
+
+                    <!-- Кнопки подтверждения решения -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button id="p1-submit-step" class="btn btn-success text-dark font-monospace fw-bold rounded-0 px-4 py-2 flex-grow-1">
+                            ПРИМЕНИТЬ ТАКТ К СЛОВУ
+                        </button>
+                        <button id="p1-submit-not-applicable" class="btn btn-outline-warning font-monospace rounded-0 px-4 py-2">
+                            ⚠️ ПРАВИЛО НЕПРИМЕНИМО К СЛОВУ (ЕСТЕСТВЕННЫЙ ОСТАНОВ)
+                        </button>
+                    </div>
+
+                    <div id="p1-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [СБОЙ ПОДСТАНОВКИ] Неверный результат такта или нарушен выбор самого левого образца! Новый вариант...
+                    </div>
+                </div>
+
+                <!-- Фаза 2: Слот-пазл / Конструирование правила токенами -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-success font-monospace mb-0">Шаг 2 из 3: Конструирование формулы подстановки</h4>
+                        <span class="badge bg-success text-dark rounded-0">Фаза 2</span>
+                    </div>
+                    <p class="text-light">
+                        Соберите требуемую формулу подстановки нормального алгорифма из строительных блоков палитры.
+                        Кликайте по токенам в палитре, чтобы последовательно заполнить слоты <strong>[Образец α]</strong>, <strong>[Тип перехода: → или →·]</strong> и <strong>[Замена β]</strong>.
+                    </p>
+
+                    <!-- Описание цели шага -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="text-secondary small font-monospace mb-1">ТЕХНИЧЕСКОЕ ЗАДАНИЕ ДЛЯ ПРАВИЛА:</div>
+                        <div id="p2-task-desc" class="font-monospace text-light fs-6 mb-2"></div>
+                        <div class="small text-secondary font-monospace">
+                            Синтаксис: <span class="text-light">α → β</span> (простая подстановка) | <span class="text-light">α → · β</span> (заключительная с точкой)
+                        </div>
+                    </div>
+
+                    <!-- Зона слотов правила -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small font-monospace mb-2">СЛОТЫ СИНТАКСИЧЕСКОЙ СБОРКИ ФОРМУЛЫ:</div>
+                        <div id="p2-slots-container" class="d-flex align-items-center gap-3 font-monospace fs-4 flex-wrap">
+                            <div class="d-flex flex-column align-items-center">
+                                <span class="text-secondary small mb-1">ОБРАЗЕЦ α:</span>
+                                <div id="p2-slot-left" class="border border-secondary bg-dark text-success px-4 py-2 text-center" style="min-width: 120px;">[ПУСТО]</div>
+                            </div>
+                            <div class="d-flex flex-column align-items-center">
+                                <span class="text-secondary small mb-1">ТИП СТРЕЛКИ:</span>
+                                <div id="p2-slot-arrow" class="border border-secondary bg-dark text-warning px-4 py-2 text-center" style="min-width: 100px;">[ПУСТО]</div>
+                            </div>
+                            <div class="d-flex flex-column align-items-center">
+                                <span class="text-secondary small mb-1">ЗАМЕНА β:</span>
+                                <div id="p2-slot-right" class="border border-secondary bg-dark text-success px-4 py-2 text-center" style="min-width: 120px;">[ПУСТО]</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Палитра токенов -->
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small font-monospace mb-2">ПАЛИТРА СТРОИТЕЛЬНЫХ ТОКЕНОВ (КЛИКАЙТЕ ДЛЯ ДОБАВЛЕНИЯ В СЛОТЫ):</div>
+                        <div id="p2-tokens-palette" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <!-- Кнопки действия -->
+                    <div class="d-flex gap-2 mb-3">
+                        <button id="p2-submit-btn" class="btn btn-success text-dark font-monospace fw-bold rounded-0 px-4 py-2 flex-grow-1">
+                            СКОМПИЛИРОВАТЬ И ПРОВЕРИТЬ ПРАВИЛО
+                        </button>
+                        <button id="p2-reset-btn" class="btn btn-outline-secondary font-monospace rounded-0 px-3">
+                            Очистить слоты
+                        </button>
+                    </div>
+
+                    <div id="p2-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [СИНТАКСИЧЕСКИЙ СБОЙ] Неверная формула подстановки или ошибка в типе терминатора! Новый вариант...
+                    </div>
+                </div>
+
+                <!-- Фаза 3: Интерактивное упорядочивание схемы НАМ -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h4 class="h5 text-success font-monospace mb-0">Шаг 3 из 3: Упорядочивание схемы нормального алгорифма</h4>
+                        <span class="badge bg-success text-dark rounded-0">Фаза 3</span>
+                    </div>
+                    <p class="text-light">
+                        В нормальных алгорифмах Маркова <strong>порядок правил имеет решающее значение</strong>: правила просматриваются строго сверху вниз, и возврат к началу схемы происходит после каждой простой подстановки.
+                        Расставьте строки схемы в правильном порядке кнопками <strong>[↑ Вверх]</strong> и <strong>[↓ Вниз]</strong>, чтобы алгорифм решил поставленную задачу без зацикливания и экранирования.
+                    </p>
+
+                    <!-- Описание технического задания -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="text-secondary small font-monospace mb-1">ТЕХНИЧЕСКАЯ ЗАДАЧА СХЕМЫ:</div>
+                        <div id="p3-task-desc" class="font-monospace text-light fs-6 mb-2"></div>
+                        <div class="small text-secondary font-monospace">
+                            Входной тест: <span id="p3-input-example" class="text-warning"></span> ➔ Целевой результат: <span id="p3-output-example" class="text-success"></span>
+                        </div>
+                    </div>
+
+                    <!-- Список правил схемы с кнопками перемещения -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small font-monospace mb-2">СХЕМА АЛГОРИФМА (ИСПОЛЬЗУЙТЕ КНОПКИ ДЛЯ СДВИГА СТРОК МЕСТАМИ):</div>
+                        <div id="p3-rules-list" class="d-flex flex-column gap-2"></div>
+                    </div>
+
+                    <!-- Кнопка запуска тестирования -->
+                    <div class="d-flex gap-2 mb-3">
+                        <button id="p3-submit-btn" class="btn btn-success text-dark font-monospace fw-bold rounded-0 px-4 py-2 flex-grow-1">
+                            ЗАПУСТИТЬ ТЕСТИРОВАНИЕ СХЕМЫ НА ВХОДНОМ СЛОВЕ
+                        </button>
+                    </div>
+
+                    <div id="p3-feedback" class="alert alert-danger rounded-0 border-danger d-none font-monospace py-2" role="alert">
+                        [СБОЙ СХЕМЫ] Схема зациклилась или дала неверный результат из-за некорректного порядка строк! Новый вариант...
+                    </div>
+                </div>
+
+                <!-- Экран триумфа / завершения -->
+                <div id="success-screen" class="phase-container d-none text-center py-4">
+                    <div class="display-5 text-success font-monospace mb-3">✓ УРОВЕНЬ 1 УСПЕШНО ПРОЙДЕН!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы безупречно освоили семантику подстановок, поиск левого образца, сборку правил и иерархию приоритетов схем Маркова.
+                    </p>
+                    <div class="card bg-black border-success rounded-0 p-3 mx-auto mb-4" style="max-width: 500px;">
+                        <div class="text-secondary small font-monospace mb-2">ИТОГОВАЯ ТЕЛЕМЕТРИЯ СЕССИИ:</div>
+                        <div class="d-flex justify-content-around text-light font-monospace">
+                            <div>Затрачено времени: <span id="final-time" class="text-success fw-bold"></span> сек</div>
+                            <div>Ошибок / штрафов: <span id="final-errors" class="text-warning fw-bold">0</span></div>
+                        </div>
+                    </div>
+                    <div class="text-secondary small font-monospace">
+                        Академический прогресс зафиксирован. Данные отправлены в журнал учителя.
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        const startTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(actionType, isSuccess = false) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            const payload = {
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 1)',
+                action_type: actionType,
+                status: isSuccess ? 'completed' : (actionType === 'hardcore_reset' ? 'failed' : 'in_progress'),
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: isSuccess
+            };
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage(payload, '*');
+            }
+        }
+
+        // ==========================================
+        // ФАЗА 1: Моделирование такта подстановки
+        // ==========================================
+        let p1InitialWord = [];
+        let p1WorkWord = [];
+        let p1Rule = null;
+        let p1ExpectedWord = null;
+        let p1IsApplicable = true;
+
+        const p1Variants = [
+            {
+                word: ['b', 'a', 'b', 'b'],
+                pattern: 'b',
+                replacement: 'a',
+                isTerminal: false,
+                desc: 'b → a',
+                applicable: true,
+                expected: ['a', 'a', 'b', 'b'] // строго самое левое 'b' на поз 0!
+            },
+            {
+                word: ['1', '0', '1', '1', '0'],
+                pattern: '10',
+                replacement: '01',
+                isTerminal: false,
+                desc: '10 → 01',
+                applicable: true,
+                expected: ['0', '1', '1', '1', '0'] // самое левое '10' на поз 0-1
+            },
+            {
+                word: ['*', 'a', 'b', 'a'],
+                pattern: '*a',
+                replacement: 'a*',
+                isTerminal: false,
+                desc: '*a → a*',
+                applicable: true,
+                expected: ['a', '*', 'b', 'a'] // сдвиг маркера
+            },
+            {
+                word: ['a', 'b', '*'],
+                pattern: '*',
+                replacement: 'c',
+                isTerminal: true,
+                desc: '* → · c',
+                applicable: true,
+                expected: ['a', 'b', 'c']
+            },
+            {
+                word: ['a', 'b', '#', 'b'],
+                pattern: '#',
+                replacement: '',
+                isTerminal: false,
+                desc: '# → λ',
+                applicable: true,
+                expected: ['a', 'b', 'b'] // удаление маркера
+            },
+            {
+                word: ['1', '0', '1', '1'],
+                pattern: '0#',
+                replacement: '1',
+                isTerminal: true,
+                desc: '0# → · 1',
+                applicable: false, // маркера # нет в слове!
+                expected: null
+            },
+            {
+                word: ['a', 'a', 'b', 'a'],
+                pattern: 'c',
+                replacement: 'x',
+                isTerminal: false,
+                desc: 'c → x',
+                applicable: false, // символа c нет
+                expected: null
+            }
+        ];
+
+        let p1VariantIndex = 0;
+
+        function initPhase1() {
+            const v = p1Variants[p1VariantIndex % p1Variants.length];
+            p1VariantIndex++;
+
+            p1InitialWord = [...v.word];
+            p1WorkWord = [...v.word];
+            p1Rule = v;
+            p1IsApplicable = v.applicable;
+            p1ExpectedWord = v.expected ? [...v.expected] : null;
+
+            document.getElementById('p1-rule-display').textContent = v.desc;
+            renderP1InitialWord();
+            renderP1WorkWord();
+        }
+
+        function renderP1InitialWord() {
+            const container = document.getElementById('p1-initial-word');
+            container.innerHTML = '';
+            p1InitialWord.forEach((char, idx) => {
+                const el = document.createElement('div');
+                el.className = 'border border-secondary bg-dark text-secondary px-3 py-2 font-monospace';
+                el.textContent = char;
+                container.appendChild(el);
+            });
+        }
+
+        const alphabetChars = ['a', 'b', 'c', '0', '1', '*', '#', 'x'];
+
+        function renderP1WorkWord() {
+            const container = document.getElementById('p1-work-word');
+            container.innerHTML = '';
+            if (p1WorkWord.length === 0) {
+                const emptyBadge = document.createElement('div');
+                emptyBadge.className = 'text-secondary small font-monospace py-2';
+                emptyBadge.textContent = '[ПУСТОЕ СЛОВО λ]';
+                container.appendChild(emptyBadge);
+                return;
+            }
+
+            p1WorkWord.forEach((char, idx) => {
+                const el = document.createElement('button');
+                el.type = 'button';
+                el.className = 'btn btn-outline-success font-monospace px-3 py-2 rounded-0';
+                el.textContent = char;
+                el.title = 'Кликните для переключения символа';
+                el.addEventListener('click', () => {
+                    const currentPos = alphabetChars.indexOf(char);
+                    const nextChar = alphabetChars[(currentPos + 1) % alphabetChars.length];
+                    p1WorkWord[idx] = nextChar;
+                    renderP1WorkWord();
+                });
+                container.appendChild(el);
+            });
+        }
+
+        document.getElementById('p1-btn-add-char').addEventListener('click', () => {
+            if (p1WorkWord.length < 8) {
+                p1WorkWord.push('a');
+                renderP1WorkWord();
+            }
+        });
+
+        document.getElementById('p1-btn-del-char').addEventListener('click', () => {
+            if (p1WorkWord.length > 0) {
+                p1WorkWord.pop();
+                renderP1WorkWord();
+            }
+        });
+
+        document.getElementById('p1-btn-reset-word').addEventListener('click', () => {
+            p1WorkWord = [...p1InitialWord];
+            renderP1WorkWord();
+        });
+
+        document.getElementById('p1-submit-step').addEventListener('click', () => {
+            const feedback = document.getElementById('p1-feedback');
+            const submitBtn = document.getElementById('p1-submit-step');
+
+            if (!p1IsApplicable) {
+                // Игрок попытался применить неприменимое правило!
+                triggerP1Error();
+                return;
+            }
+
+            const isMatch = p1WorkWord.length === p1ExpectedWord.length &&
+                p1WorkWord.every((ch, i) => ch === p1ExpectedWord[i]);
+
+            if (isMatch) {
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                initPhase2();
+            } else {
+                triggerP1Error();
+            }
+        });
+
+        document.getElementById('p1-submit-not-applicable').addEventListener('click', () => {
+            if (!p1IsApplicable) {
+                // Верно зафиксировано, что правило неприменимо
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                initPhase2();
+            } else {
+                triggerP1Error();
+            }
+        });
+
+        function triggerP1Error() {
+            attempts++;
+            sendTelemetry('hardcore_reset');
+            const feedback = document.getElementById('p1-feedback');
+            feedback.classList.remove('d-none');
+            const btn1 = document.getElementById('p1-submit-step');
+            const btn2 = document.getElementById('p1-submit-not-applicable');
+            btn1.disabled = true;
+            btn2.disabled = true;
+
+            setTimeout(() => {
+                initPhase1();
+                feedback.classList.add('d-none');
+                btn1.disabled = false;
+                btn2.disabled = false;
+            }, 1200);
+        }
+
+        // ==========================================
+        // ФАЗА 2: Слот-пазл формулы подстановки
+        // ==========================================
+        let p2CurrentTask = null;
+        let p2SlotLeft = null;
+        let p2SlotArrow = null;
+        let p2SlotRight = null;
+
+        const p2Tasks = [
+            {
+                desc: 'Сконструируйте правило продвижения маркера "*" через символ "a" без остановки алгорифма.',
+                targetLeft: '*a',
+                targetArrow: '→',
+                targetRight: 'a*'
+            },
+            {
+                desc: 'Сконструируйте заключительное правило гашения переноса в двоичной арифметике при встрече маркера "#" с нулем "0".',
+                targetLeft: '0#',
+                targetArrow: '→ ·',
+                targetRight: '1'
+            },
+            {
+                desc: 'Сконструируйте заключительное правило сложения двух унарных чисел через стирание знака плюс "+".',
+                targetLeft: '+',
+                targetArrow: '→ ·',
+                targetRight: 'λ'
+            },
+            {
+                desc: 'Сконструируйте правило удаления маркера "#" с продолжением работы алгорифма.',
+                targetLeft: '#',
+                targetArrow: '→',
+                targetRight: 'λ'
+            },
+            {
+                desc: 'Сконструируйте правило пузырьковой перестановки инвертированной двоичной пары "10" в правильный порядок.',
+                targetLeft: '10',
+                targetArrow: '→',
+                targetRight: '01'
+            }
+        ];
+
+        let p2TaskIndex = 0;
+
+        function initPhase2() {
+            p2CurrentTask = p2Tasks[p2TaskIndex % p2Tasks.length];
+            p2TaskIndex++;
+
+            p2SlotLeft = null;
+            p2SlotArrow = null;
+            p2SlotRight = null;
+
+            document.getElementById('p2-task-desc').textContent = p2CurrentTask.desc;
+            updateP2SlotsUI();
+            renderP2Palette();
+        }
+
+        function updateP2SlotsUI() {
+            document.getElementById('p2-slot-left').textContent = p2SlotLeft || '[ПУСТО]';
+            document.getElementById('p2-slot-arrow').textContent = p2SlotArrow || '[ПУСТО]';
+            document.getElementById('p2-slot-right').textContent = p2SlotRight || '[ПУСТО]';
+        }
+
+        function renderP2Palette() {
+            const paletteContainer = document.getElementById('p2-tokens-palette');
+            paletteContainer.innerHTML = '';
+
+            // Токены стрелок
+            const arrowTokens = ['→', '→ ·'];
+            // Токены подстрок (целевые + дистракторы)
+            const baseTokens = [
+                p2CurrentTask.targetLeft,
+                p2CurrentTask.targetRight,
+                '*a', 'a*', '0#', '#0', '1', '01', '10', '+', 'λ', '#', '*'
+            ];
+
+            // Дедупликация и перемешивание
+            const uniqueTokens = Array.from(new Set([...arrowTokens, ...baseTokens])).sort(() => Math.random() - 0.5);
+
+            uniqueTokens.forEach(tok => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = (tok.includes('→'))
+                    ? 'btn btn-outline-warning font-monospace rounded-0 px-3 py-1'
+                    : 'btn btn-outline-success font-monospace rounded-0 px-3 py-1';
+                btn.textContent = tok;
+                btn.addEventListener('click', () => {
+                    if (tok.includes('→')) {
+                        p2SlotArrow = tok;
+                    } else if (!p2SlotLeft) {
+                        p2SlotLeft = tok;
+                    } else if (!p2SlotRight) {
+                        p2SlotRight = tok;
+                    } else {
+                        // Если оба заполнены, перезаписываем левый
+                        p2SlotLeft = tok;
+                    }
+                    updateP2SlotsUI();
+                });
+                paletteContainer.appendChild(btn);
+            });
+        }
+
+        document.getElementById('p2-reset-btn').addEventListener('click', () => {
+            p2SlotLeft = null;
+            p2SlotArrow = null;
+            p2SlotRight = null;
+            updateP2SlotsUI();
+        });
+
+        document.getElementById('p2-submit-btn').addEventListener('click', () => {
+            const feedback = document.getElementById('p2-feedback');
+            const submitBtn = document.getElementById('p2-submit-btn');
+
+            const isMatch = (p2SlotLeft === p2CurrentTask.targetLeft) &&
+                (p2SlotArrow === p2CurrentTask.targetArrow) &&
+                (p2SlotRight === p2CurrentTask.targetRight);
+
+            if (isMatch) {
+                document.getElementById('phase2').classList.add('d-none');
+                document.getElementById('phase3').classList.remove('d-none');
+                initPhase3();
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                feedback.classList.remove('d-none');
+                submitBtn.disabled = true;
+
+                setTimeout(() => {
+                    initPhase2();
+                    feedback.classList.add('d-none');
+                    submitBtn.disabled = false;
+                }, 1200);
+            }
+        });
+
+        // ==========================================
+        // ФАЗА 3: Упорядочивание схемы НАМ
+        // ==========================================
+        let p3CurrentTask = null;
+        let p3RulesState = [];
+
+        const p3Tasks = [
+            {
+                title: 'Приписать символ "c" в конец слова в алфавите {a, b}',
+                inputWord: 'ab',
+                expectedWord: 'abc',
+                rules: [
+                    { id: 'shift_a', text: '*a → a*', priority: 1 },
+                    { id: 'shift_b', text: '*b → b*', priority: 2 },
+                    { id: 'term_c', text: '* → · c', priority: 3 },
+                    { id: 'init_star', text: 'λ → *', priority: 4 }
+                ]
+            },
+            {
+                title: 'Двоичный инкремент (+1 к числу) для младшего разряда "0"',
+                inputWord: '10',
+                expectedWord: '11',
+                rules: [
+                    { id: 'term_zero', text: '0# → · 1', priority: 1 },
+                    { id: 'carry_one', text: '1# → #0', priority: 2 },
+                    { id: 'init_hash', text: 'λ → · 1', priority: 3 }
+                ]
+            },
+            {
+                title: 'Схлопывание сдвоенных пробелов "_" с последующим удалением маркера "#"',
+                inputWord: '#a__b',
+                expectedWord: 'a_b',
+                rules: [
+                    { id: 'collapse', text: '__ → _', priority: 1 },
+                    { id: 'shift_hash', text: '#_ → _#', priority: 2 },
+                    { id: 'term_hash', text: '# → λ', priority: 3 }
+                ]
+            }
+        ];
+
+        let p3TaskIndex = 0;
+
+        function initPhase3() {
+            p3CurrentTask = p3Tasks[p3TaskIndex % p3Tasks.length];
+            p3TaskIndex++;
+
+            document.getElementById('p3-task-desc').textContent = p3CurrentTask.title;
+            document.getElementById('p3-input-example').textContent = `"${p3CurrentTask.inputWord}"`;
+            document.getElementById('p3-output-example').textContent = `"${p3CurrentTask.expectedWord}"`;
+
+            // Перемешиваем правила так, чтобы они заведомо не стояли в идеальном порядке
+            let shuffled = [...p3CurrentTask.rules];
+            while (isP3OrderCorrect(shuffled) && shuffled.length > 1) {
+                shuffled.sort(() => Math.random() - 0.5);
+            }
+            p3RulesState = shuffled;
+            renderP3RulesUI();
+        }
+
+        function isP3OrderCorrect(rulesList) {
+            for (let i = 0; i < rulesList.length - 1; i++) {
+                if (rulesList[i].priority > rulesList[i + 1].priority) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function renderP3RulesUI() {
+            const container = document.getElementById('p3-rules-list');
+            container.innerHTML = '';
+
+            p3RulesState.forEach((r, idx) => {
+                const row = document.createElement('div');
+                row.className = 'd-flex justify-content-between align-items-center bg-dark border border-secondary p-2';
+
+                const left = document.createElement('div');
+                left.className = 'd-flex align-items-center gap-3 font-monospace';
+                left.innerHTML = `<span class="badge bg-secondary text-dark rounded-0">Строка ${idx + 1}</span><span class="text-light fs-5">${r.text}</span>`;
+
+                const btns = document.createElement('div');
+                btns.className = 'd-flex gap-1';
+
+                const upBtn = document.createElement('button');
+                upBtn.type = 'button';
+                upBtn.className = 'btn btn-outline-secondary btn-sm font-monospace rounded-0';
+                upBtn.textContent = '↑ Вверх';
+                upBtn.disabled = (idx === 0);
+                upBtn.addEventListener('click', () => {
+                    if (idx > 0) {
+                        const tmp = p3RulesState[idx - 1];
+                        p3RulesState[idx - 1] = p3RulesState[idx];
+                        p3RulesState[idx] = tmp;
+                        renderP3RulesUI();
+                    }
+                });
+
+                const downBtn = document.createElement('button');
+                downBtn.type = 'button';
+                downBtn.className = 'btn btn-outline-secondary btn-sm font-monospace rounded-0';
+                downBtn.textContent = '↓ Вниз';
+                downBtn.disabled = (idx === p3RulesState.length - 1);
+                downBtn.addEventListener('click', () => {
+                    if (idx < p3RulesState.length - 1) {
+                        const tmp = p3RulesState[idx + 1];
+                        p3RulesState[idx + 1] = p3RulesState[idx];
+                        p3RulesState[idx] = tmp;
+                        renderP3RulesUI();
+                    }
+                });
+
+                btns.appendChild(upBtn);
+                btns.appendChild(downBtn);
+
+                row.appendChild(left);
+                row.appendChild(btns);
+                container.appendChild(row);
+            });
+        }
+
+        document.getElementById('p3-submit-btn').addEventListener('click', () => {
+            const feedback = document.getElementById('p3-feedback');
+            const submitBtn = document.getElementById('p3-submit-btn');
+
+            const isCorrect = isP3OrderCorrect(p3RulesState);
+
+            if (isCorrect) {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+
+                const totalSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                document.getElementById('final-time').textContent = totalSec;
+                document.getElementById('final-errors').textContent = attempts;
+
+                sendTelemetry('level_complete', true);
+            } else {
+                attempts++;
+                sendTelemetry('hardcore_reset');
+                feedback.classList.remove('d-none');
+                submitBtn.disabled = true;
+
+                setTimeout(() => {
+                    initPhase3();
+                    feedback.classList.add('d-none');
+                    submitBtn.disabled = false;
+                }, 1200);
+            }
+        });
+
+        // Инициализация симулятора
+        sendTelemetry('in_progress');
+        initPhase1();
+    </script>
+</TaskLayout>
