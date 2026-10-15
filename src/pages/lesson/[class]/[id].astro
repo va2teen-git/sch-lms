@@ -167,9 +167,9 @@ const tasks = [
                 </button>
               </div>
             </div>
-            <div class="bg-gray-950 text-gray-400 text-xs px-3 py-1 border-b border-gray-800 font-mono flex justify-between flex-wrap">
-              <span>Управление: <strong>[← / →]</strong> Движение/Шаг | <strong>[↑]</strong> Прыжок/Подтянуться | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Меч/Шаг</span>
-              <span class="text-gray-500">Jordan Mechner (1989) / HTML5: Oliver Klemenz</span>
+            <div class="bg-gray-950 text-gray-400 text-xs px-3 py-1.5 border-b border-gray-800 font-mono flex justify-between flex-wrap items-center gap-2">
+              <span>Управление: <strong>[← / →]</strong> Движение | <strong>[↑]</strong> Прыжок | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Меч/Шаг</span>
+              <span class="text-amber-400 font-bold bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 animate-pulse">💡 Кликните по экрану игры или нажмите Enter для старта</span>
             </div>
             <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
               <iframe 
@@ -177,7 +177,8 @@ const tasks = [
                 src={`/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true`}
                 class="w-full h-full border-0 absolute inset-0"
                 title="Prince of Persia"
-                allow="fullscreen; gamepad"
+                allow="fullscreen; gamepad; autoplay"
+                tabindex="0"
               ></iframe>
             </div>
 
@@ -670,12 +671,103 @@ const tasks = [
   const princeVictoryCloseBtn = document.getElementById('prince-victory-close-btn');
   const princeVictoryModal = document.getElementById('prince-victory-modal');
 
+  const focusPrince = () => {
+    if (!princeIframe) return;
+    try {
+      princeIframe.focus();
+      princeIframe.contentWindow?.focus();
+      princeIframe.contentWindow?.postMessage({ type: 'FOCUS_GAME' }, '*');
+    } catch (e) {}
+  };
+
   if (openPrinceBtn && princeOverlay) {
     openPrinceBtn.addEventListener('click', () => {
       princeOverlay.classList.remove('hidden');
       princeOverlay.classList.add('flex');
+
+      if (princeIframe) {
+        // Если фрейм был предзагружен в скрытом состоянии (display: none),
+        // перезапускаем его при первом открытии, чтобы Phaser CE построил канвас
+        // с корректными реальными размерами контейнера и сразу запустил игровой цикл
+        if (!princeIframe.dataset.activated) {
+          princeIframe.dataset.activated = 'true';
+          const currentSrc = princeIframe.src;
+          princeIframe.src = currentSrc;
+        }
+
+        princeIframe.addEventListener('load', () => {
+          setTimeout(focusPrince, 60);
+        }, { once: true });
+
+        setTimeout(focusPrince, 100);
+      }
     });
   }
+
+  // Клик в любой части оверлея возвращает фокус в игру
+  if (princeOverlay && princeIframe) {
+    princeOverlay.addEventListener('click', (e) => {
+      if ((e.target).closest('button')) return;
+      focusPrince();
+    });
+  }
+
+  // Мост клавиатурных событий: если фокус случайно ушел в родительское окно,
+  // перехватываем клавиши управления Принцем и пробрасываем их внутрь фрейма
+  window.addEventListener('keydown', (e) => {
+    if (princeOverlay && !princeOverlay.classList.contains('hidden') && princeIframe?.contentWindow) {
+      const isGameKey = [
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+        'Enter', ' ', 'Shift'
+      ].includes(e.key);
+
+      if (isGameKey && document.activeElement !== princeIframe) {
+        focusPrince();
+        try {
+          const forwarded = new KeyboardEvent(e.type, {
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            which: e.which,
+            shiftKey: e.shiftKey,
+            ctrlKey: e.ctrlKey,
+            altKey: e.altKey,
+            bubbles: true,
+            cancelable: true
+          });
+          princeIframe.contentWindow.dispatchEvent(forwarded);
+          princeIframe.contentDocument?.dispatchEvent(forwarded);
+        } catch (err) {}
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (princeOverlay && !princeOverlay.classList.contains('hidden') && princeIframe?.contentWindow) {
+      const isGameKey = [
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+        'Enter', ' ', 'Shift'
+      ].includes(e.key);
+
+      if (isGameKey && document.activeElement !== princeIframe) {
+        try {
+          const forwarded = new KeyboardEvent(e.type, {
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            which: e.which,
+            shiftKey: e.shiftKey,
+            ctrlKey: e.ctrlKey,
+            altKey: e.altKey,
+            bubbles: true,
+            cancelable: true
+          });
+          princeIframe.contentWindow.dispatchEvent(forwarded);
+          princeIframe.contentDocument?.dispatchEvent(forwarded);
+        } catch (err) {}
+      }
+    }
+  });
 
   if (closePrinceBtn && princeOverlay) {
     closePrinceBtn.addEventListener('click', () => {
@@ -695,6 +787,7 @@ const tasks = [
         princeVictoryModal.classList.add('hidden');
       }
       princeIframe.src = princeIframe.src;
+      princeIframe.addEventListener('load', () => setTimeout(focusPrince, 60), { once: true });
     });
   }
 
@@ -705,6 +798,7 @@ const tasks = [
         princeVictoryModal.classList.add('hidden');
       }
       princeIframe.src = princeIframe.src;
+      princeIframe.addEventListener('load', () => setTimeout(focusPrince, 60), { once: true });
     });
   }
 
@@ -726,12 +820,14 @@ const tasks = [
         document.exitFullscreen().catch(err => console.warn(err));
         princeFullscreenBtn.textContent = '⛶ На весь экран';
       }
+      setTimeout(focusPrince, 100);
     });
 
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement && princeFullscreenBtn) {
         princeFullscreenBtn.textContent = '⛶ На весь экран';
       }
+      setTimeout(focusPrince, 100);
     });
   }
 </script>

@@ -89,11 +89,17 @@ PrinceJS.Preloader.prototype = {
   },
 
   create: function () {
-    this.text.setText("Press to Start");
+    this.text.setText("Click or Press Enter to Start");
+    this.text.inputEnabled = true;
+    this.text.events.onInputDown.add(() => {
+      this.start();
+    }, this);
 
     this.input.keyboard.onDownCallback = this.start.bind(this);
     this.game.input.onDown.addOnce(() => {
-      this.game.sound.context.resume();
+      if (this.game.sound && this.game.sound.context && this.game.sound.context.state === 'suspended') {
+        this.game.sound.context.resume();
+      }
     });
 
     this.game.input.mouse.capture = true;
@@ -105,6 +111,10 @@ PrinceJS.Preloader.prototype = {
     this.game.canvas.oncontextmenu = function (event) {
       event.preventDefault();
     };
+
+    try {
+      window.focus();
+    } catch (e) {}
   },
 
   update: function () {
@@ -114,6 +124,10 @@ PrinceJS.Preloader.prototype = {
   },
 
   start: function () {
+    if (this.game.sound && this.game.sound.context && this.game.sound.context.state === 'suspended') {
+      this.game.sound.context.resume();
+    }
+    this.input.keyboard.onDownCallback = null;
     if (PrinceJS.SKIP_TITLE) {
       this.state.start("Game");
     } else {
