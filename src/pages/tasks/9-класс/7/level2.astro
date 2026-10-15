@@ -1,0 +1,461 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический валидатор моделей (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+
+                <!-- Заголовок и счетчик попыток -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="level-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="level-title" class="text-light fw-bold fs-6">Расчет абсолютной погрешности модели</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- Фаза 1 -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Шаг 1: Расчет абсолютной погрешности моделирования (Δ)</h5>
+                    <p class="text-light">
+                        В вычислительной лаборатории тестируется математическая модель физического процесса. 
+                        Датчики зафиксировали истинное измеренное значение оригинала, а компьютерная модель рассчитала теоретическую величину:
+                    </p>
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row">
+                            <div class="col-md-6 mb-2 mb-md-0">
+                                <span class="text-secondary small d-block">ИСТИННОЕ ЗНАЧЕНИЕ ОРИГИНАЛА (x_ист):</span>
+                                <span class="fs-4 text-light fw-bold" id="p1-x-true">0</span>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-secondary small d-block">РАССЧИТАННОЕ ЗНАЧЕНИЕ МОДЕЛИ (x_мод):</span>
+                                <span class="fs-4 text-warning fw-bold" id="p1-x-model">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-secondary small">
+                        По формуле <code>Δ = |x_мод - x_ист|</code> рассчитайте абсолютную погрешность модели и введите полученное число:
+                    </p>
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Абсолютная погрешность Δ" autocomplete="off">
+                        <button id="p1-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                    <div id="p1-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА РАСЧЕТА] Неверная абсолютная погрешность! Перегенерация параметров...
+                    </div>
+                </div>
+
+                <!-- Фаза 2 -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 2: Расчет относительной погрешности моделирования (δ)</h5>
+                    <p class="text-light">
+                        Для оценки адекватности модели аэродинамического сопротивления требуется вычислить относительную погрешность <strong>δ</strong> в процентах.
+                    </p>
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row">
+                            <div class="col-md-6 mb-2 mb-md-0">
+                                <span class="text-secondary small d-block">ЭКСПЕРИМЕНТАЛЬНЫЙ ОРИГИНАЛ (x_ист):</span>
+                                <span class="fs-4 text-light fw-bold" id="p2-x-true">0</span>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-secondary small d-block">РАСЧЕТ СИМУЛЯЦИИ (x_мод):</span>
+                                <span class="fs-4 text-warning fw-bold" id="p2-x-model">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-secondary small">
+                        По формуле <code>δ = (Δ / x_ист) × 100%</code> рассчитайте относительную погрешность. Введите число (в процентах, без знака %):
+                    </p>
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" step="any" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Относительная погрешность δ (%)" autocomplete="off">
+                        <button id="p2-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                    <div id="p2-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [ОШИБКА ДЕЛЕНИЯ] Неверный расчет относительной погрешности! Пересчет новых данных...
+                    </div>
+                </div>
+
+                <!-- Фаза 3 -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 3: Классификация по фактору времени (Статика vs Динамика)</h5>
+                    <p class="text-light">
+                        Определите временной характер предложенной модели на основе анализа ее структуры и назначения:
+                    </p>
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ИССЛЕДУЕМАЯ МОДЕЛЬ:</div>
+                        <div class="fs-5 text-light fw-bold mb-2" id="p3-desc"></div>
+                        <div class="text-secondary small" id="p3-extra"></div>
+                    </div>
+                    <p class="text-secondary small">
+                        Введите точный термин: <strong class="text-warning">СТАТИЧЕСКАЯ</strong> или <strong class="text-warning">ДИНАМИЧЕСКАЯ</strong>:
+                    </p>
+                    <div class="input-group mb-3 w-50">
+                        <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="СТАТИЧЕСКАЯ или ДИНАМИЧЕСКАЯ" autocomplete="off">
+                        <button id="p3-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                    <div id="p3-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [СБОЙ ИДЕНТИФИКАЦИИ] Ошибка определения фактора времени! Загрузка нового описания...
+                    </div>
+                </div>
+
+                <!-- Фаза 4 -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 4: Анализ детерминированности алгоритмической модели</h5>
+                    <p class="text-light">
+                        Проанализируйте логику программного модуля или математической модели. Зависит ли результат строго от формулы или содержит элементы случайности?
+                    </p>
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ЛИСТИНГ / ОПИСАНИЕ СИМУЛЯЦИИ:</div>
+                        <pre class="fs-6 text-warning mb-0 p-2 bg-dark border border-secondary" id="p4-code"></pre>
+                    </div>
+                    <p class="text-secondary small">
+                        Введите точный термин: <strong class="text-warning">ДЕТЕРМИНИРОВАННАЯ</strong> или <strong class="text-warning">СТОХАСТИЧЕСКАЯ</strong>:
+                    </p>
+                    <div class="input-group mb-3 w-50">
+                        <input type="text" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="ДЕТЕРМИНИРОВАННАЯ или СТОХАСТИЧЕСКАЯ" autocomplete="off">
+                        <button id="p4-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                    <div id="p4-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [СБОЙ СТОХАСТИКИ] Неверная оценка детерминированности! Загрузка нового алгоритма...
+                    </div>
+                </div>
+
+                <!-- Фаза 5 -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 5: Идентификация формы представления информационной модели</h5>
+                    <p class="text-light">
+                        Проанализируйте способ кодирования информации в предложенной модели:
+                    </p>
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ОПИСАНИЕ МОДЕЛИ:</div>
+                        <div class="fs-5 text-light fw-bold mb-2" id="p5-desc"></div>
+                        <div class="text-secondary small" id="p5-extra"></div>
+                    </div>
+                    <p class="text-secondary small">
+                        Введите точный термин формы представления: <strong class="text-warning">ОБРАЗНАЯ</strong>, <strong class="text-warning">ЗНАКОВАЯ</strong> или <strong class="text-warning">СМЕШАННАЯ</strong>:
+                    </p>
+                    <div class="input-group mb-3 w-50">
+                        <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="ОБРАЗНАЯ / ЗНАКОВАЯ / СМЕШАННАЯ" autocomplete="off">
+                        <button id="p5-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                    </div>
+                    <div id="p5-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
+                        [СБОЙ СТРУКТУРЫ] Неверная форма представления! Загрузка новой структуры...
+                    </div>
+                </div>
+
+                <!-- Экран завершения уровня -->
+                <div id="success-screen" class="d-none text-center py-5 border border-warning bg-black mt-3">
+                    <div class="text-warning fs-1 mb-3">✓</div>
+                    <h3 class="text-warning mb-2">АНАЛИТИЧЕСКАЯ ВАЛИДАЦИЯ УСПЕШНО ЗАВЕРШЕНА</h3>
+                    <p class="text-light mb-4">
+                        Все 5 этапов аналитического расчета параметров, погрешностей и классификации моделей пройдены.
+                        Модель признана адекватной и готовой к внедрению.
+                    </p>
+                    <div class="d-inline-block p-3 border border-warning bg-dark text-start font-monospace small">
+                        <div>СТАТУС: <span class="text-warning">УРОВЕНЬ 2 ПРОЙДЕН</span></div>
+                        <div>ЗАТРАЧЕНО ВРЕМЕНИ: <span id="final-time" class="text-warning">0</span> СЕК</div>
+                        <div>ОШИБОК РАСЧЕТА: <span id="final-attempts" class="text-warning">0</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        (function() {
+            const missionName = 'Урок 7 :: Модели и моделирование. Классификации моделей (Уровень 2)';
+            const startTime = Date.now();
+            let attempts = 0;
+            let currentPhase = 1;
+
+            // Телеметрия
+            function sendTelemetry(actionType, isSuccess = false) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: actionType,
+                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                    start_time: new Date(startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: attempts,
+                    success: isSuccess,
+                    action_log: [{ phase: currentPhase, action: actionType, time: timeSpent }]
+                }, '*');
+            }
+
+            // Утилиты генерации
+            function getRandomInt(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function getRandomItem(array) {
+                return array[Math.floor(Math.random() * array.length)];
+            }
+
+            // Фаза 1: Расчет абсолютной погрешности Δ = |x_мод - x_ист|
+            let p1CorrectDelta = 0;
+            function initPhase1() {
+                const xTrue = getRandomInt(40, 200);
+                const delta = getRandomInt(2, 25);
+                const sign = Math.random() > 0.5 ? 1 : -1;
+                const xModel = xTrue + (sign * delta);
+
+                p1CorrectDelta = delta;
+                document.getElementById('p1-x-true').textContent = xTrue;
+                document.getElementById('p1-x-model').textContent = xModel;
+                document.getElementById('p1-input').value = '';
+                document.getElementById('p1-feedback').classList.add('d-none');
+                document.getElementById('p1-input').focus();
+            }
+
+            function checkPhase1() {
+                const val = parseFloat(document.getElementById('p1-input').value.trim());
+                if (!isNaN(val) && Math.abs(val - p1CorrectDelta) < 0.001) {
+                    currentPhase = 2;
+                    sendTelemetry('in_progress');
+                    showPhase(2);
+                } else {
+                    handleError(1, initPhase1);
+                }
+            }
+
+            // Фаза 2: Расчет относительной погрешности δ = (Δ / x_ист) * 100%
+            let p2CorrectDeltaPct = 0;
+            function initPhase2() {
+                // Подбираем удобные числа для красивого целочисленного или половинного процента
+                const bases = [50, 80, 100, 120, 150, 200, 250, 400];
+                const xTrue = getRandomItem(bases);
+                const pctValues = [2, 4, 5, 8, 10, 12, 15, 20];
+                const deltaPct = getRandomItem(pctValues);
+                const delta = Math.round((xTrue * deltaPct) / 100);
+                const sign = Math.random() > 0.5 ? 1 : -1;
+                const xModel = xTrue + (sign * delta);
+
+                p2CorrectDeltaPct = deltaPct;
+                document.getElementById('p2-x-true').textContent = xTrue;
+                document.getElementById('p2-x-model').textContent = xModel;
+                document.getElementById('p2-input').value = '';
+                document.getElementById('p2-feedback').classList.add('d-none');
+                document.getElementById('p2-input').focus();
+            }
+
+            function checkPhase2() {
+                const val = parseFloat(document.getElementById('p2-input').value.trim());
+                if (!isNaN(val) && Math.abs(val - p2CorrectDeltaPct) < 0.01) {
+                    currentPhase = 3;
+                    sendTelemetry('in_progress');
+                    showPhase(3);
+                } else {
+                    handleError(2, initPhase2);
+                }
+            }
+
+            // Фаза 3: Статическая или Динамическая
+            const p3Bank = [
+                { desc: "Поэтажный чертеж дата-центра с расстановкой серверных стоек", extra: "Описывает геометрические координаты и расположение оборудования без учета временных изменений.", answer: "СТАТИЧЕСКАЯ" },
+                { desc: "Таблица технических характеристик микроконтроллера в паспорте", extra: "Фиксирует неизменяемые параметры чипа: частоту, разрядность, объем Flash-памяти.", answer: "СТАТИЧЕСКАЯ" },
+                { desc: "Схема кристаллической решетки кремния в учебнике физики", extra: "Отражает структуру взаимного расположения атомов в состоянии термодинамического покоя.", answer: "СТАТИЧЕСКАЯ" },
+                { desc: "Бухгалтерский балансовый отчет предприятия на 1 октября", extra: "Срез финансового состояния и активов компании в строго фиксированный момент времени.", answer: "СТАТИЧЕСКАЯ" },
+                { desc: "График изменения температуры кристалла процессора под нагрузкой", extra: "Показывает изменение теплового режима во времени при запуске вычислительного стресс-теста.", answer: "ДИНАМИЧЕСКАЯ" },
+                { desc: "Модель полета ракеты с расчетом изменения массы по мере сгорания топлива", extra: "Уравнение Мещерского описывает непрерывное движение тела переменной массы во времени t.", answer: "ДИНАМИЧЕСКАЯ" },
+                { desc: "Анимационная симуляция работы четырехтактного двигателя внутреннего сгорания", extra: "Описывает последовательность рабочих тактов цилиндра и перепускных клапанов во времени.", answer: "ДИНАМИЧЕСКАЯ" },
+                { desc: "Модель размножения популяции бактерий во времени: N(t) = N₀ × 2^(t/T)", extra: "Численность колонии экспоненциально растет в зависимости от прошедшего времени t.", answer: "ДИНАМИЧЕСКАЯ" }
+            ];
+
+            let p3CorrectAnswer = "";
+            function initPhase3() {
+                const item = getRandomItem(p3Bank);
+                p3CorrectAnswer = item.answer;
+                document.getElementById('p3-desc').textContent = item.desc;
+                document.getElementById('p3-extra').textContent = item.extra;
+                document.getElementById('p3-input').value = '';
+                document.getElementById('p3-feedback').classList.add('d-none');
+                document.getElementById('p3-input').focus();
+            }
+
+            function checkPhase3() {
+                const val = document.getElementById('p3-input').value.trim().toUpperCase();
+                if (val === p3CorrectAnswer) {
+                    currentPhase = 4;
+                    sendTelemetry('in_progress');
+                    showPhase(4);
+                } else {
+                    handleError(3, initPhase3);
+                }
+            }
+
+            // Фаза 4: Детерминированная или Стохастическая
+            const p4Bank = [
+                {
+                    code: "# Симуляция траектории материальной точки\ndef compute_trajectory(v0, angle_deg, t):\n    g = 9.81\n    rad = math.radians(angle_deg)\n    x = v0 * math.cos(rad) * t\n    y = v0 * math.sin(rad) * t - 0.5 * g * (t**2)\n    return x, y",
+                    answer: "ДЕТЕРМИНИРОВАННАЯ"
+                },
+                {
+                    code: "# Расчет закона Ома для участка цепи\ndef calculate_current(voltage, resistance):\n    if resistance <= 0:\n        raise ValueError('Сопротивление должно быть > 0')\n    current = voltage / resistance\n    return current",
+                    answer: "ДЕТЕРМИНИРОВАННАЯ"
+                },
+                {
+                    code: "# Пошаговый эмулятор тактов работы процессора\ndef execute_instruction(reg_a, reg_b, op):\n    if op == 'ADD': return reg_a + reg_b\n    if op == 'SUB': return reg_a - reg_b\n    if op == 'AND': return reg_a & reg_b\n    return 0",
+                    answer: "ДЕТЕРМИНИРОВАННАЯ"
+                },
+                {
+                    code: "# Моделирование времени ожидания клиента в банке (Метод Монте-Карло)\nimport random\ndef simulate_queue(customers_count):\n    total_wait = 0\n    for _ in range(customers_count):\n        service_time = random.expovariate(1.0 / 5.0) # случайное время\n        total_wait += service_time\n    return total_wait",
+                    answer: "СТОХАСТИЧЕСКАЯ"
+                },
+                {
+                    code: "# Компьютерная симуляция броуновского движения микрочастицы\nimport random\ndef brownian_step(x, y, step_len=1.0):\n    angle = random.uniform(0, 2 * math.pi) # случайный угол движения\n    dx = step_len * math.cos(angle)\n    dy = step_len * math.sin(angle)\n    return x + dx, y + dy",
+                    answer: "СТОХАСТИЧЕСКАЯ"
+                },
+                {
+                    code: "# Моделирование надежности передачи пакета при сетевых помехах\nimport random\ndef transmit_packet(packet, loss_rate=0.05):\n    if random.random() < loss_rate: # вероятность сбоя 5%\n        return 'PACKET_DROPPED'\n    return 'ACK_SUCCESS'",
+                    answer: "СТОХАСТИЧЕСКАЯ"
+                }
+            ];
+
+            let p4CorrectAnswer = "";
+            function initPhase4() {
+                const item = getRandomItem(p4Bank);
+                p4CorrectAnswer = item.answer;
+                document.getElementById('p4-code').textContent = item.code;
+                document.getElementById('p4-input').value = '';
+                document.getElementById('p4-feedback').classList.add('d-none');
+                document.getElementById('p4-input').focus();
+            }
+
+            function checkPhase4() {
+                const val = document.getElementById('p4-input').value.trim().toUpperCase();
+                if (val === p4CorrectAnswer) {
+                    currentPhase = 5;
+                    sendTelemetry('in_progress');
+                    showPhase(5);
+                } else {
+                    handleError(4, initPhase4);
+                }
+            }
+
+            // Фаза 5: Форма представления (ОБРАЗНАЯ, ЗНАКОВАЯ, СМЕШАННАЯ)
+            const p5Bank = [
+                { desc: "Цветная фотография кристалла кварца под микроскопом", extra: "Фиксирует визуальный зрительный образ строения без использования символов или условных знаков.", answer: "ОБРАЗНАЯ" },
+                { desc: "Рентгенограмма грудной клетки пациента на цифровой матрице", extra: "Отображает плотность тканей человека в виде непрерывного полутонового визуального изображения.", answer: "ОБРАЗНАЯ" },
+                { desc: "Художественный эскиз фасада проектируемого концертного зала", extra: "Графический образ внешнего вида объекта без нанесения размеров, надписей и сеток.", answer: "ОБРАЗНАЯ" },
+                { desc: "Математическая формула кинетической энергии: E = (m × v²) / 2", extra: "Описание взаимосвязи величин на формальном языке математических символов и операторов.", answer: "ЗНАКОВАЯ" },
+                { desc: "Текстовое описание внешности разыскиваемого человека в ориентировке", extra: "Словесная вербальная модель, составленная исключительно средствами естественного языка.", answer: "ЗНАКОВАЯ" },
+                { desc: "Исходный программный код функции шифрования на языке Python", extra: "Алгоритмическая модель, выраженная на формальном машинном языке программирования.", answer: "ЗНАКОВАЯ" },
+                { desc: "Запись химической реакции: 2H₂ + O₂ → 2H₂O", extra: "Описание процесса превращения веществ с помощью химических знаков и индексов.", answer: "ЗНАКОВАЯ" },
+                { desc: "Топографическая карта местности с изолиниями высот и числовым масштабом", extra: "Объединяет пространственный визуальный образ территории с условными топографическими знаками и числами.", answer: "СМЕШАННАЯ" },
+                { desc: "Схема линий метрополитена с названиями станций и пересадками", extra: "Графовая образно-знаковая структура, сочетающая схематичные линии и текстовые метки узлов.", answer: "СМЕШАННАЯ" },
+                { desc: "Таблица Менделеева с символами элементов, номерами и атомными массами", extra: "Прямоугольная матрица, связывающая положение элементов в периодах/группах с числовыми свойствами.", answer: "СМЕШАННАЯ" },
+                { desc: "Чертеж стального зубчатого колеса с указанием допусков и размеров в мм", extra: "Графическое проекционное изображение детали, снабженное числовыми размерными линиями.", answer: "СМЕШАННАЯ" }
+            ];
+
+            let p5CorrectAnswer = "";
+            function initPhase5() {
+                const item = getRandomItem(p5Bank);
+                p5CorrectAnswer = item.answer;
+                document.getElementById('p5-desc').textContent = item.desc;
+                document.getElementById('p5-extra').textContent = item.extra;
+                document.getElementById('p5-input').value = '';
+                document.getElementById('p5-feedback').classList.add('d-none');
+                document.getElementById('p5-input').focus();
+            }
+
+            function checkPhase5() {
+                const val = document.getElementById('p5-input').value.trim().toUpperCase();
+                if (val === p5CorrectAnswer) {
+                    finishLevel();
+                } else {
+                    handleError(5, initPhase5);
+                }
+            }
+
+            // Обработка ошибок (анимация сбоя, телеметрия hardcore_reset, перегенерация текущего шага)
+            function handleError(phaseNum, initFunc) {
+                attempts++;
+                document.getElementById('attempts-display').textContent = attempts;
+                sendTelemetry('hardcore_reset');
+
+                const feedback = document.getElementById(`p${phaseNum}-feedback`);
+                const btn = document.getElementById(`p${phaseNum}-btn`);
+                const input = document.getElementById(`p${phaseNum}-input`);
+
+                feedback.classList.remove('d-none');
+                btn.disabled = true;
+                input.disabled = true;
+
+                setTimeout(() => {
+                    feedback.classList.add('d-none');
+                    btn.disabled = false;
+                    input.disabled = false;
+                    initFunc();
+                }, 1200);
+            }
+
+            // Переключение фаз
+            function showPhase(phaseNum) {
+                document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
+                const activeContainer = document.getElementById(`phase${phaseNum}`);
+                if (activeContainer) {
+                    activeContainer.classList.remove('d-none');
+                }
+
+                document.getElementById('level-badge').textContent = `Шаг ${phaseNum} из 5`;
+                const titles = [
+                    "Расчет абсолютной погрешности модели",
+                    "Расчет относительной погрешности модели (%)",
+                    "Классификация по фактору времени",
+                    "Анализ детерминированности алгоритма",
+                    "Идентификация формы представления модели"
+                ];
+                document.getElementById('level-title').textContent = titles[phaseNum - 1];
+
+                if (phaseNum === 1) initPhase1();
+                if (phaseNum === 2) initPhase2();
+                if (phaseNum === 3) initPhase3();
+                if (phaseNum === 4) initPhase4();
+                if (phaseNum === 5) initPhase5();
+            }
+
+            // Финал уровня 2
+            function finishLevel() {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                sendTelemetry('level_complete', true);
+
+                document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
+                document.getElementById('success-screen').classList.remove('d-none');
+                document.getElementById('final-time').textContent = timeSpent;
+                document.getElementById('final-attempts').textContent = attempts;
+            }
+
+            // Навешивание обработчиков событий
+            document.getElementById('p1-btn').addEventListener('click', checkPhase1);
+            document.getElementById('p1-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase1(); });
+
+            document.getElementById('p2-btn').addEventListener('click', checkPhase2);
+            document.getElementById('p2-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase2(); });
+
+            document.getElementById('p3-btn').addEventListener('click', checkPhase3);
+            document.getElementById('p3-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase3(); });
+
+            document.getElementById('p4-btn').addEventListener('click', checkPhase4);
+            document.getElementById('p4-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase4(); });
+
+            document.getElementById('p5-btn').addEventListener('click', checkPhase5);
+            document.getElementById('p5-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase5(); });
+
+            // Старт
+            showPhase(1);
+            sendTelemetry('in_progress');
+        })();
+    </script>
+</TaskLayout>

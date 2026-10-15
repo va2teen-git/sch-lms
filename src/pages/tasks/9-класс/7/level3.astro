@@ -1,0 +1,505 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container my-4 font-monospace" v-cloak>
+        
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ ХАРДКОРА) -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-5 text-center shadow-lg">
+            <div class="display-3 text-danger mb-3">⚡ CYBER MATRIX PROTOCOL ⚡</div>
+            <h2 class="text-light mb-2">СИНТЕЗ МОДЕЛЕЙ В НЕЙРОМАТРИЦЕ // АРХЕТИП 1</h2>
+            <p class="text-secondary fs-5 mb-4" style="max-width: 760px; margin: 0 auto;">
+                Вы подключаетесь к ядру суперкомпьютера цифровых двойников. Для инициализации модели необходимо 
+                синтезировать цепочку классификационных атрибутов через взлом буфера шестнадцатеричной матрицы в стиле <em>Cyberpunk 2077</em>.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start small" style="max-width: 700px;">
+                <div class="text-danger fw-bold mb-2">[ПРОТОКОЛ ХАРДКОР-ИСПЫТАНИЯ // 8 ВОЛН]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Попеременный обход матрицы:</span> Вы начинаете с первой строки. Клик в активной строке фиксирует токен в буфер и активирует соответствующий <strong>столбец</strong>. Следующий клик в столбце активирует новую <strong>строку</strong>.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Целевая цепочка (Target Sequence):</span> Соберите требуемую последовательность атрибутов модели до переполнения буфера памяти.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Таймер срыва синхронизации:</span> На каждую волну отводится жесткое окно времени (от 12 до 6 секунд). Таймер непрерывно убывает!</div>
+                <div class="text-danger fw-bold">• ТОТАЛЬНЫЙ СБРОС (Full Wipeout): Любая ошибка, переполнение буфера мусором или истечение таймера вызывают немедленный сброс на ВОЛНУ 1!</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    ПОДКЛЮЧИТЬСЯ К НЕЙРОМАТРИЦЕ (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (АРКАДНЫЙ ПРОЦЕСС) -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-4 shadow-lg">
+            
+            <!-- Информационная панель и таймер -->
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР НЕЙРОМАТРИЦЫ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentWave"></span> ИЗ 8</span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-1">АРХЕТИП 1: CYBER MATRIX</span>
+                    <div class="text-secondary small mt-1">Попытка #<span v-text="attempts + 1"></span></div>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО БЛОКИРОВКИ ШЛЮЗА:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-4 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="progressBarStyle">
+                </div>
+            </div>
+
+            <!-- Верхняя панель: Синтезируемая модель и Целевой код -->
+            <div class="card bg-dark border-secondary rounded-0 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <span class="text-secondary small d-block">СИНТЕЗИРУЕМЫЙ ОБЪЕКТ МОДЕЛИРОВАНИЯ:</span>
+                        <div class="fs-5 text-light fw-bold mt-1" v-text="currentWaveData.modelName"></div>
+                        <div class="text-secondary small" v-text="currentWaveData.modelDesc"></div>
+                    </div>
+                    <div>
+                        <span class="text-secondary small d-block mb-1">ТРЕБУЕМАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ АТРИБУТОВ:</span>
+                        <div class="d-flex gap-2">
+                            <span v-for="(token, idx) in currentWaveData.targetSequence" 
+                                  :key="idx"
+                                  class="badge border fs-6 rounded-0 px-2 py-1"
+                                  :class="isTargetTokenMatched(idx) ? 'bg-success text-dark border-success' : 'bg-black text-warning border-warning'">
+                                <span v-text="token"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель буфера памяти игрока -->
+            <div class="card bg-dark border-secondary rounded-0 p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary small">БУФЕР ПАМЯТИ ВЗЛОМА (<span v-text="playerBuffer.length"></span> / <span v-text="bufferLimit"></span>):</span>
+                    <span class="small" :class="mode === 'row' ? 'text-warning' : 'text-info'">
+                        АКТИВНЫЙ РЕЖИМ: <strong><span v-text="mode === 'row' ? 'СТРОКА ' + (activeRow + 1) : 'СТОЛБЕЦ ' + (activeCol + 1)"></span></strong>
+                    </span>
+                </div>
+                <div class="d-flex gap-2">
+                    <div v-for="slotIdx in bufferLimit" 
+                         :key="slotIdx"
+                         class="border rounded-0 p-2 text-center flex-grow-1 font-monospace fw-bold"
+                         :class="playerBuffer[slotIdx - 1] ? 'bg-black text-warning border-warning' : 'bg-dark text-secondary border-secondary opacity-50'">
+                        <span v-if="playerBuffer[slotIdx - 1]" v-text="playerBuffer[slotIdx - 1]"></span>
+                        <span v-else class="text-secondary">[_]</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сетка Кибер-Матрицы (Cyber Matrix 4x4) -->
+            <div class="card bg-black border-danger rounded-0 p-3 mb-3 text-center">
+                <div class="text-secondary small mb-3 text-start d-flex justify-content-between">
+                    <span>НАЖИМАЙТЕ ТОЛЬКО НА ПОДСВЕЧЕННЫЕ ЯЧЕЙКИ В АКТИВНОЙ СТРОКЕ ИЛИ СТОЛБЦЕ:</span>
+                    <span class="text-danger fw-bold">[ПЕРЕПОЛНЕНИЕ БУФЕРА = ВАЙП]</span>
+                </div>
+
+                <div class="d-flex flex-column gap-2 mx-auto" style="max-width: 680px;">
+                    <div v-for="(row, rIdx) in matrix" :key="rIdx" class="d-flex gap-2">
+                        <button v-for="(cell, cIdx) in row" 
+                                :key="cIdx"
+                                class="btn rounded-0 flex-grow-1 p-3 text-center font-monospace fw-bold transition-colors"
+                                :class="getCellClass(rIdx, cIdx)"
+                                :disabled="!isCellClickable(rIdx, cIdx)"
+                                @click="handleCellClick(rIdx, cIdx)">
+                            <div class="fs-6" v-text="cell.token"></div>
+                            <div class="text-secondary" style="font-size: 0.65rem;" v-text="cell.hex"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Аварийное предупреждение при ошибке -->
+            <div v-if="crashMessage" class="alert alert-danger bg-black text-danger border border-danger rounded-0 py-3 text-center">
+                <div class="fs-5 fw-bold mb-1">🚨 СРЫВ СИНХРОНИЗАЦИИ // ПОЛНЫЙ СБРОС СИСТЕМЫ 🚨</div>
+                <div v-text="crashMessage"></div>
+                <div class="small mt-2 text-warning">Возврат на ВОЛНУ 1 через 1.5 сек...</div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ (ХАРДКОР ЗАВЕРШЕН) -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-5 text-center shadow-lg">
+            <div class="display-3 text-success mb-3">✓ PROTOCOL COMPLETED ✓</div>
+            <h2 class="text-light mb-2">НЕЙРОМАТРИЦА СИНТЕЗА ПОЛНОСТЬЮ ПОДЧИНЕНА</h2>
+            <p class="text-secondary fs-5 mb-4" style="max-width: 720px; margin: 0 auto;">
+                Все 8 протоколов классификации моделей безупречно синтезированы без единого срыва буфера. 
+                Вы продемонстрировали автоматизм знаний о натурных, информационных, статических и динамических моделях.
+            </p>
+
+            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 500px;">
+                <div class="text-success fw-bold mb-2">РЕЗУЛЬТАТЫ СЕАНСА ХАРДКОРА:</div>
+                <div class="text-light">СТАТУС: <span class="text-success fw-bold">УРОВЕНЬ 3 (ХАРДКОР) СДАН</span></div>
+                <div class="text-light">ВСЕГО ВОЛН: <span class="text-warning">8 из 8</span></div>
+                <div class="text-light">ОШИБОК / СБРОСОВ: <span class="text-warning" v-text="attempts"></span></div>
+                <div class="text-light">ЗАТРАЧЕНО ВРЕМЕНИ: <span class="text-warning" v-text="totalTimeSec"></span> СЕК</div>
+            </div>
+
+            <div>
+                <button @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2">
+                    ПРОЙТИ ПОВТОРНО (РЕКОРД СКОРОСТИ) ↺
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Подключение локального Vue 3 -->
+    <script is:inline src="/static/vue.global.js"></script>
+
+    <script is:inline>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    missionName: 'Урок 7 :: Модели и моделирование. Классификации моделей (Уровень 3)',
+                    startTime: Date.now(),
+                    gameState: 'intro', // 'intro', 'playing', 'victory'
+                    currentWave: 1,
+                    totalWaves: 8,
+                    attempts: 0,
+                    phaseTimeLeft: 10.0,
+                    maxPhaseTime: 10.0,
+                    timerInterval: null,
+                    crashMessage: null,
+
+                    // Матрица и буфер
+                    matrix: [],
+                    mode: 'row', // 'row' или 'col'
+                    activeRow: 0,
+                    activeCol: null,
+                    playerBuffer: [],
+                    bufferLimit: 4,
+                    usedCells: {}, // "r,c" -> true
+
+                    // Конфигурации 8 волн
+                    wavesCatalog: [
+                        {
+                            modelName: "Школьный глобус Земли",
+                            modelDesc: "Материальный объект из пластмассы, передающий форму и геометрию планеты.",
+                            targetSequence: ["НАТУРНАЯ", "ОБРАЗНАЯ"],
+                            timeLimit: 12.0,
+                            bufferLimit: 4
+                        },
+                        {
+                            modelName: "Формула второго закона Ньютона: F = m × a",
+                            modelDesc: "Описание закона механики на формальном математическом языке.",
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "ЗНАКОВАЯ"],
+                            timeLimit: 11.0,
+                            bufferLimit: 4
+                        },
+                        {
+                            modelName: "Поэтажный план помещений серверной",
+                            modelDesc: "Схема расположения комнат с указанием числовых площадей и размеров.",
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "СТАТИЧЕСКАЯ", "СМЕШАННАЯ"],
+                            timeLimit: 10.0,
+                            bufferLimit: 4
+                        },
+                        {
+                            modelName: "Траектория полета снаряда в вакууме",
+                            modelDesc: "Движение материальной точки во времени с однозначным строгим расчетом.",
+                            targetSequence: ["ДИНАМИЧЕСКАЯ", "ДЕТЕРМИНИРОВАННАЯ", "ИНФОРМАЦИОННАЯ"],
+                            timeLimit: 9.5,
+                            bufferLimit: 5
+                        },
+                        {
+                            modelName: "Симуляция очередей в кассу методом Монте-Карло",
+                            modelDesc: "Поведение потока покупателей с учетом случайных распределений и вероятностей.",
+                            targetSequence: ["ДИНАМИЧЕСКАЯ", "СТОХАСТИЧЕСКАЯ", "ИНФОРМАЦИОННАЯ"],
+                            timeLimit: 9.0,
+                            bufferLimit: 5
+                        },
+                        {
+                            modelName: "Топографическая карта с изолиниями высот",
+                            modelDesc: "Сочетание графического плана местности, масштаба и высотных отметок.",
+                            targetSequence: ["СМЕШАННАЯ", "СТАТИЧЕСКАЯ", "ИНФОРМАЦИОННАЯ"],
+                            timeLimit: 8.5,
+                            bufferLimit: 5
+                        },
+                        {
+                            modelName: "Краш-тест автомобиля с манекеном",
+                            modelDesc: "Реальный физический эксперимент для динамической оценки деформаций.",
+                            targetSequence: ["НАТУРНАЯ", "ДИНАМИЧЕСКАЯ", "ОБРАЗНАЯ"],
+                            timeLimit: 7.5,
+                            bufferLimit: 5
+                        },
+                        {
+                            modelName: "Цифровой двойник газовой турбины (Digital Twin)",
+                            modelDesc: "Компьютерная непрерывная симуляция агрегата на основе потока телеметрии IoT.",
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "ДИНАМИЧЕСКАЯ", "СТОХАСТИЧЕСКАЯ", "СМЕШАННАЯ"],
+                            timeLimit: 6.5,
+                            bufferLimit: 5
+                        }
+                    ],
+
+                    currentWaveData: {
+                        modelName: "",
+                        modelDesc: "",
+                        targetSequence: [],
+                        timeLimit: 10.0,
+                        bufferLimit: 4
+                    },
+
+                    tokensPool: [
+                        "НАТУРНАЯ", "ИНФОРМАЦИОННАЯ", "СТАТИЧЕСКАЯ", "ДИНАМИЧЕСКАЯ",
+                        "ОБРАЗНАЯ", "ЗНАКОВАЯ", "СМЕШАННАЯ", "ДЕТЕРМИНИРОВАННАЯ",
+                        "СТОХАСТИЧЕСКАЯ", "ДИСКРЕТНАЯ", "НЕПРЕРЫВНАЯ", "ПРОТОТИП"
+                    ]
+                };
+            },
+
+            computed: {
+                progressBarStyle() {
+                    const pct = Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
+                    return { width: pct + '%' };
+                },
+                totalTimeSec() {
+                    return Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                }
+            },
+
+            methods: {
+                sendTelemetry(actionType, isSuccess = false) {
+                    const timeSpent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: this.missionName,
+                        action_type: actionType,
+                        status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                        start_time: new Date(this.startTime).toISOString(),
+                        time_spent_sec: timeSpent,
+                        attempts_count: this.attempts,
+                        success: isSuccess,
+                        action_log: [{ wave: this.currentWave, action: actionType, time: timeSpent }]
+                    }, '*');
+                },
+
+                startGame() {
+                    this.startTime = Date.now();
+                    this.attempts = 0;
+                    this.gameState = 'playing';
+                    this.sendTelemetry('in_progress');
+                    this.initWave(1);
+                },
+
+                initWave(waveNum) {
+                    clearInterval(this.timerInterval);
+                    this.currentWave = waveNum;
+                    this.crashMessage = null;
+
+                    const cfg = this.wavesCatalog[waveNum - 1];
+                    this.currentWaveData = { ...cfg };
+                    this.bufferLimit = cfg.bufferLimit;
+                    this.playerBuffer = [];
+                    this.usedCells = {};
+
+                    this.phaseTimeLeft = cfg.timeLimit;
+                    this.maxPhaseTime = cfg.timeLimit;
+
+                    // Генерация гарантированно разрешимой матрицы 4x4
+                    this.generateGuaranteedMatrix(cfg.targetSequence);
+
+                    // Сброс режима обхода на первую строку
+                    this.mode = 'row';
+                    this.activeRow = 0;
+                    this.activeCol = null;
+
+                    // Запуск таймера убывания
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft -= 0.1;
+                        if (this.phaseTimeLeft <= 0) {
+                            this.phaseTimeLeft = 0;
+                            this.handleFailure('Таймер исчерпан! Канал нейроматрицы заблокирован.');
+                        }
+                    }, 100);
+                },
+
+                // Генерация матрицы 4x4 с гарантированным валидным путем Cyberpunk 2077
+                generateGuaranteedMatrix(targetSeq) {
+                    const rows = 4;
+                    const cols = 4;
+                    const mat = Array(rows).fill(null).map(() => Array(cols).fill(null));
+
+                    // Шаг 1: стартуем в строке 0
+                    const c0 = Math.floor(Math.random() * cols);
+                    mat[0][c0] = { token: targetSeq[0], hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0') };
+
+                    let curR = 0;
+                    let curC = c0;
+                    let curMode = 'col'; // следующий ход по столбцу curC
+
+                    for (let i = 1; i < targetSeq.length; i++) {
+                        if (curMode === 'col') {
+                            // Выбираем другую строку в текущем столбце curC
+                            const availableRows = [0, 1, 2, 3].filter(r => r !== curR);
+                            const nextR = availableRows[Math.floor(Math.random() * availableRows.length)];
+                            mat[nextR][curC] = { token: targetSeq[i], hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0') };
+                            curR = nextR;
+                            curMode = 'row';
+                        } else {
+                            // Выбираем другой столбец в текущей строке curR
+                            const availableCols = [0, 1, 2, 3].filter(c => c !== curC);
+                            const nextC = availableCols[Math.floor(Math.random() * availableCols.length)];
+                            mat[curR][nextC] = { token: targetSeq[i], hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0') };
+                            curC = nextC;
+                            curMode = 'col';
+                        }
+                    }
+
+                    // Заполняем оставшиеся ячейки случайными дистракторами
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            if (!mat[r][c]) {
+                                const distractor = this.tokensPool[Math.floor(Math.random() * this.tokensPool.length)];
+                                mat[r][c] = {
+                                    token: distractor,
+                                    hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0')
+                                };
+                            }
+                        }
+                    }
+
+                    this.matrix = mat;
+                },
+
+                isCellClickable(r, c) {
+                    if (this.usedCells[`${r},${c}`]) return false;
+                    if (this.mode === 'row') {
+                        return r === this.activeRow;
+                    } else {
+                        return c === this.activeCol;
+                    }
+                },
+
+                getCellClass(r, c) {
+                    if (this.usedCells[`${r},${c}`]) {
+                        return 'btn-secondary opacity-25 border-0';
+                    }
+                    if (this.isCellClickable(r, c)) {
+                        return this.mode === 'row' 
+                            ? 'btn-outline-warning border-2 shadow-sm text-warning' 
+                            : 'btn-outline-info border-2 shadow-sm text-info';
+                    }
+                    return 'btn-dark text-secondary border-secondary opacity-40';
+                },
+
+                handleCellClick(r, c) {
+                    if (!this.isCellClickable(r, c)) return;
+
+                    const cell = this.matrix[r][c];
+                    this.usedCells[`${r},${c}`] = true;
+                    this.playerBuffer.push(cell.token);
+
+                    // Проверяем совпадение целевой последовательности
+                    if (this.checkTargetMatched()) {
+                        // Успех текущей волны!
+                        clearInterval(this.timerInterval);
+                        if (this.currentWave >= this.totalWaves) {
+                            // Финал хардкора!
+                            this.gameState = 'victory';
+                            this.sendTelemetry('level_complete', true);
+                        } else {
+                            this.initWave(this.currentWave + 1);
+                        }
+                        return;
+                    }
+
+                    // Проверяем переполнение буфера
+                    if (this.playerBuffer.length >= this.bufferLimit) {
+                        this.handleFailure('Буфер памяти переполнен мусорными токенами! Аварийный сброс.');
+                        return;
+                    }
+
+                    // Переключение режима обхода строка <-> столбец
+                    if (this.mode === 'row') {
+                        this.mode = 'col';
+                        this.activeCol = c;
+                        this.activeRow = null;
+                    } else {
+                        this.mode = 'row';
+                        this.activeRow = r;
+                        this.activeCol = null;
+                    }
+                },
+
+                // Проверка, собрана ли целевая последовательность как непрерывный подмассив
+                checkTargetMatched() {
+                    const target = this.currentWaveData.targetSequence;
+                    const buf = this.playerBuffer;
+                    if (buf.length < target.length) return false;
+
+                    for (let start = 0; start <= buf.length - target.length; start++) {
+                        let match = true;
+                        for (let i = 0; i < target.length; i++) {
+                            if (buf[start + i] !== target[i]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) return true;
+                    }
+                    return false;
+                },
+
+                isTargetTokenMatched(tokenIdx) {
+                    const target = this.currentWaveData.targetSequence;
+                    const buf = this.playerBuffer;
+                    // Проверяем частичное совпадение с конца буфера
+                    const matchedCount = this.getContiguousMatchedCount();
+                    return tokenIdx < matchedCount;
+                },
+
+                getContiguousMatchedCount() {
+                    const target = this.currentWaveData.targetSequence;
+                    const buf = this.playerBuffer;
+                    // Ищем максимальный суффикс buf, являющийся префиксом target
+                    for (let len = Math.min(buf.length, target.length); len > 0; len--) {
+                        let match = true;
+                        const bufStart = buf.length - len;
+                        for (let i = 0; i < len; i++) {
+                            if (buf[bufStart + i] !== target[i]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) return len;
+                    }
+                    return 0;
+                },
+
+                handleFailure(reason) {
+                    clearInterval(this.timerInterval);
+                    this.attempts++;
+                    this.crashMessage = reason;
+                    this.sendTelemetry('hardcore_reset', false);
+
+                    // Задержка 1.5 сек и жесткий сброс на волну 1!
+                    setTimeout(() => {
+                        this.crashMessage = null;
+                        this.initWave(1);
+                    }, 1500);
+                }
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>
