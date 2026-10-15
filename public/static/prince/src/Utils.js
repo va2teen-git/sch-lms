@@ -390,6 +390,16 @@ PrinceJS.Utils = {
     if (query.get("skipCutscenes") === "true") {
       PrinceJS.SKIP_CUTSCENES = true;
     }
+
+    if (query.get("maxLevel")) {
+      let queryMaxLevel = parseInt(query.get("maxLevel"), 10);
+      if (!isNaN(queryMaxLevel) && queryMaxLevel > 0) {
+        PrinceJS.maxLevel = queryMaxLevel;
+        if (PrinceJS.currentLevel > PrinceJS.maxLevel) {
+          PrinceJS.currentLevel = PrinceJS.maxLevel;
+        }
+      }
+    }
   },
 
   applyScreenWidth() {

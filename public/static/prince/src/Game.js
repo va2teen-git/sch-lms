@@ -601,6 +601,10 @@ PrinceJS.Game.prototype = {
       return;
     }
 
+    if (PrinceJS.maxLevel && PrinceJS.currentLevel >= PrinceJS.maxLevel) {
+      return;
+    }
+
     if (PrinceJS.currentLevel > 3 && PrinceJS.currentLevel < 90) {
       return;
     }
@@ -629,16 +633,24 @@ PrinceJS.Game.prototype = {
     }
 
     PrinceJS.danger = null;
+    const completedLvl = triggerLevel || PrinceJS.currentLevel;
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({
           type: 'PRINCE_EVENT',
           action: 'level_complete',
-          completedLevel: triggerLevel || PrinceJS.currentLevel,
-          nextLevel: PrinceJS.currentLevel + 1
+          completedLevel: completedLvl,
+          nextLevel: (PrinceJS.maxLevel && completedLvl >= PrinceJS.maxLevel) ? null : PrinceJS.currentLevel + 1
         }, '*');
       }
     } catch (e) {}
+
+    if (PrinceJS.maxLevel && completedLvl >= PrinceJS.maxLevel) {
+      // Cannot pass beyond maxLevel! Stop and freeze game in completed state
+      this.game.paused = true;
+      return;
+    }
+
     PrinceJS.currentLevel++;
     PrinceJS.currentHealth = PrinceJS.currentLevel === 13 ? this.kid.health : null;
     PrinceJS.maxHealth = this.kid.maxHealth;
