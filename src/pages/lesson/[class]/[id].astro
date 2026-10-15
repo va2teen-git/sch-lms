@@ -125,7 +125,8 @@ const tasks = [
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
-  let isHardcore = localStorage.getItem('hardcore_mode') === 'true';
+  const HARDCORE_KEY = `school_lms_hardcore_${classSlug}_${lessonId}`;
+  let isHardcore = sessionStorage.getItem(HARDCORE_KEY) === 'true' || localStorage.getItem('hardcore_mode') === 'true' || localStorage.getItem(HARDCORE_KEY) === 'true';
   let currentUnlockedLevel = 1;
   let isHardcoreCompleted = false;
   let isNormalCompleted = false;
@@ -137,14 +138,16 @@ const tasks = [
   function getOrCreateAttempt(forceNew = false, modeOverride = null) {
     const raw = sessionStorage.getItem(ATTEMPT_KEY);
     let attempt = null;
-    if (raw && !forceNew) {
+    let prevNum = 0;
+    if (raw) {
       try {
-        attempt = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.number === 'number') prevNum = parsed.number;
+        if (!forceNew) attempt = parsed;
       } catch (e) {}
     }
     const currentMode = modeOverride || (isHardcore ? 'hardcore' : 'normal');
     if (!attempt || forceNew || attempt.mode !== currentMode) {
-      const prevNum = attempt && typeof attempt.number === 'number' ? attempt.number : 0;
       attempt = {
         id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         number: prevNum + 1,
@@ -322,7 +325,8 @@ const tasks = [
   
   hardcoreBtn?.addEventListener('click', () => {
     isHardcore = !isHardcore;
-    localStorage.setItem('hardcore_mode', String(isHardcore));
+    sessionStorage.setItem(HARDCORE_KEY, String(isHardcore));
+    localStorage.removeItem('hardcore_mode');
     updateHardcoreUI();
     getOrCreateAttempt(true, isHardcore ? 'hardcore' : 'normal');
     window.location.reload();
@@ -333,10 +337,27 @@ const tasks = [
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (data && data.type === 'TELEMETRY_EVENT') {
+      let levelNum = null;
+      const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
+      if (sourceIframe) {
+        levelNum = parseInt(sourceIframe.id.replace('iframe-', ''), 10) || null;
+      }
+      if (!levelNum && data.mission_name) {
+        if (data.mission_name.includes('Уровень 1')) levelNum = 1;
+        else if (data.mission_name.includes('Уровень 2')) levelNum = 2;
+        else if (data.mission_name.includes('Уровень 3')) levelNum = 3;
+      }
+
+      // CRITICAL: Block automated 0-second in_progress heartbeats from locked background iframes!
+      // When page loads, locked levels mount in background and send 0s in_progress.
+      // If the level is locked (levelNum > currentUnlockedLevel), we MUST NOT pollute telemetry!
+      if (levelNum && levelNum > currentUnlockedLevel && data.action_type === 'in_progress' && (!data.time_spent_sec || data.time_spent_sec === 0)) {
+        return;
+      }
+
       console.log('Received telemetry:', data);
       
       if (!data.mission_name) {
-        const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
         const lessonTitle = document.querySelector('h1')?.textContent || 'Неизвестный урок';
         const taskTitle = sourceIframe ? (sourceIframe.title || sourceIframe.id) : 'Неизвестное задание';
         data.mission_name = `${lessonTitle} :: ${taskTitle}`;
@@ -355,7 +376,8 @@ const tasks = [
         data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
       }
 
-      if (data.action_type === 'hardcore_reset' && isHardcore) {
+      if ((data.action_type === 'hardcore_reset' || data.action_type === 'level_fail') && isHardcore) {
+        data.action_type = 'hardcore_reset';
         alert('💀 ОШИБКА В РЕЖИМЕ ХАРДКОРА! Прогресс сброшен!');
         currentUnlockedLevel = 1;
         updateTabsState();
@@ -367,10 +389,12 @@ const tasks = [
         });
 
         currentAttempt = getOrCreateAttempt(true, 'hardcore');
+      } else if (data.action_type === 'hardcore_reset' && !isHardcore) {
+        // Normal mode safety: if an iframe sent hardcore_reset while in normal mode, downgrade to level_fail
+        data.action_type = 'level_fail';
       }
 
       if (data.action_type === 'level_complete') {
-        const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
         if (sourceIframe) {
           const completedLevel = parseInt(sourceIframe.id.replace('iframe-', ''), 10);
           if (completedLevel === currentUnlockedLevel) {
@@ -386,17 +410,6 @@ const tasks = [
             }
           }
         }
-      }
-
-      let levelNum = null;
-      const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
-      if (sourceIframe) {
-        levelNum = parseInt(sourceIframe.id.replace('iframe-', ''), 10) || null;
-      }
-      if (!levelNum && data.mission_name) {
-        if (data.mission_name.includes('Уровень 1')) levelNum = 1;
-        else if (data.mission_name.includes('Уровень 2')) levelNum = 2;
-        else if (data.mission_name.includes('Уровень 3')) levelNum = 3;
       }
 
       fetch('/api/telemetry', {

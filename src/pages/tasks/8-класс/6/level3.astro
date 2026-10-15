@@ -53,7 +53,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             <h1 class="text-danger display-1 mb-4" id="fail-title">FATAL ERROR</h1>
             <h3 class="text-white mb-4">МАССИВ РАЗРУШЕН</h3>
             <p class="text-muted" v-text="failReason"></p>
-            <p class="text-warning mt-4"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Перезагрузка системы...</p>
+            <div class="mt-4 d-flex justify-content-center gap-3">
+                <button id="retry-btn" @click="startGame" class="btn btn-warning btn-lg rounded-0 fw-bold px-4 py-2">ПОПРОБОВАТЬ СНОВА</button>
+            </div>
+            <p class="text-secondary small mt-3">Автоматический перезапуск через <span v-text="restartCountdown"></span>с...</p>
         </div>
 
         <div v-else-if="gameState === 'success'" class="text-center py-5">
@@ -71,7 +74,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         let attempts = 0;
 
         function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+            const timeSpent = Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
             window.parent.postMessage({
                 type: 'TELEMETRY_EVENT',
                 mission_name: missionName,
@@ -91,22 +94,33 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 const gameState = ref('intro'); // intro, playing, failed, success
                 const score = ref(0);
                 const timeLeft = ref(45);
+                const restartCountdown = ref(3);
                 const targetDecimal = ref(0);
                 const cells = ref([]);
                 const failReason = ref('');
                 let timerInterval = null;
+                let autoRestartInterval = null;
 
-                onMounted(() => {
-                    sendTelemetry('in_progress');
-                });
+                const clearTimers = () => {
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    if (autoRestartInterval) {
+                        clearInterval(autoRestartInterval);
+                        autoRestartInterval = null;
+                    }
+                };
 
                 const startGame = () => {
+                    clearTimers();
+                    sessionStartTime = Date.now();
                     gameState.value = 'playing';
                     score.value = 0;
                     timeLeft.value = 45;
                     generateLevel();
+                    sendTelemetry('in_progress');
                     
-                    if (timerInterval) clearInterval(timerInterval);
                     timerInterval = setInterval(() => {
                         timeLeft.value--;
                         if (timeLeft.value <= 0) {
@@ -180,21 +194,33 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 };
 
                 const failGame = (reason) => {
-                    clearInterval(timerInterval);
+                    clearTimers();
                     gameState.value = 'failed';
                     failReason.value = reason;
                     attempts++;
-                    sendTelemetry('hardcore_reset');
+                    // Decoupled arcade failure: sends 'level_fail' (in hardcore mode, platform handler issues hardcore_reset)
+                    sendTelemetry('level_fail');
+
+                    restartCountdown.value = 3;
+                    autoRestartInterval = setInterval(() => {
+                        restartCountdown.value--;
+                        if (restartCountdown.value <= 0) {
+                            clearTimers();
+                            if (gameState.value === 'failed') {
+                                startGame();
+                            }
+                        }
+                    }, 1000);
                 };
 
                 const winGame = () => {
-                    clearInterval(timerInterval);
+                    clearTimers();
                     gameState.value = 'success';
                     sendTelemetry('level_complete', true);
                 };
 
                 onUnmounted(() => {
-                    if (timerInterval) clearInterval(timerInterval);
+                    clearTimers();
                 });
 
                 const formattedTime = computed(() => {
@@ -205,6 +231,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     gameState,
                     score,
                     timeLeft,
+                    restartCountdown,
                     formattedTime,
                     targetDecimal,
                     cells,
