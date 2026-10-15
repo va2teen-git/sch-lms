@@ -1,0 +1,518 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Классификатор моделей и прототипов (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Разделение натурных, информационных моделей и объектов-прототипов</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок / попыток: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- Описание задания -->
+                <p id="phase-desc" class="text-light mb-3">
+                    Исследовательский шлюз получил пакет данных с описанием объектов и систем. 
+                    Используя мышь, <strong>перетащите каждую карточку</strong> (или кликните по ней, затем по нужному шлюзу) в соответствующий функциональный буфер классификации.
+                </p>
+
+                <!-- Окно системных уведомлений / ошибок -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СБОЙ КЛАССИФИКАЦИИ] <span id="feedback-text">Неверное распределение объектов по буферам!</span> Формирование нового потока...</span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- Зона активных карточек (источник для перетаскивания) -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-secondary small">НЕРАСПРЕДЕЛЕННЫЕ ОБЪЕКТЫ (ПЕРЕТАЩИТЕ В БУФЕРЫ НИЖЕ):</span>
+                        <button id="reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                            Сбросить на исходную
+                        </button>
+                    </div>
+                    <div id="cards-pool" class="d-flex flex-wrap gap-2 p-3 border border-dashed border-secondary bg-dark min-h-24">
+                        <!-- Карточки генерируются скриптом -->
+                    </div>
+                </div>
+
+                <!-- Целевые бакеты / контейнеры приемники -->
+                <div class="row g-3 mb-4" id="buckets-row">
+                    <!-- Буфер 1 -->
+                    <div class="col-md-4">
+                        <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="bucket1" id="bucket-1">
+                            <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold" id="b1-title">1. НАТУРНЫЕ МОДЕЛИ</span>
+                                <span class="badge border border-success text-success bg-black rounded-0 count-badge" id="b1-count">0</span>
+                            </div>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <p class="text-secondary small mb-2" id="b1-desc">Физические материальные объекты из вещества, воспроизводящие свойства оригинала.</p>
+                                <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2 min-h-36">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Буфер 2 -->
+                    <div class="col-md-4">
+                        <div class="card bg-black border-info rounded-0 h-100 target-bucket" data-category="bucket2" id="bucket-2">
+                            <div class="card-header bg-dark border-bottom border-info text-info d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold" id="b2-title">2. ИНФОРМАЦИОННЫЕ МОДЕЛИ</span>
+                                <span class="badge border border-info text-info bg-black rounded-0 count-badge" id="b2-count">0</span>
+                            </div>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <p class="text-secondary small mb-2" id="b2-desc">Описания объектов на естественных, знаковых языках или в форме образов на носителях.</p>
+                                <div class="bucket-slot flex-grow-1 p-2 border border-info bg-dark d-flex flex-column gap-2 min-h-36">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Буфер 3 -->
+                    <div class="col-md-4">
+                        <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="bucket3" id="bucket-3">
+                            <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold" id="b3-title">3. ОБЪЕКТЫ-ОРИГИНАЛЫ</span>
+                                <span class="badge border border-warning text-warning bg-black rounded-0 count-badge" id="b3-count">0</span>
+                            </div>
+                            <div class="card-body p-2 d-flex flex-column">
+                                <p class="text-secondary small mb-2" id="b3-desc">Реальные физические объекты и природные системы, являющиеся прототипами для изучения.</p>
+                                <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2 min-h-36">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопка проверки -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">
+                        Распределите все карточки по трем буферам, затем отправьте конфигурацию на валидацию.
+                    </span>
+                    <button id="verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                        ПРОВЕРИТЬ КЛАССИФИКАЦИЮ
+                    </button>
+                </div>
+
+                <!-- Экран завершения уровня -->
+                <div id="success-screen" class="d-none text-center py-5 border border-success bg-black mt-3">
+                    <div class="text-success fs-1 mb-3">✓</div>
+                    <h3 class="text-success mb-2">КЛАССИФИКАЦИЯ МОДЕЛЕЙ ЗАВЕРШЕНА</h3>
+                    <p class="text-light mb-4">
+                        Все 3 этапа структурирования успешно пройдены. 
+                        Принципы разделения натурных, информационных, статических и динамических моделей усвоены.
+                    </p>
+                    <div class="d-inline-block p-3 border border-success bg-dark text-start font-monospace small">
+                        <div>СТАТУС: <span class="text-success">УРОВЕНЬ 1 ПРОЙДЕН</span></div>
+                        <div>ЗАТРАЧЕНО ВРЕМЕНИ: <span id="final-time" class="text-warning">0</span> СЕК</div>
+                        <div>ОШИБОК КЛАССИФИКАЦИИ: <span id="final-attempts" class="text-warning">0</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        (function() {
+            const missionName = 'Урок 7 :: Модели и моделирование. Классификации моделей (Уровень 1)';
+            const startTime = Date.now();
+            let attempts = 0;
+            let currentPhase = 1;
+            let activeCardsData = [];
+            let selectedCardElement = null;
+
+            // Телеметрия
+            function sendTelemetry(actionType, isSuccess = false) {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: actionType,
+                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                    start_time: new Date(startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: attempts,
+                    success: isSuccess,
+                    action_log: [{ phase: currentPhase, action: actionType, time: timeSpent }]
+                }, '*');
+            }
+
+            // Банк заданий по трем фазам в соответствии с учебником Полякова
+            const phaseConfigs = {
+                1: {
+                    title: "Разделение натурных, информационных моделей и объектов-прототипов",
+                    desc: "Разделите предложенные сущности на натурные (материальные) модели, информационные описания и реальные объекты-прототипы.",
+                    b1: { title: "1. НАТУРНЫЕ МОДЕЛИ", desc: "Материальные объекты из вещества, воспроизводящие геометрические или физические свойства оригинала." },
+                    b2: { title: "2. ИНФОРМАЦИОННЫЕ МОДЕЛИ", desc: "Описания объектов на естественных, знаковых языках, в коде или в форме образов." },
+                    b3: { title: "3. ОБЪЕКТЫ-ОРИГИНАЛЫ (ПРОТОТИПЫ)", desc: "Реальные физические объекты, природные и технические системы, являющиеся прототипами." },
+                    bank: [
+                        // bucket1: Натурные модели
+                        { text: "Школьный глобус из пластика на металлической подставке", category: "bucket1" },
+                        { text: "Манекен человека для автомобильных краш-тестов", category: "bucket1" },
+                        { text: "Уменьшенная деревянная модель корпуса корабля для бассейна", category: "bucket1" },
+                        { text: "Макет жилого квартала из пенопласта и пластика", category: "bucket1" },
+                        { text: "Анатомический муляж человеческого сердца в натуральную величину", category: "bucket1" },
+                        { text: "Действующая миниатюрная ветроэлектростанция на стенде лаборатории", category: "bucket1" },
+
+                        // bucket2: Информационные модели
+                        { text: "Географическая карта полушарий с изолиниями глубин и высот", category: "bucket2" },
+                        { text: "Формула кинетической энергии: E = (m × v²) / 2", category: "bucket2" },
+                        { text: "Электрокардиограмма пациента (график сердечных ритмов)", category: "bucket2" },
+                        { text: "Программный код симулятора гравитации на языке Python", category: "bucket2" },
+                        { text: "Таблица Менделеева с атомными массами и свойствами элементов", category: "bucket2" },
+                        { text: "Архитектурный чертеж здания в формате CAD со всеми размерами", category: "bucket2" },
+
+                        // bucket3: Объекты-оригиналы (прототипы)
+                        { text: "Реальная планета Земля, вращающаяся вокруг Солнца", category: "bucket3" },
+                        { text: "Живой пассажир, находящийся в салоне легкового автомобиля", category: "bucket3" },
+                        { text: "Настоящий океанский танкер водоизмещением 100 000 тонн", category: "bucket3" },
+                        { text: "Построенный 16-этажный кирпичный жилой дом с жильцами", category: "bucket3" },
+                        { text: "Живое работающее сердце взрослого человека", category: "bucket3" },
+                        { text: "Реальная Саяно-Шушенская гидроэлектростанция на реке Енисей", category: "bucket3" }
+                    ]
+                },
+                2: {
+                    title: "Классификация информационных моделей по форме представления",
+                    desc: "Распределите информационные модели на образные (геометрические, зрительные), знаковые (символьные языки) и смешанные (образно-знаковые структуры).",
+                    b1: { title: "1. ОБРАЗНЫЕ МОДЕЛИ", desc: "Фиксируют визуальный зрительный образ, пространственные и геометрические характеристики без символьного синтаксиса." },
+                    b2: { title: "2. ЗНАКОВЫЕ МОДЕЛИ", desc: "Построены на основе естественных или формальных символьных языков (текст, формулы, код, ноты)." },
+                    b3: { title: "3. СМЕШАННЫЕ МОДЕЛИ", desc: "Сочетают зрительно-образные и знаковые элементы (таблицы, графы, схемы с размерами, карты)." },
+                    bank: [
+                        // bucket1: Образные
+                        { text: "Цветная фотография поверхности планеты Марс с марсохода", category: "bucket1" },
+                        { text: "Рисунок строения растительной клетки в биологическом атласе", category: "bucket1" },
+                        { text: "Рентгеновский снимок грудной клетки человека", category: "bucket1" },
+                        { text: "Художественный живописный портрет писателя маслом на холсте", category: "bucket1" },
+                        { text: "3D-полигональная визуализация кузова автомобиля в графическом редакторе", category: "bucket1" },
+
+                        // bucket2: Знаковые
+                        { text: "Запись химической реакции: 2H₂ + O₂ → 2H₂O", category: "bucket2" },
+                        { text: "Словесный словарный портрет разыскиваемого человека в протоколе", category: "bucket2" },
+                        { text: "Математическое уравнение второго закона Ньютона: F = m × a", category: "bucket2" },
+                        { text: "Исходный текст алгоритма быстрой сортировки на языке C++", category: "bucket2" },
+                        { text: "Партитура симфонии, записанная нотными знаками на нотном стане", category: "bucket2" },
+
+                        // bucket3: Смешанные
+                        { text: "Топографическая карта местности с числовым масштабом и условными знаками", category: "bucket3" },
+                        { text: "Схема линий Московского метрополитена с названиями станций", category: "bucket3" },
+                        { text: "Таблица расписания движения пригородных поездов по станциям", category: "bucket3" },
+                        { text: "Круговая секторная диаграмма распределения долей рынка браузеров", category: "bucket3" },
+                        { text: "Чертеж стального вала с указанием числовых допусков и диаметров в мм", category: "bucket3" },
+                        { text: "Генеалогическое древо династии с именами правителей и датами правления", category: "bucket3" }
+                    ]
+                },
+                3: {
+                    title: "Классификация по фактору времени и характеру процессов",
+                    desc: "Распределите модели по учету временной динамики: статические (фиксированный момент), динамические детерминированные (строгий однозначный расчет) и стохастические (вероятностные).",
+                    b1: { title: "1. СТАТИЧЕСКИЕ МОДЕЛИ", desc: "Фиксируют состояние объекта в определенный момент времени («моментальный снимок», срез параметров)." },
+                    b2: { title: "2. ДИНАМИЧЕСКИЕ ДЕТЕРМИНИРОВАННЫЕ", desc: "Описывают изменение системы во времени; результат строго и однозначно вычисляется по входным данным." },
+                    b3: { title: "3. ДИНАМИЧЕСКИЕ СТОХАСТИЧЕСКИЕ", desc: "Описывают поведение системы во времени с учетом случайных факторов, вероятностей и статистических флуктуаций." },
+                    bank: [
+                        // bucket1: Статические
+                        { text: "Поэтажный архитектурный план здания с указанием площадей помещений", category: "bucket1" },
+                        { text: "Таблица технических характеристик процессора в паспорте изделия", category: "bucket1" },
+                        { text: "Бухгалтерский балансовый отчет предприятия на 31 декабря", category: "bucket1" },
+                        { text: "Схема структурной формулы молекулы бензола (C₆H₆)", category: "bucket1" },
+                        { text: "Снимок МРТ головного мозга пациента на дату обследования", category: "bucket1" },
+
+                        // bucket2: Динамические детерминированные
+                        { text: "Математический расчет траектории полета артиллерийского снаряда в вакууме", category: "bucket2" },
+                        { text: "Пошаговая эмуляция тактов выполнения машинных инструкций в микропроцессоре", category: "bucket2" },
+                        { text: "Анимационная кинематическая модель движения кривошипно-шатунного механизма", category: "bucket2" },
+                        { text: "Модель свободного падения тела с высоты h по формуле: h = (g × t²) / 2", category: "bucket2" },
+                        { text: "Расчет фаз затмения Луны на основе законов небесной механики Кеплера", category: "bucket2" },
+
+                        // bucket3: Динамические стохастические (вероятностные)
+                        { text: "Моделирование очередей покупателей в супермаркете методом Монте-Карло", category: "bucket3" },
+                        { text: "Компьютерная симуляция броуновского движения микрочастиц в жидкости", category: "bucket3" },
+                        { text: "Вероятностный прогноз траектории движения штормового циклона на 5 суток", category: "bucket3" },
+                        { text: "Имитационная модель колебания биржевых котировок акций с учетом рыночных рисков", category: "bucket3" },
+                        { text: "Моделирование сетевого трафика и вероятности потерь пакетов при пиковых DDoS-атаках", category: "bucket3" }
+                    ]
+                }
+            };
+
+            // Перемешивание массива
+            function shuffle(array) {
+                const arr = [...array];
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            }
+
+            // Выборка сбалансированного набора карточек для текущей фазы
+            function selectCardsForPhase(phase) {
+                const config = phaseConfigs[phase];
+                const byCategory = { bucket1: [], bucket2: [], bucket3: [] };
+                config.bank.forEach(card => {
+                    if (byCategory[card.category]) {
+                        byCategory[card.category].push(card);
+                    }
+                });
+
+                // Выбираем по 2 случайных карточки из каждой категории (всего 6 карточек)
+                const selected = [
+                    ...shuffle(byCategory.bucket1).slice(0, 2),
+                    ...shuffle(byCategory.bucket2).slice(0, 2),
+                    ...shuffle(byCategory.bucket3).slice(0, 2)
+                ];
+
+                return shuffle(selected);
+            }
+
+            // Рендеринг текущей фазы
+            function renderPhase(phase) {
+                const config = phaseConfigs[phase];
+                document.getElementById('phase-badge').textContent = `Шаг ${phase} из 3`;
+                document.getElementById('phase-title').textContent = config.title;
+                document.getElementById('phase-desc').textContent = config.desc;
+
+                document.getElementById('b1-title').textContent = config.b1.title;
+                document.getElementById('b1-desc').textContent = config.b1.desc;
+
+                document.getElementById('b2-title').textContent = config.b2.title;
+                document.getElementById('b2-desc').textContent = config.b2.desc;
+
+                document.getElementById('b3-title').textContent = config.b3.title;
+                document.getElementById('b3-desc').textContent = config.b3.desc;
+
+                // Очистка слотов бакетов
+                document.querySelectorAll('.bucket-slot').forEach(slot => slot.innerHTML = '');
+                updateBucketCounts();
+
+                // Генерация карточек в пуле
+                activeCardsData = selectCardsForPhase(phase);
+                const pool = document.getElementById('cards-pool');
+                pool.innerHTML = '';
+
+                activeCardsData.forEach((item, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'badge bg-black text-light border border-secondary rounded-0 p-2 text-wrap text-start text-sm cursor-grab user-select-none transition-colors d-flex align-items-center gap-2';
+                    card.style.maxWidth = '100%';
+                    card.draggable = true;
+                    card.dataset.id = 'card-' + index;
+                    card.dataset.category = item.category;
+                    card.innerHTML = `<span class="text-secondary fw-bold">::</span> <span>${item.text}</span>`;
+
+                    // Drag Events
+                    card.addEventListener('dragstart', handleDragStart);
+                    card.addEventListener('dragend', handleDragEnd);
+
+                    // Click to Select / Move (Accessibility)
+                    card.addEventListener('click', () => handleCardClick(card));
+
+                    pool.appendChild(card);
+                });
+
+                document.getElementById('verify-btn').disabled = true;
+                selectedCardElement = null;
+            }
+
+            // Обработка клика по карточке (для режима клик-перемещение)
+            function handleCardClick(card) {
+                if (selectedCardElement === card) {
+                    card.classList.remove('border-warning', 'bg-dark');
+                    card.classList.add('border-secondary', 'bg-black');
+                    selectedCardElement = null;
+                    return;
+                }
+
+                if (selectedCardElement) {
+                    selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                    selectedCardElement.classList.add('border-secondary', 'bg-black');
+                }
+
+                selectedCardElement = card;
+                card.classList.remove('border-secondary', 'bg-black');
+                card.classList.add('border-warning', 'bg-dark');
+            }
+
+            // Drag and drop handlers
+            let draggedElement = null;
+
+            function handleDragStart(e) {
+                draggedElement = this;
+                this.classList.add('opacity-50');
+                e.dataTransfer.setData('text/plain', this.dataset.id);
+                e.dataTransfer.effectAllowed = 'move';
+            }
+
+            function handleDragEnd() {
+                this.classList.remove('opacity-50');
+                draggedElement = null;
+            }
+
+            // Настройка дроп-зон (бакетов и исходного пула)
+            function setupDropZones() {
+                const dropZones = [
+                    document.getElementById('cards-pool'),
+                    ...document.querySelectorAll('.bucket-slot')
+                ];
+
+                dropZones.forEach(zone => {
+                    zone.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        zone.classList.add('bg-secondary', 'bg-opacity-25');
+                    });
+
+                    zone.addEventListener('dragleave', () => {
+                        zone.classList.remove('bg-secondary', 'bg-opacity-25');
+                    });
+
+                    zone.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        zone.classList.remove('bg-secondary', 'bg-opacity-25');
+                        if (draggedElement) {
+                            zone.appendChild(draggedElement);
+                            updateBucketCounts();
+                            checkCanVerify();
+                        }
+                    });
+
+                    // Клик по контейнеру перемещает выбранную карточку
+                    zone.addEventListener('click', (e) => {
+                        if (selectedCardElement && e.target === zone) {
+                            zone.appendChild(selectedCardElement);
+                            selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                            selectedCardElement.classList.add('border-secondary', 'bg-black');
+                            selectedCardElement = null;
+                            updateBucketCounts();
+                            checkCanVerify();
+                        }
+                    });
+                });
+
+                // Клик по карточке бакета также перемещает в слот
+                document.querySelectorAll('.target-bucket').forEach(bucket => {
+                    bucket.addEventListener('click', (e) => {
+                        if (selectedCardElement && !e.target.closest('.bucket-slot')) {
+                            const slot = bucket.querySelector('.bucket-slot');
+                            slot.appendChild(selectedCardElement);
+                            selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                            selectedCardElement.classList.add('border-secondary', 'bg-black');
+                            selectedCardElement = null;
+                            updateBucketCounts();
+                            checkCanVerify();
+                        }
+                    });
+                });
+            }
+
+            // Обновление счетчиков в бакетах
+            function updateBucketCounts() {
+                const b1Count = document.querySelector('#bucket-1 .bucket-slot').children.length;
+                const b2Count = document.querySelector('#bucket-2 .bucket-slot').children.length;
+                const b3Count = document.querySelector('#bucket-3 .bucket-slot').children.length;
+
+                document.getElementById('b1-count').textContent = b1Count;
+                document.getElementById('b2-count').textContent = b2Count;
+                document.getElementById('b3-count').textContent = b3Count;
+            }
+
+            // Проверка, можно ли активировать кнопку проверки
+            function checkCanVerify() {
+                const pool = document.getElementById('cards-pool');
+                const verifyBtn = document.getElementById('verify-btn');
+                // Кнопка активна, если в пуле больше нет карточек (все распределены)
+                verifyBtn.disabled = pool.children.length > 0;
+            }
+
+            // Кнопка сброса текущих карточек обратно в пул
+            document.getElementById('reset-pool-btn').addEventListener('click', () => {
+                const pool = document.getElementById('cards-pool');
+                document.querySelectorAll('.bucket-slot > div').forEach(card => {
+                    pool.appendChild(card);
+                });
+                updateBucketCounts();
+                checkCanVerify();
+                if (selectedCardElement) {
+                    selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                    selectedCardElement.classList.add('border-secondary', 'bg-black');
+                    selectedCardElement = null;
+                }
+            });
+
+            // Валидация решения текущей фазы
+            document.getElementById('verify-btn').addEventListener('click', () => {
+                const b1Cards = Array.from(document.querySelector('#bucket-1 .bucket-slot').children);
+                const b2Cards = Array.from(document.querySelector('#bucket-2 .bucket-slot').children);
+                const b3Cards = Array.from(document.querySelector('#bucket-3 .bucket-slot').children);
+
+                let isCorrect = true;
+
+                // Проверяем соответствие категорий
+                b1Cards.forEach(c => { if (c.dataset.category !== 'bucket1') isCorrect = false; });
+                b2Cards.forEach(c => { if (c.dataset.category !== 'bucket2') isCorrect = false; });
+                b3Cards.forEach(c => { if (c.dataset.category !== 'bucket3') isCorrect = false; });
+
+                if (isCorrect) {
+                    // Успешное завершение шага
+                    if (currentPhase < 3) {
+                        currentPhase++;
+                        sendTelemetry('in_progress');
+                        renderPhase(currentPhase);
+                    } else {
+                        // Завершение всех 3 фаз
+                        finishLevel();
+                    }
+                } else {
+                    // Ошибка классификации
+                    attempts++;
+                    document.getElementById('attempts-display').textContent = attempts;
+                    sendTelemetry('hardcore_reset');
+
+                    const feedbackBox = document.getElementById('feedback-box');
+                    feedbackBox.classList.remove('d-none');
+                    document.getElementById('verify-btn').disabled = true;
+
+                    // Задержка 1.2 сек и процедурная перегенерация текущего шага
+                    setTimeout(() => {
+                        feedbackBox.classList.add('d-none');
+                        renderPhase(currentPhase);
+                    }, 1200);
+                }
+            });
+
+            // Финал уровня 1
+            function finishLevel() {
+                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                sendTelemetry('level_complete', true);
+
+                document.getElementById('final-time').textContent = timeSpent;
+                document.getElementById('final-attempts').textContent = attempts;
+
+                // Скрыть интерактивные блоки, показать экран успеха
+                document.getElementById('buckets-row').classList.add('d-none');
+                document.getElementById('cards-pool').closest('.card').classList.add('d-none');
+                document.getElementById('verify-btn').closest('.d-flex').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+            }
+
+            // Инициализация
+            setupDropZones();
+            renderPhase(1);
+            sendTelemetry('in_progress');
+        })();
+    </script>
+</TaskLayout>

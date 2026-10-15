@@ -47,4 +47,30 @@ test.describe('Curriculum & Architecture Linting Suite (9th Grade - Lesson 7: Mo
     // Check that clean HTML/Unicode notation is used instead
     expect(content).toMatch(/<sub.*>|<sup.*>/);
   });
+
+  test('Level 1 adheres to architectural and game design requirements', async () => {
+    const tasksPath = path.join(process.cwd(), 'src/pages/tasks/9-класс/7');
+    const level1File = path.join(tasksPath, 'level1.astro');
+    expect(fs.existsSync(level1File)).toBe(true);
+
+    const code = fs.readFileSync(level1File, 'utf-8');
+    // TaskLayout component usage
+    expect(code).toContain('import TaskLayout');
+    expect(code).toContain('<TaskLayout');
+    // Telemetry events
+    expect(code).toContain('TELEMETRY_EVENT');
+    expect(code).toContain('level_complete');
+    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('Урок 7');
+    // No forbidden style tags (must use Tailwind CSS / Bootstrap utility classes)
+    expect(code.includes('<style>')).toBe(false);
+    expect(code.includes('<style ')).toBe(false);
+    // Zero Multiple Choice Policy
+    expect(code.includes('type="radio"')).toBe(false);
+    expect(code.includes('<select')).toBe(false);
+    // 3 phases
+    expect(code).toContain('currentPhase < 3');
+    expect(code).toContain('Шаг 1 из 3');
+  });
 });
+
