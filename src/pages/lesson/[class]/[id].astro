@@ -17,6 +17,8 @@ if (!course || !lesson) {
   return Astro.redirect('/courses');
 }
 
+const princeBonusLevel = lesson?.princeBonusLevel ? parseInt(lesson.princeBonusLevel, 10) : null;
+
 // Попытка загрузить теорию
 const theoryPath = path.join(process.cwd(), 'src', 'content', 'lessons', classSlug, lessonId, 'theory.md');
 let theoryHtml = '<p class="text-gray-500">Теоретический материал еще не добавлен.</p>';
@@ -110,18 +112,80 @@ const tasks = [
             </>
           )}
         </div>
-        <div id="completion-screen" class="hidden absolute inset-0 bg-white flex-col items-center justify-center p-8 text-center z-10">
+        <div id="completion-screen" class="hidden absolute inset-0 bg-white flex-col items-center justify-center p-8 text-center z-10 overflow-y-auto">
           <h2 class="text-4xl font-bold mb-4" id="completion-title">🎉 Урок пройден!</h2>
-          <p class="text-xl text-gray-600 mb-8" id="completion-subtitle">Вы успешно завершили все задания.</p>
-          <button id="reset-lesson-btn" class="px-6 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition-colors">Пройти заново</button>
+          <p class="text-xl text-gray-600 mb-6" id="completion-subtitle">Вы успешно завершили все задания.</p>
+          
+          {princeBonusLevel && (
+            <div id="prince-bonus-card" class="hidden mb-6 p-5 border-2 border-amber-500 bg-gray-900 text-left max-w-lg shadow-2xl rounded-0">
+              <div class="flex items-center justify-between border-b border-amber-600/40 pb-2 mb-3">
+                <span class="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold flex items-center gap-1.5">
+                  <span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО
+                </span>
+                <span class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs px-2 py-0.5 font-mono font-bold">
+                  УРОВЕНЬ {princeBonusLevel}
+                </span>
+              </div>
+              <div class="text-lg font-bold text-amber-300 font-mono mb-1">
+                ⚔️ PRINCE OF PERSIA (1989)
+              </div>
+              <p class="text-xs text-gray-300 font-mono mb-4 leading-relaxed">
+                За безупречное прохождение режима «Хардкор» вам открыт секретный Уровень {princeBonusLevel} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!
+              </p>
+              <button 
+                id="open-prince-btn" 
+                class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-sm font-mono transition-colors flex items-center justify-center gap-2 rounded-0 shadow"
+              >
+                <span>▶ ЗАПУСТИТЬ УРОВЕНЬ {princeBonusLevel}</span>
+              </button>
+            </div>
+          )}
+
+          <button id="reset-lesson-btn" class="px-6 py-3 bg-blue-600 text-white rounded-0 font-bold hover:bg-blue-700 transition-colors">Пройти заново</button>
         </div>
+
+        {princeBonusLevel && (
+          <div id="prince-overlay" class="hidden absolute inset-0 bg-black flex-col z-20">
+            <div class="bg-gray-900 border-b border-gray-700 px-3 py-2 flex items-center justify-between shrink-0 text-white font-mono text-sm">
+              <div class="flex items-center gap-2">
+                <span class="text-amber-400">⚔️</span>
+                <span class="font-bold text-amber-300">PRINCE OF PERSIA (1989)</span>
+                <span class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">УРОВЕНЬ {princeBonusLevel}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="prince-reload-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="Перезапустить уровень">
+                  🔄 Рестарт
+                </button>
+                <button id="prince-fullscreen-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="На весь экран">
+                  ⛶ На весь экран
+                </button>
+                <button id="close-prince-btn" class="px-3 py-1 bg-red-900 hover:bg-red-800 text-xs font-bold text-white border border-red-700 transition-colors">
+                  ✖ Свернуть
+                </button>
+              </div>
+            </div>
+            <div class="bg-gray-950 text-gray-400 text-xs px-3 py-1 border-b border-gray-800 font-mono flex justify-between flex-wrap">
+              <span>Управление: <strong>[← / →]</strong> Движение/Шаг | <strong>[↑]</strong> Прыжок/Подтянуться | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Меч/Шаг</span>
+              <span class="text-gray-500">Jordan Mechner (1989) / HTML5: Oliver Klemenz</span>
+            </div>
+            <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+              <iframe 
+                id="prince-game-iframe"
+                src={`/static/prince/index.html?level=${princeBonusLevel}&skipTitle=true`}
+                class="w-full h-full border-0 absolute inset-0"
+                title="Prince of Persia"
+                allow="fullscreen; gamepad"
+              ></iframe>
+            </div>
+          </div>
+        )}
       </section>
     </main>
 
   </div>
 </Layout>
 
-<script define:vars={{ classSlug, lessonId }}>
+<script define:vars={{ classSlug, lessonId, princeBonusLevel }}>
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
@@ -211,6 +275,17 @@ const tasks = [
           title.classList.remove('text-red-600');
         }
       }
+
+      // Проверка разблокировки бонусного уровня Prince of Persia
+      const princeBonusCard = document.getElementById('prince-bonus-card');
+      if (princeBonusCard) {
+        if (displayHardcore && princeBonusLevel) {
+          princeBonusCard.classList.remove('hidden');
+        } else {
+          princeBonusCard.classList.add('hidden');
+        }
+      }
+
       return true;
     }
     
@@ -218,6 +293,10 @@ const tasks = [
     const compScreen = document.getElementById('completion-screen');
     compScreen?.classList.add('hidden');
     compScreen?.classList.remove('flex');
+
+    const princeBonusCard = document.getElementById('prince-bonus-card');
+    if (princeBonusCard) princeBonusCard.classList.add('hidden');
+
     return false;
   }
 
@@ -475,4 +554,50 @@ const tasks = [
       }
     });
   });
+
+  // Интерактивное управление бонусным модулем Prince of Persia
+  const openPrinceBtn = document.getElementById('open-prince-btn');
+  const closePrinceBtn = document.getElementById('close-prince-btn');
+  const princeOverlay = document.getElementById('prince-overlay');
+  const princeReloadBtn = document.getElementById('prince-reload-btn');
+  const princeFullscreenBtn = document.getElementById('prince-fullscreen-btn');
+  const princeIframe = document.getElementById('prince-game-iframe');
+
+  if (openPrinceBtn && princeOverlay) {
+    openPrinceBtn.addEventListener('click', () => {
+      princeOverlay.classList.remove('hidden');
+      princeOverlay.classList.add('flex');
+    });
+  }
+
+  if (closePrinceBtn && princeOverlay) {
+    closePrinceBtn.addEventListener('click', () => {
+      princeOverlay.classList.remove('flex');
+      princeOverlay.classList.add('hidden');
+    });
+  }
+
+  if (princeReloadBtn && princeIframe) {
+    princeReloadBtn.addEventListener('click', () => {
+      princeIframe.src = princeIframe.src;
+    });
+  }
+
+  if (princeFullscreenBtn && princeOverlay) {
+    princeFullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        princeOverlay.requestFullscreen().catch(err => console.warn(err));
+        princeFullscreenBtn.textContent = '✖ Свернуть экран';
+      } else {
+        document.exitFullscreen().catch(err => console.warn(err));
+        princeFullscreenBtn.textContent = '⛶ На весь экран';
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && princeFullscreenBtn) {
+        princeFullscreenBtn.textContent = '⛶ На весь экран';
+      }
+    });
+  }
 </script>
