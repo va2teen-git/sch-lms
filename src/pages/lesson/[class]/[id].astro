@@ -129,6 +129,9 @@ const tasks = [
               <div class="text-lg font-bold text-amber-300 font-mono mb-1">
                 ⚔️ PRINCE OF PERSIA (1989)
               </div>
+              <p class="text-xs text-amber-200/90 font-serif italic mb-2">
+                «О доблестный путник! За твою непреклонную стойкость и чистый разум падишах дарует тебе ключ от древней сокровищницы...»
+              </p>
               <p class="text-xs text-gray-300 font-mono mb-4 leading-relaxed">
                 За безупречное прохождение режима «Хардкор» вам открыт секретный Уровень {princeBonusLevel} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!
               </p>
@@ -176,6 +179,62 @@ const tasks = [
                 title="Prince of Persia"
                 allow="fullscreen; gamepad"
               ></iframe>
+            </div>
+
+            <!-- Persian Congratulations & Victory Modal -->
+            <div id="prince-victory-modal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-md z-30 flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
+              <div class="max-w-2xl w-full bg-gradient-to-b from-gray-950 via-gray-900 to-black border-2 border-amber-500 p-6 sm:p-8 text-center shadow-2xl relative rounded-0">
+                <div class="text-amber-500/80 font-mono text-xs tracking-widest uppercase mb-1">
+                  ✦ ════════════════════════════════════════════════ ✦
+                </div>
+                <div class="flex items-center justify-center gap-2 mb-2">
+                  <span class="text-2xl">👑</span>
+                  <span class="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold bg-amber-500/10 border border-amber-500/30 px-3 py-1">
+                    СЕКРЕТНЫЙ РЕТРО-АРХИВ // ПОЛНЫЙ ТРИУМФ
+                  </span>
+                  <span class="text-2xl">👑</span>
+                </div>
+                <h3 class="text-2xl sm:text-3xl font-bold text-amber-300 font-serif tracking-wide mb-2 uppercase">
+                  ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ!
+                </h3>
+                <div class="text-xs font-mono text-amber-400 mb-4">
+                  ДАР ВЕЛИКОГО ПАДИШАХА // УРОВЕНЬ <span id="prince-victory-level">{princeBonusLevel}</span> ПОКОРЕН
+                </div>
+
+                <div class="border-t border-b border-amber-500/40 py-4 my-3 text-amber-100 text-sm sm:text-base leading-relaxed text-justify space-y-3 font-serif bg-black/50 p-4 max-h-[45vh] overflow-y-auto">
+                  <p class="italic text-center font-semibold text-amber-300">
+                    «О солнцеподобный витязь, услада очей мудрецов и непревзойденный владыка кремниевых стихий!»
+                  </p>
+                  <p>
+                    Да осыплют небеса твой путь лепестками дамасских роз и сиянием неугасимых звезд семи небес! Твой ясный ум и непоколебимая доблесть рассекли мрак древних катакомб коварного визиря Джаффара, подобно сверкающему булатному клинку из благородной стали Исфахана.
+                  </p>
+                  <p>
+                    Ни бездонные пропасти, ни скрытые в плитах лезвия, ни коварные шипы не заставили дрогнуть твое благородное сердце. С грацией барса и терпением великого суфия ты прошел сквозь каменный лабиринт, явив миру величие истинного знания, силу духа и безупречность холодного расчета!
+                  </p>
+                  <p>
+                    Пусть же отныне звонкие струны ситара и сладкогласые поэты разносят весть о твоем подвиге по всем оазисам, базарам и караван-сараям Востока! Твое благословенное имя золотой вязью навечно вписано в скрижали славы, о светозарный повелитель алгоритмов и победитель Песков Времени!
+                  </p>
+                </div>
+
+                <div class="text-amber-500/80 font-mono text-xs tracking-widest uppercase mb-5">
+                  ✦ ════════════════════════════════════════════════ ✦
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 justify-center items-center font-mono">
+                  <button 
+                    id="prince-continue-btn"
+                    class="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-xs transition-colors rounded-0 shadow-lg cursor-pointer"
+                  >
+                    ⚔️ Продолжить путь (Следующий уровень)
+                  </button>
+                  <button 
+                    id="prince-victory-close-btn"
+                    class="w-full sm:w-auto px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-amber-300 border border-amber-500/50 font-bold uppercase tracking-wider text-xs transition-colors rounded-0 cursor-pointer"
+                  >
+                    📜 Вернуться к уроку с почетом
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -415,6 +474,45 @@ const tasks = [
 
   window.addEventListener('message', (event) => {
     const data = event.data;
+    if (data && data.type === 'PRINCE_EVENT') {
+      console.log('Received Prince event:', data);
+      if (data.action === 'level_complete') {
+        const victoryModal = document.getElementById('prince-victory-modal');
+        const victoryLevelSpan = document.getElementById('prince-victory-level');
+        if (victoryLevelSpan && data.completedLevel) {
+          victoryLevelSpan.textContent = String(data.completedLevel);
+        }
+        if (victoryModal) {
+          victoryModal.classList.remove('hidden');
+          victoryModal.classList.add('flex');
+        }
+
+        // Send telemetry for Prince bonus level completion
+        fetch('/api/telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_firstName: localStorage.getItem('student_firstName'),
+            student_lastName: localStorage.getItem('student_lastName'),
+            student_class: localStorage.getItem('student_class'),
+            course_slug: classSlug,
+            lesson_id: lessonId,
+            mission_name: `${fullTitle} :: Prince of Persia (Уровень ${data.completedLevel || princeBonusLevel})`,
+            action_type: 'level_complete',
+            status: 'completed',
+            time_spent_sec: 60,
+            attempts_count: 1,
+            success: true,
+            is_hardcore: isHardcore,
+            attempt_id: currentAttempt.id,
+            attempt_number: currentAttempt.number,
+            attempt_mode: currentAttempt.mode
+          })
+        }).catch(err => console.error('Prince telemetry error:', err));
+      }
+      return;
+    }
+
     if (data && data.type === 'TELEMETRY_EVENT') {
       let levelNum = null;
       const sourceIframe = Array.from(iframes).find(iframe => iframe.contentWindow === event.source);
@@ -562,6 +660,9 @@ const tasks = [
   const princeReloadBtn = document.getElementById('prince-reload-btn');
   const princeFullscreenBtn = document.getElementById('prince-fullscreen-btn');
   const princeIframe = document.getElementById('prince-game-iframe');
+  const princeContinueBtn = document.getElementById('prince-continue-btn');
+  const princeVictoryCloseBtn = document.getElementById('prince-victory-close-btn');
+  const princeVictoryModal = document.getElementById('prince-victory-modal');
 
   if (openPrinceBtn && princeOverlay) {
     openPrinceBtn.addEventListener('click', () => {
@@ -572,6 +673,10 @@ const tasks = [
 
   if (closePrinceBtn && princeOverlay) {
     closePrinceBtn.addEventListener('click', () => {
+      if (princeVictoryModal) {
+        princeVictoryModal.classList.remove('flex');
+        princeVictoryModal.classList.add('hidden');
+      }
       princeOverlay.classList.remove('flex');
       princeOverlay.classList.add('hidden');
     });
@@ -579,7 +684,27 @@ const tasks = [
 
   if (princeReloadBtn && princeIframe) {
     princeReloadBtn.addEventListener('click', () => {
+      if (princeVictoryModal) {
+        princeVictoryModal.classList.remove('flex');
+        princeVictoryModal.classList.add('hidden');
+      }
       princeIframe.src = princeIframe.src;
+    });
+  }
+
+  if (princeContinueBtn && princeVictoryModal) {
+    princeContinueBtn.addEventListener('click', () => {
+      princeVictoryModal.classList.remove('flex');
+      princeVictoryModal.classList.add('hidden');
+    });
+  }
+
+  if (princeVictoryCloseBtn && princeVictoryModal && princeOverlay) {
+    princeVictoryCloseBtn.addEventListener('click', () => {
+      princeVictoryModal.classList.remove('flex');
+      princeVictoryModal.classList.add('hidden');
+      princeOverlay.classList.remove('flex');
+      princeOverlay.classList.add('hidden');
     });
   }
 
