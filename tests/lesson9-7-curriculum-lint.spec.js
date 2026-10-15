@@ -101,6 +101,33 @@ test.describe('Curriculum & Architecture Linting Suite (9th Grade - Lesson 7: Mo
     expect(code.includes('<select')).toBe(false);
     expect(code).toMatch(/<input[^>]+type="(text|number)"/);
   });
+
+  test('Level 3 adheres to architectural requirements (Vue 3, Archetype 1 Cyber Matrix, countdown timer)', async () => {
+    const tasksPath = path.join(process.cwd(), 'src/pages/tasks/9-класс/7');
+    const level3File = path.join(tasksPath, 'level3.astro');
+    expect(fs.existsSync(level3File)).toBe(true);
+
+    const code = fs.readFileSync(level3File, 'utf-8');
+    expect(code).toContain('import TaskLayout');
+    expect(code).toContain('<TaskLayout');
+    // Uses Vue 3
+    expect(code).toContain('createApp');
+    expect(code).toContain('Vue');
+    // Countdown timer per wave
+    expect(code).toMatch(/timer|timeleft|phaseTimeLeft/i);
+    // Archetype 1 Cyber Matrix indicator
+    expect(code).toContain('АРХЕТИП 1');
+    expect(code).toContain('CYBER MATRIX');
+    // Telemetry events
+    expect(code).toContain('TELEMETRY_EVENT');
+    expect(code).toContain('level_complete');
+    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('Урок 7');
+    // No forbidden style tags
+    expect(code.includes('<style>')).toBe(false);
+    expect(code.includes('<style ')).toBe(false);
+  });
 });
+
 
 
