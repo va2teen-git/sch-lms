@@ -46,9 +46,9 @@ const iframeUrl = `/static/prince/index.html?level=${level}&maxLevel=${effective
   </div>
 
   <!-- Controls Reminder Banner -->
-  <div class="bg-black text-secondary px-3 py-1 border-bottom border-secondary small d-flex justify-content-between flex-wrap">
-    <span>Управление: <strong>[← / →]</strong> Движение/Шаг | <strong>[↑]</strong> Прыжок/Подтянуться | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Удар мечом/Шаг/Предмет</span>
-    <span class="text-muted">Jordan Mechner / HTML5: Oliver Klemenz</span>
+  <div class="bg-black text-secondary px-3 py-1.5 border-bottom border-secondary small d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Управление: <strong>[← / →]</strong> Движение | <strong>[↑]</strong> Прыжок | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Меч/Шаг</span>
+    <span class="text-warning small fw-bold">💡 Кликните по экрану игры или нажмите Enter для старта</span>
   </div>
 
   <!-- Game Container -->
@@ -58,7 +58,8 @@ const iframeUrl = `/static/prince/index.html?level=${level}&maxLevel=${effective
       src={iframeUrl}
       class="w-100 h-100 border-0"
       title="Prince of Persia"
-      allow="fullscreen; gamepad"
+      allow="fullscreen; gamepad; autoplay"
+      tabindex="0"
     ></iframe>
   </div>
 </div>
@@ -71,9 +72,56 @@ const iframeUrl = `/static/prince/index.html?level=${level}&maxLevel=${effective
 
   let startTime = Date.now();
 
+  const focusGame = () => {
+    if (!iframe) return;
+    try {
+      iframe.focus();
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.postMessage({ type: 'FOCUS_GAME' }, '*');
+    } catch (e) {}
+  };
+
+  if (iframe) {
+    iframe.addEventListener('load', () => setTimeout(focusGame, 60));
+    setTimeout(focusGame, 100);
+  }
+
+  if (wrapper) {
+    wrapper.addEventListener('click', (e) => {
+      if ((e.target).closest('button')) return;
+      focusGame();
+    });
+  }
+
+  // Keyboard bridge for PrinceEmulator
+  window.addEventListener('keydown', (e) => {
+    if (iframe?.contentWindow && [
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'Enter', ' ', 'Shift'
+    ].includes(e.key) && document.activeElement !== iframe) {
+      focusGame();
+      try {
+        const forwarded = new KeyboardEvent(e.type, {
+          key: e.key,
+          code: e.code,
+          keyCode: e.keyCode,
+          which: e.which,
+          shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey,
+          altKey: e.altKey,
+          bubbles: true,
+          cancelable: true
+        });
+        iframe.contentWindow.dispatchEvent(forwarded);
+        iframe.contentDocument?.dispatchEvent(forwarded);
+      } catch (err) {}
+    }
+  });
+
   if (restartBtn && iframe) {
     restartBtn.addEventListener('click', () => {
       iframe.src = iframe.src;
+      iframe.addEventListener('load', () => setTimeout(focusGame, 60), { once: true });
     });
   }
 
@@ -88,12 +136,14 @@ const iframeUrl = `/static/prince/index.html?level=${level}&maxLevel=${effective
         document.exitFullscreen().catch(err => console.warn(err));
         fsBtn.innerText = '⛶ НА ВЕСЬ ЭКРАН';
       }
+      setTimeout(focusGame, 100);
     });
 
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) {
         fsBtn.innerText = '⛶ НА ВЕСЬ ЭКРАН';
       }
+      setTimeout(focusGame, 100);
     });
   }
 
