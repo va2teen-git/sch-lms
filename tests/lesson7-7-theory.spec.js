@@ -54,4 +54,27 @@ test.describe('Lesson 7-7: Computer Networks and Internet Search (Theory Lint Su
     expect(displayLatexMatches, 'Display LaTeX ($$...$$) found in theory.md!').toBeNull();
     expect(inlineLatexMatches, 'Inline LaTeX ($...$) found in theory.md!').toBeNull();
   });
+
+  test('Additional theory sections comply with Zero-Leakage Policy (no direct task answers)', async () => {
+    const theoryFile = path.join(lessonPath, 'theory.md');
+    const content = fs.readFileSync(theoryFile, 'utf-8');
+
+    const additionalSection = content.split('## Дополнительная информация')[1];
+    expect(additionalSection, 'Section "## Дополнительная информация" must be present').toBeTruthy();
+
+    // Запрет утечки конкретных поисковых запросов и строчек заданий из level2
+    expect(additionalSection).not.toMatch(/собачк/i);
+    expect(additionalSection).not.toMatch(/лебедев/i);
+    expect(additionalSection).not.toMatch(/солнышко лесное/i);
+    expect(additionalSection).not.toMatch(/у лукоморья/i);
+
+    // Запрет утечки готового URL из level1
+    expect(additionalSection).not.toContain('kpolyakov.spb.ru');
+    expect(additionalSection).not.toContain('probook.htm');
+
+    // Запрет утечки конкретных тестовых аномалий из level3
+    expect(additionalSection).not.toContain('192.168.312.45');
+    expect(additionalSection).not.toContain('10.290.1.1');
+  });
 });
+
