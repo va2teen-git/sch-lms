@@ -155,6 +155,26 @@ test.describe('Comprehensive Telemetry & Attempt Lifecycle Engine Suite', () => 
       headers: { 'Content-Type': 'application/json' }
     });
 
+    // Level 3: concurrently loaded at T0, reports 1000s from page start
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 3,
+        mission_name: `${missionPrefix} (Уровень 3)`,
+        action_type: 'level_complete',
+        time_spent_sec: 1000,
+        attempt_id: attId,
+        attempt_number: 1,
+        attempt_mode: 'normal',
+        is_hardcore: false,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
     const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
     const body = await res.json();
     const s = body.students[0];
@@ -164,8 +184,16 @@ test.describe('Comprehensive Telemetry & Attempt Lifecycle Engine Suite', () => 
     expect(att.levels[1].timeSpentSec).toBe(500);
     // Level 2 pure: 850 - 500 = 350s
     expect(att.levels[2].timeSpentSec).toBe(350);
-    // Total pure time for attempt: 500 + 350 = 850s (not 500 + 850 = 1350s!)
-    expect(att.totalTimeSec).toBe(850);
+    // Level 3 pure: 1000 - 850 = 150s
+    expect(att.levels[3].timeSpentSec).toBe(150);
+    // Total pure time for attempt: 500 + 350 + 150 = 1000s (not 500 + 850 + 1000 = 2350s!)
+    expect(att.totalTimeSec).toBe(1000);
+
+    // Verify student-level metrics synced
+    expect(s.levels[1].timeSpentSec).toBe(500);
+    expect(s.levels[2].timeSpentSec).toBe(350);
+    expect(s.levels[3].timeSpentSec).toBe(150);
+    expect(s.totalActiveTimeSec).toBe(1000);
   });
 
   test('3. Multi-Run Cumulative Active Time vs Best Run Time tracking', async ({ request }) => {
@@ -533,5 +561,95 @@ test.describe('Comprehensive Telemetry & Attempt Lifecycle Engine Suite', () => 
     await expect(lastTh).toBeVisible();
     await expect(lastTh).toContainText('Был на уроке');
     await expect(lastTh).toContainText('Время ухода');
+  });
+
+  test('12. Concurrent start_time deduplication when event timestamps are minutes apart', async ({ request }) => {
+    const studentFn = `Интервал_${Date.now()}`;
+    const studentLn = 'Попыткин';
+    const sClass = '7-класс';
+    const lessonId = '7';
+    const missionPrefix = `Урок ${lessonId} :: Задание`;
+    const attId = `att_interval_${Date.now()}`;
+    const t0 = new Date(Date.now() - 3600 * 1000).toISOString();
+
+    // Level 1: reports 800s
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 1,
+        mission_name: `${missionPrefix} (Уровень 1)`,
+        action_type: 'level_complete',
+        time_spent_sec: 800,
+        start_time: t0,
+        attempt_id: attId,
+        attempt_number: 1,
+        attempt_mode: 'normal',
+        is_hardcore: false,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Level 2: reports 2000s cumulative with same start_time
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 2,
+        mission_name: `${missionPrefix} (Уровень 2)`,
+        action_type: 'level_complete',
+        time_spent_sec: 2000,
+        start_time: t0,
+        attempt_id: attId,
+        attempt_number: 1,
+        attempt_mode: 'normal',
+        is_hardcore: false,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Level 3: reports 2200s cumulative with same start_time
+    await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: studentFn,
+        student_lastName: studentLn,
+        student_class: sClass,
+        lesson_id: lessonId,
+        level_number: 3,
+        mission_name: `${missionPrefix} (Уровень 3)`,
+        action_type: 'level_complete',
+        time_spent_sec: 2200,
+        start_time: t0,
+        attempt_id: attId,
+        attempt_number: 1,
+        attempt_mode: 'normal',
+        is_hardcore: false,
+        success: true
+      },
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=all&exclude_tests=0&lesson=${lessonId}&search=${encodeURIComponent(studentFn)}`);
+    const body = await res.json();
+    const s = body.students[0];
+    const att = s.attempts[0];
+
+    // Deduplication should use start_time despite event arrival times
+    expect(att.levels[1].timeSpentSec).toBe(800);
+    expect(att.levels[2].timeSpentSec).toBe(1200); // 2000 - 800
+    expect(att.levels[3].timeSpentSec).toBe(200);  // 2200 - 2000
+    expect(att.totalTimeSec).toBe(2200);
+
+    // Student active time is 2200s (not 800 + 2000 + 2200 = 5000s)
+    expect(s.levels[1].timeSpentSec).toBe(800);
+    expect(s.levels[2].timeSpentSec).toBe(1200);
+    expect(s.levels[3].timeSpentSec).toBe(200);
+    expect(s.totalActiveTimeSec).toBe(2200);
   });
 });
