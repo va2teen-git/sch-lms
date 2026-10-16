@@ -1,0 +1,848 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <h2 class="h4 text-success mb-0">Тренажер: Определение истинности составного высказывания (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Верхняя панель статуса и счетчика попыток -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Трассировка дерева вычислений составного высказывания</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки / Перекалибровки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Алерт ошибки / процедурного сброса фазы -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СБОЙ ЛОГИЧЕСКОГО КОНТУРА] <span id="feedback-text">Нарушена таблица истинности или правило инверсии!</span> Генерация нового варианта...</span>
+                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: ДЕРЕВО ВЫЧИСЛЕНИЙ СОСТАВНОГО ВЫСКАЗЫВАНИЯ (Node Toggle) ================= -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-2">
+                        На вход логического анализатора поданы сигналы <strong class="text-info">A, B, C</strong>.
+                        Соблюдая строгий приоритет операций (<span class="text-warning">Скобки () → НЕ (¬) → И (∧) → ИЛИ (∨)</span>),
+                        <strong>кликайте мышью по узлам [?]</strong>, чтобы выставить промежуточные сигналы и итоговое значение <strong class="text-success">F</strong> в состояние <strong>0</strong> или <strong>1</strong>.
+                    </p>
+
+                    <!-- Формула и входной вектор -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-7">
+                            <div class="card bg-black border-warning rounded-0 h-100 p-3 d-flex flex-column justify-content-center">
+                                <div class="text-secondary small mb-1">АНАЛИЗИРУЕМОЕ СОСТАВНОЕ ВЫСКАЗЫВАНИЕ:</div>
+                                <div id="p1-formula-display" class="fs-4 text-warning fw-bold"></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <div class="card bg-black border-info rounded-0 h-100 p-3">
+                                <div class="text-secondary small mb-2">ВХОДНЫЕ СИГНАЛЫ ДАТЧИКОВ:</div>
+                                <div class="d-flex justify-content-around align-items-center">
+                                    <div class="text-center">
+                                        <span class="text-secondary small d-block">Вход A</span>
+                                        <span id="p1-in-a" class="badge bg-dark border border-info text-info rounded-0 fs-5 px-3 py-1">0</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="text-secondary small d-block">Вход B</span>
+                                        <span id="p1-in-b" class="badge bg-dark border border-info text-info rounded-0 fs-5 px-3 py-1">0</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="text-secondary small d-block">Вход C</span>
+                                        <span id="p1-in-c" class="badge bg-dark border border-info text-info rounded-0 fs-5 px-3 py-1">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Сетка пошаговых узлов дерева разбора -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                            <span class="text-success fw-bold small">КАСКАДНАЯ СХЕМА ПОШАГОВОГО ВЫЧИСЛЕНИЯ:</span>
+                            <span class="text-secondary small">Клик по кнопке узла: [?] → [0] → [1]</span>
+                        </div>
+
+                        <div id="p1-nodes-grid" class="row g-3">
+                            <!-- Генерируется через JS: 3 промежуточных узла + 1 финальный выход F -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ПРОВЕРИТЬ ДЕРЕВО ВЫЧИСЛЕНИЙ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: КОНСТРУИРОВАНИЕ ПРОМЕЖУТКА БЕЗ ОТРИЦАНИЯ (Slot & Snap) ================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Преобразуйте составное высказывание о числе <code class="text-warning">x</code> так, чтобы <strong>избавиться от всех знаков отрицания НЕ (¬)</strong>.
+                        <strong>Перетащите мышью</strong> (или кликните по токену, затем по слоту) верные знаки неравенств, граничные числа и логическую связку в целевой шаблон.
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        Подсказка: при снятии <code>НЕ</code> строгий знак (<code>&lt;</code>, <code>&gt;</code>) меняется на противоположный нестрогий (<code>&ge;</code>, <code>&le;</code>), а при раскрытии общей скобки <code>НЕ (P ИЛИ Q)</code> по закону де Моргана связка <code>ИЛИ</code> меняется на <code>И</code>.
+                    </p>
+
+                    <!-- Исходное высказывание с отрицаниями -->
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ИСХОДНОЕ ВЫСКАЗЫВАНИЕ С ОТРИЦАНИЯМИ:</div>
+                        <div id="p2-source-expr" class="fs-4 text-warning fw-bold"></div>
+                    </div>
+
+                    <!-- Целевой шаблон со слотами -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-success small fw-bold">РАВНОСИЛЬНОЕ УСЛОВИЕ БЕЗ «НЕ» (ЗАПОЛНИТЕ СЛОТЫ):</span>
+                            <button id="p2-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0">
+                                Очистить слоты
+                            </button>
+                        </div>
+
+                        <div id="p2-slots-container" class="d-flex flex-wrap align-items-center justify-content-center gap-2 py-3 bg-dark border border-secondary">
+                            <span class="fs-4 text-light fw-bold">( x</span>
+                            <button type="button" class="btn btn-outline-info rounded-0 px-3 py-2 fs-5 fw-bold p2-slot" data-slot="op1" data-type="op" data-val="" data-expected="">
+                                [знак 1]
+                            </button>
+                            <button type="button" class="btn btn-outline-warning rounded-0 px-3 py-2 fs-5 fw-bold p2-slot" data-slot="num1" data-type="num" data-val="" data-expected="">
+                                [число 1]
+                            </button>
+                            <span class="fs-4 text-light fw-bold">)</span>
+
+                            <button type="button" class="btn btn-outline-success rounded-0 px-3 py-2 fs-5 fw-bold mx-2 p2-slot" data-slot="logic" data-type="logic" data-val="" data-expected="">
+                                [связка]
+                            </button>
+
+                            <span class="fs-4 text-light fw-bold">( x</span>
+                            <button type="button" class="btn btn-outline-info rounded-0 px-3 py-2 fs-5 fw-bold p2-slot" data-slot="op2" data-type="op" data-val="" data-expected="">
+                                [знак 2]
+                            </button>
+                            <button type="button" class="btn btn-outline-warning rounded-0 px-3 py-2 fs-5 fw-bold p2-slot" data-slot="num2" data-type="num" data-val="" data-expected="">
+                                [число 2]
+                            </button>
+                            <span class="fs-4 text-light fw-bold">)</span>
+                        </div>
+                    </div>
+
+                    <!-- Палитра токенов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПАЛИТРА ТОКЕНОВ (КЛИКНИТЕ ИЛИ ПЕРЕТАЩИТЕ В СЛОТ):</div>
+                        <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2">
+                            <!-- Токены генерируются через JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ПРОВЕРИТЬ ПРЕОБРАЗОВАННОЕ УСЛОВИЕ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: СОРТИРОВКА ОБЪЕКТОВ ПО ИСТИННОСТИ (Drag-to-Bucket) ================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Распределите все 6 карточек из входного буфера по двум целевым шлюзам:
+                        в шлюз <strong class="text-success">«ИСТИНА (1)»</strong> поместите объекты, для которых составное высказывание истинно,
+                        а в шлюз <strong class="text-danger">«ЛОЖЬ (0)»</strong> — объекты, для которых оно ложно.
+                    </p>
+
+                    <!-- Заданное составное правило -->
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <div class="text-secondary small mb-1">ПРОВЕРЯЕМОЕ СОСТАВНОЕ ВЫСКАЗЫВАНИЕ:</div>
+                                <div id="p3-rule-display" class="fs-5 text-warning fw-bold"></div>
+                            </div>
+                            <button id="p3-reset-btn" class="btn btn-sm btn-outline-secondary rounded-0">
+                                Вернуть все карточки в буфер
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Исходный пул карточек -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ВХОДНОЙ БУФЕР ОБЪЕКТОВ (ПЕРЕТАЩИТЕ ИЛИ КЛИКНИТЕ КАРТОЧКУ → КЛИКНИТЕ ШЛЮЗ):</div>
+                        <div id="p3-source-pool" class="d-flex flex-wrap gap-2 p-2 bg-dark border border-secondary p3-bucket" data-bucket="source">
+                            <!-- Карточки генерируются через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Два целевых контейнера (шлюза) -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <div id="p3-bucket-true" class="card bg-black border-success rounded-0 h-100 p3-bucket" data-bucket="true">
+                                <div class="card-header bg-dark border-bottom border-success text-success fw-bold d-flex justify-content-between align-items-center">
+                                    <span>ШЛЮЗ «ИСТИНА (1)»</span>
+                                    <span class="badge bg-success text-dark rounded-0">Высказывание = 1</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-wrap gap-2 align-content-start min-vh-25" id="p3-bucket-true-body">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div id="p3-bucket-false" class="card bg-black border-danger rounded-0 h-100 p3-bucket" data-bucket="false">
+                                <div class="card-header bg-dark border-bottom border-danger text-danger fw-bold d-flex justify-content-between align-items-center">
+                                    <span>ШЛЮЗ «ЛОЖЬ (0)»</span>
+                                    <span class="badge bg-danger text-dark rounded-0">Высказывание = 0</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-wrap gap-2 align-content-start min-vh-25" id="p3-bucket-false-body">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2" disabled>
+                            ПРОВЕРИТЬ РАСПРЕДЕЛЕНИЕ ПАКЕТОВ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ЭКРАН ЗАВЕРШЕНИЯ УРОВНЯ ================= -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-success display-4">✓ УРОВЕНЬ 1 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light mb-3">Алгоритмы оценки составных высказываний освоены</h3>
+                    <p class="text-secondary mx-auto mb-4">
+                        Вы успешно выполнили трассировку приоритетов логических операций, преобразование числовых неравенств со снятием отрицания «НЕ» и классификацию слов и чисел по истинности составного высказывания.
+                    </p>
+                    <div class="badge border border-success text-success bg-black p-3 fs-6 rounded-0">
+                        Переходите на Уровень 2 (Аналитический) в верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        const missionName = 'Урок 9 :: Определение истинности составного высказывания (Уровень 1)';
+        const startTime = Date.now();
+        let attempts = 0;
+        let isLocked = false;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function triggerErrorAndRegenerate(message, regenerateFn) {
+            if (isLocked) return;
+            isLocked = true;
+            attempts++;
+            document.getElementById('attempts-display').textContent = String(attempts);
+            sendTelemetry('hardcore_reset', false);
+
+            const feedbackBox = document.getElementById('feedback-box');
+            const feedbackText = document.getElementById('feedback-text');
+            feedbackText.textContent = message;
+            feedbackBox.classList.remove('d-none');
+
+            setTimeout(() => {
+                feedbackBox.classList.add('d-none');
+                isLocked = false;
+                regenerateFn();
+            }, 1200);
+        }
+
+        // =========================================================================
+        // ФАЗА 1: ИНТЕРАКТИВНАЯ ТРАССИРОВКА ДЕРЕВА ВЫЧИСЛЕНИЙ (Node Toggle)
+        // =========================================================================
+        function initPhase1() {
+            const A = rnd(0, 1);
+            const B = rnd(0, 1);
+            const C = rnd(0, 1);
+
+            const templates = [
+                {
+                    formula: 'F = (A ∨ ¬B) ∧ (B ∨ C)',
+                    compute: (a, b, c) => {
+                        const n1 = 1 - b;
+                        const n2 = (a || n1) ? 1 : 0;
+                        const n3 = (b || c) ? 1 : 0;
+                        const f = (n2 && n3) ? 1 : 0;
+                        return [
+                            { id: 'node1', title: 'Шаг 1 (Инверсия НЕ)', expr: 'Узел 1: ¬B', expected: n1 },
+                            { id: 'node2', title: 'Шаг 2 (Первая скобка)', expr: 'Узел 2: A ∨ ¬B', expected: n2 },
+                            { id: 'node3', title: 'Шаг 3 (Вторая скобка)', expr: 'Узел 3: B ∨ C', expected: n3 },
+                            { id: 'nodeF', title: 'Шаг 4 (Финальный выход И)', expr: 'Выход F: (Узел 2) ∧ (Узел 3)', expected: f }
+                        ];
+                    }
+                },
+                {
+                    formula: 'F = ¬(A ∧ B) ∨ (¬B ∧ C)',
+                    compute: (a, b, c) => {
+                        const n1 = (a && b) ? 1 : 0;
+                        const n2 = 1 - n1;
+                        const n3 = ((1 - b) && c) ? 1 : 0;
+                        const f = (n2 || n3) ? 1 : 0;
+                        return [
+                            { id: 'node1', title: 'Шаг 1 (Первая скобка)', expr: 'Узел 1: A ∧ B', expected: n1 },
+                            { id: 'node2', title: 'Шаг 2 (Отрицание скобки)', expr: 'Узел 2: ¬(A ∧ B)', expected: n2 },
+                            { id: 'node3', title: 'Шаг 3 (Вторая скобка)', expr: 'Узел 3: ¬B ∧ C', expected: n3 },
+                            { id: 'nodeF', title: 'Шаг 4 (Финальный выход ИЛИ)', expr: 'Выход F: (Узел 2) ∨ (Узел 3)', expected: f }
+                        ];
+                    }
+                },
+                {
+                    formula: 'F = (¬A ∧ B) ∨ ¬(B ∨ C)',
+                    compute: (a, b, c) => {
+                        const n1 = ((1 - a) && b) ? 1 : 0;
+                        const n2 = (b || c) ? 1 : 0;
+                        const n3 = 1 - n2;
+                        const f = (n1 || n3) ? 1 : 0;
+                        return [
+                            { id: 'node1', title: 'Шаг 1 (Первая скобка)', expr: 'Узел 1: ¬A ∧ B', expected: n1 },
+                            { id: 'node2', title: 'Шаг 2 (Вторая скобка)', expr: 'Узел 2: B ∨ C', expected: n2 },
+                            { id: 'node3', title: 'Шаг 3 (Отрицание второй скобки)', expr: 'Узел 3: ¬(B ∨ C)', expected: n3 },
+                            { id: 'nodeF', title: 'Шаг 4 (Финальный выход ИЛИ)', expr: 'Выход F: (Узел 1) ∨ (Узел 3)', expected: f }
+                        ];
+                    }
+                },
+                {
+                    formula: 'F = ¬(A ∨ B) ∧ (B ∨ ¬C)',
+                    compute: (a, b, c) => {
+                        const n1 = (a || b) ? 1 : 0;
+                        const n2 = 1 - n1;
+                        const n3 = (b || (1 - c)) ? 1 : 0;
+                        const f = (n2 && n3) ? 1 : 0;
+                        return [
+                            { id: 'node1', title: 'Шаг 1 (Первая скобка)', expr: 'Узел 1: A ∨ B', expected: n1 },
+                            { id: 'node2', title: 'Шаг 2 (Отрицание скобки)', expr: 'Узел 2: ¬(A ∨ B)', expected: n2 },
+                            { id: 'node3', title: 'Шаг 3 (Вторая скобка)', expr: 'Узел 3: B ∨ ¬C', expected: n3 },
+                            { id: 'nodeF', title: 'Шаг 4 (Финальный выход И)', expr: 'Выход F: (Узел 2) ∧ (Узел 3)', expected: f }
+                        ];
+                    }
+                }
+            ];
+
+            const tpl = templates[rnd(0, templates.length - 1)];
+            const steps = tpl.compute(A, B, C);
+
+            document.getElementById('p1-formula-display').textContent = tpl.formula;
+            document.getElementById('p1-in-a').textContent = String(A);
+            document.getElementById('p1-in-b').textContent = String(B);
+            document.getElementById('p1-in-c').textContent = String(C);
+
+            const grid = document.getElementById('p1-nodes-grid');
+            grid.innerHTML = '';
+
+            steps.forEach((step, idx) => {
+                const isFinal = idx === steps.length - 1;
+                const col = document.createElement('div');
+                col.className = 'col-12 col-sm-6 col-md-3';
+                col.innerHTML = `
+                    <div class="card bg-dark ${isFinal ? 'border-success' : 'border-secondary'} rounded-0 h-100 p-3 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="text-secondary small mb-1">${step.title}</div>
+                            <div class="${isFinal ? 'text-success' : 'text-light'} fw-bold mb-3">${step.expr}</div>
+                        </div>
+                        <button type="button"
+                            class="btn btn-outline-secondary rounded-0 w-100 py-2 fs-5 fw-bold p1-node-toggle"
+                            data-node="${step.id}"
+                            data-val="?"
+                            data-expected="${step.expected}">
+                            [ ? ]
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(col);
+            });
+
+            document.getElementById('p1-verify-btn').disabled = true;
+        }
+
+        function updatePhase1VerifyBtn() {
+            const buttons = document.querySelectorAll('.p1-node-toggle');
+            const allSet = Array.from(buttons).every(btn => btn.getAttribute('data-val') !== '?');
+            document.getElementById('p1-verify-btn').disabled = !allSet;
+        }
+
+        document.getElementById('p1-nodes-grid').addEventListener('click', (e) => {
+            if (isLocked) return;
+            const btn = e.target.closest('.p1-node-toggle');
+            if (!btn) return;
+
+            const current = btn.getAttribute('data-val');
+            let next = '0';
+            if (current === '?') next = '0';
+            else if (current === '0') next = '1';
+            else next = '0';
+
+            btn.setAttribute('data-val', next);
+            btn.textContent = `[ ${next} ]`;
+            btn.classList.remove('btn-outline-secondary', 'btn-outline-warning', 'btn-outline-success');
+            btn.classList.add(next === '1' ? 'btn-outline-success' : 'btn-outline-warning');
+
+            updatePhase1VerifyBtn();
+        });
+
+        document.getElementById('p1-verify-btn').addEventListener('click', () => {
+            if (isLocked) return;
+            const buttons = document.querySelectorAll('.p1-node-toggle');
+            const allCorrect = Array.from(buttons).every(
+                btn => btn.getAttribute('data-val') === btn.getAttribute('data-expected')
+            );
+
+            if (allCorrect) {
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+                document.getElementById('phase-title').textContent = 'Снятие отрицания НЕ и законы де Моргана на числовой прямой';
+                initPhase2();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Ошибка в вычислении одного из промежуточных логических узлов или выхода F!',
+                    initPhase1
+                );
+            }
+        });
+
+        // =========================================================================
+        // ФАЗА 2: КОНСТРУИРОВАНИЕ ПРОМЕЖУТКА БЕЗ «НЕ» (Slot & Snap)
+        // =========================================================================
+        let p2SelectedToken = null;
+
+        function initPhase2() {
+            p2SelectedToken = null;
+            const a = rnd(3, 12);
+            const b = rnd(a + 4, 24);
+
+            const variants = [
+                {
+                    source: `НЕ (x < ${a}) И НЕ (x > ${b})`,
+                    op1: '≥',
+                    num1: String(a),
+                    logic: 'И',
+                    op2: '≤',
+                    num2: String(b)
+                },
+                {
+                    source: `НЕ (x ≤ ${a}) И НЕ (x ≥ ${b})`,
+                    op1: '>',
+                    num1: String(a),
+                    logic: 'И',
+                    op2: '<',
+                    num2: String(b)
+                },
+                {
+                    source: `НЕ ((x < ${a}) ИЛИ (x ≥ ${b}))`,
+                    op1: '≥',
+                    num1: String(a),
+                    logic: 'И',
+                    op2: '<',
+                    num2: String(b)
+                },
+                {
+                    source: `НЕ ((x ≤ ${a}) ИЛИ (x > ${b}))`,
+                    op1: '>',
+                    num1: String(a),
+                    logic: 'И',
+                    op2: '≤',
+                    num2: String(b)
+                },
+                {
+                    source: `НЕ ((x ≥ ${a}) И (x ≤ ${b}))`,
+                    op1: '<',
+                    num1: String(a),
+                    logic: 'ИЛИ',
+                    op2: '>',
+                    num2: String(b)
+                }
+            ];
+
+            const v = variants[rnd(0, variants.length - 1)];
+            document.getElementById('p2-source-expr').textContent = v.source;
+
+            const slotMap = {
+                op1: { expected: v.op1, placeholder: '[знак 1]' },
+                num1: { expected: v.num1, placeholder: '[число 1]' },
+                logic: { expected: v.logic, placeholder: '[связка]' },
+                op2: { expected: v.op2, placeholder: '[знак 2]' },
+                num2: { expected: v.num2, placeholder: '[число 2]' }
+            };
+
+            document.querySelectorAll('.p2-slot').forEach(slot => {
+                const key = slot.getAttribute('data-slot');
+                slot.setAttribute('data-val', '');
+                slot.setAttribute('data-expected', slotMap[key].expected);
+                slot.textContent = slotMap[key].placeholder;
+            });
+
+            const tokenSpecs = shuffle([
+                { val: '<', type: 'op', label: '<' },
+                { val: '≤', type: 'op', label: '≤' },
+                { val: '>', type: 'op', label: '>' },
+                { val: '≥', type: 'op', label: '≥' },
+                { val: 'И', type: 'logic', label: 'И' },
+                { val: 'ИЛИ', type: 'logic', label: 'ИЛИ' },
+                { val: String(a), type: 'num', label: String(a) },
+                { val: String(b), type: 'num', label: String(b) },
+                { val: String(a - 1), type: 'num', label: String(a - 1) },
+                { val: String(b + 1), type: 'num', label: String(b + 1) }
+            ]);
+
+            const pool = document.getElementById('p2-tokens-pool');
+            pool.innerHTML = '';
+            tokenSpecs.forEach((t, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.draggable = true;
+                btn.id = `p2-tok-${idx}`;
+                btn.className = 'btn btn-outline-light rounded-0 px-3 py-2 fs-5 fw-bold p2-token';
+                btn.setAttribute('data-val', t.val);
+                btn.setAttribute('data-type', t.type);
+                btn.textContent = t.label;
+                pool.appendChild(btn);
+            });
+
+            document.getElementById('p2-verify-btn').disabled = true;
+        }
+
+        function updatePhase2VerifyBtn() {
+            const slots = document.querySelectorAll('.p2-slot');
+            const allFilled = Array.from(slots).every(s => s.getAttribute('data-val') !== '');
+            document.getElementById('p2-verify-btn').disabled = !allFilled;
+        }
+
+        function assignTokenToSlot(slot, val) {
+            slot.setAttribute('data-val', val);
+            slot.textContent = val;
+            updatePhase2VerifyBtn();
+        }
+
+        document.getElementById('p2-tokens-pool').addEventListener('click', (e) => {
+            if (isLocked) return;
+            const tok = e.target.closest('.p2-token');
+            if (!tok) return;
+
+            document.querySelectorAll('.p2-token').forEach(b => b.classList.remove('active', 'border-warning'));
+            p2SelectedToken = tok;
+            tok.classList.add('active', 'border-warning');
+        });
+
+        document.getElementById('p2-tokens-pool').addEventListener('dragstart', (e) => {
+            const tok = e.target.closest('.p2-token');
+            if (!tok) return;
+            p2SelectedToken = tok;
+            if (e.dataTransfer) {
+                e.dataTransfer.setData('text/plain', tok.getAttribute('data-val'));
+            }
+        });
+
+        document.getElementById('p2-slots-container').addEventListener('dragover', (e) => {
+            const slot = e.target.closest('.p2-slot');
+            if (slot) e.preventDefault();
+        });
+
+        document.getElementById('p2-slots-container').addEventListener('drop', (e) => {
+            if (isLocked) return;
+            const slot = e.target.closest('.p2-slot');
+            if (!slot) return;
+            e.preventDefault();
+            const val = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || (p2SelectedToken && p2SelectedToken.getAttribute('data-val'));
+            if (val) {
+                assignTokenToSlot(slot, val);
+                document.querySelectorAll('.p2-token').forEach(b => b.classList.remove('active', 'border-warning'));
+                p2SelectedToken = null;
+            }
+        });
+
+        document.getElementById('p2-slots-container').addEventListener('click', (e) => {
+            if (isLocked) return;
+            const slot = e.target.closest('.p2-slot');
+            if (!slot) return;
+
+            if (p2SelectedToken) {
+                assignTokenToSlot(slot, p2SelectedToken.getAttribute('data-val'));
+                document.querySelectorAll('.p2-token').forEach(b => b.classList.remove('active', 'border-warning'));
+                p2SelectedToken = null;
+            } else {
+                const placeholders = {
+                    op1: '[знак 1]',
+                    num1: '[число 1]',
+                    logic: '[связка]',
+                    op2: '[знак 2]',
+                    num2: '[число 2]'
+                };
+                const key = slot.getAttribute('data-slot');
+                slot.setAttribute('data-val', '');
+                slot.textContent = placeholders[key];
+                updatePhase2VerifyBtn();
+            }
+        });
+
+        document.getElementById('p2-reset-btn').addEventListener('click', () => {
+            if (isLocked) return;
+            const placeholders = {
+                op1: '[знак 1]',
+                num1: '[число 1]',
+                logic: '[связка]',
+                op2: '[знак 2]',
+                num2: '[число 2]'
+            };
+            document.querySelectorAll('.p2-slot').forEach(slot => {
+                const key = slot.getAttribute('data-slot');
+                slot.setAttribute('data-val', '');
+                slot.textContent = placeholders[key];
+            });
+            updatePhase2VerifyBtn();
+        });
+
+        document.getElementById('p2-verify-btn').addEventListener('click', () => {
+            if (isLocked) return;
+            const slots = document.querySelectorAll('.p2-slot');
+            const allCorrect = Array.from(slots).every(
+                s => s.getAttribute('data-val') === s.getAttribute('data-expected')
+            );
+
+            if (allCorrect) {
+                document.getElementById('phase2').classList.add('d-none');
+                document.getElementById('phase3').classList.remove('d-none');
+                document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+                document.getElementById('phase-title').textContent = 'Классификация слов и чисел по истинности высказывания';
+                initPhase3();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверно раскрыто отрицание неравенства (проверьте строгость знака или связку де Моргана)!',
+                    initPhase2
+                );
+            }
+        });
+
+        // =========================================================================
+        // ФАЗА 3: СОРТИРОВКА ОБЪЕКТОВ ПО ШЛЮЗАМ ИСТИНА / ЛОЖЬ (Drag-to-Bucket)
+        // =========================================================================
+        let p3SelectedCard = null;
+
+        function isVowel(ch) {
+            return 'аеёиоуыэюя'.includes(ch.toLowerCase());
+        }
+
+        function initPhase3() {
+            p3SelectedCard = null;
+
+            const wordPool = [
+                'Никита', 'Михаил', 'Емеля', 'Иван', 'Марина', 'Антон',
+                'Сервер', 'Модем', 'Сканер', 'Принтер', 'Паскаль', 'Питон',
+                'Алиса', 'Борис', 'Полина', 'Виктор', 'Ольга', 'Степан'
+            ];
+
+            const k = rnd(10, 22);
+
+            const scenarios = [
+                {
+                    ruleText: 'НЕ (Первая буква гласная) И НЕ (Последняя буква согласная)',
+                    generateItems: () => {
+                        const picked = shuffle(wordPool).slice(0, 6);
+                        return picked.map(w => {
+                            const firstVowel = isVowel(w[0]);
+                            const lastConsonant = !isVowel(w[w.length - 1]);
+                            const isTrue = (!firstVowel) && (!lastConsonant);
+                            return { label: w, expected: isTrue ? 'true' : 'false' };
+                        });
+                    }
+                },
+                {
+                    ruleText: 'НЕ (Количество букв нечетное) И (Первая буква согласная)',
+                    generateItems: () => {
+                        const picked = shuffle(wordPool).slice(0, 6);
+                        return picked.map(w => {
+                            const isEvenLen = (w.length % 2 === 0);
+                            const firstCons = !isVowel(w[0]);
+                            const isTrue = isEvenLen && firstCons;
+                            return { label: `${w} (${w.length} б.)`, expected: isTrue ? 'true' : 'false' };
+                        });
+                    }
+                },
+                {
+                    ruleText: `НЕ (x < ${k}) И (x четное)`,
+                    generateItems: () => {
+                        const candidates = [k - 3, k - 2, k - 1, k, k + 1, k + 2, k + 3, k + 4];
+                        const picked = shuffle(candidates).slice(0, 6);
+                        return picked.map(num => {
+                            const isTrue = !(num < k) && (num % 2 === 0);
+                            return { label: `x = ${num}`, expected: isTrue ? 'true' : 'false' };
+                        });
+                    }
+                },
+                {
+                    ruleText: `НЕ (x > ${k}) И НЕ (x четное)`,
+                    generateItems: () => {
+                        const candidates = [k - 3, k - 2, k - 1, k, k + 1, k + 2, k + 3, k + 4];
+                        const picked = shuffle(candidates).slice(0, 6);
+                        return picked.map(num => {
+                            const isTrue = !(num > k) && (num % 2 !== 0);
+                            return { label: `x = ${num}`, expected: isTrue ? 'true' : 'false' };
+                        });
+                    }
+                }
+            ];
+
+            const sc = scenarios[rnd(0, scenarios.length - 1)];
+            document.getElementById('p3-rule-display').textContent = sc.ruleText;
+
+            const items = sc.generateItems();
+            const sourcePool = document.getElementById('p3-source-pool');
+            const trueBody = document.getElementById('p3-bucket-true-body');
+            const falseBody = document.getElementById('p3-bucket-false-body');
+
+            sourcePool.innerHTML = '';
+            trueBody.innerHTML = '';
+            falseBody.innerHTML = '';
+
+            items.forEach((item, idx) => {
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.draggable = true;
+                card.id = `p3-card-${idx}`;
+                card.className = 'btn btn-outline-info rounded-0 px-3 py-2 fw-bold p3-card';
+                card.setAttribute('data-id', String(idx));
+                card.setAttribute('data-expected-bucket', item.expected);
+                card.textContent = item.label;
+                sourcePool.appendChild(card);
+            });
+
+            document.getElementById('p3-verify-btn').disabled = true;
+        }
+
+        function updatePhase3VerifyBtn() {
+            const remaining = document.querySelectorAll('#p3-source-pool .p3-card').length;
+            document.getElementById('p3-verify-btn').disabled = remaining > 0;
+        }
+
+        function moveCardToBucket(card, bucketEl) {
+            if (!card || !bucketEl) return;
+            const bucketType = bucketEl.getAttribute('data-bucket');
+            let targetContainer = bucketEl;
+            if (bucketType === 'true') {
+                targetContainer = document.getElementById('p3-bucket-true-body');
+            } else if (bucketType === 'false') {
+                targetContainer = document.getElementById('p3-bucket-false-body');
+            } else {
+                targetContainer = document.getElementById('p3-source-pool');
+            }
+            card.classList.remove('active', 'border-warning');
+            targetContainer.appendChild(card);
+            p3SelectedCard = null;
+            updatePhase3VerifyBtn();
+        }
+
+        document.getElementById('phase3').addEventListener('click', (e) => {
+            if (isLocked) return;
+            const bucket = e.target.closest('.p3-bucket');
+            const card = e.target.closest('.p3-card');
+
+            if (p3SelectedCard && bucket && bucket !== p3SelectedCard.closest('.p3-bucket')) {
+                moveCardToBucket(p3SelectedCard, bucket);
+                return;
+            }
+
+            if (card) {
+                document.querySelectorAll('.p3-card').forEach(c => c.classList.remove('active', 'border-warning'));
+                p3SelectedCard = card;
+                card.classList.add('active', 'border-warning');
+                return;
+            }
+
+            if (bucket && p3SelectedCard) {
+                moveCardToBucket(p3SelectedCard, bucket);
+            }
+        });
+
+        document.getElementById('phase3').addEventListener('dragstart', (e) => {
+            const card = e.target.closest('.p3-card');
+            if (!card) return;
+            p3SelectedCard = card;
+            if (e.dataTransfer) {
+                e.dataTransfer.setData('text/plain', card.id);
+            }
+        });
+
+        document.getElementById('phase3').addEventListener('dragover', (e) => {
+            const bucket = e.target.closest('.p3-bucket');
+            if (bucket) e.preventDefault();
+        });
+
+        document.getElementById('phase3').addEventListener('drop', (e) => {
+            if (isLocked) return;
+            const bucket = e.target.closest('.p3-bucket');
+            if (!bucket) return;
+            e.preventDefault();
+            const cardId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+            const card = (cardId && document.getElementById(cardId)) || p3SelectedCard;
+            if (card) {
+                moveCardToBucket(card, bucket);
+            }
+        });
+
+        document.getElementById('p3-reset-btn').addEventListener('click', () => {
+            if (isLocked) return;
+            const sourcePool = document.getElementById('p3-source-pool');
+            document.querySelectorAll('.p3-card').forEach(card => {
+                card.classList.remove('active', 'border-warning');
+                sourcePool.appendChild(card);
+            });
+            p3SelectedCard = null;
+            updatePhase3VerifyBtn();
+        });
+
+        document.getElementById('p3-verify-btn').addEventListener('click', () => {
+            if (isLocked) return;
+            const trueCards = document.querySelectorAll('#p3-bucket-true-body .p3-card');
+            const falseCards = document.querySelectorAll('#p3-bucket-false-body .p3-card');
+
+            const trueOk = Array.from(trueCards).every(c => c.getAttribute('data-expected-bucket') === 'true');
+            const falseOk = Array.from(falseCards).every(c => c.getAttribute('data-expected-bucket') === 'false');
+
+            if (trueOk && falseOk && (trueCards.length + falseCards.length === 6)) {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+                sendTelemetry('level_complete', true);
+            } else {
+                triggerErrorAndRegenerate(
+                    'Один или несколько объектов распределены в неверный логический шлюз!',
+                    initPhase3
+                );
+            }
+        });
+
+        // Старт тренажера
+        initPhase1();
+    </script>
+</TaskLayout>

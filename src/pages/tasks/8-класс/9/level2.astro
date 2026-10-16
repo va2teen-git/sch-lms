@@ -1,0 +1,543 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический расчет составных высказываний (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Аналитический режим // Ручной ввод</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Шапка прогресса и счетчика ошибок -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Аналитическое вычисление составного выражения</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки / Перекалибровки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Единый блок обратной связи при ошибке -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[АНАЛИТИЧЕСКИЙ СБОЙ] <span id="feedback-text">Неверный расчет!</span> Генерация нового варианта фазы...</span>
+                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: ВЫЧИСЛЕНИЕ СЛОЖНОГО ВЫРАЖЕНИЯ ПРИ ЗАДАННЫХ ПАРАМЕТРАХ ================= -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Фаза 1 из 5: Вычисление составного выражения при заданных параметрах</h5>
+                    <p class="text-light mb-2">
+                        Подставьте заданные числовые значения параметров <strong class="text-info">x, y, z</strong> в простые условия сравнения и делимости,
+                        а затем вычислите истинность всего составного высказывания строго по приоритету операций:
+                        <span class="text-warning">Скобки () → НЕ (¬) → И (∧) → ИЛИ (∨)</span>.
+                    </p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-5">
+                            <div class="card bg-black border-info rounded-0 h-100 p-3">
+                                <div class="text-secondary small mb-2">ЗНАЧЕНИЯ ВХОДНЫХ ПАРАМЕТРОВ:</div>
+                                <div id="p1-params-display" class="fs-5 text-info fw-bold"></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-7">
+                            <div class="card bg-black border-warning rounded-0 h-100 p-3">
+                                <div class="text-secondary small mb-2">СОСТАВНАЯ ЛОГИЧЕСКАЯ ФОРМУЛА:</div>
+                                <div id="p1-formula-display" class="fs-5 text-warning fw-bold"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p1-input" class="form-label text-light small mb-2">
+                            Введите итоговое логическое значение формулы (<strong class="text-warning">1</strong> — если высказывание истинно, <strong class="text-warning">0</strong> — если ложно):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p1-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Введите 1 или 0" autocomplete="off" data-expected="">
+                            <button id="p1-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: НАИМЕНЬШЕЕ ЦЕЛОЕ ЧИСЛО X (ВЫСКАЗЫВАНИЕ ИСТИННО) ================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 2 из 5: Поиск наименьшего целого числа x, при котором высказывание ИСТИННО</h5>
+                    <p class="text-light mb-2">
+                        Раскройте отрицание левой границы (<code class="text-warning">НЕ (x &lt; A)</code> превращается в <code class="text-success">x &ge; A</code>, а <code class="text-warning">НЕ (x &le; A)</code> превращается в <code class="text-success">x &gt; A</code>)
+                        и найдите <strong>наименьшее целое число x</strong>, для которого истинны обе части конъюнкции.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ЗАДАНИЕ (ПОИСК МИНИМУМА НА ЛУЧЕ):</div>
+                        <div class="text-light mb-2">Напишите <strong>наименьшее</strong> целое число <code class="text-warning">x</code>, для которого <strong>ИСТИННО</strong> высказывание:</div>
+                        <div id="p2-formula-display" class="fs-4 text-warning fw-bold"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-light small mb-2">
+                            Введите найденное наименьшее целое число <strong class="text-warning">x</strong>:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p2-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 14" autocomplete="off" data-expected="">
+                            <button id="p2-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: НАИБОЛЬШЕЕ ЦЕЛОЕ ЧИСЛО X (ВЫСКАЗЫВАНИЕ ИСТИННО) ================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 3 из 5: Поиск наибольшего целого числа x, при котором высказывание ИСТИННО</h5>
+                    <p class="text-light mb-2">
+                        Обратите особое внимание на правую границу после снятия <code class="text-warning">НЕ</code> и учет третьего условия четности/нечетности.
+                        Найдите <strong>наибольшее целое число x</strong>, для которого высказывание истинно.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ЗАДАНИЕ (ПОИСК МАКСИМУМА НА ПРОМЕЖУТКЕ):</div>
+                        <div class="text-light mb-2">Напишите <strong>наибольшее</strong> целое число <code class="text-warning">x</code>, для которого <strong>ИСТИННО</strong> высказывание:</div>
+                        <div id="p3-formula-display" class="fs-4 text-warning fw-bold"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-light small mb-2">
+                            Введите найденное наибольшее целое число <strong class="text-warning">x</strong>:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p3-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 27" autocomplete="off" data-expected="">
+                            <button id="p3-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 4: ЭКСТРЕМАЛЬНОЕ ЧИСЛО X ПРИ УСЛОВИИ ЛОЖНОСТИ ДИЗЪЮНКЦИИ ================= -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 4 из 5: Поиск экстремального числа x, при котором высказывание с «ИЛИ» ЛОЖНО</h5>
+                    <p class="text-light mb-2">
+                        Высказывание со связкой <code class="text-warning">ИЛИ (∨)</code> <strong>ЛОЖНО (0)</strong> тогда и только тогда, когда <strong>ложна КАЖДАЯ его часть одновременно</strong>!
+                        Примените закон де Моргана <code class="text-info">¬(P ∨ Q) = ¬P ∧ ¬Q</code>: инвертируйте все простые условия и замените <code>ИЛИ</code> на <code>И</code>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                            <span class="text-secondary small">ЗАДАНИЕ НА ЛОЖНОСТЬ ВЫСКАЗЫВАНИЯ (МЕТОД ДЕ МОРГАНА):</span>
+                            <span class="badge bg-danger text-light rounded-0">ИЩЕМ, ГДЕ ВЫСКАЗЫВАНИЕ = 0 (ЛОЖНО)</span>
+                        </div>
+                        <div id="p4-question-display" class="text-light mb-2"></div>
+                        <div id="p4-formula-display" class="fs-4 text-warning fw-bold"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-light small mb-2">
+                            Введите искомое целое число <strong class="text-warning">x</strong>:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p4-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Введите целое число x" autocomplete="off" data-expected="">
+                            <button id="p4-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 5: КОЛИЧЕСТВО ЦЕЛЫХ ЧИСЕЛ X, ДЛЯ КОТОРЫХ ВЫСКАЗЫВАНИЕ ИСТИННО ================= -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 5 из 5: Подсчет количества целых чисел x на числовом промежутке</h5>
+                    <p class="text-light mb-2">
+                        Приведите составное высказывание к замкнутому отрезку с целыми границами <code class="text-info">[a; b]</code>
+                        (число целых точек на отрезке равно <code class="text-warning">N = b − a + 1</code>) и учтите дополнительное условие фильтрации.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ЗАДАНИЕ (ПОДСЧЕТ МОЩНОСТИ МНОЖЕСТВА РЕШЕНИЙ):</div>
+                        <div class="text-light mb-2">Для скольких <strong>целых чисел x</strong> <strong>ИСТИННО</strong> высказывание:</div>
+                        <div id="p5-formula-display" class="fs-4 text-warning fw-bold"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-light small mb-2">
+                            Введите точное <strong>количество</strong> целых чисел <strong class="text-warning">N</strong>:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="p5-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 8" autocomplete="off" data-expected="">
+                            <button id="p5-btn" class="btn btn-outline-warning rounded-0 px-4"> ЗАВЕРШИТЬ УРОВЕНЬ 2</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ЭКРАН ЗАВЕРШЕНИЯ УРОВНЯ 2 ================= -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-warning display-4">★ УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light mb-3">Аналитический аппарат составных высказываний освоен</h3>
+                    <p class="text-secondary mx-auto mb-4">
+                        Вы безошибочно выполнили расчет сложных логических выражений по приоритетам, нашли наименьшие и наибольшие целые решения неравенств со снятием отрицания «НЕ», применили законы де Моргана для условия ложности и вычислили количество целых точек на промежутке.
+                    </p>
+                    <div class="badge border border-danger text-danger bg-black p-3 fs-6 rounded-0">
+                        Финальное испытание: Переходите на Уровень 3 (Скоростная аркада) в верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        const missionName = 'Урок 9 :: Определение истинности составного высказывания (Уровень 2)';
+        const startTime = Date.now();
+        let attempts = 0;
+        let isLocked = false;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function setPhaseHeader(stepNum, title) {
+            document.getElementById('phase-badge').textContent = `Шаг ${stepNum} из 5`;
+            document.getElementById('phase-title').textContent = title;
+        }
+
+        function triggerErrorAndRegenerate(message, regenerateFn) {
+            if (isLocked) return;
+            isLocked = true;
+            attempts++;
+            document.getElementById('attempts-display').textContent = String(attempts);
+            sendTelemetry('hardcore_reset', false);
+
+            const fb = document.getElementById('feedback-box');
+            document.getElementById('feedback-text').textContent = message;
+            fb.classList.remove('d-none');
+
+            setTimeout(() => {
+                fb.classList.add('d-none');
+                isLocked = false;
+                regenerateFn();
+            }, 1200);
+        }
+
+        // =========================================================================
+        // ФАЗА 1: Аналитическое вычисление выражения при заданных x, y, z
+        // =========================================================================
+        function initPhase1() {
+            const x = rnd(8, 25);
+            const y = rnd(5, 20);
+            const z = rnd(6, 24);
+            const a = rnd(10, 22);
+            const b = rnd(8, 18);
+
+            const variants = [
+                {
+                    formula: `НЕ (x < ${a}) И ((y > ${b}) ИЛИ (z четное))`,
+                    val: (!(x < a) && ((y > b) || (z % 2 === 0))) ? '1' : '0'
+                },
+                {
+                    formula: `((x ≥ ${a}) И НЕ (y ≤ ${b})) ИЛИ НЕ (z нечетное)`,
+                    val: (((x >= a) && !(y <= b)) || !(z % 2 !== 0)) ? '1' : '0'
+                },
+                {
+                    formula: `НЕ ((x > ${a}) ИЛИ (y < ${b})) И (z кратно 3)`,
+                    val: (!((x > a) || (y < b)) && (z % 3 === 0)) ? '1' : '0'
+                },
+                {
+                    formula: `НЕ (x четное) И ((y ≥ ${b}) ИЛИ НЕ (z > ${a}))`,
+                    val: (!(x % 2 === 0) && ((y >= b) || !(z > a))) ? '1' : '0'
+                }
+            ];
+
+            const chosen = variants[rnd(0, variants.length - 1)];
+            document.getElementById('p1-params-display').textContent = `x = ${x},  y = ${y},  z = ${z}`;
+            document.getElementById('p1-formula-display').textContent = chosen.formula;
+
+            const input = document.getElementById('p1-input');
+            input.value = '';
+            input.setAttribute('data-expected', chosen.val);
+        }
+
+        function checkPhase1() {
+            if (isLocked) return;
+            const input = document.getElementById('p1-input');
+            const val = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (val === expected && (val === '0' || val === '1')) {
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                setPhaseHeader(2, 'Поиск наименьшего целого числа x (высказывание ИСТИННО)');
+                initPhase2();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверное значение логического выражения! Проверьте порядок действий: скобки → НЕ → И → ИЛИ.',
+                    initPhase1
+                );
+            }
+        }
+
+        // =========================================================================
+        // ФАЗА 2: Наименьшее целое x, при котором высказывание ИСТИННО
+        // =========================================================================
+        function initPhase2() {
+            const A = rnd(12, 45);
+            const K = rnd(3, 5);
+
+            const templates = [
+                {
+                    text: `НЕ (x < ${A}) И (x четное)`,
+                    testFn: (x) => !(x < A) && (x % 2 === 0)
+                },
+                {
+                    text: `НЕ (x ≤ ${A}) И (x четное)`,
+                    testFn: (x) => !(x <= A) && (x % 2 === 0)
+                },
+                {
+                    text: `НЕ (x < ${A}) И НЕ (x четное)`,
+                    testFn: (x) => !(x < A) && (x % 2 !== 0)
+                },
+                {
+                    text: `НЕ (x ≤ ${A}) И (x кратно ${K})`,
+                    testFn: (x) => !(x <= A) && (x % K === 0)
+                }
+            ];
+
+            const tpl = templates[rnd(0, templates.length - 1)];
+            let ans = A;
+            while (!tpl.testFn(ans)) {
+                ans++;
+            }
+
+            document.getElementById('p2-formula-display').textContent = tpl.text;
+            const input = document.getElementById('p2-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(ans));
+        }
+
+        function checkPhase2() {
+            if (isLocked) return;
+            const input = document.getElementById('p2-input');
+            const val = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (val !== '' && val === expected) {
+                document.getElementById('phase2').classList.add('d-none');
+                document.getElementById('phase3').classList.remove('d-none');
+                setPhaseHeader(3, 'Поиск наибольшего целого числа x (высказывание ИСТИННО)');
+                initPhase3();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверное наименьшее число x! Внимательно проверьте строгость левой границы после снятия НЕ.',
+                    initPhase2
+                );
+            }
+        }
+
+        // =========================================================================
+        // ФАЗА 3: Наибольшее целое x, при котором высказывание ИСТИННО
+        // =========================================================================
+        function initPhase3() {
+            const A = rnd(8, 20);
+            const B = rnd(A + 10, 55);
+
+            const templates = [
+                {
+                    text: `(x > ${A}) И НЕ (x > ${B}) И НЕ (x четное)`,
+                    testFn: (x) => (x > A) && !(x > B) && (x % 2 !== 0)
+                },
+                {
+                    text: `НЕ (x < ${A}) И НЕ (x ≥ ${B}) И (x четное)`,
+                    testFn: (x) => !(x < A) && !(x >= B) && (x % 2 === 0)
+                },
+                {
+                    text: `(x ≥ ${A}) И НЕ (x > ${B}) И НЕ (x нечетное)`,
+                    testFn: (x) => (x >= A) && !(x > B) && (x % 2 === 0)
+                },
+                {
+                    text: `НЕ (x ≤ ${A}) И НЕ (x ≥ ${B}) И НЕ (x четное)`,
+                    testFn: (x) => !(x <= A) && !(x >= B) && (x % 2 !== 0)
+                }
+            ];
+
+            const tpl = templates[rnd(0, templates.length - 1)];
+            let ans = B;
+            while (!tpl.testFn(ans)) {
+                ans--;
+            }
+
+            document.getElementById('p3-formula-display').textContent = tpl.text;
+            const input = document.getElementById('p3-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(ans));
+        }
+
+        function checkPhase3() {
+            if (isLocked) return;
+            const input = document.getElementById('p3-input');
+            const val = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (val !== '' && val === expected) {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('phase4').classList.remove('d-none');
+                setPhaseHeader(4, 'Поиск экстремального числа x при ЛОЖНОСТИ дизъюнкции');
+                initPhase4();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверное наибольшее число x! Проверьте включение правой границы B и условие четности.',
+                    initPhase3
+                );
+            }
+        }
+
+        // =========================================================================
+        // ФАЗА 4: Экстремальное целое x, при котором высказывание с ИЛИ ЛОЖНО
+        // =========================================================================
+        function initPhase4() {
+            const A = rnd(10, 28);
+            const B = rnd(A + 8, 50);
+
+            const templates = [
+                {
+                    question: 'Напишите НАИБОЛЬШЕЕ целое число x, для которого ЛОЖНО высказывание:',
+                    formula: `(x ≤ ${A}) ИЛИ (x ≥ ${B})`,
+                    ans: B - 1
+                },
+                {
+                    question: 'Напишите НАИМЕНЬШЕЕ целое число x, для которого ЛОЖНО высказывание:',
+                    formula: `(x < ${A}) ИЛИ НЕ (x ≤ ${B})`,
+                    ans: A
+                },
+                {
+                    question: 'Напишите НАИБОЛЬШЕЕ целое число x, для которого ЛОЖНО высказывание:',
+                    formula: `НЕ (x > ${A}) ИЛИ (x > ${B}) ИЛИ (x четное)`,
+                    ans: (B % 2 !== 0) ? B : (B - 1)
+                },
+                {
+                    question: 'Напишите НАИМЕНЬШЕЕ целое число x, для которого ЛОЖНО высказывание:',
+                    formula: `(x < ${A}) ИЛИ (x ≥ ${B}) ИЛИ НЕ (x четное)`,
+                    ans: (A % 2 === 0) ? A : (A + 1)
+                }
+            ];
+
+            const tpl = templates[rnd(0, templates.length - 1)];
+            document.getElementById('p4-question-display').textContent = tpl.question;
+            document.getElementById('p4-formula-display').textContent = tpl.formula;
+
+            const input = document.getElementById('p4-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(tpl.ans));
+        }
+
+        function checkPhase4() {
+            if (isLocked) return;
+            const input = document.getElementById('p4-input');
+            const val = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (val !== '' && val === expected) {
+                document.getElementById('phase4').classList.add('d-none');
+                document.getElementById('phase5').classList.remove('d-none');
+                setPhaseHeader(5, 'Подсчет количества целых чисел x на промежутке');
+                initPhase5();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Ошибка при поиске границы ложности! Помните: дизъюнкция (ИЛИ) ложна, только когда ложна КАЖДАЯ её часть.',
+                    initPhase4
+                );
+            }
+        }
+
+        // =========================================================================
+        // ФАЗА 5: Количество целых чисел x, для которых высказывание ИСТИННО
+        // =========================================================================
+        function initPhase5() {
+            const A = rnd(7, 25);
+            const B = rnd(A + 7, A + 22);
+            const mid = Math.floor((A + B) / 2);
+
+            const templates = [
+                {
+                    formula: `НЕ (x < ${A}) И НЕ (x > ${B})`,
+                    testFn: (x) => !(x < A) && !(x > B)
+                },
+                {
+                    formula: `НЕ (x ≤ ${A}) И (x < ${B})`,
+                    testFn: (x) => !(x <= A) && (x < B)
+                },
+                {
+                    formula: `НЕ (x < ${A}) И НЕ (x > ${B}) И (x четное)`,
+                    testFn: (x) => !(x < A) && !(x > B) && (x % 2 === 0)
+                },
+                {
+                    formula: `НЕ (x < ${A}) И НЕ (x > ${B}) И НЕ (x = ${mid})`,
+                    testFn: (x) => !(x < A) && !(x > B) && (x !== mid)
+                }
+            ];
+
+            const tpl = templates[rnd(0, templates.length - 1)];
+            let count = 0;
+            for (let x = A - 2; x <= B + 2; x++) {
+                if (tpl.testFn(x)) count++;
+            }
+
+            document.getElementById('p5-formula-display').textContent = tpl.formula;
+            const input = document.getElementById('p5-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(count));
+        }
+
+        function checkPhase5() {
+            if (isLocked) return;
+            const input = document.getElementById('p5-input');
+            const val = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (val !== '' && val === expected) {
+                document.getElementById('phase5').classList.add('d-none');
+                document.getElementById('success-screen').classList.remove('d-none');
+                sendTelemetry('level_complete', true);
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверное количество целых чисел N! Проверьте формулу N = b − a + 1 для включенных границ и учет фильтра.',
+                    initPhase5
+                );
+            }
+        }
+
+        // Привязка кнопок и клавиши Enter для всех 5 фаз
+        const phaseHandlers = [
+            { btnId: 'p1-btn', inputId: 'p1-input', fn: checkPhase1 },
+            { btnId: 'p2-btn', inputId: 'p2-input', fn: checkPhase2 },
+            { btnId: 'p3-btn', inputId: 'p3-input', fn: checkPhase3 },
+            { btnId: 'p4-btn', inputId: 'p4-input', fn: checkPhase4 },
+            { btnId: 'p5-btn', inputId: 'p5-input', fn: checkPhase5 }
+        ];
+
+        phaseHandlers.forEach(({ btnId, inputId, fn }) => {
+            document.getElementById(btnId).addEventListener('click', fn);
+            document.getElementById(inputId).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    fn();
+                }
+            });
+        });
+
+        // Инициализация первой фазы при загрузке
+        initPhase1();
+    </script>
+</TaskLayout>
