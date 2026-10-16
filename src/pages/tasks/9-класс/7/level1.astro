@@ -170,7 +170,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         { text: "Уменьшенная деревянная модель корпуса корабля для бассейна", category: "bucket1" },
                         { text: "Макет жилого квартала из пенопласта и пластика", category: "bucket1" },
                         { text: "Анатомический муляж человеческого сердца в натуральную величину", category: "bucket1" },
-                        { text: "Действующая миниатюрная ветроэлектростанция на стенде лаборатории", category: "bucket1" },
+                        { text: "Физическая действующая масштабная модель ветроэлектростанции (макет 1:50) на лабораторном стенде", category: "bucket1" },
 
                         // bucket2: Информационные модели
                         { text: "Географическая карта полушарий с изолиниями глубин и высот", category: "bucket2" },
@@ -213,7 +213,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         // bucket3: Смешанные
                         { text: "Топографическая карта местности с числовым масштабом и условными знаками", category: "bucket3" },
                         { text: "Схема линий Московского метрополитена с названиями станций", category: "bucket3" },
-                        { text: "Таблица расписания движения пригородных поездов по станциям", category: "bucket3" },
+                        { text: "Таблица расписания движения поездов (двумерная матричная сетка станций со временем отправления)", category: "bucket3" },
                         { text: "Круговая секторная диаграмма распределения долей рынка браузеров", category: "bucket3" },
                         { text: "Чертеж стального вала с указанием числовых допусков и диаметров в мм", category: "bucket3" },
                         { text: "Генеалогическое древо династии с именами правителей и датами правления", category: "bucket3" }
@@ -230,14 +230,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         { text: "Поэтажный архитектурный план здания с указанием площадей помещений", category: "bucket1" },
                         { text: "Таблица технических характеристик процессора в паспорте изделия", category: "bucket1" },
                         { text: "Бухгалтерский балансовый отчет предприятия на 31 декабря", category: "bucket1" },
-                        { text: "Схема структурной формулы молекулы бензола (C₆H₆)", category: "bucket1" },
+                        { text: "Статическая структурная схема взаимного расположения атомов в молекуле бензола", category: "bucket1" },
                         { text: "Снимок МРТ головного мозга пациента на дату обследования", category: "bucket1" },
 
                         // bucket2: Динамические детерминированные
                         { text: "Математический расчет траектории полета артиллерийского снаряда в вакууме", category: "bucket2" },
                         { text: "Пошаговая эмуляция тактов выполнения машинных инструкций в микропроцессоре", category: "bucket2" },
                         { text: "Анимационная кинематическая модель движения кривошипно-шатунного механизма", category: "bucket2" },
-                        { text: "Модель свободного падения тела с высоты h по формуле: h = (g × t²) / 2", category: "bucket2" },
+                        { text: "Динамический расчет изменения координаты при свободном падении тела от времени: h(t) = (g × t²) / 2", category: "bucket2" },
                         { text: "Расчет фаз затмения Луны на основе законов небесной механики Кеплера", category: "bucket2" },
 
                         // bucket3: Динамические стохастические (вероятностные)
@@ -318,33 +318,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     card.addEventListener('dragstart', handleDragStart);
                     card.addEventListener('dragend', handleDragEnd);
 
-                    // Click to Select / Move (Accessibility)
-                    card.addEventListener('click', () => handleCardClick(card));
-
                     pool.appendChild(card);
                 });
 
                 document.getElementById('verify-btn').disabled = true;
                 selectedCardElement = null;
-            }
-
-            // Обработка клика по карточке (для режима клик-перемещение)
-            function handleCardClick(card) {
-                if (selectedCardElement === card) {
-                    card.classList.remove('border-warning', 'bg-dark');
-                    card.classList.add('border-secondary', 'bg-black');
-                    selectedCardElement = null;
-                    return;
-                }
-
-                if (selectedCardElement) {
-                    selectedCardElement.classList.remove('border-warning', 'bg-dark');
-                    selectedCardElement.classList.add('border-secondary', 'bg-black');
-                }
-
-                selectedCardElement = card;
-                card.classList.remove('border-secondary', 'bg-black');
-                card.classList.add('border-warning', 'bg-dark');
             }
 
             // Drag and drop handlers
@@ -362,60 +340,121 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 draggedElement = null;
             }
 
-            // Настройка дроп-зон (бакетов и исходного пула)
+            // Настройка дроп-зон для Drag and Drop (бакеты и исходный пул)
             function setupDropZones() {
-                const dropZones = [
-                    document.getElementById('cards-pool'),
-                    ...document.querySelectorAll('.bucket-slot')
-                ];
+                const pool = document.getElementById('cards-pool');
 
-                dropZones.forEach(zone => {
-                    zone.addEventListener('dragover', (e) => {
+                // Пул карточек: drag over / drop
+                pool.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    pool.classList.add('bg-secondary', 'bg-opacity-25');
+                });
+                pool.addEventListener('dragleave', (e) => {
+                    if (!pool.contains(e.relatedTarget)) {
+                        pool.classList.remove('bg-secondary', 'bg-opacity-25');
+                    }
+                });
+                pool.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    pool.classList.remove('bg-secondary', 'bg-opacity-25');
+                    if (draggedElement) {
+                        pool.appendChild(draggedElement);
+                        updateBucketCounts();
+                        checkCanVerify();
+                    }
+                });
+
+                // Бакеты: drag over / drop
+                document.querySelectorAll('.target-bucket').forEach(bucket => {
+                    const slot = bucket.querySelector('.bucket-slot');
+
+                    bucket.addEventListener('dragover', (e) => {
                         e.preventDefault();
                         e.dataTransfer.dropEffect = 'move';
-                        zone.classList.add('bg-secondary', 'bg-opacity-25');
+                        bucket.classList.add('border-warning');
                     });
 
-                    zone.addEventListener('dragleave', () => {
-                        zone.classList.remove('bg-secondary', 'bg-opacity-25');
-                    });
-
-                    zone.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        zone.classList.remove('bg-secondary', 'bg-opacity-25');
-                        if (draggedElement) {
-                            zone.appendChild(draggedElement);
-                            updateBucketCounts();
-                            checkCanVerify();
+                    bucket.addEventListener('dragleave', (e) => {
+                        if (!bucket.contains(e.relatedTarget)) {
+                            bucket.classList.remove('border-warning');
                         }
                     });
 
-                    // Клик по контейнеру перемещает выбранную карточку
-                    zone.addEventListener('click', (e) => {
-                        if (selectedCardElement && e.target === zone) {
-                            zone.appendChild(selectedCardElement);
-                            selectedCardElement.classList.remove('border-warning', 'bg-dark');
-                            selectedCardElement.classList.add('border-secondary', 'bg-black');
-                            selectedCardElement = null;
+                    bucket.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        bucket.classList.remove('border-warning');
+                        if (draggedElement) {
+                            slot.appendChild(draggedElement);
                             updateBucketCounts();
                             checkCanVerify();
                         }
                     });
                 });
+            }
 
-                // Клик по карточке бакета также перемещает в слот
-                document.querySelectorAll('.target-bucket').forEach(bucket => {
-                    bucket.addEventListener('click', (e) => {
-                        if (selectedCardElement && !e.target.closest('.bucket-slot')) {
-                            const slot = bucket.querySelector('.bucket-slot');
-                            slot.appendChild(selectedCardElement);
+            // Централизованная делегированная обработка кликов (выбор карточки, клик-перемещение)
+            function setupClickDelegation() {
+                document.addEventListener('click', (e) => {
+                    const card = e.target.closest('.badge[draggable="true"]');
+                    const bucket = e.target.closest('.target-bucket');
+                    const pool = e.target.closest('#cards-pool');
+
+                    if (!selectedCardElement) {
+                        // Нет выбранной карточки: если кликнули по карточке — выбираем ее
+                        if (card) {
+                            selectedCardElement = card;
+                            card.classList.remove('border-secondary', 'bg-black');
+                            card.classList.add('border-warning', 'bg-dark');
+                        }
+                        return;
+                    }
+
+                    // Карточка уже выбрана
+                    if (card === selectedCardElement) {
+                        // Повторный клик по выбранной карточке: отмена выбора
+                        selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                        selectedCardElement.classList.add('border-secondary', 'bg-black');
+                        selectedCardElement = null;
+                        return;
+                    }
+
+                    if (bucket) {
+                        // Клик по целевому бакету (включая слот, заголовок, описание или другие карточки): перемещаем в слот
+                        const slot = bucket.querySelector('.bucket-slot');
+                        slot.appendChild(selectedCardElement);
+                        selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                        selectedCardElement.classList.add('border-secondary', 'bg-black');
+                        selectedCardElement = null;
+                        updateBucketCounts();
+                        checkCanVerify();
+                        return;
+                    }
+
+                    if (pool) {
+                        // Если кликнули по другой карточке в пуле — переключаем выбор на нее
+                        if (card && card.parentElement === pool) {
                             selectedCardElement.classList.remove('border-warning', 'bg-dark');
                             selectedCardElement.classList.add('border-secondary', 'bg-black');
-                            selectedCardElement = null;
-                            updateBucketCounts();
-                            checkCanVerify();
+                            selectedCardElement = card;
+                            card.classList.remove('border-secondary', 'bg-black');
+                            card.classList.add('border-warning', 'bg-dark');
+                            return;
                         }
-                    });
+                        // Иначе клик по пулу возвращает выбранную карточку обратно в пул
+                        pool.appendChild(selectedCardElement);
+                        selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                        selectedCardElement.classList.add('border-secondary', 'bg-black');
+                        selectedCardElement = null;
+                        updateBucketCounts();
+                        checkCanVerify();
+                        return;
+                    }
+
+                    // Клик в пустое пространство вне бакетов и пула: сброс выбора
+                    selectedCardElement.classList.remove('border-warning', 'bg-dark');
+                    selectedCardElement.classList.add('border-secondary', 'bg-black');
+                    selectedCardElement = null;
                 });
             }
 
@@ -511,6 +550,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Инициализация
             setupDropZones();
+            setupClickDelegation();
             renderPhase(1);
             sendTelemetry('in_progress');
         })();

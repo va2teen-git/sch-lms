@@ -46,7 +46,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         По формуле <code>Δ = |x_мод - x_ист|</code> рассчитайте абсолютную погрешность модели и введите полученное число:
                     </p>
                     <div class="input-group mb-3 w-100" style="max-width: 580px;">
-                        <input type="number" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Абсолютная погрешность Δ" autocomplete="off">
+                        <input type="text" inputmode="decimal" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Абсолютная погрешность Δ" autocomplete="off">
                         <button id="p1-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
                     </div>
                     <div id="p1-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
@@ -76,7 +76,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         По формуле <code>δ = (Δ / x_ист) × 100%</code> рассчитайте относительную погрешность. Введите число (в процентах, без знака %):
                     </p>
                     <div class="input-group mb-3 w-100" style="max-width: 580px;">
-                        <input type="number" step="any" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Относительная погрешность δ (%)" autocomplete="off">
+                        <input type="text" inputmode="decimal" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Относительная погрешность δ (%)" autocomplete="off">
                         <button id="p2-btn" class="btn btn-outline-warning rounded-0 px-4">ПРОВЕРИТЬ</button>
                     </div>
                     <div id="p2-feedback" class="alert alert-danger bg-black text-danger border-danger rounded-0 d-none py-2">
@@ -220,7 +220,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase1() {
-                const val = parseFloat(document.getElementById('p1-input').value.trim());
+                const raw = document.getElementById('p1-input').value.trim().replace(',', '.');
+                const val = parseFloat(raw);
                 if (!isNaN(val) && Math.abs(val - p1CorrectDelta) < 0.001) {
                     currentPhase = 2;
                     sendTelemetry('in_progress');
@@ -233,16 +234,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Фаза 2: Расчет относительной погрешности δ = (Δ / x_ист) * 100%
             let p2CorrectDeltaPct = 0;
             function initPhase2() {
-                // Подбираем удобные числа для красивого целочисленного или половинного процента
-                const bases = [50, 80, 100, 120, 150, 200, 250, 400];
-                const xTrue = getRandomItem(bases);
-                const pctValues = [2, 4, 5, 8, 10, 12, 15, 20];
-                const deltaPct = getRandomItem(pctValues);
-                const delta = Math.round((xTrue * deltaPct) / 100);
+                // Подбираем пары xTrue и deltaPct, дающие строго целочисленную абсолютную погрешность Δ
+                const validPairs = [
+                    { xTrue: 50, pct: 2 }, { xTrue: 50, pct: 4 }, { xTrue: 50, pct: 6 }, { xTrue: 50, pct: 8 }, { xTrue: 50, pct: 10 }, { xTrue: 50, pct: 12 }, { xTrue: 50, pct: 14 }, { xTrue: 50, pct: 16 }, { xTrue: 50, pct: 20 },
+                    { xTrue: 80, pct: 5 }, { xTrue: 80, pct: 10 }, { xTrue: 80, pct: 15 }, { xTrue: 80, pct: 20 }, { xTrue: 80, pct: 25 },
+                    { xTrue: 100, pct: 2 }, { xTrue: 100, pct: 3 }, { xTrue: 100, pct: 4 }, { xTrue: 100, pct: 5 }, { xTrue: 100, pct: 8 }, { xTrue: 100, pct: 10 }, { xTrue: 100, pct: 12 }, { xTrue: 100, pct: 15 }, { xTrue: 100, pct: 20 },
+                    { xTrue: 120, pct: 5 }, { xTrue: 120, pct: 10 }, { xTrue: 120, pct: 15 }, { xTrue: 120, pct: 20 }, { xTrue: 120, pct: 25 },
+                    { xTrue: 150, pct: 2 }, { xTrue: 150, pct: 4 }, { xTrue: 150, pct: 6 }, { xTrue: 150, pct: 8 }, { xTrue: 150, pct: 10 }, { xTrue: 150, pct: 12 }, { xTrue: 150, pct: 14 }, { xTrue: 150, pct: 16 }, { xTrue: 150, pct: 20 },
+                    { xTrue: 200, pct: 2 }, { xTrue: 200, pct: 3 }, { xTrue: 200, pct: 4 }, { xTrue: 200, pct: 5 }, { xTrue: 200, pct: 7 }, { xTrue: 200, pct: 8 }, { xTrue: 200, pct: 10 }, { xTrue: 200, pct: 15 }, { xTrue: 200, pct: 20 },
+                    { xTrue: 250, pct: 2 }, { xTrue: 250, pct: 4 }, { xTrue: 250, pct: 6 }, { xTrue: 250, pct: 8 }, { xTrue: 250, pct: 10 }, { xTrue: 250, pct: 12 }, { xTrue: 250, pct: 14 }, { xTrue: 250, pct: 16 }, { xTrue: 250, pct: 20 },
+                    { xTrue: 400, pct: 2 }, { xTrue: 400, pct: 3 }, { xTrue: 400, pct: 4 }, { xTrue: 400, pct: 5 }, { xTrue: 400, pct: 8 }, { xTrue: 400, pct: 10 }, { xTrue: 400, pct: 15 }, { xTrue: 400, pct: 20 }
+                ];
+                const pair = getRandomItem(validPairs);
+                const xTrue = pair.xTrue;
+                const deltaPct = pair.pct;
+                const delta = (xTrue * deltaPct) / 100;
                 const sign = Math.random() > 0.5 ? 1 : -1;
                 const xModel = xTrue + (sign * delta);
 
-                p2CorrectDeltaPct = deltaPct;
+                p2CorrectDeltaPct = (Math.abs(xModel - xTrue) / xTrue) * 100;
                 document.getElementById('p2-x-true').textContent = xTrue;
                 document.getElementById('p2-x-model').textContent = xModel;
                 document.getElementById('p2-input').value = '';
@@ -251,7 +261,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase2() {
-                const val = parseFloat(document.getElementById('p2-input').value.trim());
+                const raw = document.getElementById('p2-input').value.trim().replace('%', '').replace(',', '.').trim();
+                const val = parseFloat(raw);
                 if (!isNaN(val) && Math.abs(val - p2CorrectDeltaPct) < 0.01) {
                     currentPhase = 3;
                     sendTelemetry('in_progress');
@@ -259,6 +270,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 } else {
                     handleError(2, initPhase2);
                 }
+            }
+
+            // Функция нормализации текстового ввода терминов (убираем ё, пробелы, приводим к нижнему регистру)
+            function normalizeTerm(str) {
+                return (str || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, '');
             }
 
             // Фаза 3: Статическая или Динамическая
@@ -285,8 +301,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase3() {
-                const val = document.getElementById('p3-input').value.trim().toUpperCase();
-                if (val === p3CorrectAnswer) {
+                const val = normalizeTerm(document.getElementById('p3-input').value);
+                const isStatic = val.startsWith('статич') || val === 'статика';
+                const isDynamic = val.startsWith('динамич') || val === 'динамика';
+                const isCorrect = (p3CorrectAnswer === 'СТАТИЧЕСКАЯ' && isStatic) ||
+                                  (p3CorrectAnswer === 'ДИНАМИЧЕСКАЯ' && isDynamic);
+                if (isCorrect) {
                     currentPhase = 4;
                     sendTelemetry('in_progress');
                     showPhase(4);
@@ -334,8 +354,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase4() {
-                const val = document.getElementById('p4-input').value.trim().toUpperCase();
-                if (val === p4CorrectAnswer) {
+                const val = normalizeTerm(document.getElementById('p4-input').value);
+                const isDeterministic = val.startsWith('детермин');
+                const isStochastic = val.startsWith('стохаст') || val.startsWith('вероятност');
+                const isCorrect = (p4CorrectAnswer === 'ДЕТЕРМИНИРОВАННАЯ' && isDeterministic) ||
+                                  (p4CorrectAnswer === 'СТОХАСТИЧЕСКАЯ' && isStochastic);
+                if (isCorrect) {
                     currentPhase = 5;
                     sendTelemetry('in_progress');
                     showPhase(5);
@@ -371,8 +395,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase5() {
-                const val = document.getElementById('p5-input').value.trim().toUpperCase();
-                if (val === p5CorrectAnswer) {
+                const val = normalizeTerm(document.getElementById('p5-input').value);
+                const isObraz = val.startsWith('образ');
+                const isZnak = val.startsWith('знак');
+                const isSmesh = val.startsWith('смешан');
+                const isCorrect = (p5CorrectAnswer === 'ОБРАЗНАЯ' && isObraz) ||
+                                  (p5CorrectAnswer === 'ЗНАКОВАЯ' && isZnak) ||
+                                  (p5CorrectAnswer === 'СМЕШАННАЯ' && isSmesh);
+                if (isCorrect) {
                     finishLevel();
                 } else {
                     handleError(5, initPhase5);
