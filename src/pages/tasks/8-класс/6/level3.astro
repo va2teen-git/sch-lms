@@ -3,7 +3,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 ---
 
 <TaskLayout level={3}>
-    <div id="app" class="container mt-4" v-cloak>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3" v-cloak>
         <div v-if="gameState === 'intro'" class="text-center py-5">
             <h2 class="text-danger mb-4">ВНИМАНИЕ: КРИТИЧЕСКИЙ СБОЙ RAID-МАССИВА</h2>
             <p class="fs-5 text-white mb-4">Файловая система разрушается. Вам необходимо восстановить 10 секторов памяти до полного отказа системы (60 секунд). За каждый верный сектор начисляется бонус +10 секунд.</p>
@@ -146,22 +146,39 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     const correctSys = systems[Math.floor(Math.random() * systems.length)];
                     
                     const newCells = [];
-                    newCells.push(createCellObj(target, correctSys, true));
+                    const correctCell = createCellObj(target, correctSys, true);
+                    newCells.push(correctCell);
 
-                    // Generate 8 incorrect cells
-                    for(let i = 0; i < 8; i++) {
-                        let sys = systems[Math.floor(Math.random() * systems.length)];
-                        let offset = 0;
+                    const usedValues = new Set([target]);
+                    const usedRawValues = new Set([correctCell.rawValue]);
+
+                    // Generate 8 strictly unique incorrect cells
+                    for (let i = 0; i < 8; i++) {
+                        let candidate = null;
                         do {
+                            const sys = systems[Math.floor(Math.random() * systems.length)];
                             // offset from -15 to +15, but not 0
-                            offset = Math.floor(Math.random() * 31) - 15;
-                        } while (offset === 0 || target + offset <= 0);
-                        
-                        newCells.push(createCellObj(target + offset, sys, false));
+                            const offset = Math.floor(Math.random() * 31) - 15;
+                            const val = target + offset;
+                            if (offset === 0 || val <= 0 || usedValues.has(val)) continue;
+                            const cellObj = createCellObj(val, sys, false);
+                            if (usedRawValues.has(cellObj.rawValue)) continue;
+                            candidate = cellObj;
+                        } while (!candidate);
+
+                        usedValues.add(candidate.value);
+                        usedRawValues.add(candidate.rawValue);
+                        newCells.push(candidate);
                     }
 
-                    // Shuffle cells
-                    cells.value = newCells.sort(() => Math.random() - 0.5);
+                    // Unbiased Fisher-Yates shuffle
+                    for (let i = newCells.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        const tmp = newCells[i];
+                        newCells[i] = newCells[j];
+                        newCells[j] = tmp;
+                    }
+                    cells.value = newCells;
                 };
 
                 const createCellObj = (value, base, isCorrect) => {

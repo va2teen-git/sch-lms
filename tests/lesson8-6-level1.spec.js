@@ -90,9 +90,38 @@ test.describe('Lesson 8-6 Level 1: Number Systems', () => {
     
     // Check DB for hardcore_reset event
     const db = new sqlite3('telemetry.db');
+    await expect.poll(() => {
+      return db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' ORDER BY id DESC LIMIT 1`).get();
+    }, { timeout: 10000 }).toBeDefined();
     const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' ORDER BY id DESC LIMIT 1`).get();
     expect(row).toBeDefined();
     expect(row.is_hardcore).toBe(1);
+  });
+
+  test('should tolerate spaces, leading zeros (e.g. 0755 for chmod), and lowercase hex', async ({ page }) => {
+    await page.goto('/tasks/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level1');
+    await expect(page.locator('#phase1')).toBeVisible();
+
+    // Phase 1: leading zero + spaces
+    const bin1 = await page.locator('#p1-value').innerText();
+    const dec1 = parseInt(bin1, 2).toString(10);
+    await page.locator('#p1-input').fill(`  0${dec1}  `);
+    await page.locator('#p1-btn').click();
+    await expect(page.locator('#phase2')).toBeVisible();
+
+    // Phase 2: chmod octal with leading zero (e.g. 0755)
+    const dec2 = await page.locator('#p2-value').innerText();
+    const oct2 = parseInt(dec2, 10).toString(8);
+    await page.locator('#p2-input').fill(`0${oct2}`);
+    await page.locator('#p2-btn').click();
+    await expect(page.locator('#phase3')).toBeVisible();
+
+    // Phase 3: lowercase hex with space
+    const bin3 = await page.locator('#p3-value').innerText();
+    const hex3 = parseInt(bin3, 2).toString(16).toLowerCase();
+    await page.locator('#p3-input').fill(` ${hex3[0]} ${hex3[1]} `);
+    await page.locator('#p3-input').press('Enter');
+    await expect(page.locator('#success-screen')).toBeVisible();
   });
 
 });
