@@ -1,0 +1,743 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 7 класс, Урок 7 - Компьютерные сети. Поиск информации в сети Интернет
+// Архетип 2: «Packet Flow Router / Data Pipelines» (Магистральный диспетчер сетевой маршрутизации)
+// 10 процедурных волн, жесткий локальный таймер, физическая топологическая сетка коммутации 4x3.
+// Тотальный хардкор-сброс на Волну 1 при любой ошибке маршрутизации или истечении таймера.
+---
+
+<TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
+<div id="app" class="container-fluid min-vh-100 p-4 rounded-0 bg-black text-danger">
+
+    <!-- 1. СТАРТОВЫЙ ЭКРАН -->
+    <div v-if="!started && !completed" class="text-center py-5">
+        <div class="d-inline-block border border-danger p-4 bg-dark rounded-0 mb-4 text-start" style="max-width: 820px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                <h1 class="h3 text-danger mb-0 fw-bold">АРХЕТИП: PACKET FLOW ROUTER // ДИСПЕТЧЕР КОММУТАЦИИ</h1>
+                <span class="badge bg-danger text-black rounded-0 fw-bold">ФИНАЛЬНЫЙ БОСС</span>
+            </div>
+            <p class="text-light fs-5">
+                Магистральный оптоволоконный маршрутизатор опорной сети подвергся шквалу разнородного трафика. 
+                Пакеты данных непрерывно поступают на входной порт. Ваша задача — на лету вращать сетевые шлюзы матрицы 4x3 
+                и направлять каждый пакет в соответствующий серверный терминал до того, как импульс врежется в тупик!
+            </p>
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
+                <div class="fw-bold text-danger mb-2 text-uppercase">[ПРАВИЛА МАГИСТРАЛЬНОЙ МАРШРУТИЗАЦИИ]:</div>
+                <ul class="mb-0 ps-3">
+                    <li class="mb-1">Необходимо отразить <strong>10 нарастающих волн</strong> сетевого трафика.</li>
+                    <li class="mb-1">Спецификация портов: <code>ВЕБ-КЛАСТЕР</code> (HTTP:80, HTTPS:443), <code>FTP-АРХИВ</code> (порт 21), <code>DNS-РЕЗОЛВЕР</code> (порт 53).</li>
+                    <li class="mb-1">Любые аномалии (октеты IP &gt; 255, конфликт портов, пиратские торренты по ст. 146 УК РФ) ДОЛЖНЫ направляться строго в <code>FIREWALL / SINKHOLE</code>!</li>
+                    <li class="mb-1"><strong>ТОТАЛЬНЫЙ ХАРДКОР-СБРОС:</strong> неверный сервер, тупик или истечение таймера мгновенно сбрасывают весь прогресс <strong>на Волну 1</strong>!</li>
+                </ul>
+            </div>
+            <div class="text-secondary small mb-3">
+                Управление: клик мышью по роутеру поворачивает его направление (Вправо &rarr; Вниз &rarr; Вверх). Клавиша <kbd class="bg-dark text-danger border border-danger">ПРОБЕЛ</kbd> — принудительный форсаж пакета.
+            </div>
+            <div class="text-center pt-2">
+                <button @click="startGame" id="btn-start" class="btn btn-outline-danger btn-lg rounded-0 fw-bold px-5 py-3">
+                    ЗАПУСТИТЬ МАТРИЦУ МАРШРУТИЗАЦИИ [ENTER]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ЭКРАН ПОБЕДЫ -->
+    <div v-else-if="completed" id="success-screen" class="text-center py-5">
+        <div class="d-inline-block border border-success p-5 bg-dark rounded-0" style="max-width: 750px;">
+            <h1 class="display-5 text-success fw-bold mb-3">МАГИСТРАЛЬНЫЙ ТРАФИК УСПЕШНО СТАБИЛИЗИРОВАН</h1>
+            <p class="fs-5 text-light mb-4">
+                Все 10 скоростных волн пакетов успешно маршрутизированы через коммутационную матрицу! 
+                Веб-запросы доставлены, архивы приняты, DNS-запросы разрешены, а сетевые аномалии и невалидные IP изолированы в Sinkhole.
+            </p>
+            <div class="badge bg-black text-success border border-success rounded-0 fs-6 px-4 py-2">
+                УРОВЕНЬ 3 (АРКАДА) ПРОЙДЕН // СТАТУС: MASTER ROUTER
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ИГРОВОЙ ЭКРАН (КОММУТАЦИОННАЯ МАТРИЦА 4x3) -->
+    <div v-else class="row justify-content-center">
+        <div class="col-12 col-xl-11">
+
+            <!-- Шапка волны и таймера -->
+            <div class="card bg-dark border-danger rounded-0 mb-3 p-3">
+                <div class="row align-items-center">
+                    <div class="col-md-4 text-start">
+                        <span class="text-secondary small d-block">ТЕКУЩИЙ ЭТАП МАРШРУТИЗАЦИИ:</span>
+                        <span class="fs-4 fw-bold text-danger">ВОЛНА <span v-text="currentWaveIndex + 1"></span> ИЗ <span v-text="waves.length"></span></span>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <span class="text-secondary small d-block">ТАЙМЕР ТРАНСЛЯЦИИ ПАКЕТА:</span>
+                        <div class="progress bg-black border border-danger rounded-0 mt-1" style="height: 16px;">
+                            <div class="progress-bar bg-danger progress-bar-striped progress-bar-animated" :style="{ width: timerPercent + '%' }"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <span class="text-secondary small d-block">ВРЕМЯ ДО АВАРИЙНОГО ПУСКА:</span>
+                        <span class="fs-3 fw-bold font-monospace" :class="timeLeft <= 2 ? 'text-danger' : 'text-warning'">
+                            <span v-text="timeLeft.toFixed(1)"></span> сек
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Тревожный баннер хардкор-сброса -->
+            <div v-if="alarmActive" class="alert alert-danger bg-black border border-danger rounded-0 p-3 mb-3 text-center" role="alert">
+                <h4 class="alert-heading fw-bold mb-1">[КРИТИЧЕСКАЯ АВАРИЯ МАРШРУТИЗАЦИИ]</h4>
+                <p class="mb-0 fs-5" v-text="alarmMessage"></p>
+                <div class="small text-secondary mt-1">ТОТАЛЬНЫЙ СБРОС СИСТЕМЫ НА ВОЛНУ 1...</div>
+            </div>
+
+            <div class="row g-3">
+                <!-- ЛЕВАЯ КОЛОНКА: ВХОДНОЙ ПАКЕТ И АНАЛИЗАТОР -->
+                <div class="col-lg-4">
+                    <div class="card bg-dark border-danger rounded-0 h-100 p-3">
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                            <span class="fw-bold text-danger">ВХОДНОЙ ПАКЕТ ДАННЫХ</span>
+                            <span class="badge bg-danger text-black rounded-0 font-monospace">INGRESS BUS</span>
+                        </div>
+
+                        <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                            <div class="text-secondary small mb-1">ЗАГОЛОВОК ПАКЕТА:</div>
+                            <div class="fs-5 text-warning fw-bold mb-2" v-text="currentWave.title"></div>
+                            
+                            <div class="small text-light mb-1">
+                                <span class="text-secondary">Протокол:</span> 
+                                <span class="fw-bold text-info" v-text="currentWave.protocol"></span>
+                            </div>
+                            <div class="small text-light mb-1">
+                                <span class="text-secondary">Узел назначения:</span> 
+                                <span class="fw-bold text-warning" v-text="currentWave.host"></span>
+                            </div>
+                            <div class="small text-light mb-1">
+                                <span class="text-secondary">Порт:</span> 
+                                <span class="fw-bold text-light" v-text="currentWave.port"></span>
+                            </div>
+                            <div class="small text-light mb-2">
+                                <span class="text-secondary">IP-адрес:</span> 
+                                <span class="fw-bold" :class="currentWave.isIpBad ? 'text-danger' : 'text-success'" v-text="currentWave.ip"></span>
+                            </div>
+                            <div v-if="currentWave.flag" class="badge bg-black border border-danger text-danger rounded-0 text-start w-100 p-2 mt-1">
+                                ВНИМАНИЕ: <span v-text="currentWave.flag"></span>
+                            </div>
+                        </div>
+
+                        <div class="card bg-black border-danger rounded-0 p-3 mb-3 text-start">
+                            <div class="text-secondary small mb-1">ДИСПЕТЧЕРСКАЯ ЗАДАЧА:</div>
+                            <p class="small text-light mb-0" v-text="currentWave.instruction"></p>
+                        </div>
+
+                        <div class="mt-auto">
+                            <button @click="dispatchPacket" id="btn-dispatch" class="btn btn-outline-danger w-100 py-3 rounded-0 fw-bold fs-5">
+                                ФОРСАЖ ПАКЕТА [ПРОБЕЛ]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ЦЕНТР И ПРАВО: СЕТКА МАРШРУТИЗАЦИИ 4x3 И ВЫХОДНЫЕ СЕРВЕРЫ -->
+                <div class="col-lg-8">
+                    <div class="card bg-dark border-danger rounded-0 p-3">
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                            <span class="fw-bold text-danger">КОММУТАЦИОННАЯ МАТРИЦА СЕТЕВЫХ УЗЛОВ (4x3)</span>
+                            <span class="small text-secondary">Вход: Строка <span class="text-warning fw-bold" v-text="currentWave.entryRow + 1"></span></span>
+                        </div>
+
+                        <!-- Сетка 4 строки x (3 роутера + 1 серверный терминал) -->
+                        <div class="d-flex flex-column gap-2 mb-3">
+                            <div v-for="(row, r) in 4" :key="r" class="d-flex align-items-center gap-2">
+                                
+                                <!-- Маркер входа слева -->
+                                <div class="text-center font-monospace" style="width: 45px;">
+                                    <span v-if="currentWave.entryRow === r" class="badge bg-danger text-black rounded-0 w-100 py-2 fw-bold">ВХОД</span>
+                                    <span v-else class="text-secondary small opacity-25">&bull;</span>
+                                </div>
+
+                                <!-- 3 узла роутеров в строке -->
+                                <div v-for="(col, c) in 3" :key="c" class="flex-fill">
+                                    <button 
+                                        @click="rotateNode(r, c)" 
+                                        :class="getNodeClass(r, c)"
+                                        :id="'node-' + r + '-' + c"
+                                        class="btn w-100 py-3 rounded-0 font-monospace d-flex flex-column align-items-center justify-content-center"
+                                        style="min-height: 85px;"
+                                    >
+                                        <div class="fs-3 fw-bold mb-0" v-text="getDirectionArrow(grid[r][c])"></div>
+                                        <div class="small opacity-75" style="font-size: 0.72rem;">
+                                            [<span v-text="r"></span>,<span v-text="c"></span>] <span v-text="getDirectionLabel(grid[r][c])"></span>
+                                        </div>
+                                    </button>
+                                </div>
+
+                                <!-- Выходной серверный терминал справа -->
+                                <div style="width: 250px;">
+                                    <div 
+                                        :class="getTargetServerClass(r)"
+                                        :id="'target-server-' + r"
+                                        class="card p-2 rounded-0 border text-start h-100 d-flex justify-content-center"
+                                    >
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold small" v-text="TARGET_SERVERS[r].name"></span>
+                                            <span class="badge rounded-0" :class="TARGET_SERVERS[r].badgeClass" v-text="TARGET_SERVERS[r].badge"></span>
+                                        </div>
+                                        <div class="small opacity-75" style="font-size: 0.75rem;" v-text="TARGET_SERVERS[r].desc"></div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- Статус текущего маршрута -->
+                        <div class="card bg-black border-secondary rounded-0 p-2 d-flex flex-row justify-content-between align-items-center">
+                            <div class="small text-light">
+                                <span class="text-secondary">Текущий выход маршрута:</span> 
+                                <strong :class="currentPathResult.valid ? 'text-success' : 'text-danger'" class="ms-1 fs-6">
+                                    <span v-text="currentPathResult.summary"></span>
+                                </strong>
+                            </div>
+                            <div class="small text-secondary">
+                                Длина пути: <span class="text-warning fw-bold" v-text="currentPathResult.path.length"></span> узлов
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+<script is:inline>
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    // Спецификация 4 целевых серверных стоек
+    const TARGET_SERVERS = [
+        {
+            id: 0,
+            name: 'ВЕБ-КЛАСТЕР',
+            badge: 'HTTP:80 / HTTPS:443',
+            badgeClass: 'bg-primary text-white',
+            desc: 'Веб-сайты, порталы, энциклопедии, домены .ru/.edu.ru'
+        },
+        {
+            id: 1,
+            name: 'FTP-АРХИВ',
+            badge: 'FTP:21',
+            badgeClass: 'bg-info text-dark',
+            desc: 'Файловые серверы, скачивание дистрибутивов и архивов'
+        },
+        {
+            id: 2,
+            name: 'DNS-РЕЗОЛВЕР',
+            badge: 'DNS:53',
+            badgeClass: 'bg-warning text-dark',
+            desc: 'Преобразование символьных имен в числовые IP'
+        },
+        {
+            id: 3,
+            name: 'SINKHOLE / ФАЕРВОЛ',
+            badge: 'DROP / ИЗОЛЯЦИЯ',
+            badgeClass: 'bg-danger text-white',
+            desc: 'Октеты > 255, конфликты портов, пиратство (ст. 146 УК РФ)'
+        }
+    ];
+
+    // Банк процедурных сценариев пакетов для 10 волн
+    const SCENARIOS_POOL = [
+        {
+            title: 'HTTPS-запрос к школьному порталу',
+            protocol: 'https://',
+            host: 'school-collection.edu.ru',
+            port: 443,
+            ip: '77.88.55.242',
+            isIpBad: false,
+            flag: null,
+            targetRow: 0,
+            instruction: 'Легитимный защищенный веб-трафик по стандартному порту 443. Маршрутизируйте в ВЕБ-КЛАСТЕР.'
+        },
+        {
+            title: 'Загрузка файла с архива ОГЭ/ЕГЭ',
+            protocol: 'ftp://',
+            host: 'archive.fipi.ru',
+            port: 21,
+            ip: '192.168.0.15',
+            isIpBad: false,
+            flag: null,
+            targetRow: 1,
+            instruction: 'Служба передачи файлов FTP по стандартному порту 21. Направьте в FTP-АРХИВ.'
+        },
+        {
+            title: 'Запрос преобразования домена DNS',
+            protocol: 'dns://',
+            host: 'ns1.yandex.ru',
+            port: 53,
+            ip: '77.88.21.11',
+            isIpBad: false,
+            flag: null,
+            targetRow: 2,
+            instruction: 'Служебный запрос резолвинга символьного имени в IP-адрес. Направьте в DNS-РЕЗОЛВЕР.'
+        },
+        {
+            title: 'Аномалия: недопустимый октет IPv4',
+            protocol: 'http://',
+            host: 'gateway.net',
+            port: 80,
+            ip: '192.168.312.45',
+            isIpBad: true,
+            flag: 'КРИТИЧЕСКИЙ СБОЙ: октет 312 > 255!',
+            targetRow: 3,
+            instruction: 'Октет 312 нарушает стандарт IPv4 (допустимо строго 0-255). Немедленно изолируйте в SINKHOLE!'
+        },
+        {
+            title: 'HTTP-обращение к образовательному сайту',
+            protocol: 'http://',
+            host: 'kpolyakov.spb.ru',
+            port: 80,
+            ip: '213.180.204.1',
+            isIpBad: false,
+            flag: null,
+            targetRow: 0,
+            instruction: 'Стандартный веб-запрос по открытому протоколу HTTP (порт 80). Маршрутизируйте в ВЕБ-КЛАСТЕР.'
+        },
+        {
+            title: 'Конфликт протокола и порта',
+            protocol: 'http://',
+            host: 'fake-bank.ru',
+            port: 21,
+            ip: '10.0.4.15',
+            isIpBad: false,
+            flag: 'СЕТЕВАЯ АНОМАЛИЯ: веб-протокол на порт FTP!',
+            targetRow: 3,
+            instruction: 'Попытка туннелирования HTTP через порт 21 (FTP). Потенциальная атака, сбросьте в SINKHOLE!'
+        },
+        {
+            title: 'Резервное копирование базы школы',
+            protocol: 'ftp://',
+            host: 'backup.school.org',
+            port: 21,
+            ip: '172.16.0.88',
+            isIpBad: false,
+            flag: null,
+            targetRow: 1,
+            instruction: 'Передача системного архива резервной копии. Маршрутизируйте в FTP-АРХИВ.'
+        },
+        {
+            title: 'Торрент-трафик: пиратский медиафайл',
+            protocol: 'p2p://',
+            host: 'pirate-warez.org',
+            port: 6881,
+            ip: '85.112.4.99',
+            isIpBad: false,
+            flag: 'НАРУШЕНИЕ ЗАКОНА: плагиат и пиратство (ст. 146 УК РФ)!',
+            targetRow: 3,
+            instruction: 'Трафик грубо нарушает авторские права (статья 146 УК РФ). Немедленно перенаправьте в SINKHOLE!'
+        },
+        {
+            title: 'Корневой DNS-запрос зоны .RU',
+            protocol: 'dns://',
+            host: 'a.dns.ripn.net',
+            port: 53,
+            ip: '193.0.14.129',
+            isIpBad: false,
+            flag: null,
+            targetRow: 2,
+            instruction: 'Системный запрос к корневому серверу имен доменной зоны .RU. Направьте в DNS-РЕЗОЛВЕР.'
+        },
+        {
+            title: 'Поддельный пакет с переполнением байта',
+            protocol: 'https://',
+            host: 'secure-portal.ru',
+            port: 443,
+            ip: '10.290.1.1',
+            isIpBad: true,
+            flag: 'КРИТИЧЕСКИЙ СБОЙ: октет 290 > 255!',
+            targetRow: 3,
+            instruction: 'Спуфинг-пакет с недействительным IP-адресом (октет 290 > 255). Изолируйте в SINKHOLE!'
+        },
+        {
+            title: 'Запрос к сайту Кремля на кириллице',
+            protocol: 'https://',
+            host: 'президент.рф',
+            port: 443,
+            ip: '95.173.136.70',
+            isIpBad: false,
+            flag: null,
+            targetRow: 0,
+            instruction: 'Обращение к кириллическому домену верхнего уровня .рф по порту 443. Направьте в ВЕБ-КЛАСТЕР.'
+        },
+        {
+            title: 'Библиотечный каталог учебников',
+            protocol: 'ftp://',
+            host: 'books.edu.ru',
+            port: 21,
+            ip: '194.226.120.3',
+            isIpBad: false,
+            flag: null,
+            targetRow: 1,
+            instruction: 'Запрос на загрузку учебных пособий по протоколу передачи файлов. Направьте в FTP-АРХИВ.'
+        }
+    ];
+
+    createApp({
+        setup() {
+            const started = ref(false);
+            const completed = ref(false);
+            const alarmActive = ref(false);
+            const alarmMessage = ref('');
+
+            const waves = ref([]);
+            const currentWaveIndex = ref(0);
+
+            // Сетка роутеров 4 строки x 3 столбца
+            // Направления: 'RIGHT', 'DOWN', 'UP'
+            const grid = ref([
+                ['RIGHT', 'RIGHT', 'RIGHT'],
+                ['RIGHT', 'RIGHT', 'RIGHT'],
+                ['RIGHT', 'RIGHT', 'RIGHT'],
+                ['RIGHT', 'RIGHT', 'RIGHT']
+            ]);
+
+            // Таймер волны (в секундах)
+            const waveTimeLimit = ref(6.0);
+            const timeLeft = ref(6.0);
+            let timerInterval = null;
+
+            const currentWave = computed(() => {
+                return waves.value[currentWaveIndex.value] || {};
+            });
+
+            const timerPercent = computed(() => {
+                if (waveTimeLimit.value <= 0) return 0;
+                return Math.max(0, Math.min(100, (timeLeft.value / waveTimeLimit.value) * 100));
+            });
+
+            // Расчет текущего пути от точки входа
+            const currentPathResult = computed(() => {
+                if (!started.value || waves.value.length === 0) {
+                    return { valid: false, exitRow: null, path: [], summary: 'МАТРИЦА НЕ АКТИВНА' };
+                }
+
+                const entryRow = currentWave.value.entryRow;
+                let r = entryRow;
+                let c = 0;
+                const path = [];
+                const visited = new Set();
+
+                while (true) {
+                    const key = `${r},${c}`;
+                    if (visited.has(key)) {
+                        return { valid: false, exitRow: null, path, summary: 'ЗАМКНУТЫЙ ЦИКЛ МАРШРУТИЗАЦИИ!' };
+                    }
+                    visited.add(key);
+                    path.push({ r, c });
+
+                    const dir = grid.value[r][c];
+
+                    if (dir === 'RIGHT') {
+                        c++;
+                        if (c === 3) {
+                            // Успешный выход справа в строку r!
+                            const server = TARGET_SERVERS[r];
+                            const isCorrect = (r === currentWave.value.targetRow);
+                            return {
+                                valid: isCorrect,
+                                exitRow: r,
+                                path,
+                                summary: isCorrect 
+                                    ? `ВЫХОД: [${server.name}] (ВЕРНО)` 
+                                    : `ВЫХОД: [${server.name}] (ОШИБКА НАЗНАЧЕНИЯ)`
+                            };
+                        }
+                    } else if (dir === 'DOWN') {
+                        r++;
+                        if (r > 3) {
+                            return { valid: false, exitRow: null, path, summary: 'ОБРЫВ КАБЕЛЯ ВНИЗУ (ТУПИК)' };
+                        }
+                    } else if (dir === 'UP') {
+                        r--;
+                        if (r < 0) {
+                            return { valid: false, exitRow: null, path, summary: 'ОБРЫВ КАБЕЛЯ ВВЕРХУ (ТУПИК)' };
+                        }
+                    }
+
+                    if (path.length > 12) {
+                        return { valid: false, exitRow: null, path, summary: 'ПРЕВЫШЕН ЛИМИТ ХОПОВ (TTL)' };
+                    }
+                }
+            });
+
+            function shuffle(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            function generate10Waves() {
+                const shuffledPool = shuffle(SCENARIOS_POOL);
+                const selected = shuffledPool.slice(0, 10);
+
+                // Назначаем каждой волне случайную точку входа (строку 0..3)
+                waves.value = selected.map((item, idx) => {
+                    const entryRow = Math.floor(Math.random() * 4);
+                    return {
+                        ...item,
+                        waveNumber: idx + 1,
+                        entryRow: entryRow
+                    };
+                });
+
+                currentWaveIndex.value = 0;
+                resetGridDirections();
+                updateTestState();
+            }
+
+            function resetGridDirections() {
+                // Инициализируем сетку разнообразными направлениями
+                const dirs = ['RIGHT', 'DOWN', 'UP'];
+                const newGrid = [];
+                for (let r = 0; r < 4; r++) {
+                    const row = [];
+                    for (let c = 0; c < 3; c++) {
+                        row.push(dirs[Math.floor(Math.random() * dirs.length)]);
+                    }
+                    newGrid.push(row);
+                }
+                grid.value = newGrid;
+            }
+
+            function updateTestState() {
+                window.__DEV_LEVEL3_STATE__ = {
+                    started: started.value,
+                    completed: completed.value,
+                    currentWaveIndex: currentWaveIndex.value,
+                    currentWave: currentWave.value,
+                    grid: grid.value,
+                    currentPathResult: currentPathResult.value,
+                    // Хелпер для быстрого авто-решения волны в тестах
+                    solveCurrentWave: () => {
+                        const targetRow = currentWave.value.targetRow;
+                        const entryRow = currentWave.value.entryRow;
+
+                        // Сбрасываем всю сетку в RIGHT
+                        for (let r = 0; r < 4; r++) {
+                            for (let c = 0; c < 3; c++) {
+                                grid.value[r][c] = 'RIGHT';
+                            }
+                        }
+
+                        if (entryRow === targetRow) {
+                            // Уже прямая линия на целевой сервер
+                        } else if (entryRow < targetRow) {
+                            // Двигаемся вниз в первой колонке
+                            for (let r = entryRow; r < targetRow; r++) {
+                                grid.value[r][0] = 'DOWN';
+                            }
+                            grid.value[targetRow][0] = 'RIGHT';
+                            grid.value[targetRow][1] = 'RIGHT';
+                            grid.value[targetRow][2] = 'RIGHT';
+                        } else {
+                            // Двигаемся вверх в первой колонке
+                            for (let r = entryRow; r > targetRow; r--) {
+                                grid.value[r][0] = 'UP';
+                            }
+                            grid.value[targetRow][0] = 'RIGHT';
+                            grid.value[targetRow][1] = 'RIGHT';
+                            grid.value[targetRow][2] = 'RIGHT';
+                        }
+                    }
+                };
+            }
+
+            function rotateNode(r, c) {
+                if (!started.value || completed.value || alarmActive.value) return;
+
+                const cur = grid.value[r][c];
+                if (cur === 'RIGHT') grid.value[r][c] = 'DOWN';
+                else if (cur === 'DOWN') grid.value[r][c] = 'UP';
+                else grid.value[r][c] = 'RIGHT';
+
+                updateTestState();
+            }
+
+            function getDirectionArrow(dir) {
+                if (dir === 'RIGHT') return '➔';
+                if (dir === 'DOWN') return '⬇';
+                return '⬆';
+            }
+
+            function getDirectionLabel(dir) {
+                if (dir === 'RIGHT') return 'ВПРАВО';
+                if (dir === 'DOWN') return 'ВНИЗ';
+                return 'ВВЕРХ';
+            }
+
+            function getNodeClass(r, c) {
+                const inPath = currentPathResult.value.path.some(p => p.r === r && p.c === c);
+                if (inPath) {
+                    return currentPathResult.value.valid 
+                        ? 'btn-success text-black border-success fw-bold shadow' 
+                        : 'btn-danger text-black border-danger fw-bold shadow';
+                }
+                return 'btn-outline-danger text-light bg-black';
+            }
+
+            function getTargetServerClass(r) {
+                const isExit = (currentPathResult.value.exitRow === r);
+                const isTarget = (currentWave.value && currentWave.value.targetRow === r);
+
+                if (isExit) {
+                    return currentPathResult.value.valid
+                        ? 'bg-success text-black border-success shadow-lg'
+                        : 'bg-danger text-black border-danger shadow-lg';
+                }
+                if (isTarget) {
+                    return 'bg-black text-warning border-warning';
+                }
+                return 'bg-black text-secondary border-secondary opacity-50';
+            }
+
+            // Телеметрия
+            const startTime = new Date();
+            let attempts = 0;
+            const missionName = 'Урок 7 :: Компьютерные сети. Поиск информации в сети Интернет (Уровень 3)';
+
+            function sendTelemetry(action_type, status, success) {
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: action_type,
+                    status: status,
+                    start_time: startTime.toISOString(),
+                    time_spent_sec: Math.floor((new Date() - startTime) / 1000),
+                    attempts_count: attempts,
+                    success: success
+                }, '*');
+            }
+
+            function startTimer() {
+                clearInterval(timerInterval);
+                // Таймер ужесточается с каждой волной: с 6.5 сек на 1-й до 4.0 сек на 10-й
+                const calculatedLimit = Math.max(3.8, 6.5 - (currentWaveIndex.value * 0.28));
+                waveTimeLimit.value = calculatedLimit;
+                timeLeft.value = calculatedLimit;
+
+                timerInterval = setInterval(() => {
+                    timeLeft.value = Math.max(0, timeLeft.value - 0.1);
+                    if (timeLeft.value <= 0.05) {
+                        clearInterval(timerInterval);
+                        dispatchPacket(); // Автоматический пуск при истечении времени
+                    }
+                }, 100);
+            }
+
+            function handleHardcoreFailure(msg) {
+                attempts++;
+                clearInterval(timerInterval);
+                alarmMessage.value = msg;
+                alarmActive.value = true;
+
+                // Тотальный сброс телеметрии
+                sendTelemetry('hardcore_reset', 'in_progress', false);
+
+                setTimeout(() => {
+                    alarmActive.value = false;
+                    generate10Waves();
+                    startTimer();
+                }, 1800);
+            }
+
+            function dispatchPacket() {
+                if (!started.value || completed.value || alarmActive.value) return;
+
+                const result = currentPathResult.value;
+
+                if (result.valid) {
+                    // Пакет успешно доставлен в правильный целевой терминал!
+                    if (currentWaveIndex.value < waves.value.length - 1) {
+                        currentWaveIndex.value++;
+                        resetGridDirections();
+                        updateTestState();
+                        startTimer();
+                    } else {
+                        // Все 10 волн успешно завершены!
+                        clearInterval(timerInterval);
+                        completed.value = true;
+                        updateTestState();
+                        sendTelemetry('level_complete', 'completed', true);
+                    }
+                } else {
+                    // Ошибка маршрутизации: либо не тот сервер, либо тупик/обрыв
+                    let failReason = result.summary;
+                    if (result.exitRow !== null) {
+                        const targetName = TARGET_SERVERS[currentWave.value.targetRow].name;
+                        const gotName = TARGET_SERVERS[result.exitRow].name;
+                        failReason = `Пакет доставлен в [${gotName}], но требовался терминал [${targetName}]!`;
+                    }
+                    handleHardcoreFailure(failReason);
+                }
+            }
+
+            function startGame() {
+                started.value = true;
+                completed.value = false;
+                alarmActive.value = false;
+                sendTelemetry('in_progress', 'in_progress', false);
+                generate10Waves();
+                startTimer();
+            }
+
+            function handleKeyDown(e) {
+                if (!started.value && e.key === 'Enter') {
+                    startGame();
+                    return;
+                }
+                if (started.value && !completed.value && !alarmActive.value) {
+                    if (e.code === 'Space' || e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        dispatchPacket();
+                    }
+                }
+            }
+
+            onMounted(() => {
+                window.addEventListener('keydown', handleKeyDown);
+                updateTestState();
+            });
+
+            onUnmounted(() => {
+                clearInterval(timerInterval);
+                window.removeEventListener('keydown', handleKeyDown);
+            });
+
+            return {
+                started,
+                completed,
+                alarmActive,
+                alarmMessage,
+                waves,
+                currentWaveIndex,
+                currentWave,
+                grid,
+                waveTimeLimit,
+                timeLeft,
+                timerPercent,
+                TARGET_SERVERS,
+                currentPathResult,
+                rotateNode,
+                getDirectionArrow,
+                getDirectionLabel,
+                getNodeClass,
+                getTargetServerClass,
+                dispatchPacket,
+                startGame
+            };
+        }
+    }).mount('#app');
+</script>
