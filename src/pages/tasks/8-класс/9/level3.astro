@@ -1,0 +1,508 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 8 класс, Урок 9 — Определение истинности составного высказывания
+// Архетип: Гибрид Архетипа 3 («Logic Pulse Runner / Circuit Overdrive») и Архетипа 2 («Packet Flow Router / Data Pipelines»)
+// 10 процедурных волн, динамический таймер (7.0с -> 4.3с), 3-каскадная пространственная коммутация импульса + форсаж [ПРОБЕЛ / Enter].
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ АРКАДНОГО БОССА) -->
+        <div v-if="gameState === 'intro'" id="intro-screen" class="card bg-dark border-danger rounded-0 p-3 p-md-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 gap-2">
+                <h2 class="h4 text-danger mb-0 fw-bold">⚡ LOGIC PULSE RUNNER // CIRCUIT OVERDRIVE</h2>
+                <span class="badge bg-danger text-dark rounded-0 fw-bold px-3 py-2">АРКАДНЫЙ БОСС // УРОВЕНЬ 3</span>
+            </div>
+
+            <p class="text-light mb-3">
+                По шине логического сопроцессора со сверхвысокой скоростью движется световой импульс данных.
+                На каждой из <strong class="text-danger">10 волн</strong> вам необходимо успеть переключить
+                <strong>3 каскадных узла коммутационной матрицы</strong> (входные вентили <code class="text-info">P</code>, <code class="text-info">Q</code> и магистральный шлюз <code class="text-warning">F</code>)
+                и нажать <strong>ФОРСАЖ ИМПУЛЬСА</strong> до того, как бегущий фронт сигнала столкнется с неверно настроенным шлюзом!
+            </p>
+
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light py-2">
+                <div class="fw-bold text-danger mb-1">[ПРОТОКОЛ СКОРОСТНОЙ МАГИСТРАЛИ — HARDCORE MODE]:</div>
+                <ul class="mb-0 ps-3 small">
+                    <li class="mb-1"><strong>Пространственная коммутация 3 узлов:</strong> вычислите истинность левого предиката <code>P</code> (Узел 1), правого предиката <code>Q</code> (Узел 2) и результирующего выхода <code>F</code> (Узел 3).</li>
+                    <li class="mb-1"><strong>Динамический таймер волны:</strong> время прохождения импульса сжимается от <span class="text-warning fw-bold">7.0 сек</span> на 1-й волне до <span class="text-danger fw-bold">4.3 сек</span> на 10-й волне.</li>
+                    <li class="mb-1"><strong>Форсаж импульса:</strong> клавиши <kbd class="bg-dark text-warning border border-warning">ПРОБЕЛ</kbd> или <kbd class="bg-dark text-warning border border-warning">Enter</kbd> мгновенно пускают импульс через выставленные шлюзы.</li>
+                    <li><strong>Тотальный сброс (Hardcore Reset):</strong> любая ошибка в любом из 3 вентилей или истечение таймера вызывает короткое замыкание и <strong>полный сброс прогресса на Волну 1</strong>!</li>
+                </ul>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="text-secondary small">
+                    Горячие клавиши: <kbd class="bg-black text-info border border-secondary">1</kbd> — Узел P,
+                    <kbd class="bg-black text-info border border-secondary">2</kbd> — Узел Q,
+                    <kbd class="bg-black text-warning border border-secondary">3</kbd> — Шлюз F,
+                    <kbd class="bg-black text-success border border-secondary">Space / Enter</kbd> — Форсаж
+                </div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger rounded-0 fw-bold px-4 py-2">
+                    ЗАПУСТИТЬ ГЕНЕРАТОР ИМПУЛЬСА [ENTER]
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. ИГРОВОЙ ЭКРАН (КОММУТАЦИОННАЯ МАТРИЦА И БЕГУЩИЙ ИМПУЛЬС) -->
+        <div v-else-if="gameState === 'playing'" id="game-screen" class="card bg-dark border-danger rounded-0 p-3 p-md-4">
+
+            <!-- Верхняя панель: Волна, Таймер, Бегущий световой импульс -->
+            <div class="row g-2 align-items-center border-bottom border-secondary pb-2 mb-3">
+                <div class="col-12 col-md-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-secondary small">МАГИСТРАЛЬ СОПРОЦЕССОРА:</span>
+                        <span id="wave-indicator" class="badge bg-danger text-dark rounded-0 fs-6 fw-bold">
+                            ВОЛНА <span v-text="currentWave + 1"></span> / 10
+                        </span>
+                    </div>
+                    <div class="progress bg-black border border-secondary rounded-0">
+                        <div class="progress-bar bg-danger" :style="{ width: ((currentWave) * 10) + '%' }"></div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 text-center">
+                    <div class="text-secondary small">СБРОСОВ СХЕМЫ: <span id="attempts-counter" class="text-warning fw-bold" v-text="attempts"></span></div>
+                    <div class="small text-info" v-text="waveData.categoryName"></div>
+                </div>
+
+                <div class="col-12 col-md-4 text-md-end">
+                    <div class="d-flex justify-content-between justify-content-md-end align-items-center gap-2 mb-1">
+                        <span class="text-secondary small">ДО СТОЛКНОВЕНИЯ ФРОНТА:</span>
+                        <span id="timer-display" :class="phaseTimeLeft <= 2.2 ? 'text-danger' : 'text-warning'" class="fs-5 fw-bold">
+                            <span v-text="phaseTimeLeft.toFixed(1)"></span> с
+                        </span>
+                    </div>
+                    <div class="progress bg-black border border-secondary rounded-0">
+                        <div class="progress-bar" :class="phaseTimeLeft <= 2.2 ? 'bg-danger' : 'bg-warning'" :style="{ width: timerPercent + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сирена короткого замыкания (Hardcore Reset) -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black border-danger rounded-0 text-center py-2 mb-3" role="alert">
+                <div class="fw-bold text-danger">[КОРОТКОЕ ЗАМЫКАНИЕ ШИНЫ // HARDCORE RESET]</div>
+                <div class="text-light small" v-text="alarmReason"></div>
+                <div class="text-warning small">Сброс магистрали на Волну 1 и перегенерация контуров...</div>
+            </div>
+
+            <!-- Визуальная трасса бегущего логического импульса -->
+            <div class="card bg-black border-info rounded-0 p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center small mb-1">
+                    <span class="text-info fw-bold">⚡ ФРОНТ СВЕТОВОГО ИМПУЛЬСА НА ШИНЕ ДАННЫХ:</span>
+                    <span class="text-warning fw-bold" v-text="pulseProgress + '% ТРАССЫ'"></span>
+                </div>
+                <div class="progress bg-dark border border-info rounded-0">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" :style="{ width: pulseProgress + '%' }"></div>
+                </div>
+            </div>
+
+            <!-- Входной пакет данных и полное составное правило -->
+            <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-md-4 border-bottom border-md-bottom-0 border-secondary pb-2 pb-md-0">
+                        <div class="text-secondary small">ВХОДНОЙ ПАКЕТ ДАННЫХ:</div>
+                        <div id="packet-payload" class="fs-4 text-info fw-bold" v-text="waveData.payloadText"></div>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <div class="text-secondary small">СОСТАВНОЕ ПРАВИЛО МАРШРУТИЗАЦИИ F:</div>
+                        <div id="packet-formula" class="fs-5 text-warning fw-bold" v-text="waveData.fullFormula"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Пространственная матрица 3 каскадных вентилей (P, Q -> F) -->
+            <div class="row g-3 mb-3 align-items-stretch">
+
+                <!-- УЗЕЛ 1: Вентиль P -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between"
+                         :class="nodeP === 1 ? 'border-success' : 'border-secondary'">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-info text-dark rounded-0">УЗЕЛ 1 (ВЕНТИЛЬ P)</span>
+                                <span class="text-secondary small">Клавиша [1]</span>
+                            </div>
+                            <div class="text-light fw-bold mb-3" v-text="waveData.condPText"></div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-p"
+                                @click="toggleNode('P')"
+                                :disabled="alarmActive"
+                                :data-val="nodeP"
+                                :data-expected-p="waveData.expectedP"
+                                class="btn rounded-0 w-100 py-2 fs-5 fw-bold"
+                                :class="nodeP === 1 ? 'btn-success text-dark' : 'btn-outline-secondary text-light'">
+                            P = <span v-text="nodeP"></span> (<span v-text="nodeP === 1 ? 'ИСТИНА' : 'ЛОЖЬ'"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ 2: Вентиль Q -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between"
+                         :class="nodeQ === 1 ? 'border-success' : 'border-secondary'">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-info text-dark rounded-0">УЗЕЛ 2 (ВЕНТИЛЬ Q)</span>
+                                <span class="text-secondary small">Клавиша [2]</span>
+                            </div>
+                            <div class="text-light fw-bold mb-3" v-text="waveData.condQText"></div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-q"
+                                @click="toggleNode('Q')"
+                                :disabled="alarmActive"
+                                :data-val="nodeQ"
+                                :data-expected-q="waveData.expectedQ"
+                                class="btn rounded-0 w-100 py-2 fs-5 fw-bold"
+                                :class="nodeQ === 1 ? 'btn-success text-dark' : 'btn-outline-secondary text-light'">
+                            Q = <span v-text="nodeQ"></span> (<span v-text="nodeQ === 1 ? 'ИСТИНА' : 'ЛОЖЬ'"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ 3: Магистральный выходной шлюз F -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between"
+                         :class="nodeF === 1 ? 'border-warning' : 'border-danger'">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-warning text-dark rounded-0">УЗЕЛ 3 (ВЫХОДНОЙ ШЛЮЗ F)</span>
+                                <span class="text-secondary small">Клавиша [3]</span>
+                            </div>
+                            <div class="text-warning fw-bold mb-3" v-text="waveData.combineText"></div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-f"
+                                @click="toggleNode('F')"
+                                :disabled="alarmActive"
+                                :data-val="nodeF"
+                                :data-expected-f="waveData.expectedF"
+                                class="btn rounded-0 w-100 py-2 fs-5 fw-bold"
+                                :class="nodeF === 1 ? 'btn-warning text-dark' : 'btn-outline-danger text-light'">
+                            F = <span v-text="nodeF"></span> (<span v-text="nodeF === 1 ? 'ПРОПУСК 1' : 'БЛОК 0'"></span>)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопка ФОРСАЖ ИМПУЛЬСА -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top border-secondary">
+                <div class="text-secondary small">
+                    Настройте все 3 узла (<code class="text-info">P</code>, <code class="text-info">Q</code>, <code class="text-warning">F</code>) и активируйте пуск импульса!
+                </div>
+                <button type="button"
+                        id="btn-boost"
+                        @click="firePulse"
+                        :disabled="alarmActive"
+                        class="btn btn-outline-success rounded-0 fw-bold px-4 py-2">
+                    ⚡ ФОРСАЖ ИМПУЛЬСА [ПРОБЕЛ / ENTER]
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. ЭКРАН ПОБЕДЫ (10/10 ВОЛН ПРОЙДЕНЫ) -->
+        <div v-else-if="gameState === 'success'" id="success-screen" class="card bg-dark border-success rounded-0 p-4 text-center py-5">
+            <div class="display-4 text-success mb-2">⚡ МАГИСТРАЛЬ СИНХРОНИЗИРОВАНА</div>
+            <h3 class="text-light mb-3">Все 10 скоростных волн логического импульса пройдены без ошибок!</h3>
+            <p class="text-secondary mx-auto mb-4">
+                Вы довели до автоматизма оценку истинности составных высказываний, инверсию строгих и нестрогих неравенств, законы де Моргана и скоростную коммутацию вентилей.
+            </p>
+            <div class="d-inline-block border border-success bg-black p-3 text-start small mx-auto mb-3">
+                <div>СТАТУС МИССИИ: <span class="text-success fw-bold">УРОВЕНЬ 3 ЗАВЕРШЕН (10 / 10)</span></div>
+                <div>АВАРИЙНЫХ СБРОСОВ: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+            </div>
+            <div>
+                <button type="button" @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2">
+                    ПОВТОРИТЬ ЗАБЕГ
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const missionName = 'Урок 9 :: Определение истинности составного высказывания (Уровень 3)';
+        const startTime = Date.now();
+        let attemptsCount = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attemptsCount,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function isVowel(ch) {
+            return 'аеёиоуыэюя'.includes(ch.toLowerCase());
+        }
+
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const gameState = ref('intro');
+                const currentWave = ref(0);
+                const phaseTimeLeft = ref(7.0);
+                const waveMaxTime = ref(7.0);
+                const attempts = ref(0);
+                const alarmActive = ref(false);
+                const alarmReason = ref('');
+
+                const nodeP = ref(0);
+                const nodeQ = ref(0);
+                const nodeF = ref(0);
+
+                const waveData = ref({
+                    categoryName: '',
+                    payloadText: '',
+                    fullFormula: '',
+                    condPText: '',
+                    condQText: '',
+                    combineText: '',
+                    expectedP: 0,
+                    expectedQ: 0,
+                    expectedF: 0
+                });
+
+                let timerId = null;
+                let resetTimeoutId = null;
+
+                const timerPercent = computed(() => {
+                    if (waveMaxTime.value <= 0) return 0;
+                    return Math.max(0, Math.min(100, (phaseTimeLeft.value / waveMaxTime.value) * 100));
+                });
+
+                const pulseProgress = computed(() => {
+                    if (waveMaxTime.value <= 0) return 100;
+                    const elapsed = waveMaxTime.value - phaseTimeLeft.value;
+                    return Math.max(0, Math.min(100, Math.round((elapsed / waveMaxTime.value) * 100)));
+                });
+
+                function generateWave(waveIdx) {
+                    nodeP.value = 0;
+                    nodeQ.value = 0;
+                    nodeF.value = 0;
+
+                    // Динамическое сжатие таймера от 7.0с на 1-й волне до 4.3с на 10-й волне
+                    const limit = Number((7.0 - waveIdx * 0.3).toFixed(1));
+                    waveMaxTime.value = limit;
+                    phaseTimeLeft.value = limit;
+
+                    const mode = waveIdx % 3;
+
+                    if (mode === 0) {
+                        // Категория 1: Числовые неравенства с отрицанием НЕ и четностью
+                        const a = rnd(10, 30);
+                        const x = a + rnd(-3, 4);
+                        const strictLeft = rnd(0, 1) === 1;
+                        const useOr = rnd(0, 1) === 1;
+
+                        const condPText = strictLeft ? `P: НЕ (x < ${a})` : `P: НЕ (x ≤ ${a})`;
+                        const pVal = strictLeft ? (!(x < a) ? 1 : 0) : (!(x <= a) ? 1 : 0);
+
+                        const checkEven = rnd(0, 1) === 1;
+                        const condQText = checkEven ? 'Q: (x четное)' : 'Q: НЕ (x четное)';
+                        const qVal = checkEven ? (x % 2 === 0 ? 1 : 0) : (x % 2 !== 0 ? 1 : 0);
+
+                        const combineText = useOr ? 'F = P ИЛИ Q (Дизъюнкция)' : 'F = P И Q (Конъюнкция)';
+                        const fVal = useOr ? ((pVal || qVal) ? 1 : 0) : ((pVal && qVal) ? 1 : 0);
+
+                        waveData.value = {
+                            categoryName: 'Сектор АЛУ: Числовая ось и границы',
+                            payloadText: `x = ${x}`,
+                            fullFormula: `${condPText.slice(3)} ${useOr ? 'ИЛИ' : 'И'} ${condQText.slice(3)}`,
+                            condPText,
+                            condQText,
+                            combineText,
+                            expectedP: pVal,
+                            expectedQ: qVal,
+                            expectedF: fVal
+                        };
+                    } else if (mode === 1) {
+                        // Категория 2: Символьные строки и слова (ОГЭ / Поляков)
+                        const words = ['Никита', 'Михаил', 'Емеля', 'Иван', 'Марина', 'Сервер', 'Модем', 'Сканер', 'Принтер', 'Полина'];
+                        const word = words[rnd(0, words.length - 1)];
+                        const useOr = rnd(0, 1) === 1;
+
+                        const pVal = !isVowel(word[0]) ? 1 : 0;
+                        const qVal = isVowel(word[word.length - 1]) ? 1 : 0;
+                        const fVal = useOr ? ((pVal || qVal) ? 1 : 0) : ((pVal && qVal) ? 1 : 0);
+
+                        waveData.value = {
+                            categoryName: 'Сектор Лексем: Анализ символьных цепочек',
+                            payloadText: `Слово: "${word}"`,
+                            fullFormula: `НЕ (Первая буква гласная) ${useOr ? 'ИЛИ' : 'И'} НЕ (Последняя буква согласная)`,
+                            condPText: 'P: НЕ (Первая буква гласная)',
+                            condQText: 'Q: НЕ (Последняя буква согласная)',
+                            combineText: useOr ? 'F = P ИЛИ Q (Дизъюнкция)' : 'F = P И Q (Конъюнкция)',
+                            expectedP: pVal,
+                            expectedQ: qVal,
+                            expectedF: fVal
+                        };
+                    } else {
+                        // Категория 3: Закон де Моргана (общее отрицание над скобкой)
+                        const a = rnd(8, 22);
+                        const b = rnd(a + 5, 34);
+                        const x = rnd(a - 2, b + 2);
+                        const innerOr = rnd(0, 1) === 1;
+
+                        const pVal = (x < a) ? 1 : 0;
+                        const qVal = (x > b) ? 1 : 0;
+                        const fVal = innerOr ? (!((pVal === 1) || (qVal === 1)) ? 1 : 0) : (!((pVal === 1) && (qVal === 1)) ? 1 : 0);
+
+                        waveData.value = {
+                            categoryName: 'Сектор де Моргана: Инверсия скобки',
+                            payloadText: `x = ${x}`,
+                            fullFormula: `НЕ ((x < ${a}) ${innerOr ? 'ИЛИ' : 'И'} (x > ${b}))`,
+                            condPText: `P: (x < ${a})`,
+                            condQText: `Q: (x > ${b})`,
+                            combineText: innerOr ? 'F = НЕ (P ИЛИ Q)' : 'F = НЕ (P И Q)',
+                            expectedP: pVal,
+                            expectedQ: qVal,
+                            expectedF: fVal
+                        };
+                    }
+                }
+
+                function stopTimer() {
+                    if (timerId) {
+                        clearInterval(timerId);
+                        timerId = null;
+                    }
+                }
+
+                function startWaveTimer() {
+                    stopTimer();
+                    timerId = setInterval(() => {
+                        if (alarmActive.value || gameState.value !== 'playing') return;
+                        phaseTimeLeft.value = Math.max(0, Number((phaseTimeLeft.value - 0.1).toFixed(1)));
+                        if (phaseTimeLeft.value <= 0) {
+                            triggerHardcoreReset('Таймер истек! Импульс врезался в некоммутированный шлюз.');
+                        }
+                    }, 100);
+                }
+
+                function triggerHardcoreReset(reason) {
+                    if (alarmActive.value) return;
+                    stopTimer();
+                    alarmActive.value = true;
+                    alarmReason.value = reason;
+                    attempts.value++;
+                    attemptsCount = attempts.value;
+                    sendTelemetry('hardcore_reset', false);
+
+                    resetTimeoutId = setTimeout(() => {
+                        alarmActive.value = false;
+                        currentWave.value = 0;
+                        generateWave(0);
+                        startWaveTimer();
+                    }, 1100);
+                }
+
+                function toggleNode(which) {
+                    if (alarmActive.value || gameState.value !== 'playing') return;
+                    if (which === 'P') nodeP.value = nodeP.value === 1 ? 0 : 1;
+                    else if (which === 'Q') nodeQ.value = nodeQ.value === 1 ? 0 : 1;
+                    else if (which === 'F') nodeF.value = nodeF.value === 1 ? 0 : 1;
+                }
+
+                function firePulse() {
+                    if (alarmActive.value || gameState.value !== 'playing') return;
+
+                    const okP = nodeP.value === waveData.value.expectedP;
+                    const okQ = nodeQ.value === waveData.value.expectedQ;
+                    const okF = nodeF.value === waveData.value.expectedF;
+
+                    if (okP && okQ && okF) {
+                        if (currentWave.value + 1 >= 10) {
+                            stopTimer();
+                            gameState.value = 'success';
+                            sendTelemetry('level_complete', true);
+                        } else {
+                            currentWave.value++;
+                            generateWave(currentWave.value);
+                        }
+                    } else {
+                        triggerHardcoreReset('Ошибка коммутации! Один из вентилей (P, Q или F) выставлен неверно.');
+                    }
+                }
+
+                function startGame() {
+                    if (resetTimeoutId) clearTimeout(resetTimeoutId);
+                    alarmActive.value = false;
+                    currentWave.value = 0;
+                    gameState.value = 'playing';
+                    generateWave(0);
+                    startWaveTimer();
+                }
+
+                function handleKeydown(e) {
+                    if (gameState.value === 'intro' && e.key === 'Enter') {
+                        e.preventDefault();
+                        startGame();
+                        return;
+                    }
+                    if (gameState.value !== 'playing' || alarmActive.value) return;
+
+                    if (e.key === '1') {
+                        e.preventDefault();
+                        toggleNode('P');
+                    } else if (e.key === '2') {
+                        e.preventDefault();
+                        toggleNode('Q');
+                    } else if (e.key === '3') {
+                        e.preventDefault();
+                        toggleNode('F');
+                    } else if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        firePulse();
+                    }
+                }
+
+                onMounted(() => {
+                    window.addEventListener('keydown', handleKeydown);
+                });
+
+                onUnmounted(() => {
+                    stopTimer();
+                    if (resetTimeoutId) clearTimeout(resetTimeoutId);
+                    window.removeEventListener('keydown', handleKeydown);
+                });
+
+                return {
+                    gameState,
+                    currentWave,
+                    phaseTimeLeft,
+                    waveMaxTime,
+                    timerPercent,
+                    pulseProgress,
+                    attempts,
+                    alarmActive,
+                    alarmReason,
+                    nodeP,
+                    nodeQ,
+                    nodeF,
+                    waveData,
+                    startGame,
+                    toggleNode,
+                    firePulse
+                };
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>
