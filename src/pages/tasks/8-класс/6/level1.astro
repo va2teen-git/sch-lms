@@ -3,7 +3,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 ---
 
 <TaskLayout level={1}>
-    <div class="container mt-4">
+    <div class="container-fluid px-2 px-md-3 my-3">
         <h2 class="mb-4">Миссия: Восстановление сервера</h2>
         <div id="game-container" class="card bg-dark border-success">
             <div class="card-body">
@@ -23,7 +23,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <div id="phase2" class="phase-container d-none">
                     <h4 class="text-success">Шаг 2: Права доступа</h4>
                     <p>Требуемый уровень прав (десятичный): <span id="p2-value" class="fw-bold font-monospace fs-4"></span><sub>10</sub></p>
-                    <p>Для команды `chmod` введите права в восьмеричной системе:</p>
+                    <p>Для команды <code class="text-success">chmod</code> введите права в восьмеричной системе:</p>
                     <div class="input-group mb-3">
                         <input type="text" id="p2-input" class="form-control bg-dark text-success border-success rounded-0" autocomplete="off" placeholder="Например: 755">
                         <button id="p2-btn" class="btn btn-outline-success rounded-0">Ввод</button>
@@ -37,7 +37,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <p>Поврежденный байт памяти: <span id="p3-value" class="fw-bold font-monospace fs-4"></span><sub>2</sub></p>
                     <p>Разбейте байт на тетрады и введите значение в шестнадцатеричной системе (2 символа):</p>
                     <div class="input-group mb-3">
-                        <input type="text" id="p3-input" class="form-control bg-dark text-success border-success rounded-0" autocomplete="off" placeholder="Например: B6">
+                        <input type="text" id="p3-input" class="form-control bg-dark text-success border-success rounded-0" autocomplete="off" placeholder="Например: 5C">
                         <button id="p3-btn" class="btn btn-outline-success rounded-0">Ввод</button>
                     </div>
                     <div id="p3-feedback" class="text-danger fw-bold d-none">Сбой контрольной суммы! Выделение нового сектора...</div>
@@ -91,14 +91,22 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('p2-input').value = '';
         }
 
-        // Фаза 3: 2 -> 16
+        // Фаза 3: 2 -> 16 (нижний сегмент байта 16..127 -> 10..7F, без пересечения с Уровнем 2)
         let p3Correct = '';
         function initPhase3() {
-            // Генерируем число от 16 до 255, чтобы в шестнадцатеричной было от 10 до FF
-            const dec = Math.floor(Math.random() * (255 - 16 + 1)) + 16;
+            // Генерируем число от 16 до 127, чтобы в шестнадцатеричной было от 10 до 7F
+            const dec = Math.floor(Math.random() * (127 - 16 + 1)) + 16;
             p3Correct = dec.toString(16).toUpperCase();
             document.getElementById('p3-value').textContent = dec.toString(2).padStart(8, '0');
             document.getElementById('p3-input').value = '';
+        }
+
+        function normalizeAnswer(raw) {
+            return (raw || '')
+                .replace(/\s+/g, '')
+                .toUpperCase()
+                .replace(/^0X/, '')
+                .replace(/^0+(?=[0-9A-F])/, '');
         }
 
         function checkPhase(phaseNum, inputId, btnId, feedbackId, correctVal, nextPhaseId, initFn) {
@@ -106,9 +114,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const btnEl = document.getElementById(btnId);
             const feedbackEl = document.getElementById(feedbackId);
             
-            let userVal = inputEl.value.trim().toUpperCase();
+            let userVal = normalizeAnswer(inputEl.value);
+            let targetVal = normalizeAnswer(correctVal);
             
-            if (userVal === correctVal) {
+            if (userVal === targetVal) {
                 document.getElementById(`phase${phaseNum}`).classList.add('d-none');
                 const nextEl = document.getElementById(nextPhaseId);
                 nextEl.classList.remove('d-none');

@@ -3,7 +3,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 ---
 
 <TaskLayout level={2}>
-    <div class="container mt-4">
+    <div class="container-fluid px-2 px-md-3 my-3">
         <h2 class="mb-4 text-warning">Миссия: Низкоуровневый отладчик</h2>
         <div id="game-container" class="card bg-dark border-warning">
             <div class="card-body">
@@ -23,7 +23,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <div id="phase2" class="phase-container d-none">
                     <h4 class="text-warning">Шаг 2: Байт конфигурации</h4>
                     <p>Система ожидает 8-битный флаг конфигурации. В технической документации указан код: <span id="p2-value" class="fw-bold font-monospace fs-4 text-white"></span><sub>16</sub></p>
-                    <p>Вручную введите строку из 8 бит (нулей и единиц):</p>
+                    <p>Вручную введите двоичное значение этого байта (8 бит или без незначащих нулей слева):</p>
                     <div class="input-group mb-3">
                         <input type="text" id="p2-input" class="form-control bg-dark text-warning border-warning rounded-0" autocomplete="off" placeholder="Например: 11000011">
                         <button id="p2-btn" class="btn btn-outline-warning rounded-0">Ввод</button>
@@ -58,7 +58,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 <!-- Фаза 5 -->
                 <div id="phase5" class="phase-container d-none">
-                    <h4 class="text-warning">Шаг 5: Проверка четности</h4>
+                    <h4 class="text-warning">Шаг 5: Проверка целостности (контрольная сумма)</h4>
                     <p>Для разблокировки загрузчика необходимо сложить три контрольных числа, заданных в восьмеричной системе:</p>
                     <p class="fs-4 text-white"><span id="p5-val1" class="fw-bold font-monospace"></span><sub>8</sub> + <span id="p5-val2" class="fw-bold font-monospace"></span><sub>8</sub> + <span id="p5-val3" class="fw-bold font-monospace"></span><sub>8</sub></p>
                     <p>Вычислите сумму и введите ответ в десятичной системе:</p>
@@ -97,10 +97,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }, '*');
         }
 
-        // Фаза 1: Bin -> Hex
+        // Фаза 1: Bin -> Hex (верхний сегмент байта 128..255 -> 80..FF, без пересечения с Уровнем 1)
         let p1Correct = '';
         function initPhase1() {
-            const dec = Math.floor(Math.random() * (255 - 16 + 1)) + 16;
+            const dec = Math.floor(Math.random() * (255 - 128 + 1)) + 128;
             p1Correct = dec.toString(16).toUpperCase();
             document.getElementById('p1-value').textContent = dec.toString(2).padStart(8, '0');
             document.getElementById('p1-input').value = '';
@@ -148,14 +148,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('p5-input').value = '';
         }
 
+        function normalizeAnswer(raw) {
+            return (raw || '')
+                .replace(/\s+/g, '')
+                .toUpperCase()
+                .replace(/^0X/, '')
+                .replace(/^0+(?=[0-9A-F])/, '');
+        }
+
         function checkPhase(phaseNum, inputId, btnId, feedbackId, correctVal, nextPhaseId, initFn) {
             const inputEl = document.getElementById(inputId);
             const btnEl = document.getElementById(btnId);
             const feedbackEl = document.getElementById(feedbackId);
             
-            let userVal = inputEl.value.trim().toUpperCase();
+            let userVal = normalizeAnswer(inputEl.value);
+            let targetVal = normalizeAnswer(correctVal);
             
-            if (userVal === correctVal) {
+            if (userVal === targetVal) {
                 document.getElementById(`phase${phaseNum}`).classList.add('d-none');
                 const nextEl = document.getElementById(nextPhaseId);
                 nextEl.classList.remove('d-none');

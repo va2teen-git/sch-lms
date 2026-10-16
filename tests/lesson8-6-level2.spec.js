@@ -76,11 +76,11 @@ test.describe('Lesson 8-6 Level 2: Low-Level Debugger', () => {
     // Take screenshot
     await page.screenshot({ path: 'scratch/scr_test_8_6_level2_end.png' });
 
-    // Wait a bit for telemetry to be saved
-    await page.waitForTimeout(1000);
-    
     // Check DB
     const db = new sqlite3('telemetry.db');
+    await expect.poll(() => {
+      return db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' AND mission_name LIKE '%Уровень 2%' ORDER BY id DESC LIMIT 1`).get();
+    }, { timeout: 10000 }).toBeDefined();
     const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' AND mission_name LIKE '%Уровень 2%' ORDER BY id DESC LIMIT 1`).get();
     expect(row).toBeDefined();
     expect(row.success).toBe(1);
@@ -122,11 +122,58 @@ test.describe('Lesson 8-6 Level 2: Low-Level Debugger', () => {
     await frame.locator('#p1-btn').click();
     
     // Check DB for hardcore_reset event
-    await page.waitForTimeout(1000); 
     const db = new sqlite3('telemetry.db');
+    await expect.poll(() => {
+      return db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' AND mission_name LIKE '%Уровень 2%' ORDER BY id DESC LIMIT 1`).get();
+    }, { timeout: 10000 }).toBeDefined();
     const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' AND mission_name LIKE '%Уровень 2%' ORDER BY id DESC LIMIT 1`).get();
     expect(row).toBeDefined();
     expect(row.is_hardcore).toBe(1);
+  });
+
+  test('should accept unpadded binary (without leading zero as in theory.md), spaced tetrads, and verify Phase 5 integrity title', async ({ page }) => {
+    await page.goto('/tasks/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level2');
+    await expect(page.locator('#phase1')).toBeVisible();
+
+    // Phase 1: lowercase hex with 0x prefix
+    const p1Bin = await page.locator('#p1-value').innerText();
+    const p1Hex = parseInt(p1Bin, 2).toString(16).toLowerCase();
+    await page.locator('#p1-input').fill(`0x${p1Hex}`);
+    await page.locator('#p1-btn').click();
+
+    // Phase 2: unpadded binary (no leading zeros) OR spaced tetrads
+    await expect(page.locator('#phase2')).toBeVisible();
+    const p2Hex = await page.locator('#p2-value').innerText();
+    const p2BinUnpadded = parseInt(p2Hex, 16).toString(2); // without padStart(8, '0')
+    await page.locator('#p2-input').fill(p2BinUnpadded);
+    await page.locator('#p2-btn').click();
+
+    // Phase 3: octal with leading zero
+    await expect(page.locator('#phase3')).toBeVisible();
+    const p3Hex = await page.locator('#p3-value').innerText();
+    const p3Oct = parseInt(p3Hex, 16).toString(8);
+    await page.locator('#p3-input').fill(`0${p3Oct}`);
+    await page.locator('#p3-btn').click();
+
+    // Phase 4: Dec - Bin with whitespace
+    await expect(page.locator('#phase4')).toBeVisible();
+    const p4Dec = await page.locator('#p4-val1').innerText();
+    const p4Bin = await page.locator('#p4-val2').innerText();
+    const p4Result = (parseInt(p4Dec, 10) - parseInt(p4Bin, 2)).toString();
+    await page.locator('#p4-input').fill(`  ${p4Result}  `);
+    await page.locator('#p4-btn').click();
+
+    // Phase 5: verify accurate heading ("Проверка целостности") and complete
+    await expect(page.locator('#phase5')).toBeVisible();
+    await expect(page.locator('#phase5 h4')).toContainText('Проверка целостности');
+    const p5o1 = await page.locator('#p5-val1').innerText();
+    const p5o2 = await page.locator('#p5-val2').innerText();
+    const p5o3 = await page.locator('#p5-val3').innerText();
+    const p5Result = (parseInt(p5o1, 8) + parseInt(p5o2, 8) + parseInt(p5o3, 8)).toString();
+    await page.locator('#p5-input').fill(p5Result);
+    await page.locator('#p5-btn').click();
+
+    await expect(page.locator('#success-screen')).toBeVisible();
   });
 
 });

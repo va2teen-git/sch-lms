@@ -58,8 +58,10 @@ test.describe('Lesson 8-6 Level 3: RAID Defragmentation (Vue)', () => {
     await expect(frame.locator('#success-title')).toBeVisible();
     
     // Check DB
-    await page.waitForTimeout(500);
     const db = new sqlite3('telemetry.db');
+    await expect.poll(() => {
+      return db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' AND mission_name LIKE '%Уровень 3%' ORDER BY id DESC LIMIT 1`).get();
+    }, { timeout: 10000 }).toBeDefined();
     const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'level_complete' AND mission_name LIKE '%Уровень 3%' ORDER BY id DESC LIMIT 1`).get();
     expect(row).toBeDefined();
     expect(row.success).toBe(1);
@@ -109,8 +111,10 @@ test.describe('Lesson 8-6 Level 3: RAID Defragmentation (Vue)', () => {
     await wrongCell.click();
     
     // Check DB for hardcore_reset event
-    await page.waitForTimeout(1000); 
     const db = new sqlite3('telemetry.db');
+    await expect.poll(() => {
+      return db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' AND mission_name LIKE '%Уровень 3%' ORDER BY id DESC LIMIT 1`).get();
+    }, { timeout: 10000 }).toBeDefined();
     const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' AND mission_name LIKE '%Уровень 3%' ORDER BY id DESC LIMIT 1`).get();
     expect(row).toBeDefined();
     expect(row.is_hardcore).toBe(1);
@@ -151,5 +155,48 @@ test.describe('Lesson 8-6 Level 3: RAID Defragmentation (Vue)', () => {
     
     // Bonus indicator +10с should be visible
     await expect(frame.locator('text=+10с')).toBeVisible();
+  });
+
+  test('should generate 200 waves with zero duplicate distractor values/strings and exact base conversions', async ({ page }) => {
+    await page.goto('/tasks/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/6/level3');
+    await page.locator('#start-btn').click();
+    await expect(page.locator('#target-value')).toBeVisible();
+
+    const audit = await page.evaluate(() => {
+      const el = document.getElementById('app');
+      const ctx = el.__vue_app__._instance.setupState;
+      let mathErrors = 0;
+      let duplicateValues = 0;
+      let duplicateRawStrings = 0;
+
+      for (let w = 0; w < 200; w++) {
+        const target = ctx.targetDecimal;
+        const cells = ctx.cells;
+        const vals = new Set();
+        const raws = new Set();
+        let correctCount = 0;
+
+        for (const c of cells) {
+          if (parseInt(c.rawValue, c.sys) !== c.value) mathErrors++;
+          if (c.value === target && c.isCorrect) correctCount++;
+          vals.add(c.value);
+          raws.add(c.rawValue);
+        }
+
+        if (correctCount !== 1 || cells.length !== 9) mathErrors++;
+        if (vals.size !== 9) duplicateValues++;
+        if (raws.size !== 9) duplicateRawStrings++;
+
+        ctx.score = 0;
+        const correctCell = cells.find(c => c.isCorrect);
+        ctx.handleCellClick(correctCell);
+      }
+
+      return { mathErrors, duplicateValues, duplicateRawStrings };
+    });
+
+    expect(audit.mathErrors).toBe(0);
+    expect(audit.duplicateValues).toBe(0);
+    expect(audit.duplicateRawStrings).toBe(0);
   });
 });
