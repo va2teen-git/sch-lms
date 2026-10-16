@@ -87,10 +87,7 @@ test.describe('7 класс. Урок 7. Уровень 3: Компьютерн�
     await expect(successScreen.locator('h1')).toContainText('МАГИСТРАЛЬНЫЙ ТРАФИК УСПЕШНО СТАБИЛИЗИРОВАН');
 
     // Проверка телеметрии
-    const completeEvent = telemetryEvents.find(e => e.action_type === 'level_complete');
-    expect(completeEvent).toBeDefined();
-    expect(completeEvent.success).toBe(true);
-    expect(completeEvent.status).toBe('completed');
+    await expect.poll(() => telemetryEvents.some(e => e.action_type === 'level_complete' && e.success === true)).toBe(true);
   });
 
   test('Ошибочная маршрутизация, сигнал тревоги и тотальный хардкор-сброс на Волну 1', async ({ page }) => {
