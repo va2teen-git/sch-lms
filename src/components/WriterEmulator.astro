@@ -3,9 +3,15 @@ export interface Props {
   missionName: string;
   initialHTML?: string;
   hardcoreReset?: boolean;
+  checkOgeFormat?: boolean;
 }
 
-const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.props;
+const { 
+  missionName, 
+  initialHTML = '<p></p>', 
+  hardcoreReset = false,
+  checkOgeFormat = true
+} = Astro.props;
 ---
 <div class="d-flex flex-column h-100 bg-black p-2 rounded-0 user-select-none-header">
     <!-- Оконная панель LibreOffice Writer -->
@@ -32,6 +38,7 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                     <li><a class="dropdown-item" href="#" id="menu-file-new">Создать (Ctrl+N)</a></li>
                     <li><a class="dropdown-item" href="#" id="menu-file-open">Открыть... (Ctrl+O)</a></li>
                     <li><a class="dropdown-item" href="#" id="menu-file-sample">Загрузить пример текста (ОГЭ 13.2)</a></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="menu-file-reset-raw">Сбросить всё (Режим по умолчанию)</a></li>
                     <li><hr class="dropdown-divider my-1"></li>
                     <li><a class="dropdown-item" href="#" id="menu-file-save">Сохранить (Ctrl+S)</a></li>
                     <li><a class="dropdown-item" href="#" id="menu-file-pdf">Экспорт в PDF...</a></li>
@@ -80,6 +87,8 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             <div class="dropdown">
                 <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Формат</div>
                 <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item fw-bold text-success" href="#" id="menu-format-page">Страница... (Поля, разметка)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
                     <li><h6 class="dropdown-header py-0 text-muted" style="font-size: 11px;">Текст</h6></li>
                     <li><a class="dropdown-item" href="#" id="menu-format-bold"><b>Полужирный (Ctrl+B)</b></a></li>
                     <li><a class="dropdown-item" href="#" id="menu-format-italic"><i>Курсив (Ctrl+I)</i></a></li>
@@ -103,6 +112,7 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                 <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Таблица</div>
                 <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
                     <li><a class="dropdown-item fw-bold" href="#" id="menu-table-insert">Вставить таблицу...</a></li>
+                    <li><a class="dropdown-item fw-bold text-primary" href="#" id="menu-table-props">Свойства таблицы...</a></li>
                     <li><hr class="dropdown-divider my-1"></li>
                     <li><a class="dropdown-item" href="#" id="menu-table-row-above">Вставить строку выше</a></li>
                     <li><a class="dropdown-item" href="#" id="menu-table-row-below">Вставить строку ниже</a></li>
@@ -119,6 +129,8 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             <div class="dropdown">
                 <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Сервис</div>
                 <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item fw-bold text-warning" href="#" id="menu-tools-oge-check">Протокол проверки ОГЭ 13.2...</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
                     <li><a class="dropdown-item" href="#" id="menu-tools-wordcount">Количество слов и статистика...</a></li>
                     <li><a class="dropdown-item" href="#" id="menu-tools-spelling">Проверка орфографии (F7)</a></li>
                 </ul>
@@ -177,22 +189,22 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                 <option value="p">Основной текст</option>
             </select>
 
-            <!-- Гарнитура шрифта -->
+            <!-- Гарнитура шрифта (по умолчанию Liberation Sans - сырой режим) -->
             <select id="select-font" class="lo-select" style="width: 155px;" title="Гарнитура шрифта">
-                <option value="Liberation Serif" selected>Liberation Serif</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Liberation Sans">Liberation Sans</option>
+                <option value="Liberation Sans" selected>Liberation Sans</option>
                 <option value="Arial">Arial</option>
+                <option value="Liberation Serif">Liberation Serif</option>
+                <option value="Times New Roman">Times New Roman</option>
                 <option value="Calibri">Calibri</option>
                 <option value="Courier New">Courier New</option>
             </select>
 
-            <!-- Размер шрифта -->
+            <!-- Размер шрифта (по умолчанию 11 пт - сырой режим) -->
             <select id="select-fontsize" class="lo-select" style="width: 70px;" title="Размер шрифта">
                 <option value="10pt">10 пт</option>
-                <option value="11pt">11 пт</option>
+                <option value="11pt" selected>11 пт</option>
                 <option value="12pt">12 пт</option>
-                <option value="14pt" selected>14 пт</option>
+                <option value="14pt">14 пт</option>
                 <option value="16pt">16 пт</option>
                 <option value="18pt">18 пт</option>
                 <option value="20pt">20 пт</option>
@@ -268,17 +280,17 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             <div class="d-flex h-100 justify-content-center align-items-center">
                 <!-- Обертка линейки, центрированная в точности над листом А4 (макс. ширина 800px) -->
                 <div id="lo-ruler" style="width: 800px; height: 18px; position: relative; background: #fff; border: 1px solid #b5b5b5; font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; color: #444;">
-                    <!-- Левое поле листа (80px / 2 см) -->
-                    <div style="position: absolute; left: 0; top: 0; width: 80px; height: 100%; background-color: #e5e5e5; border-right: 1px solid #999;"></div>
+                    <!-- Левое поле листа (динамическое, 40px / 1.0 см по умолчанию) -->
+                    <div id="ruler-left-margin-box" style="position: absolute; left: 0; top: 0; width: 40px; height: 100%; background-color: #e5e5e5; border-right: 1px solid #999;"></div>
                     
-                    <!-- Маркер отступа первой строки (Красная строка ОГЭ - верхний треугольник на 1 см / 40px) -->
-                    <div id="ruler-first-line" style="position: absolute; left: 120px; top: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #333; cursor: pointer; z-index: 10;" title="Отступ первой строки (Красная строка ОГЭ: 1.0 см)"></div>
+                    <!-- Маркер отступа первой строки (Красная строка ОГЭ - верхний треугольник) -->
+                    <div id="ruler-first-line" style="position: absolute; left: 40px; top: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #333; cursor: pointer; z-index: 10;" title="Красная строка (Кликните для установки 1.0 см по ОГЭ)"></div>
                     
-                    <!-- Маркер левого отступа абзаца (нижний треугольник на 0 см) -->
-                    <div id="ruler-left-indent" style="position: absolute; left: 75px; bottom: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid #333; cursor: pointer; z-index: 10;" title="Отступ слева: 0 см"></div>
+                    <!-- Маркер левого отступа абзаца (нижний треугольник) -->
+                    <div id="ruler-left-indent" style="position: absolute; left: 35px; bottom: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid #333; cursor: pointer; z-index: 10;" title="Отступ слева: 0 см"></div>
 
                     <!-- Шкала 1 .. 16 см -->
-                    <div class="d-flex h-100 position-relative" style="margin-left: 80px; width: 640px;">
+                    <div id="ruler-ticks" class="d-flex h-100 position-relative" style="margin-left: 40px; width: 720px;">
                         <span style="position: absolute; left: 40px; top: 1px;">1</span>
                         <span style="position: absolute; left: 80px; top: 1px;">2</span>
                         <span style="position: absolute; left: 120px; top: 1px;">3</span>
@@ -297,10 +309,10 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                         <span style="position: absolute; left: 635px; top: 1px;">16</span>
                     </div>
 
-                    <!-- Маркер правого отступа (на 16 см / 640px от поля) -->
-                    <div id="ruler-right-indent" style="position: absolute; right: 75px; bottom: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid #333; cursor: pointer; z-index: 10;" title="Правое поле: 0 см"></div>
-                    <!-- Правое поле листа (80px / 2 см) -->
-                    <div style="position: absolute; right: 0; top: 0; width: 80px; height: 100%; background-color: #e5e5e5; border-left: 1px solid #999;"></div>
+                    <!-- Маркер правого отступа -->
+                    <div id="ruler-right-indent" style="position: absolute; right: 35px; bottom: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid #333; cursor: pointer; z-index: 10;" title="Правое поле"></div>
+                    <!-- Правое поле листа (динамическое, 40px / 1.0 см по умолчанию) -->
+                    <div id="ruler-right-margin-box" style="position: absolute; right: 0; top: 0; width: 40px; height: 100%; background-color: #e5e5e5; border-left: 1px solid #999;"></div>
                 </div>
             </div>
         </div>
@@ -316,8 +328,9 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             <div class="border-end pe-3 border-secondary" id="statusbar-words" style="min-width: 140px;">0 слов, 0 символов</div>
             <div class="border-end pe-3 border-secondary">Базовый</div>
             <div class="border-end pe-3 border-secondary">Русский (Россия)</div>
-            <div class="border-end pe-3 border-secondary flex-grow-1">
+            <div class="border-end pe-3 border-secondary flex-grow-1 d-flex align-items-center">
                 <span id="writer-status" class="fw-bold px-2"></span>
+                <button type="button" id="btn-show-report" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-0 ms-2" style="display: none; font-size: 11px;">Протокол ОГЭ</button>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span style="font-weight: bold; cursor: pointer;" id="zoom-out">−</span>
@@ -519,16 +532,154 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
     </div>
 </div>
 
+<!-- 5. Модальное окно: «Страница...» (Поля и разметка) -->
+<div class="modal" id="modal-page" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light">
+                <h6 class="modal-title fs-6 fw-bold text-dark">Параметры страницы (Поля)</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <p class="text-muted mb-2" style="font-size: 12px;">По стандарту ОГЭ 13.2 левое поле должно быть не менее 2.0 см (допуск 2.0–3.0 см), остальные поля — 1.5–2.0 см.</p>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label mb-1">Левое поле:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="0.1" class="form-control rounded-0" id="dialog-page-left" value="1.0">
+                            <span class="input-group-text rounded-0">см</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1">Правое поле:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="0.1" class="form-control rounded-0" id="dialog-page-right" value="1.0">
+                            <span class="input-group-text rounded-0">см</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1">Верхнее поле:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="0.1" class="form-control rounded-0" id="dialog-page-top" value="1.0">
+                            <span class="input-group-text rounded-0">см</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1">Нижнее поле:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="0.1" class="form-control rounded-0" id="dialog-page-bottom" value="1.0">
+                            <span class="input-group-text rounded-0">см</span>
+                        </div>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <button type="button" class="btn btn-outline-success btn-sm rounded-0 w-100" id="btn-page-set-oge">Установить стандартные поля ОГЭ (2.0 см со всех сторон)</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light">
+                <button type="button" class="btn btn-primary btn-sm rounded-0 px-4" id="btn-apply-page">ОК</button>
+                <button type="button" class="btn btn-secondary btn-sm rounded-0 px-3" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 6. Модальное окно: «Свойства таблицы...» -->
+<div class="modal" id="modal-table-props" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light">
+                <h6 class="modal-title fs-6 fw-bold text-dark">Свойства таблицы</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="mb-3">
+                    <label class="form-label fw-bold mb-1">Выравнивание таблицы на странице:</label>
+                    <select class="form-select form-select-sm rounded-0" id="dialog-table-align">
+                        <option value="center" selected>По центру (Стандарт ОГЭ)</option>
+                        <option value="left">По левому краю</option>
+                        <option value="right">По правому краю</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold mb-1">Выравнивание текста в шапке (заголовках):</label>
+                    <select class="form-select form-select-sm rounded-0" id="dialog-table-header-align">
+                        <option value="center" selected>По центру (Строго по ОГЭ)</option>
+                        <option value="left">По левому краю</option>
+                        <option value="right">По правому краю</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold mb-1">Размер шрифта в таблице:</label>
+                    <select class="form-select form-select-sm rounded-0" id="dialog-table-font-size">
+                        <option value="14pt" selected>14 пт (как в основном тексте)</option>
+                        <option value="12pt">12 пт (на 2 пт меньше основного текста)</option>
+                        <option value="10pt">10 пт</option>
+                    </select>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="dialog-table-header-bold" checked>
+                    <label class="form-check-label fw-semibold" for="dialog-table-header-bold">Выделить шапку полужирным шрифтом (ОГЭ)</label>
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light">
+                <button type="button" class="btn btn-primary btn-sm rounded-0 px-4" id="btn-apply-table-props">ОК</button>
+                <button type="button" class="btn btn-secondary btn-sm rounded-0 px-3" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 7. Модальное окно: «Протокол проверки оформления (ОГЭ 13.2)» -->
+<div class="modal" id="modal-oge-report" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="oge-modal-badge" class="badge bg-danger fs-6 px-2 py-1">0 / 2 баллов</span>
+                    <h6 class="modal-title fs-6 fw-bold text-dark mb-0">Экспертная проверка оформления (ОГЭ 13.2)</h6>
+                </div>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3" style="max-height: 70vh; overflow-y: auto;">
+                <div id="oge-report-alert" class="alert alert-danger rounded-0 py-2 px-3 mb-3" style="font-size: 12px;">
+                    <!-- Динамический текст резюме -->
+                </div>
+                
+                <h6 class="fw-bold mb-2 text-secondary" style="font-size: 12px; text-transform: uppercase;">Детализированный отчёт эксперта:</h6>
+                <div id="oge-report-items" class="d-flex flex-column gap-2">
+                    <!-- Динамические пункты проверки -->
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light d-flex justify-content-between">
+                <span class="text-muted" style="font-size: 11px;">Критерии оценивания утверждены ФИПИ для задания 13.2 ОГЭ</span>
+                <button type="button" class="btn btn-secondary btn-sm rounded-0 px-4" data-bs-dismiss="modal">Понятно, исправить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <link rel="stylesheet" href="/static/jodit/jodit.min.css" />
 <script src="/static/bootstrap.bundle.min.js" is:inline></script>
 <script src="/static/jodit/jodit.min.js" is:inline></script>
 
-<script define:vars={{ missionName, hardcoreReset }}>
+<script define:vars={{ missionName, hardcoreReset, checkOgeFormat }}>
     let attempts = 0;
     let startTime = Date.now();
     let editor = null;
     let isNonPrintingActive = false;
     let isRulerActive = true;
+    let lastActivePara = null;
+    let lastActiveTable = null;
+    let lastOgeReport = null;
+
+    // Поля страницы по умолчанию (сырой режим: сброшены в 1.0 см)
+    let pageMargins = {
+        leftCm: 1.0,
+        rightCm: 1.0,
+        topCm: 1.0,
+        bottomCm: 1.0
+    };
 
     function sendTelemetry(actionType, status, success = false) {
         const msg = {
@@ -588,6 +739,7 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                     const jsb = document.querySelector('.jodit-status-bar');
                     if (jsb) jsb.style.display = 'none';
                     updateStatusbarWords();
+                    applyPageMargins(pageMargins);
                 }
             }
         });
@@ -681,29 +833,61 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         document.getElementById('menu-file-open')?.addEventListener('click', onOpen);
 
         // Загрузка типового образца текста для ОГЭ 13.2
+        // Загрузка типового образца текста для ОГЭ 13.2 (в сыром неотформатированном виде)
         document.getElementById('menu-file-sample')?.addEventListener('click', () => {
+            pageMargins = { leftCm: 1.0, rightCm: 1.0, topCm: 1.0, bottomCm: 1.0 };
+            applyPageMargins(pageMargins);
             editor.value = `<p>Российская Федерация — крупнейшее государство мира, расположенное на востоке Европы и севере Азии. Территория страны составляет более 17 млн км² и омывается водами 12 морей.</p>
-<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+<table>
   <thead>
     <tr>
-      <th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Субъект РФ</th>
-      <th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Площадь (тыс. км²)</th>
-      <th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Население (млн чел.)</th>
+      <th>Субъект РФ</th>
+      <th>Площадь (тыс. км²)</th>
+      <th>Население (млн чел.)</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td style="border: 1px solid #000; padding: 6px; text-align: left;">Москва</td>
-      <td style="border: 1px solid #000; padding: 6px; text-align: center;">2.56</td>
-      <td style="border: 1px solid #000; padding: 6px; text-align: center;">13.1</td>
+      <td>Москва</td>
+      <td>2.56</td>
+      <td>13.1</td>
     </tr>
     <tr>
-      <td style="border: 1px solid #000; padding: 6px; text-align: left;">Санкт-Петербург</td>
-      <td style="border: 1px solid #000; padding: 6px; text-align: center;">1.44</td>
-      <td style="border: 1px solid #000; padding: 6px; text-align: center;">5.6</td>
+      <td>Санкт-Петербург</td>
+      <td>1.44</td>
+      <td>5.6</td>
     </tr>
   </tbody>
-</table>`;
+</table><p></p>`;
+            const selFont = document.getElementById('select-font');
+            const selSize = document.getElementById('select-fontsize');
+            if (selFont) selFont.value = 'Liberation Sans';
+            if (selSize) selSize.value = '11pt';
+            toggleBtnActive('btn-align-left', true);
+            toggleBtnActive('btn-align-justify', false);
+        });
+
+        // Сбросить всё в режим по умолчанию
+        document.getElementById('menu-file-reset-raw')?.addEventListener('click', () => {
+            pageMargins = { leftCm: 1.0, rightCm: 1.0, topCm: 1.0, bottomCm: 1.0 };
+            applyPageMargins(pageMargins);
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            if (wysiwyg) {
+                wysiwyg.querySelectorAll('p, table, th, td, span').forEach(el => {
+                    el.removeAttribute('style');
+                });
+            }
+            const selFont = document.getElementById('select-font');
+            const selSize = document.getElementById('select-fontsize');
+            if (selFont) selFont.value = 'Liberation Sans';
+            if (selSize) selSize.value = '11pt';
+            toggleBtnActive('btn-align-left', true);
+            toggleBtnActive('btn-align-justify', false);
+            const statusEl = document.getElementById('writer-status');
+            if (statusEl) {
+                statusEl.className = 'text-muted px-2';
+                statusEl.innerText = 'Параметры сброшены в режим по умолчанию.';
+            }
         });
 
         const onSave = () => {
@@ -805,13 +989,18 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         document.getElementById('select-font')?.addEventListener('change', (e) => {
             const font = e.target.value;
             editor.execCommand('fontname', false, font);
+            const cur = editor.selection?.current();
+            const p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
+            if (p) p.style.fontFamily = `'${font}', serif`;
         });
 
         // Размер шрифта
         document.getElementById('select-fontsize')?.addEventListener('change', (e) => {
             const size = e.target.value;
-            // Применяем CSS-размер шрифта к текущему выделению
             editor.selection.applyStyle({ fontSize: size });
+            const cur = editor.selection?.current();
+            const p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
+            if (p) p.style.fontSize = size;
         });
 
         // Форматирование текста
@@ -914,7 +1103,64 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         });
     }
 
-    let lastActivePara = null;
+    // Парсер см/px/pt в сантиметры
+    function parseCm(val) {
+        if (!val) return null;
+        val = val.trim().toLowerCase();
+        if (val.endsWith('cm')) return parseFloat(val);
+        if (val.endsWith('px')) return parseFloat(val) / 37.79527559;
+        if (val.endsWith('pt')) return parseFloat(val) * 0.0352778;
+        const num = parseFloat(val);
+        return isNaN(num) ? null : num;
+    }
+
+    // Применение полей листа и синхронизация линейки
+    function applyPageMargins(margins) {
+        pageMargins = { ...margins };
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (wysiwyg) {
+            const leftPx = Math.round(margins.leftCm * 40);
+            const rightPx = Math.round(margins.rightCm * 40);
+            const topPx = Math.round(margins.topCm * 40);
+            const bottomPx = Math.round(margins.bottomCm * 40);
+            wysiwyg.style.setProperty('padding-left', `${leftPx}px`, 'important');
+            wysiwyg.style.setProperty('padding-right', `${rightPx}px`, 'important');
+            wysiwyg.style.setProperty('padding-top', `${topPx}px`, 'important');
+            wysiwyg.style.setProperty('padding-bottom', `${bottomPx}px`, 'important');
+        }
+        updateRulerMargins();
+    }
+
+    function updateRulerMargins() {
+        const leftBox = document.getElementById('ruler-left-margin-box');
+        const rightBox = document.getElementById('ruler-right-margin-box');
+        const firstLine = document.getElementById('ruler-first-line');
+        const leftIndent = document.getElementById('ruler-left-indent');
+        const rightIndent = document.getElementById('ruler-right-indent');
+        const ticks = document.getElementById('ruler-ticks');
+
+        const leftPx = Math.round(pageMargins.leftCm * 40);
+        const rightPx = Math.round(pageMargins.rightCm * 40);
+
+        if (leftBox) leftBox.style.width = `${leftPx}px`;
+        if (rightBox) rightBox.style.width = `${rightPx}px`;
+        if (leftIndent) leftIndent.style.left = `${leftPx - 5}px`;
+        if (rightIndent) rightIndent.style.right = `${rightPx - 5}px`;
+        if (firstLine) firstLine.style.left = `${leftPx}px`;
+        if (ticks) {
+            ticks.style.marginLeft = `${leftPx}px`;
+            ticks.style.width = `${Math.max(0, 800 - leftPx - rightPx)}px`;
+        }
+    }
+
+    function updateRulerFirstLineMarker(indentCm = 0) {
+        const firstLine = document.getElementById('ruler-first-line');
+        if (firstLine) {
+            const leftPx = Math.round(pageMargins.leftCm * 40);
+            const indentPx = Math.round(indentCm * 40);
+            firstLine.style.left = `${leftPx + indentPx}px`;
+        }
+    }
 
     // Применение стилей к текущему абзацу или группе выделенных абзацев
     function applyParagraphStyle(styles) {
@@ -937,7 +1183,11 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         }
 
         targets.forEach(target => {
-            if (styles.textIndent !== undefined) target.style.textIndent = styles.textIndent;
+            if (styles.textIndent !== undefined) {
+                target.style.textIndent = styles.textIndent;
+                const cm = parseCm(styles.textIndent);
+                if (cm !== null) updateRulerFirstLineMarker(cm);
+            }
             if (styles.lineHeight !== undefined) target.style.lineHeight = styles.lineHeight;
             if (styles.textAlign !== undefined) target.style.textAlign = styles.textAlign;
             if (styles.marginTop !== undefined) target.style.marginTop = styles.marginTop;
@@ -946,6 +1196,492 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             if (styles.marginRight !== undefined) target.style.marginRight = styles.marginRight;
         });
         updateStatusbarWords();
+    }
+
+    // Настройка свойств таблицы
+    function applyTableProps(props) {
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (!wysiwyg) return;
+
+        let table = lastActiveTable;
+        if (!table || !document.contains(table)) {
+            const sel = editor.selection ? editor.selection.current() : null;
+            if (sel) {
+                table = sel.closest ? sel.closest('table') : (sel.parentElement ? sel.parentElement.closest('table') : null);
+            }
+        }
+        if (!table) {
+            table = wysiwyg.querySelector('table');
+        }
+        if (!table) {
+            alert('В документе не найдена таблица. Вставьте таблицу через меню «Таблица → Вставить таблицу».');
+            return;
+        }
+
+        // 1. Выравнивание таблицы на листе
+        if (props.align === 'center') {
+            table.style.marginLeft = 'auto';
+            table.style.marginRight = 'auto';
+            table.setAttribute('align', 'center');
+        } else if (props.align === 'left') {
+            table.style.marginLeft = '0';
+            table.style.marginRight = 'auto';
+            table.setAttribute('align', 'left');
+        } else if (props.align === 'right') {
+            table.style.marginLeft = 'auto';
+            table.style.marginRight = '0';
+            table.setAttribute('align', 'right');
+        }
+
+        // 2. Шапка таблицы: выравнивание текста и полужирный шрифт
+        const headerCells = table.querySelectorAll('th, thead td, tr:first-child th, tr:first-child td');
+        headerCells.forEach(cell => {
+            if (props.headerAlign) {
+                cell.style.textAlign = props.headerAlign;
+            }
+            if (props.headerBold !== undefined) {
+                cell.style.fontWeight = props.headerBold ? 'bold' : 'normal';
+            }
+        });
+
+        // 3. Размер шрифта во всей таблице
+        if (props.fontSize) {
+            table.querySelectorAll('td, th').forEach(cell => {
+                cell.style.fontSize = props.fontSize;
+            });
+        }
+    }
+
+    // Экспертная проверка документа на соответствие ОГЭ 13.2
+    function inspectOgeDocument(rootEl, margins) {
+        const items = [];
+
+        if (!rootEl) {
+            return {
+                valid: false,
+                score: 0,
+                items: [{ id: 'no_doc', category: 'paragraph', label: 'Документ', passed: false, message: 'Документ пуст или редактор не инициализирован.' }],
+                crutchesFound: false,
+                summary: 'Документ не содержит текста.'
+            };
+        }
+
+        const textContent = rootEl.textContent || '';
+        const trimmedText = textContent.trim();
+
+        if (trimmedText.length === 0) {
+            return {
+                valid: false,
+                score: 0,
+                items: [{ id: 'empty_text', category: 'paragraph', label: 'Текст документа', passed: false, message: 'В документе отсутствует текст. Наберите текст задания.' }],
+                crutchesFound: false,
+                summary: 'Документ пуст. Наберите текст для проверки.'
+            };
+        }
+
+        // 1. ДЕТЕКТОР КОСТЫЛЕЙ
+        const paras = Array.from(rootEl.querySelectorAll('p, h1, h2, h3'));
+        
+        // Костыль 1: Красная строка пробелами или табами
+        let spaceIndentFound = false;
+        for (const p of paras) {
+            const html = p.innerHTML || '';
+            if (/^(&nbsp;|\s){2,}/i.test(html) || /^\t+/.test(p.textContent || '')) {
+                spaceIndentFound = true;
+                break;
+            }
+        }
+        if (spaceIndentFound) {
+            items.push({
+                id: 'crutch_spaces_indent',
+                category: 'crutches',
+                label: 'Красная строка пробелами',
+                passed: false,
+                isCrutch: true,
+                message: 'Красная строка сделана клавишей Пробел или Tab! По критериям ОГЭ отступ первой строки настраивается в свойствах абзаца (Формат → Абзац → Первая строка: 1.0 см) или на линейке.'
+            });
+        }
+
+        // Костыль 2: Двойной Enter для пустых строк
+        let emptyParasCount = 0;
+        for (const p of paras) {
+            const pText = (p.textContent || '').trim();
+            const inner = (p.innerHTML || '').trim();
+            if (pText === '' && (inner === '' || inner === '<br>' || inner === '&nbsp;')) {
+                emptyParasCount++;
+            }
+        }
+        if (emptyParasCount > 0) {
+            items.push({
+                id: 'crutch_double_enter',
+                category: 'crutches',
+                label: 'Лишние пустые строки (Enter)',
+                passed: false,
+                isCrutch: true,
+                message: `Обнаружено ${emptyParasCount} пустых строк (двойной Enter)! По критериям ОГЭ запрещено разделять абзацы пустыми строками. Используйте межабзацный интервал (Формат → Абзац → Отступ после абзаца).`
+            });
+        }
+
+        // Костыль 3: Дефис вместо длинного тире между словами
+        if (/\s+-\s+/g.test(textContent)) {
+            items.push({
+                id: 'crutch_hyphen',
+                category: 'crutches',
+                label: 'Дефис вместо тире',
+                passed: false,
+                isCrutch: true,
+                message: 'Использован дефис (-) вместо длинного тире (—). Вставляйте тире через меню «Вставка → Специальные символы» или Alt+0151.'
+            });
+        }
+
+        // Костыль 4: Программистские кавычки вместо кавычек-ёлочек
+        if (/"[^"]+"/.test(textContent)) {
+            items.push({
+                id: 'crutch_quotes',
+                category: 'crutches',
+                label: 'Прямые кавычки вместо кавычек-ёлочек',
+                passed: false,
+                isCrutch: true,
+                message: 'Использованы прямые кавычки (") вместо кавычек-ёлочек (« »). Вставляйте кавычки через меню «Вставка → Специальные символы».'
+            });
+        }
+
+        // 2. ПАРАМЕТРЫ СТРАНИЦЫ (ПОЛЯ)
+        const isLeftMarginOk = margins.leftCm >= 1.8 && margins.leftCm <= 3.2;
+        const isRightMarginOk = margins.rightCm >= 1.3 && margins.rightCm <= 2.5;
+        const isTopMarginOk = margins.topCm >= 1.3 && margins.topCm <= 2.5;
+        const isBottomMarginOk = margins.bottomCm >= 1.3 && margins.bottomCm <= 2.5;
+
+        if (isLeftMarginOk && isRightMarginOk && isTopMarginOk && isBottomMarginOk) {
+            items.push({
+                id: 'page_margins',
+                category: 'page',
+                label: 'Поля страницы',
+                passed: true,
+                message: `Поля страницы настроены верно (Левое: ${margins.leftCm} см, Правое: ${margins.rightCm} см, Верх/Низ: ${margins.topCm} см).`
+            });
+        } else {
+            items.push({
+                id: 'page_margins',
+                category: 'page',
+                label: 'Поля страницы',
+                passed: false,
+                message: `Поля страницы не настроены под стандарт ОГЭ (сейчас: Л ${margins.leftCm}см, П ${margins.rightCm}см). Настройте поля (Левое 2.0 см, остальные 1.5–2.0 см) через меню «Формат → Страница...».`
+            });
+        }
+
+        // 3. ПАРАМЕТРЫ АБЗАЦЕВ И ОСНОВНОГО ТЕКСТА
+        const contentParas = paras.filter(p => (p.textContent || '').trim().length > 0);
+
+        if (contentParas.length === 0 && trimmedText.length > 0) {
+            items.push({
+                id: 'para_structure',
+                category: 'paragraph',
+                label: 'Структура абзацев',
+                passed: false,
+                message: 'Текст должен быть оформлен в виде абзацев (<p>).'
+            });
+        } else {
+            let indentPassCount = 0;
+            let nonJustifyCount = 0;
+            let wrongFontCount = 0;
+            let wrongSizeCount = 0;
+
+            contentParas.forEach((p) => {
+                const style = window.getComputedStyle(p);
+                
+                // 1. textIndent
+                const indentCm = parseCm(p.style.textIndent || style.textIndent) || 0;
+                if (indentCm >= 0.85 && indentCm <= 1.25) {
+                    indentPassCount++;
+                }
+
+                // 2. textAlign
+                const align = p.style.textAlign || style.textAlign;
+                if (align !== 'justify') {
+                    nonJustifyCount++;
+                }
+
+                // 3. Гарнитура шрифта (Serif)
+                const childWithFont = p.querySelector('[style*="font-family"], font[face]');
+                const childFont = childWithFont ? (childWithFont.style.fontFamily || childWithFont.getAttribute('face') || '') : '';
+                const fontFam = (childFont || p.style.fontFamily || style.fontFamily || '').toLowerCase();
+                const isSans = fontFam.includes('sans-serif') || fontFam.includes('arial') || fontFam.includes('liberation sans');
+                const isSerif = !isSans && (fontFam.includes('liberation serif') || fontFam.includes('times') || fontFam.includes('serif'));
+                if (!isSerif) {
+                    wrongFontCount++;
+                }
+
+                // 4. Размер шрифта (14 пт)
+                const childWithSize = p.querySelector('[style*="font-size"]');
+                const targetEl = childWithSize || p;
+                const pxSize = parseFloat(window.getComputedStyle(targetEl).fontSize);
+                const ptSize = pxSize * 0.75;
+                if (ptSize < 13 || ptSize > 15.5) {
+                    wrongSizeCount++;
+                }
+            });
+
+            // Красная строка
+            if (indentPassCount === contentParas.length) {
+                items.push({
+                    id: 'para_first_line',
+                    category: 'paragraph',
+                    label: 'Красная строка (1.0 см)',
+                    passed: true,
+                    message: 'Отступ первой строки равен 1.0 см во всех абзацах текста.'
+                });
+            } else {
+                items.push({
+                    id: 'para_first_line',
+                    category: 'paragraph',
+                    label: 'Красная строка (1.0 см)',
+                    passed: false,
+                    message: `Красная строка 1.0 см отсутствует в ${contentParas.length - indentPassCount} абзац(ах). Настройте отступ через Меню «Формат → Абзац» (Первая строка: 1.0 см) или передвиньте верхний маркер на линейке.`
+                });
+            }
+
+            // Выравнивание
+            if (nonJustifyCount === 0) {
+                items.push({
+                    id: 'para_justify',
+                    category: 'paragraph',
+                    label: 'Выравнивание по ширине',
+                    passed: true,
+                    message: 'Основной текст выровнен по ширине (Justify).'
+                });
+            } else {
+                items.push({
+                    id: 'para_justify',
+                    category: 'paragraph',
+                    label: 'Выравнивание по ширине',
+                    passed: false,
+                    message: 'Основной текст выровнен не по ширине. По критериям ОГЭ основной текст должен быть выровнен по ширине (Ctrl+J).'
+                });
+            }
+
+            // Гарнитура
+            if (wrongFontCount === 0) {
+                items.push({
+                    id: 'font_family',
+                    category: 'font',
+                    label: 'Гарнитура шрифта (Serif)',
+                    passed: true,
+                    message: 'Использован шрифт с засечками (Liberation Serif / Times New Roman).'
+                });
+            } else {
+                items.push({
+                    id: 'font_family',
+                    category: 'font',
+                    label: 'Гарнитура шрифта (Serif)',
+                    passed: false,
+                    message: 'Текст набран шрифтом без засечек. Выберите гарнитуру «Liberation Serif» или «Times New Roman» в выпадающем списке шрифтов.'
+                });
+            }
+
+            // Размер шрифта
+            if (wrongSizeCount === 0) {
+                items.push({
+                    id: 'font_size',
+                    category: 'font',
+                    label: 'Размер шрифта (14 пт)',
+                    passed: true,
+                    message: 'Основной текст набран кеглем 14 пт.'
+                });
+            } else {
+                items.push({
+                    id: 'font_size',
+                    category: 'font',
+                    label: 'Размер шрифта (14 пт)',
+                    passed: false,
+                    message: 'Размер основного текста отличается от требуемых 14 пт. Выделите текст и установите размер «14 пт» на панели инструментов.'
+                });
+            }
+
+            // Межстрочный интервал (1.0 - 1.5)
+            const pStyle = window.getComputedStyle(contentParas[0]);
+            const lh = contentParas[0].style.lineHeight || pStyle.lineHeight;
+            let isLhOk = true;
+            if (lh) {
+                const lhNum = parseFloat(lh);
+                const fsNum = parseFloat(pStyle.fontSize);
+                const ratio = lh.endsWith('px') ? (lhNum / fsNum) : lhNum;
+                if (!isNaN(ratio) && (ratio < 0.95 || ratio > 1.6)) {
+                    isLhOk = false;
+                }
+            }
+            if (isLhOk) {
+                items.push({
+                    id: 'line_spacing',
+                    category: 'paragraph',
+                    label: 'Межстрочный интервал (1.0–1.5)',
+                    passed: true,
+                    message: 'Межстрочный интервал соответствует норме (от 1.0 до 1.5).'
+                });
+            } else {
+                items.push({
+                    id: 'line_spacing',
+                    category: 'paragraph',
+                    label: 'Межстрочный интервал (1.0–1.5)',
+                    passed: false,
+                    message: 'Межстрочный интервал выходит за рамки допустимого (должен быть от 1.0 до 1.5, рекомендуется 1.15).'
+                });
+            }
+        }
+
+        // 4. ТАБЛИЦА (ЕСЛИ ЕСТЬ)
+        const tables = Array.from(rootEl.querySelectorAll('table'));
+        if (tables.length > 0) {
+            tables.forEach((tbl, tIdx) => {
+                const tStyle = window.getComputedStyle(tbl);
+                const isCentered = tbl.style.marginLeft === 'auto' && tbl.style.marginRight === 'auto'
+                    || tbl.getAttribute('align') === 'center'
+                    || tStyle.marginLeft === tStyle.marginRight;
+
+                if (isCentered) {
+                    items.push({
+                        id: `table_align_${tIdx}`,
+                        category: 'table',
+                        label: 'Центрирование таблицы',
+                        passed: true,
+                        message: 'Таблица отцентрирована по горизонтали.'
+                    });
+                } else {
+                    items.push({
+                        id: `table_align_${tIdx}`,
+                        category: 'table',
+                        label: 'Центрирование таблицы',
+                        passed: false,
+                        message: 'Таблица не отцентрирована на листе. Настройте выравнивание таблицы по центру (Меню: Таблица → Свойства таблицы).'
+                    });
+                }
+
+                // Шапка таблицы
+                const headerCells = Array.from(tbl.querySelectorAll('th, thead td, tr:first-child th, tr:first-child td'));
+                let headersCentered = true;
+                for (const hCell of headerCells) {
+                    const cStyle = window.getComputedStyle(hCell);
+                    const align = hCell.style.textAlign || cStyle.textAlign;
+                    if (align !== 'center') {
+                        headersCentered = false;
+                        break;
+                    }
+                }
+                if (headersCentered && headerCells.length > 0) {
+                    items.push({
+                        id: `table_headers_${tIdx}`,
+                        category: 'table',
+                        label: 'Выравнивание шапки таблицы',
+                        passed: true,
+                        message: 'Заголовки столбцов выровнены по центру.'
+                    });
+                } else if (headerCells.length > 0) {
+                    items.push({
+                        id: `table_headers_${tIdx}`,
+                        category: 'table',
+                        label: 'Выравнивание шапки таблицы',
+                        passed: false,
+                        message: 'В заголовках столбцов таблицы текст должен быть выровнен строго по центру.'
+                    });
+                }
+
+                // Размер шрифта в таблице (не больше основного, 12-14 пт)
+                const firstCell = tbl.querySelector('td, th');
+                if (firstCell) {
+                    const cStyle = window.getComputedStyle(firstCell);
+                    const px = parseFloat(cStyle.fontSize);
+                    const pt = px * 0.75;
+                    if (pt <= 15) {
+                        items.push({
+                            id: `table_font_size_${tIdx}`,
+                            category: 'table',
+                            label: 'Размер шрифта в таблице',
+                            passed: true,
+                            message: `Размер шрифта в таблице (${Math.round(pt)} пт) не превышает размер основного текста.`
+                        });
+                    } else {
+                        items.push({
+                            id: `table_font_size_${tIdx}`,
+                            category: 'table',
+                            label: 'Размер шрифта в таблице',
+                            passed: false,
+                            message: `Размер шрифта в таблице (${Math.round(pt)} пт) больше допустимого. Допускается 12–14 пт.`
+                        });
+                    }
+                }
+            });
+        }
+
+        // 5. ИТОГОВЫЙ БАЛЛ ПО КРИТЕРИЯМ ОГЭ 13.2
+        const failedItems = items.filter(it => !it.passed);
+        const crutchesFound = items.some(it => it.isCrutch && !it.passed);
+
+        let score = 2;
+        if (failedItems.length > 0) {
+            if (failedItems.length <= 2 && !crutchesFound) {
+                score = 1;
+            } else {
+                score = 0;
+            }
+        }
+
+        const valid = failedItems.length === 0;
+        let summary = '';
+        if (valid) {
+            summary = 'Документ полностью соответствует требованиям ОГЭ по информатике (Задание 13.2)! Набрано 2 из 2 баллов.';
+        } else {
+            const errorDescriptions = failedItems.map(f => `• ${f.message}`).join('\n');
+            summary = `Обнаружены отклонения от стандартов ОГЭ (Оценка: ${score}/2):\n${errorDescriptions}`;
+        }
+
+        return {
+            valid,
+            score,
+            items,
+            crutchesFound,
+            summary
+        };
+    }
+
+    // Отрисовка протокола ОГЭ в модальном окне
+    function renderOgeReportModal(report) {
+        const badgeEl = document.getElementById('oge-modal-badge');
+        const alertEl = document.getElementById('oge-report-alert');
+        const itemsEl = document.getElementById('oge-report-items');
+
+        if (badgeEl) {
+            if (report.score === 2) {
+                badgeEl.className = 'badge bg-success fs-6 px-2 py-1';
+                badgeEl.innerText = '2 / 2 баллов (Отлично)';
+            } else if (report.score === 1) {
+                badgeEl.className = 'badge bg-warning text-dark fs-6 px-2 py-1';
+                badgeEl.innerText = '1 / 2 баллов (Зачтено с замечаниями)';
+            } else {
+                badgeEl.className = 'badge bg-danger fs-6 px-2 py-1';
+                badgeEl.innerText = '0 / 2 баллов (Не зачтено)';
+            }
+        }
+
+        if (alertEl) {
+            alertEl.className = report.valid 
+                ? 'alert alert-success rounded-0 py-2 px-3 mb-3' 
+                : 'alert alert-danger rounded-0 py-2 px-3 mb-3';
+            alertEl.innerText = report.summary;
+        }
+
+        if (itemsEl) {
+            itemsEl.innerHTML = '';
+            report.items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = `p-2 border ${item.passed ? 'border-success bg-light text-success' : 'border-danger bg-white text-danger'} rounded-0`;
+                const icon = item.passed ? '✅' : (item.isCrutch ? '⚠️ [КОСТЫЛЬ]' : '❌');
+                card.innerHTML = `
+                    <div class="fw-bold mb-1">${icon} ${item.label}</div>
+                    <div class="text-secondary small" style="color: #444 !important;">${item.message}</div>
+                `;
+                itemsEl.appendChild(card);
+            });
+        }
     }
 
     // Инициализация диалоговых окон
@@ -985,12 +1721,11 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                 textAlign: alignRadio
             });
 
-            // Закрываем модалку
             const modalEl = document.getElementById('modal-paragraph');
             if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
         });
 
-        // 2. Диалог «Таблица...»
+        // 2. Диалог «Вставить таблицу...»
         const openTableDialog = (e) => {
             if (e) e.preventDefault();
             const modalEl = document.getElementById('modal-table');
@@ -1049,7 +1784,86 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             editor.selection.current()?.closest('table')?.remove();
         });
 
-        // 3. Диалог «Специальные символы...»
+        // 3. Диалог «Свойства таблицы...»
+        const openTablePropsDialog = (e) => {
+            if (e) e.preventDefault();
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            const sel = editor.selection ? editor.selection.current() : null;
+            if (sel) {
+                lastActiveTable = sel.closest ? sel.closest('table') : (sel.parentElement ? sel.parentElement.closest('table') : null);
+            }
+            if (!lastActiveTable && wysiwyg) {
+                lastActiveTable = wysiwyg.querySelector('table');
+            }
+            const modalEl = document.getElementById('modal-table-props');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('menu-table-props')?.addEventListener('click', openTablePropsDialog);
+        document.getElementById('menu-table-properties')?.addEventListener('click', openTablePropsDialog);
+
+        document.getElementById('btn-apply-table-props')?.addEventListener('click', () => {
+            const align = document.getElementById('dialog-table-align')?.value || 'center';
+            const headerAlign = document.getElementById('dialog-table-header-align')?.value || 'center';
+            const fontSize = document.getElementById('dialog-table-font-size')?.value || '14pt';
+            const headerBold = document.getElementById('dialog-table-header-bold')?.checked ?? true;
+
+            applyTableProps({
+                align,
+                headerAlign,
+                fontSize,
+                headerBold
+            });
+
+            const modalEl = document.getElementById('modal-table-props');
+            if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
+        });
+
+        // 4. Диалог «Параметры страницы...»
+        const openPageDialog = (e) => {
+            if (e) e.preventDefault();
+            const leftInp = document.getElementById('dialog-page-left');
+            const rightInp = document.getElementById('dialog-page-right');
+            const topInp = document.getElementById('dialog-page-top');
+            const bottomInp = document.getElementById('dialog-page-bottom');
+            if (leftInp) leftInp.value = pageMargins.leftCm;
+            if (rightInp) rightInp.value = pageMargins.rightCm;
+            if (topInp) topInp.value = pageMargins.topCm;
+            if (bottomInp) bottomInp.value = pageMargins.bottomCm;
+
+            const modalEl = document.getElementById('modal-page');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('menu-format-page')?.addEventListener('click', openPageDialog);
+
+        document.getElementById('btn-page-set-oge')?.addEventListener('click', () => {
+            const leftInp = document.getElementById('dialog-page-left');
+            const rightInp = document.getElementById('dialog-page-right');
+            const topInp = document.getElementById('dialog-page-top');
+            const bottomInp = document.getElementById('dialog-page-bottom');
+            if (leftInp) leftInp.value = '2.0';
+            if (rightInp) rightInp.value = '2.0';
+            if (topInp) topInp.value = '2.0';
+            if (bottomInp) bottomInp.value = '2.0';
+        });
+
+        document.getElementById('btn-apply-page')?.addEventListener('click', () => {
+            const left = parseFloat(document.getElementById('dialog-page-left')?.value || '1.0');
+            const right = parseFloat(document.getElementById('dialog-page-right')?.value || '1.0');
+            const top = parseFloat(document.getElementById('dialog-page-top')?.value || '1.0');
+            const bottom = parseFloat(document.getElementById('dialog-page-bottom')?.value || '1.0');
+
+            applyPageMargins({
+                leftCm: left,
+                rightCm: right,
+                topCm: top,
+                bottomCm: bottom
+            });
+
+            const modalEl = document.getElementById('modal-page');
+            if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
+        });
+
+        // 5. Диалог «Специальные символы...»
         const openSymbolsDialog = (e) => {
             if (e) e.preventDefault();
             const modalEl = document.getElementById('modal-symbols');
@@ -1066,6 +1880,19 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                 if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
             });
         });
+
+        // 6. Диалог «Протокол проверки ОГЭ 13.2»
+        const openOgeReportDialog = (e) => {
+            if (e) e.preventDefault();
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            const report = inspectOgeDocument(wysiwyg, pageMargins);
+            lastOgeReport = report;
+            renderOgeReportModal(report);
+            const modalEl = document.getElementById('modal-oge-report');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('menu-tools-oge-check')?.addEventListener('click', openOgeReportDialog);
+        document.getElementById('btn-show-report')?.addEventListener('click', openOgeReportDialog);
     }
 
     // Зум (масштабирование страницы)
@@ -1094,6 +1921,12 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         });
     }
 
+    // Экспорт вспомогательных функций на window для тестов и интеграций
+    window.inspectOgeDocument = inspectOgeDocument;
+    window.applyPageMargins = applyPageMargins;
+    window.applyParagraphStyle = applyParagraphStyle;
+    window.applyTableProps = applyTableProps;
+
     // Валидация решения (кнопка ПРОВЕРИТЬ ДОКУМЕНТ)
     document.getElementById('check-btn').addEventListener('click', () => {
         if (!editor) return;
@@ -1101,7 +1934,42 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         const wysiwyg = document.querySelector('.jodit-wysiwyg');
         const content = (wysiwyg && wysiwyg.innerHTML) ? wysiwyg.innerHTML : editor.value;
         const statusEl = document.getElementById('writer-status');
+        const reportBtn = document.getElementById('btn-show-report');
+
+        // ЯДЕРНАЯ ФИЧА: Если включена проверка формата ОГЭ
+        // Сначала проводим автоматическую экспертную проверку документа
+        if (checkOgeFormat !== false) {
+            const report = inspectOgeDocument(wysiwyg, pageMargins);
+            lastOgeReport = report;
+
+            if (!report.valid) {
+                if (statusEl) {
+                    statusEl.className = 'text-danger fw-bold px-2';
+                    statusEl.innerText = `❌ Ошибка ОГЭ 13.2 (${report.score}/2 баллов): несоответствие стандарту!`;
+                }
+                if (reportBtn) {
+                    reportBtn.style.display = 'inline-block';
+                }
+                renderOgeReportModal(report);
+                const modalEl = document.getElementById('modal-oge-report');
+                if (modalEl && window.bootstrap) {
+                    new bootstrap.Modal(modalEl).show();
+                }
+                sendTelemetry('hardcore_reset', 'in_progress', false);
+                if (hardcoreReset) {
+                    editor.value = '';
+                }
+                document.dispatchEvent(new CustomEvent('writer-error', { detail: { report } }));
+                return; // БЛОКИРУЕМ прохождение задания, пока оформление не приведено в норму
+            } else {
+                if (reportBtn) {
+                    reportBtn.style.display = 'inline-block';
+                }
+                renderOgeReportModal(report);
+            }
+        }
         
+        // Если оформление соответствует стандарту ОГЭ, переходим к проверке условий урока
         const event = new CustomEvent('writer-check', { 
             detail: { 
                 html: content, 
@@ -1231,19 +2099,19 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
         border-radius: 0 !important;
     }
 
-    /* Сам лист формата А4 */
+    /* Сам лист формата А4: по умолчанию в режиме сброса параметров (сырой режим) */
     .jodit-wysiwyg {
         background-color: #ffffff !important;
         width: 800px !important;
         min-height: 1131px !important; /* Пропорция A4 */
         margin: 0 auto !important;
-        padding: 60px 80px !important; /* Поля документа (2.0 см) */
+        padding: 40px 40px !important; /* Поля документа по умолчанию: сброшены в 1.0 см */
         box-shadow: 1px 3px 10px rgba(0,0,0,0.25) !important;
         border: 1px solid #c0c0c0 !important;
         outline: none !important;
-        font-family: 'Liberation Serif', 'Times New Roman', serif !important;
-        font-size: 14pt !important;
-        line-height: 1.5 !important;
+        font-family: 'Liberation Sans', Arial, sans-serif;
+        font-size: 11pt;
+        line-height: 1.0;
         color: #000 !important;
         transition: transform 0.15s ease-out;
     }

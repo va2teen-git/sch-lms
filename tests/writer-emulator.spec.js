@@ -149,4 +149,141 @@ test.describe('LibreOffice Writer Emulator Suite', () => {
     await expect(wordsStatus).toContainText('20 символов');
   });
 
+  test('Режим по умолчанию: сброс параметров в сырое состояние (Liberation Sans, 11pt, поля 1.0 см)', async ({ page }) => {
+    // Проверяем значения селекторов на панели
+    const fontSelect = page.locator('#select-font');
+    const sizeSelect = page.locator('#select-fontsize');
+    await expect(fontSelect).toHaveValue('Liberation Sans');
+    await expect(sizeSelect).toHaveValue('11pt');
+
+    // Проверяем поля листа (padding wysiwyg: 1.0 см ~ 40px)
+    const paddingLeft = await page.evaluate(() => {
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      return wysiwyg ? window.getComputedStyle(wysiwyg).paddingLeft : null;
+    });
+    expect(paddingLeft).toBe('40px');
+
+    // Проверяем линейку (левое поле 40px)
+    const rulerBoxWidth = await page.evaluate(() => {
+      const box = document.getElementById('ruler-left-margin-box');
+      return box ? box.style.width : null;
+    });
+    expect(rulerBoxWidth).toBe('40px');
+  });
+
+  test('Детектор костылей ОГЭ: отступ пробелами и дефис блокируют проверку с выводом протокола', async ({ page }) => {
+    // Вводим текст с типичными ошибками-костылями (отступ пробелами, дефис вместо тире, прямые кавычки)
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      wysiwyg.innerHTML = '<p>&nbsp;&nbsp;&nbsp;&nbsp;Флеш-память - тип твердотельной "энергонезависимой" памяти.</p>';
+      wysiwyg.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // Нажимаем ПРОВЕРИТЬ ДОКУМЕНТ
+    await page.locator('#check-btn').click();
+
+    // Проверяем появление модального окна протокола проверки ОГЭ 13.2
+    const modalOge = page.locator('#modal-oge-report');
+    await expect(modalOge).toBeVisible();
+
+    // Проверяем статусбар и бейдж (0 / 2 баллов)
+    await expect(page.locator('#oge-modal-badge')).toContainText('0 / 2 баллов');
+    await expect(page.locator('#writer-status')).toContainText('Ошибка ОГЭ 13.2');
+
+    // Проверяем, что костыли обнаружены и описаны
+    const reportItems = page.locator('#oge-report-items');
+    await expect(reportItems).toContainText('Красная строка пробелами');
+    await expect(reportItems).toContainText('Дефис вместо тире');
+    await expect(reportItems).toContainText('Прямые кавычки вместо кавычек-ёлочек');
+  });
+
+  test('Диалог «Параметры страницы...»: настройка стандартных полей ОГЭ (2.0 см)', async ({ page }) => {
+    // Открываем меню Формат -> Страница...
+    await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+    await page.locator('#menu-format-page').click();
+
+    const modalPage = page.locator('#modal-page');
+    await expect(modalPage).toBeVisible();
+
+    // Нажимаем кнопку быстрой установки стандарта ОГЭ (2.0 см)
+    await page.locator('#btn-page-set-oge').click();
+    await expect(page.locator('#dialog-page-left')).toHaveValue('2.0');
+    await expect(page.locator('#dialog-page-right')).toHaveValue('2.0');
+
+    // Нажимаем ОК
+    await page.locator('#btn-apply-page').click();
+    await expect(modalPage).toBeHidden();
+
+    // Проверяем изменение padding на листе (~76px / 80px)
+    const paddingLeft = await page.evaluate(() => {
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      return wysiwyg ? wysiwyg.style.paddingLeft : null;
+    });
+    expect(paddingLeft).toBe('80px');
+  });
+
+  test('Диалог «Свойства таблицы...»: выравнивание таблицы по центру и шапки', async ({ page }) => {
+    // Вставляем таблицу
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      wysiwyg.innerHTML = '<table><thead><tr><th>Характеристика</th><th>Значение</th></tr></thead><tbody><tr><td>Частота</td><td>3.5 ГГц</td></tr></tbody></table>';
+      wysiwyg.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // Открываем Таблица -> Свойства таблицы...
+    await page.locator('.lo-menu-item').filter({ hasText: /^Таблица$/ }).click();
+    await page.locator('#menu-table-props').click();
+
+    const modalProps = page.locator('#modal-table-props');
+    await expect(modalProps).toBeVisible();
+
+    // Выбираем: выравнивание по центру, шапка по центру, 14пт
+    await page.locator('#dialog-table-align').selectOption('center');
+    await page.locator('#dialog-table-header-align').selectOption('center');
+    await page.locator('#dialog-table-font-size').selectOption('14pt');
+
+    await page.locator('#btn-apply-table-props').click();
+    await expect(modalProps).toBeHidden();
+
+    // Проверяем стили таблицы
+    const tableStyles = await page.evaluate(() => {
+      const tbl = document.querySelector('table');
+      const th = document.querySelector('th');
+      return {
+        marginLeft: tbl?.style.marginLeft,
+        marginRight: tbl?.style.marginRight,
+        thAlign: th?.style.textAlign,
+        thWeight: th?.style.fontWeight
+      };
+    });
+
+    expect(tableStyles.marginLeft).toBe('auto');
+    expect(tableStyles.marginRight).toBe('auto');
+    expect(tableStyles.thAlign).toBe('center');
+    expect(tableStyles.thWeight).toBe('bold');
+  });
+
+  test('Клик по линейке устанавливает красную строку 1.0 см', async ({ page }) => {
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      wysiwyg.innerHTML = '<p id="para-ruler">Первый абзац без отступа.</p>';
+      wysiwyg.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // Принимаем нативный dialog
+    page.on('dialog', dialog => dialog.accept());
+
+    // Кликаем по маркеру первой строки на линейке
+    await page.locator('#ruler-first-line').click();
+
+    const indent = await page.evaluate(() => {
+      const p = document.getElementById('para-ruler');
+      return p?.style.textIndent;
+    });
+    expect(indent).toMatch(/^1(\.0)?cm$/);
+  });
+
 });

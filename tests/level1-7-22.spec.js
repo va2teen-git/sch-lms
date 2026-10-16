@@ -30,12 +30,18 @@ test.describe('7 класс - Урок 22', () => {
       else if (action.includes('курсивом')) html = `Вот мой <em>${targetWord}</em> и он работает фаза ${phase}`;
       else if (action.includes('подчеркнутым')) html = `Вот мой <u>${targetWord}</u> и он работает фаза ${phase}`;
       
-      // Устанавливаем HTML напрямую через evaluate
+      // Устанавливаем параметры страницы и HTML по критериям ОГЭ (поля 2 см, шрифт 14pt Liberation Serif, красная строка 1 см, выравнивание по ширине)
       await page.evaluate((htmlContent) => {
         // @ts-ignore
-        document.querySelector('.jodit-wysiwyg').innerHTML = htmlContent;
+        if (window.applyPageMargins) {
+          // @ts-ignore
+          window.applyPageMargins({ leftCm: 2.0, rightCm: 2.0, topCm: 2.0, bottomCm: 2.0 });
+        }
+        // @ts-ignore
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        wysiwyg.innerHTML = `<p style="text-indent: 1.0cm; text-align: justify; font-family: 'Liberation Serif', serif; font-size: 14pt; line-height: 1.15;">${htmlContent}</p>`;
         // вызываем событие input чтобы Jodit обновил свой внутренний стейт если нужно
-        document.querySelector('.jodit-wysiwyg').dispatchEvent(new Event('input', { bubbles: true }));
+        wysiwyg.dispatchEvent(new Event('input', { bubbles: true }));
       }, html);
 
       if (phase === 3) {
