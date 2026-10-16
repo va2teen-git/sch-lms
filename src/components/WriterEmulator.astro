@@ -7,108 +7,513 @@ export interface Props {
 
 const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.props;
 ---
-<div class="d-flex flex-column h-100 bg-black p-2 rounded-0">
-    <div class="d-flex justify-content-between mb-2">
-        <span class="text-success fw-bold">LibreOffice Writer [Эмулятор]</span>
-        <button id="check-btn" class="btn btn-outline-success btn-sm rounded-0 fw-bold px-4">ПРОВЕРИТЬ ДОКУМЕНТ</button>
+<div class="d-flex flex-column h-100 bg-black p-2 rounded-0 user-select-none-header">
+    <!-- Оконная панель LibreOffice Writer -->
+    <div class="d-flex justify-content-between align-items-center mb-1 px-2 py-1" style="background-color: #2b2b2b; border: 1px solid #444; color: #eee; font-family: 'Segoe UI', sans-serif; font-size: 13px;">
+        <div class="d-flex align-items-center gap-2">
+            <!-- Иконка LibreOffice Writer -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="2" width="18" height="20" rx="1" fill="#0066cc"/>
+                <path d="M15 2L21 8H15V2Z" fill="#80b3ff"/>
+                <path d="M7 11H17M7 14H17M7 17H13" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <span class="fw-semibold">Без имени 1 — LibreOffice Writer</span>
+        </div>
+        <button id="check-btn" class="btn btn-outline-success btn-sm rounded-0 fw-bold px-4 py-0" style="font-size: 12px; height: 26px;">ПРОВЕРИТЬ ДОКУМЕНТ</button>
     </div>
     
     <div class="flex-grow-1 bg-light text-dark rounded-0 overflow-hidden d-flex flex-column border border-secondary" id="editor-container" style="background-color: #f0f0f0 !important;">
         
-        
-        <!-- Функциональное меню LibreOffice -->
-        <div class="d-flex px-2 py-0 user-select-none lo-menu-bar" style="background-color: #f0f0f0; font-size: 12px; color: #333; font-family: 'Segoe UI', sans-serif;">
+        <!-- 1. Главное меню LibreOffice -->
+        <div class="d-flex px-1 user-select-none lo-menu-bar border-bottom" style="background-color: #f0f0f0; font-size: 12px; color: #222; font-family: 'Segoe UI', sans-serif;">
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Файл</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="editor.value=''; return false;">Создать</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="alert('Эмуляция: Открытие отключено'); return false;">Открыть...</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="alert('Эмуляция: Сохранение отключено'); return false;">Сохранить</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="window.print(); return false;">Печать...</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Файл</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="menu-file-new">Создать (Ctrl+N)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-file-open">Открыть... (Ctrl+O)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-file-sample">Загрузить пример текста (ОГЭ 13.2)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-file-save">Сохранить (Ctrl+S)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-file-pdf">Экспорт в PDF...</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-file-print">Печать... (Ctrl+P)</a></li>
                 </ul>
             </div>
             
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Правка</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('undo'); return false;">Отменить</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('redo'); return false;">Вернуть</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('cut'); return false;">Вырезать</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('copy'); return false;">Копировать</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('paste'); return false;">Вставить</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('selectall'); return false;">Выделить всё</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Правка</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="menu-edit-undo">Отменить (Ctrl+Z)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-edit-redo">Вернуть (Ctrl+Y)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-edit-cut">Вырезать (Ctrl+X)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-edit-copy">Копировать (Ctrl+C)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-edit-paste">Вставить (Ctrl+V)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-edit-selectall">Выделить всё (Ctrl+A)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-edit-find">Найти и заменить... (Ctrl+H)</a></li>
                 </ul>
             </div>
 
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Вид</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('source'); return false;">Исходный HTML</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('fullsize'); return false;">Во весь экран</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Вид</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item d-flex justify-content-between align-items-center" href="#" id="menu-view-nonprinting">Непечатаемые символы <span class="badge bg-secondary">Ctrl+F10</span></a></li>
+                    <li><a class="dropdown-item d-flex justify-content-between align-items-center" href="#" id="menu-view-ruler">Линейка <span id="ruler-check-mark">✓</span></a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-view-fullscreen">Во весь экран (F11)</a></li>
                 </ul>
             </div>
 
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Вставка</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('image'); return false;">Изображение...</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('hr'); return false;">Горизонтальная линия</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('symbol'); return false;">Специальные символы...</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('link'); return false;">Гиперссылка...</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Вставка</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="menu-insert-table">Таблица... (Ctrl+F12)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-insert-symbols">Специальные символы... (Ω)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-insert-pagebreak">Разрыв страницы (Ctrl+Enter)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-insert-hr">Горизонтальная линия</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-insert-image">Изображение...</a></li>
                 </ul>
             </div>
 
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Формат</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('bold'); return false;">Полужирный</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('italic'); return false;">Курсив</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('underline'); return false;">Подчеркнутый</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('strikethrough'); return false;">Зачеркнутый</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('superscript'); return false;">Надстрочный</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('subscript'); return false;">Подстрочный</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('eraser'); return false;">Очистить форматирование</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Формат</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><h6 class="dropdown-header py-0 text-muted" style="font-size: 11px;">Текст</h6></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-bold"><b>Полужирный (Ctrl+B)</b></a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-italic"><i>Курсив (Ctrl+I)</i></a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-underline"><u>Подчеркнутый (Ctrl+U)</u></a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-strikethrough"><s>Зачеркнутый</s></a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-sup">Надстрочный (x²)</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-sub">Подстрочный (x₂)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-clear">Очистить прямое форматирование (Ctrl+M)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item fw-bold text-primary" href="#" id="menu-format-paragraph">Абзац... (Красная строка 1 см, интервалы)</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-align-justify">Выравнивание: По ширине</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-align-center">Выравнивание: По центру</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-align-left">Выравнивание: По левому краю</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-format-align-right">Выравнивание: По правому краю</a></li>
                 </ul>
             </div>
 
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Таблица</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="editor.execCommand('table'); return false;">Вставить таблицу...</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Таблица</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item fw-bold" href="#" id="menu-table-insert">Вставить таблицу...</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-table-row-above">Вставить строку выше</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-table-row-below">Вставить строку ниже</a></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="menu-table-row-delete">Удалить строку</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item" href="#" id="menu-table-col-left">Вставить столбец слева</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-table-col-right">Вставить столбец справа</a></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="menu-table-col-delete">Удалить столбец</a></li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="menu-table-delete">Удалить таблицу</a></li>
                 </ul>
             </div>
             
             <div class="dropdown">
-                <div class="px-2 py-1 cursor-pointer rounded-1 lo-menu-item" data-bs-toggle="dropdown">Справка</div>
-                <ul class="dropdown-menu rounded-0 shadow-sm" style="font-size: 13px;">
-                    <li><a class="dropdown-item" href="#" onclick="alert('LibreOffice Writer Эмулятор для подготовки к ОГЭ'); return false;">О программе</a></li>
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Сервис</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="menu-tools-wordcount">Количество слов и статистика...</a></li>
+                    <li><a class="dropdown-item" href="#" id="menu-tools-spelling">Проверка орфографии (F7)</a></li>
+                </ul>
+            </div>
+
+            <div class="dropdown">
+                <div class="px-2 py-1 cursor-pointer lo-menu-item" data-bs-toggle="dropdown">Справка</div>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="menu-help-about">О программе LibreOffice Writer</a></li>
                 </ul>
             </div>
         </div>
 
-        <!-- Jodit Editor -->
-        <textarea id="writer-editor">{initialHTML}</textarea>
+        <!-- 2. Панель инструментов 1: «Стандартная» (в точности по скриншоту пользователя) -->
+        <div class="d-flex align-items-center px-1 py-1 lo-toolbar border-bottom flex-wrap gap-1" style="background-color: #f0f0f0;">
+            <button type="button" class="lo-btn" id="btn-new" title="Создать (Ctrl+N)"><span class="lo-icon" style="background-image: url('/static/colibre/new.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-open" title="Открыть (Ctrl+O)"><span class="lo-icon" style="background-image: url('/static/colibre/open.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-save" title="Сохранить (Ctrl+S)"><span class="lo-icon" style="background-image: url('/static/colibre/save.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-pdf" title="Экспорт в PDF"><span class="lo-icon" style="background-image: url('/static/colibre/pdf.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-print" title="Печать (Ctrl+P)"><span class="lo-icon" style="background-image: url('/static/colibre/print.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-printpreview" title="Предварительный просмотр"><span class="lo-icon" style="background-image: url('/static/colibre/printpreview.svg');"></span></button>
+            
+            <div class="lo-divider"></div>
+
+            <button type="button" class="lo-btn" id="btn-cut" title="Вырезать (Ctrl+X)"><span class="lo-icon" style="background-image: url('/static/colibre/cut.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-copy" title="Копировать (Ctrl+C)"><span class="lo-icon" style="background-image: url('/static/colibre/copy.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-paste" title="Вставить (Ctrl+V)"><span class="lo-icon" style="background-image: url('/static/colibre/paste.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-formatpaint" title="Копировать формат"><span class="lo-icon" style="background-image: url('/static/colibre/formatpaint.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <button type="button" class="lo-btn" id="btn-undo" title="Отменить (Ctrl+Z)"><span class="lo-icon" style="background-image: url('/static/colibre/undo.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-redo" title="Вернуть (Ctrl+Y)"><span class="lo-icon" style="background-image: url('/static/colibre/redo.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <button type="button" class="lo-btn" id="btn-find" title="Найти и заменить (Ctrl+H)"><span class="lo-icon" style="background-image: url('/static/colibre/find.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-nonprinting" title="Непечатаемые символы (Ctrl+F10)"><span class="lo-icon" style="background-image: url('/static/colibre/nonprinting.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <button type="button" class="lo-btn" id="btn-table" title="Вставить таблицу (Ctrl+F12)"><span class="lo-icon" style="background-image: url('/static/colibre/table.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-image" title="Вставить изображение"><span class="lo-icon" style="background-image: url('/static/colibre/image.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-symbol" title="Специальные символы (Ω)"><span class="lo-icon" style="background-image: url('/static/colibre/symbol.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-pagebreak" title="Разрыв страницы (Ctrl+Enter)"><span class="lo-icon" style="background-image: url('/static/colibre/pagebreak.svg');"></span></button>
+        </div>
+
+        <!-- 3. Панель инструментов 2: «Форматирование» (в точности по скриншоту пользователя) -->
+        <div class="d-flex align-items-center px-1 py-1 lo-toolbar border-bottom flex-wrap gap-1" style="background-color: #f0f0f0;">
+            <!-- Стиль абзаца -->
+            <select id="select-style" class="lo-select" style="width: 130px;" title="Стиль абзаца">
+                <option value="p">Базовый</option>
+                <option value="h1">Заголовок 1</option>
+                <option value="h2">Заголовок 2</option>
+                <option value="h3">Заголовок 3</option>
+                <option value="p">Основной текст</option>
+            </select>
+
+            <!-- Гарнитура шрифта -->
+            <select id="select-font" class="lo-select" style="width: 155px;" title="Гарнитура шрифта">
+                <option value="Liberation Serif" selected>Liberation Serif</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Liberation Sans">Liberation Sans</option>
+                <option value="Arial">Arial</option>
+                <option value="Calibri">Calibri</option>
+                <option value="Courier New">Courier New</option>
+            </select>
+
+            <!-- Размер шрифта -->
+            <select id="select-fontsize" class="lo-select" style="width: 70px;" title="Размер шрифта">
+                <option value="10pt">10 пт</option>
+                <option value="11pt">11 пт</option>
+                <option value="12pt">12 пт</option>
+                <option value="14pt" selected>14 пт</option>
+                <option value="16pt">16 пт</option>
+                <option value="18pt">18 пт</option>
+                <option value="20pt">20 пт</option>
+                <option value="24pt">24 пт</option>
+            </select>
+
+            <div class="lo-divider"></div>
+
+            <!-- Символьное форматирование (Ж, К, Ч, S) -->
+            <button type="button" class="lo-btn" id="btn-bold" title="Полужирный (Ctrl+B)"><span class="lo-icon" style="background-image: url('/static/colibre/bold_ru.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-italic" title="Курсив (Ctrl+I)"><span class="lo-icon" style="background-image: url('/static/colibre/italic_ru.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-underline" title="Подчеркнутый (Ctrl+U)"><span class="lo-icon" style="background-image: url('/static/colibre/underline_ru.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-strikethrough" title="Зачеркнутый"><span class="lo-icon" style="background-image: url('/static/colibre/strikethrough_ru.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <!-- Индексы -->
+            <button type="button" class="lo-btn" id="btn-sup" title="Надстрочный знак (x²)"><span class="lo-icon" style="background-image: url('/static/colibre/superscript.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-sub" title="Подстрочный знак (x₂)"><span class="lo-icon" style="background-image: url('/static/colibre/subscript.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <!-- Очистка и цвета -->
+            <button type="button" class="lo-btn" id="btn-eraser" title="Очистить прямое форматирование (Ctrl+M)"><span class="lo-icon" style="background-image: url('/static/colibre/eraser.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-fontcolor" title="Цвет шрифта"><span class="lo-icon" style="background-image: url('/static/colibre/fontcolor.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-backcolor" title="Цвет выделения"><span class="lo-icon" style="background-image: url('/static/colibre/backcolor.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <!-- Выравнивание -->
+            <button type="button" class="lo-btn active" id="btn-align-left" title="По левому краю (Ctrl+L)"><span class="lo-icon" style="background-image: url('/static/colibre/align.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-align-center" title="По центру (Ctrl+E)"><span class="lo-icon" style="background-image: url('/static/colibre/aligncenter.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-align-right" title="По правому краю (Ctrl+R)"><span class="lo-icon" style="background-image: url('/static/colibre/alignright.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-align-justify" title="По ширине (Ctrl+J)"><span class="lo-icon" style="background-image: url('/static/colibre/alignjustify.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <!-- Списки -->
+            <button type="button" class="lo-btn" id="btn-ul" title="Маркированный список (Shift+F12)"><span class="lo-icon" style="background-image: url('/static/colibre/ul.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-ol" title="Нумерованный список (F12)"><span class="lo-icon" style="background-image: url('/static/colibre/ol.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <!-- Отступы -->
+            <button type="button" class="lo-btn" id="btn-outdent" title="Уменьшить отступ"><span class="lo-icon" style="background-image: url('/static/colibre/outdent.svg');"></span></button>
+            <button type="button" class="lo-btn" id="btn-indent" title="Увеличить отступ"><span class="lo-icon" style="background-image: url('/static/colibre/indent.svg');"></span></button>
+
+            <div class="lo-divider"></div>
+
+            <!-- Интервалы -->
+            <div class="dropdown d-inline-block">
+                <button type="button" class="lo-btn" id="btn-linespacing" data-bs-toggle="dropdown" title="Междустрочный интервал"><span class="lo-icon" style="background-image: url('/static/colibre/linespacing.svg');"></span></button>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" data-lineheight="1.0">Одинарный (1.0)</a></li>
+                    <li><a class="dropdown-item" href="#" data-lineheight="1.15">1.15 строки</a></li>
+                    <li><a class="dropdown-item" href="#" data-lineheight="1.5">Полуторный (1.5)</a></li>
+                    <li><a class="dropdown-item" href="#" data-lineheight="2.0">Двойной (2.0)</a></li>
+                </ul>
+            </div>
+
+            <div class="dropdown d-inline-block">
+                <button type="button" class="lo-btn" id="btn-paraspace" data-bs-toggle="dropdown" title="Межабзацный интервал"><span class="lo-icon" style="background-image: url('/static/colibre/paraspace.svg');"></span></button>
+                <ul class="dropdown-menu rounded-0 shadow-sm lo-dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="act-para-add-bottom">Добавить интервал после абзаца (6 пт)</a></li>
+                    <li><a class="dropdown-item" href="#" id="act-para-add-top">Добавить интервал перед абзацем (6 пт)</a></li>
+                    <li><a class="dropdown-item" href="#" id="act-para-remove">Удалить интервалы абзаца</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 4. Горизонтальная линейка LibreOffice Writer (Точно как на скриншоте) -->
+        <div id="lo-ruler-container" class="border-bottom user-select-none" style="background-color: #f0f0f0; height: 24px; position: relative; overflow: hidden;">
+            <div class="d-flex h-100 justify-content-center align-items-center">
+                <!-- Обертка линейки, центрированная в точности над листом А4 (макс. ширина 800px) -->
+                <div id="lo-ruler" style="width: 800px; height: 18px; position: relative; background: #fff; border: 1px solid #b5b5b5; font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; color: #444;">
+                    <!-- Левое поле листа (80px / 2 см) -->
+                    <div style="position: absolute; left: 0; top: 0; width: 80px; height: 100%; background-color: #e5e5e5; border-right: 1px solid #999;"></div>
+                    
+                    <!-- Маркер отступа первой строки (Красная строка ОГЭ - верхний треугольник на 1 см / 40px) -->
+                    <div id="ruler-first-line" style="position: absolute; left: 120px; top: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #333; cursor: pointer; z-index: 10;" title="Отступ первой строки (Красная строка ОГЭ: 1.0 см)"></div>
+                    
+                    <!-- Маркер левого отступа абзаца (нижний треугольник на 0 см) -->
+                    <div id="ruler-left-indent" style="position: absolute; left: 75px; bottom: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid #333; cursor: pointer; z-index: 10;" title="Отступ слева: 0 см"></div>
+
+                    <!-- Шкала 1 .. 16 см -->
+                    <div class="d-flex h-100 position-relative" style="margin-left: 80px; width: 640px;">
+                        <span style="position: absolute; left: 40px; top: 1px;">1</span>
+                        <span style="position: absolute; left: 80px; top: 1px;">2</span>
+                        <span style="position: absolute; left: 120px; top: 1px;">3</span>
+                        <span style="position: absolute; left: 160px; top: 1px;">4</span>
+                        <span style="position: absolute; left: 200px; top: 1px;">5</span>
+                        <span style="position: absolute; left: 240px; top: 1px;">6</span>
+                        <span style="position: absolute; left: 280px; top: 1px;">7</span>
+                        <span style="position: absolute; left: 320px; top: 1px;">8</span>
+                        <span style="position: absolute; left: 360px; top: 1px;">9</span>
+                        <span style="position: absolute; left: 400px; top: 1px;">10</span>
+                        <span style="position: absolute; left: 440px; top: 1px;">11</span>
+                        <span style="position: absolute; left: 480px; top: 1px;">12</span>
+                        <span style="position: absolute; left: 520px; top: 1px;">13</span>
+                        <span style="position: absolute; left: 560px; top: 1px;">14</span>
+                        <span style="position: absolute; left: 600px; top: 1px;">15</span>
+                        <span style="position: absolute; left: 635px; top: 1px;">16</span>
+                    </div>
+
+                    <!-- Маркер правого отступа (на 16 см / 640px от поля) -->
+                    <div id="ruler-right-indent" style="position: absolute; right: 75px; bottom: -1px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid #333; cursor: pointer; z-index: 10;" title="Правое поле: 0 см"></div>
+                    <!-- Правое поле листа (80px / 2 см) -->
+                    <div style="position: absolute; right: 0; top: 0; width: 80px; height: 100%; background-color: #e5e5e5; border-left: 1px solid #999;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Рабочее пространство с белым листом А4 на сером столе -->
+        <div class="flex-grow-1 position-relative overflow-hidden" id="workspace-wrapper">
+            <textarea id="writer-editor">{initialHTML}</textarea>
+        </div>
         
-        <!-- Фейковый статус-бар LibreOffice -->
-        <div class="d-flex align-items-center px-2 py-1 user-select-none" style="background-color: #f0f0f0; border-top: 1px solid #ccc; font-size: 11px; color: #555; font-family: 'Segoe UI', sans-serif; gap: 15px;">
+        <!-- 6. Статус-бар LibreOffice -->
+        <div class="d-flex align-items-center px-2 py-1 user-select-none" style="background-color: #f0f0f0; border-top: 1px solid #ccc; font-size: 11px; color: #444; font-family: 'Segoe UI', sans-serif; gap: 15px;">
             <div class="border-end pe-3 border-secondary" style="min-width: 90px;">Страница 1 из 1</div>
-            <div class="border-end pe-3 border-secondary" id="statusbar-words" style="min-width: 130px;">0 слов, 0 символов</div>
+            <div class="border-end pe-3 border-secondary" id="statusbar-words" style="min-width: 140px;">0 слов, 0 символов</div>
             <div class="border-end pe-3 border-secondary">Базовый</div>
             <div class="border-end pe-3 border-secondary">Русский (Россия)</div>
             <div class="border-end pe-3 border-secondary flex-grow-1">
                 <span id="writer-status" class="fw-bold px-2"></span>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <span>−</span>
-                <input type="range" class="form-range" style="width: 80px; height: 0.5rem;" min="50" max="200" value="100" />
-                <span>+</span>
-                <span>100%</span>
+                <span style="font-weight: bold; cursor: pointer;" id="zoom-out">−</span>
+                <input type="range" id="zoom-slider" class="form-range" style="width: 85px; height: 0.5rem;" min="50" max="150" value="100" />
+                <span style="font-weight: bold; cursor: pointer;" id="zoom-in">+</span>
+                <span id="zoom-val" style="min-width: 35px; text-align: right;">100%</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= МОДАЛЬНЫЕ ОКНА LIBREOFFICE WRITER ================= -->
+
+<!-- 1. Модальное окно: «Абзац...» (Ключевое для ОГЭ 13.2) -->
+<div class="modal" id="modal-paragraph" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light">
+                <h6 class="modal-title fs-6 fw-bold text-dark">Параметры абзаца (LibreOffice Writer)</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <ul class="nav nav-tabs rounded-0 mb-3" style="font-size: 12px;">
+                    <li class="nav-item">
+                        <button class="nav-link active rounded-0 text-dark" data-bs-toggle="tab" data-bs-target="#tab-indent">Отступы и интервалы</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link rounded-0 text-dark" data-bs-toggle="tab" data-bs-target="#tab-align">Выравнивание</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Вкладка: Отступы и интервалы -->
+                    <div class="tab-pane fade show active" id="tab-indent">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-primary mb-1">Первая строка (красная строка):</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.1" class="form-control rounded-0" id="dialog-para-firstline" value="1.0">
+                                    <span class="input-group-text rounded-0">см</span>
+                                </div>
+                                <small class="text-muted" style="font-size: 11px;">Требование ОГЭ 13.2: 1.0 см</small>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-1">Междустрочный интервал:</label>
+                                <select class="form-select form-select-sm rounded-0" id="dialog-para-lineheight">
+                                    <option value="1.0" selected>Одинарный (1.0)</option>
+                                    <option value="1.15">1.15 строки</option>
+                                    <option value="1.5">Полуторный (1.5)</option>
+                                    <option value="2.0">Двойной (2.0)</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-1">Отступ слева (до текста):</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.1" class="form-control rounded-0" id="dialog-para-left" value="0.0">
+                                    <span class="input-group-text rounded-0">см</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-1">Отступ справа (после текста):</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.1" class="form-control rounded-0" id="dialog-para-right" value="0.0">
+                                    <span class="input-group-text rounded-0">см</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-1">Интервал над абзацем:</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="1" class="form-control rounded-0" id="dialog-para-top" value="0">
+                                    <span class="input-group-text rounded-0">пт</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-1">Интервал под абзацем:</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="1" class="form-control rounded-0" id="dialog-para-bottom" value="0">
+                                    <span class="input-group-text rounded-0">пт</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка: Выравнивание -->
+                    <div class="tab-pane fade" id="tab-align">
+                        <label class="form-label fw-bold mb-2">Выравнивание текста:</label>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="dialog-align" id="align-radio-justify" value="justify" checked>
+                                <label class="form-check-label fw-semibold" for="align-radio-justify">По ширине (Стандарт ОГЭ)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="dialog-align" id="align-radio-left" value="left">
+                                <label class="form-check-label" for="align-radio-left">По левому краю</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="dialog-align" id="align-radio-center" value="center">
+                                <label class="form-check-label" for="align-radio-center">По центру (Заголовки / Таблицы)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="dialog-align" id="align-radio-right" value="right">
+                                <label class="form-check-label" for="align-radio-right">По правому краю</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light">
+                <button type="button" class="btn btn-primary btn-sm rounded-0 px-4" id="btn-apply-paragraph">ОК</button>
+                <button type="button" class="btn btn-secondary btn-sm rounded-0 px-3" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Модальное окно: «Вставить таблицу...» -->
+<div class="modal" id="modal-table" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light">
+                <h6 class="modal-title fs-6 fw-bold text-dark">Вставить таблицу</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="mb-3">
+                    <label class="form-label mb-1">Количество столбцов:</label>
+                    <input type="number" class="form-control form-control-sm rounded-0" id="dialog-table-cols" value="3" min="1" max="10">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label mb-1">Количество строк:</label>
+                    <input type="number" class="form-control form-control-sm rounded-0" id="dialog-table-rows" value="3" min="1" max="20">
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light">
+                <button type="button" class="btn-primary btn btn-sm rounded-0 px-3" id="btn-apply-table">Вставить</button>
+                <button type="button" class="btn btn-secondary btn-sm rounded-0" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Модальное окно: «Специальные символы...» (Символы ОГЭ) -->
+<div class="modal" id="modal-symbols" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light">
+                <h6 class="modal-title fs-6 fw-bold text-dark">Специальные символы (ОГЭ)</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <p class="text-muted mb-2" style="font-size: 12px;">Нажмите на символ для вставки в документ:</p>
+                <div class="d-flex flex-wrap gap-2 lo-symbols-palette">
+                    <button type="button" id="sym-degree" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="°" title="Градус (°)">°</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="—" title="Длинное тире (—)">—</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="«" title="Открывающая кавычка («)">«</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="»" title="Закрывающая кавычка (»)">»</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="±" title="Плюс-минус (±)">±</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="×" title="Знак умножения (×)">×</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="²" title="Квадрат (²)">²</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="³" title="Куб (³)">³</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≤" title="Меньше или равно (≤)">≤</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≥" title="Больше или равно (≥)">≥</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≠" title="Не равно (≠)">≠</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≈" title="Приблизительно (≈)">≈</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="₽" title="Символ рубля (₽)">₽</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="€" title="Символ евро (€)">€</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="α" title="Греческая буква альфа (α)">α</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="β" title="Греческая буква бета (β)">β</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="π" title="Греческая буква пи (π)">π</button>
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light">
+                <button type="button" class="btn btn-secondary btn-sm rounded-0 px-3" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Модальное окно: «Количество слов...» -->
+<div class="modal" id="modal-wordcount" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content rounded-0 shadow border border-secondary" style="font-family: 'Segoe UI', sans-serif; font-size: 13px; background-color: #f7f7f7;">
+            <div class="modal-header py-2 px-3 border-bottom bg-light">
+                <h6 class="modal-title fs-6 fw-bold text-dark">Статистика документа</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <table class="table table-sm table-borderless mb-0" style="font-size: 13px;">
+                    <tr><td>Слов:</td><td class="text-end fw-bold" id="stat-words">0</td></tr>
+                    <tr><td>Символов (без пробелов):</td><td class="text-end fw-bold" id="stat-chars-nospace">0</td></tr>
+                    <tr><td>Символов (с пробелами):</td><td class="text-end fw-bold" id="stat-chars-total">0</td></tr>
+                    <tr><td>Абзацев:</td><td class="text-end fw-bold" id="stat-paragraphs">1</td></tr>
+                </table>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top bg-light">
+                <button type="button" class="btn btn-primary btn-sm rounded-0 px-3" data-bs-dismiss="modal">ОК</button>
             </div>
         </div>
     </div>
@@ -121,6 +526,9 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
 <script define:vars={{ missionName, hardcoreReset }}>
     let attempts = 0;
     let startTime = Date.now();
+    let editor = null;
+    let isNonPrintingActive = false;
+    let isRulerActive = true;
 
     function sendTelemetry(actionType, status, success = false) {
         const msg = {
@@ -134,73 +542,571 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             success: success
         };
         window.parent.postMessage(msg, '*');
+
+        if (window.parent === window) {
+            fetch('/api/telemetry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student_firstName: 'Test',
+                    student_lastName: 'Student',
+                    student_class: '7-класс',
+                    course_slug: '7-класс',
+                    lesson_id: '22',
+                    level_number: 1,
+                    mission_name: missionName,
+                    action_type: actionType,
+                    status: status,
+                    time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
+                    attempts_count: attempts,
+                    success: success,
+                    is_hardcore: typeof localStorage !== 'undefined' && localStorage.getItem('hardcore_mode') === 'true'
+                })
+            }).catch(() => {});
+        }
     }
 
     sendTelemetry('in_progress', 'in_progress');
 
-    let editor = null;
-    
     document.addEventListener('DOMContentLoaded', () => {
+        // Инициализация Jodit без родного тулбара, так как мы отрисовали аутентичную панель LibreOffice
         editor = Jodit.make('#writer-editor', {
             theme: 'default',
+            toolbar: false,
             toolbarSticky: false,
             showCharsCounter: false,
             showWordsCounter: false,
             showXPathInStatusbar: false,
             height: '100%',
             language: 'ru',
-            // Имитация панели инструментов LibreOffice Writer (Стандартная + Форматирование)
-                        buttons: [
-                'undo', 'redo', '|',
-                'cut', 'copy', 'paste', '|',
-                'find', 'source', '|',
-                'table', 'image', 'hr', 'link', 'symbol', '|',
-                '\n',
-                'paragraph', 'font', 'fontsize', '|',
-                'bold', 'italic', 'underline', 'strikethrough', '|',
-                'superscript', 'subscript', '|',
-                'eraser', 'brush', '|',
-                'align', 'ul', 'ol', '|',
-                'outdent', 'indent'
-            ],
-            toolbarAdaptive: false,
             events: {
-                change: () => updateStatusbarWords()
+                change: () => {
+                    updateStatusbarWords();
+                },
+                afterInit: () => {
+                    // Скрываем родной статусбар Jodit
+                    const jsb = document.querySelector('.jodit-status-bar');
+                    if (jsb) jsb.style.display = 'none';
+                    updateStatusbarWords();
+                }
             }
         });
+
+        // Слушатель смены выделения в документе для обновления активных кнопок панели
+        document.addEventListener('selectionchange', updateToolbarActiveStates);
         
-        // Скрываем родной статусбар Jodit, так как мы сделали свой кастомный LibreOffice
-        const joditStatusbar = document.querySelector('.jodit-status-bar');
-        if (joditStatusbar) {
-            joditStatusbar.style.display = 'none';
-        }
-        
-        // Инициализация счетчика слов
-        setTimeout(updateStatusbarWords, 100);
+        // Привязка действий тулбара и меню
+        bindToolbarAndMenuActions();
+
+        // Инициализация модалок Bootstrap
+        initModals();
+
+        // Зум листа
+        initZoom();
     });
-    
+
     function updateStatusbarWords() {
-        if(!editor) return;
-        const text = editor.text;
-        const chars = text.replace(/\s/g, '').length;
+        if (!editor) return;
+        const text = editor.text || '';
+        const charsNoSpace = text.replace(/\s/g, '').length;
+        const charsTotal = text.length;
         const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+        
         const sbWords = document.getElementById('statusbar-words');
-        if(sbWords) {
-            sbWords.innerText = `${words} слов, ${chars} символов`;
+        if (sbWords) {
+            sbWords.innerText = `${words} слов, ${charsNoSpace} символов`;
+        }
+
+        // Статистика в модалке
+        const statW = document.getElementById('stat-words');
+        const statCNS = document.getElementById('stat-chars-nospace');
+        const statCT = document.getElementById('stat-chars-total');
+        const statP = document.getElementById('stat-paragraphs');
+        if (statW) statW.innerText = words;
+        if (statCNS) statCNS.innerText = charsNoSpace;
+        if (statCT) statCT.innerText = charsTotal;
+        if (statP && editor.editor) {
+            const paras = editor.editor.querySelectorAll('p, h1, h2, h3, li');
+            statP.innerText = Math.max(1, paras.length);
         }
     }
 
+    // Подсветка активных кнопок форматирования в зависимости от положения курсора
+    function updateToolbarActiveStates() {
+        if (!editor || !document.activeElement) return;
+        
+        const isBold = document.queryCommandState('bold');
+        const isItalic = document.queryCommandState('italic');
+        const isUnderline = document.queryCommandState('underline');
+        const isStrike = document.queryCommandState('strikethrough');
+        const isSup = document.queryCommandState('superscript');
+        const isSub = document.queryCommandState('subscript');
+        const isJustifyLeft = document.queryCommandState('justifyleft');
+        const isJustifyCenter = document.queryCommandState('justifycenter');
+        const isJustifyRight = document.queryCommandState('justifyright');
+        const isJustifyFull = document.queryCommandState('justifyfull');
+        const isUL = document.queryCommandState('insertunorderedlist');
+        const isOL = document.queryCommandState('insertorderedlist');
+
+        toggleBtnActive('btn-bold', isBold);
+        toggleBtnActive('btn-italic', isItalic);
+        toggleBtnActive('btn-underline', isUnderline);
+        toggleBtnActive('btn-strikethrough', isStrike);
+        toggleBtnActive('btn-sup', isSup);
+        toggleBtnActive('btn-sub', isSub);
+        toggleBtnActive('btn-align-left', isJustifyLeft);
+        toggleBtnActive('btn-align-center', isJustifyCenter);
+        toggleBtnActive('btn-align-right', isJustifyRight);
+        toggleBtnActive('btn-align-justify', isJustifyFull);
+        toggleBtnActive('btn-ul', isUL);
+        toggleBtnActive('btn-ol', isOL);
+    }
+
+    function toggleBtnActive(id, isActive) {
+        const btn = document.getElementById(id);
+        if (btn) {
+            if (isActive) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+    }
+
+    function bindToolbarAndMenuActions() {
+        // --- СТАНДАРТНАЯ ПАНЕЛЬ И МЕНЮ ФАЙЛ ---
+        const onNew = () => { if (confirm('Создать новый документ?')) editor.value = '<p></p>'; };
+        document.getElementById('btn-new')?.addEventListener('click', onNew);
+        document.getElementById('menu-file-new')?.addEventListener('click', onNew);
+
+        const onOpen = () => { alert('LibreOffice Writer: функция открытия локального файла отключена в режиме тренажера.'); };
+        document.getElementById('btn-open')?.addEventListener('click', onOpen);
+        document.getElementById('menu-file-open')?.addEventListener('click', onOpen);
+
+        // Загрузка типового образца текста для ОГЭ 13.2
+        document.getElementById('menu-file-sample')?.addEventListener('click', () => {
+            editor.value = `<p>Российская Федерация — крупнейшее государство мира, расположенное на востоке Европы и севере Азии. Территория страны составляет более 17 млн км² и омывается водами 12 морей.</p>
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+  <thead>
+    <tr>
+      <th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Субъект РФ</th>
+      <th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Площадь (тыс. км²)</th>
+      <th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">Население (млн чел.)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="border: 1px solid #000; padding: 6px; text-align: left;">Москва</td>
+      <td style="border: 1px solid #000; padding: 6px; text-align: center;">2.56</td>
+      <td style="border: 1px solid #000; padding: 6px; text-align: center;">13.1</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #000; padding: 6px; text-align: left;">Санкт-Петербург</td>
+      <td style="border: 1px solid #000; padding: 6px; text-align: center;">1.44</td>
+      <td style="border: 1px solid #000; padding: 6px; text-align: center;">5.6</td>
+    </tr>
+  </tbody>
+</table>`;
+        });
+
+        const onSave = () => {
+            const blob = new Blob([editor.value], { type: 'text/html;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'document.html';
+            a.click();
+        };
+        document.getElementById('btn-save')?.addEventListener('click', onSave);
+        document.getElementById('menu-file-save')?.addEventListener('click', onSave);
+
+        const onPrint = () => { window.print(); };
+        document.getElementById('btn-print')?.addEventListener('click', onPrint);
+        document.getElementById('btn-pdf')?.addEventListener('click', onPrint);
+        document.getElementById('btn-printpreview')?.addEventListener('click', onPrint);
+        document.getElementById('menu-file-print')?.addEventListener('click', onPrint);
+        document.getElementById('menu-file-pdf')?.addEventListener('click', onPrint);
+
+        // Буфер обмена и отмена
+        document.getElementById('btn-undo')?.addEventListener('click', () => editor.execCommand('undo'));
+        document.getElementById('menu-edit-undo')?.addEventListener('click', () => editor.execCommand('undo'));
+        document.getElementById('btn-redo')?.addEventListener('click', () => editor.execCommand('redo'));
+        document.getElementById('menu-edit-redo')?.addEventListener('click', () => editor.execCommand('redo'));
+
+        document.getElementById('btn-cut')?.addEventListener('click', () => editor.execCommand('cut'));
+        document.getElementById('menu-edit-cut')?.addEventListener('click', () => editor.execCommand('cut'));
+        document.getElementById('btn-copy')?.addEventListener('click', () => editor.execCommand('copy'));
+        document.getElementById('menu-edit-copy')?.addEventListener('click', () => editor.execCommand('copy'));
+        document.getElementById('btn-paste')?.addEventListener('click', () => editor.execCommand('paste'));
+        document.getElementById('menu-edit-paste')?.addEventListener('click', () => editor.execCommand('paste'));
+        document.getElementById('menu-edit-selectall')?.addEventListener('click', () => editor.execCommand('selectall'));
+
+        // Найти и заменить
+        const onFind = () => {
+            const query = prompt('Введите текст для поиска:');
+            if (query) {
+                const replaceWith = prompt(`Заменить "${query}" на:`);
+                if (replaceWith !== null) {
+                    editor.value = editor.value.split(query).join(replaceWith);
+                }
+            }
+        };
+        document.getElementById('btn-find')?.addEventListener('click', onFind);
+        document.getElementById('menu-edit-find')?.addEventListener('click', onFind);
+
+        // Непечатаемые символы (¶)
+        const toggleNonPrinting = () => {
+            isNonPrintingActive = !isNonPrintingActive;
+            const container = document.getElementById('workspace-wrapper');
+            const btn = document.getElementById('btn-nonprinting');
+            if (isNonPrintingActive) {
+                container?.classList.add('lo-show-nonprinting');
+                btn?.classList.add('active');
+            } else {
+                container?.classList.remove('lo-show-nonprinting');
+                btn?.classList.remove('active');
+            }
+        };
+        document.getElementById('btn-nonprinting')?.addEventListener('click', toggleNonPrinting);
+        document.getElementById('menu-view-nonprinting')?.addEventListener('click', toggleNonPrinting);
+
+        // Переключение линейки
+        document.getElementById('menu-view-ruler')?.addEventListener('click', () => {
+            isRulerActive = !isRulerActive;
+            const rContainer = document.getElementById('lo-ruler-container');
+            const check = document.getElementById('ruler-check-mark');
+            if (rContainer) rContainer.style.display = isRulerActive ? 'block' : 'none';
+            if (check) check.innerText = isRulerActive ? '✓' : '';
+        });
+
+        // Полноэкранный режим
+        document.getElementById('menu-view-fullscreen')?.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.getElementById('editor-container')?.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        });
+
+        // Вставка разрыва страницы и горизонтальной линии
+        const onPageBreak = () => { editor.selection.insertHTML('<hr style="page-break-after: always; border: 1px dashed #999; margin: 20px 0;" />'); };
+        document.getElementById('btn-pagebreak')?.addEventListener('click', onPageBreak);
+        document.getElementById('menu-insert-pagebreak')?.addEventListener('click', onPageBreak);
+        document.getElementById('menu-insert-hr')?.addEventListener('click', () => editor.selection.insertHTML('<hr />'));
+        document.getElementById('btn-image')?.addEventListener('click', () => {
+            const url = prompt('Введите URL изображения:');
+            if (url) editor.selection.insertHTML(`<img src="${url}" style="max-width: 100%; height: auto;" />`);
+        });
+
+        // --- ПАНЕЛЬ ФОРМАТИРОВАНИЯ И МЕНЮ ФОРМАТ ---
+        // Стиль абзаца
+        document.getElementById('select-style')?.addEventListener('change', (e) => {
+            const tag = e.target.value;
+            editor.execCommand('formatBlock', false, tag);
+        });
+
+        // Гарнитура шрифта
+        document.getElementById('select-font')?.addEventListener('change', (e) => {
+            const font = e.target.value;
+            editor.execCommand('fontname', false, font);
+        });
+
+        // Размер шрифта
+        document.getElementById('select-fontsize')?.addEventListener('change', (e) => {
+            const size = e.target.value;
+            // Применяем CSS-размер шрифта к текущему выделению
+            editor.selection.applyStyle({ fontSize: size });
+        });
+
+        // Форматирование текста
+        const bindCmd = (btnId, menuId, cmd) => {
+            const fn = () => { editor.execCommand(cmd); updateToolbarActiveStates(); };
+            document.getElementById(btnId)?.addEventListener('click', fn);
+            if (menuId) document.getElementById(menuId)?.addEventListener('click', fn);
+        };
+        bindCmd('btn-bold', 'menu-format-bold', 'bold');
+        bindCmd('btn-italic', 'menu-format-italic', 'italic');
+        bindCmd('btn-underline', 'menu-format-underline', 'underline');
+        bindCmd('btn-strikethrough', 'menu-format-strikethrough', 'strikethrough');
+        bindCmd('btn-sup', 'menu-format-sup', 'superscript');
+        bindCmd('btn-sub', 'menu-format-sub', 'subscript');
+        
+        // Очистить прямое форматирование (Ctrl+M)
+        const onClearFormat = () => {
+            editor.execCommand('removeFormat');
+            // Очищаем локальные инлайн-стили абзаца
+            const block = editor.selection.current();
+            if (block) {
+                const p = block.closest('p, h1, h2, h3, li');
+                if (p) {
+                    p.style.textIndent = '';
+                    p.style.lineHeight = '';
+                    p.style.textAlign = '';
+                    p.style.marginTop = '';
+                    p.style.marginBottom = '';
+                }
+            }
+        };
+        document.getElementById('btn-eraser')?.addEventListener('click', onClearFormat);
+        document.getElementById('menu-format-clear')?.addEventListener('click', onClearFormat);
+
+        // Цвета
+        document.getElementById('btn-fontcolor')?.addEventListener('click', () => {
+            const color = prompt('Введите цвет текста (например: #ff0000, blue, black):', '#000000');
+            if (color) editor.execCommand('foreColor', false, color);
+        });
+        document.getElementById('btn-backcolor')?.addEventListener('click', () => {
+            const color = prompt('Введите цвет фона/выделения (например: yellow, #e0e0e0):', '#ffff00');
+            if (color) editor.execCommand('hiliteColor', false, color);
+        });
+
+        // Выравнивание
+        bindCmd('btn-align-left', 'menu-format-align-left', 'justifyleft');
+        bindCmd('btn-align-center', 'menu-format-align-center', 'justifycenter');
+        bindCmd('btn-align-right', 'menu-format-align-right', 'justifyright');
+        bindCmd('btn-align-justify', 'menu-format-align-justify', 'justifyfull');
+
+        // Списки
+        document.getElementById('btn-ul')?.addEventListener('click', () => editor.execCommand('insertunorderedlist'));
+        document.getElementById('btn-ol')?.addEventListener('click', () => editor.execCommand('insertorderedlist'));
+
+        // Отступы
+        document.getElementById('btn-outdent')?.addEventListener('click', () => editor.execCommand('outdent'));
+        document.getElementById('btn-indent')?.addEventListener('click', () => editor.execCommand('indent'));
+
+        // Междустрочный интервал
+        document.querySelectorAll('[data-lineheight]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                const lh = el.getAttribute('data-lineheight');
+                applyParagraphStyle({ lineHeight: lh });
+            });
+        });
+
+        // Межабзацный интервал
+        document.getElementById('act-para-add-bottom')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            applyParagraphStyle({ marginBottom: '6pt' });
+        });
+        document.getElementById('act-para-add-top')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            applyParagraphStyle({ marginTop: '6pt' });
+        });
+        document.getElementById('act-para-remove')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            applyParagraphStyle({ marginTop: '0', marginBottom: '0' });
+        });
+
+        // Клик по линейке для быстрой установки красной строки 1 см (ОГЭ)
+        document.getElementById('ruler-first-line')?.addEventListener('click', () => {
+            applyParagraphStyle({ textIndent: '1.0cm' });
+            alert('LibreOffice: для текущего абзаца установлен отступ первой строки (красная строка) 1,00 см');
+        });
+
+        // Сервис: статистика
+        const onWordCount = () => {
+            updateStatusbarWords();
+            const modalEl = document.getElementById('modal-wordcount');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('menu-tools-wordcount')?.addEventListener('click', onWordCount);
+        document.getElementById('menu-tools-spelling')?.addEventListener('click', () => {
+            alert('LibreOffice Writer: проверка правописания завершена. Ошибок не обнаружено.');
+        });
+        document.getElementById('menu-help-about')?.addEventListener('click', () => {
+            alert('LibreOffice Writer Community 24.x\nЭмулятор офисного пакета для подготовки к ОГЭ по информатике (Задание 13.2)');
+        });
+    }
+
+    let lastActivePara = null;
+
+    // Применение стилей к текущему абзацу или группе выделенных абзацев
+    function applyParagraphStyle(styles) {
+        if (!editor) return;
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (!wysiwyg) return;
+
+        let targets = [];
+        const sel = editor.selection ? editor.selection.current() : null;
+        if (sel) {
+            const p = sel.closest ? sel.closest('p, h1, h2, h3, li') : (sel.parentElement ? sel.parentElement.closest('p, h1, h2, h3, li') : null);
+            if (p) targets = [p];
+        }
+        if (targets.length === 0 && lastActivePara && document.contains(lastActivePara)) {
+            targets = [lastActivePara];
+        }
+        if (targets.length === 0) {
+            const allP = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
+            targets = allP.length > 0 ? Array.from(allP) : [wysiwyg];
+        }
+
+        targets.forEach(target => {
+            if (styles.textIndent !== undefined) target.style.textIndent = styles.textIndent;
+            if (styles.lineHeight !== undefined) target.style.lineHeight = styles.lineHeight;
+            if (styles.textAlign !== undefined) target.style.textAlign = styles.textAlign;
+            if (styles.marginTop !== undefined) target.style.marginTop = styles.marginTop;
+            if (styles.marginBottom !== undefined) target.style.marginBottom = styles.marginBottom;
+            if (styles.marginLeft !== undefined) target.style.marginLeft = styles.marginLeft;
+            if (styles.marginRight !== undefined) target.style.marginRight = styles.marginRight;
+        });
+        updateStatusbarWords();
+    }
+
+    // Инициализация диалоговых окон
+    function initModals() {
+        // 1. Диалог «Абзац...»
+        const openParaDialog = (e) => {
+            if (e) e.preventDefault();
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            const sel = editor.selection ? editor.selection.current() : null;
+            if (sel) {
+                lastActivePara = sel.closest ? sel.closest('p, h1, h2, h3, li') : (sel.parentElement ? sel.parentElement.closest('p, h1, h2, h3, li') : null);
+            }
+            if (!lastActivePara && wysiwyg) {
+                lastActivePara = wysiwyg.querySelector('p, h1, h2, h3, li');
+            }
+            const modalEl = document.getElementById('modal-paragraph');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('menu-format-paragraph')?.addEventListener('click', openParaDialog);
+
+        document.getElementById('btn-apply-paragraph')?.addEventListener('click', () => {
+            const firstLine = document.getElementById('dialog-para-firstline')?.value || '1.0';
+            const left = document.getElementById('dialog-para-left')?.value || '0.0';
+            const right = document.getElementById('dialog-para-right')?.value || '0.0';
+            const top = document.getElementById('dialog-para-top')?.value || '0';
+            const bottom = document.getElementById('dialog-para-bottom')?.value || '0';
+            const lh = document.getElementById('dialog-para-lineheight')?.value || '1.0';
+            const alignRadio = document.querySelector('input[name="dialog-align"]:checked')?.value || 'justify';
+
+            applyParagraphStyle({
+                textIndent: `${firstLine}cm`,
+                marginLeft: `${left}cm`,
+                marginRight: `${right}cm`,
+                marginTop: `${top}pt`,
+                marginBottom: `${bottom}pt`,
+                lineHeight: lh,
+                textAlign: alignRadio
+            });
+
+            // Закрываем модалку
+            const modalEl = document.getElementById('modal-paragraph');
+            if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
+        });
+
+        // 2. Диалог «Таблица...»
+        const openTableDialog = (e) => {
+            if (e) e.preventDefault();
+            const modalEl = document.getElementById('modal-table');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('btn-table')?.addEventListener('click', openTableDialog);
+        document.getElementById('menu-insert-table')?.addEventListener('click', openTableDialog);
+        document.getElementById('menu-table-insert')?.addEventListener('click', openTableDialog);
+
+        document.getElementById('btn-apply-table')?.addEventListener('click', () => {
+            const cols = parseInt(document.getElementById('dialog-table-cols')?.value || '3', 10);
+            const rows = parseInt(document.getElementById('dialog-table-rows')?.value || '3', 10);
+            
+            let html = '<table style="width: 100%; border-collapse: collapse; margin: 12px 0;"><thead><tr>';
+            for (let c = 1; c <= cols; c++) {
+                html += `<th style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; background: #fafafa;">Заголовок ${c}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+            for (let r = 1; r <= rows - 1; r++) {
+                html += '<tr>';
+                for (let c = 1; c <= cols; c++) {
+                    html += `<td style="border: 1px solid #000; padding: 6px; text-align: left;">Ячейка ${r},${c}</td>`;
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table><p></p>';
+            editor.selection.insertHTML(html);
+
+            const modalEl = document.getElementById('modal-table');
+            if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
+        });
+
+        // Операции над таблицей (строки / столбцы)
+        document.getElementById('menu-table-row-above')?.addEventListener('click', () => {
+            const cell = editor.selection.current()?.closest('td, th');
+            if (cell) {
+                const tr = cell.closest('tr');
+                const newTr = tr.cloneNode(true);
+                Array.from(newTr.children).forEach(td => td.innerHTML = '&nbsp;');
+                tr.parentNode.insertBefore(newTr, tr);
+            }
+        });
+        document.getElementById('menu-table-row-below')?.addEventListener('click', () => {
+            const cell = editor.selection.current()?.closest('td, th');
+            if (cell) {
+                const tr = cell.closest('tr');
+                const newTr = tr.cloneNode(true);
+                Array.from(newTr.children).forEach(td => td.innerHTML = '&nbsp;');
+                tr.after(newTr);
+            }
+        });
+        document.getElementById('menu-table-row-delete')?.addEventListener('click', () => {
+            editor.selection.current()?.closest('tr')?.remove();
+        });
+        document.getElementById('menu-table-delete')?.addEventListener('click', () => {
+            editor.selection.current()?.closest('table')?.remove();
+        });
+
+        // 3. Диалог «Специальные символы...»
+        const openSymbolsDialog = (e) => {
+            if (e) e.preventDefault();
+            const modalEl = document.getElementById('modal-symbols');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
+        };
+        document.getElementById('btn-symbol')?.addEventListener('click', openSymbolsDialog);
+        document.getElementById('menu-insert-symbols')?.addEventListener('click', openSymbolsDialog);
+
+        document.querySelectorAll('.lo-sym-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sym = btn.getAttribute('data-sym');
+                if (sym) editor.selection.insertHTML(sym);
+                const modalEl = document.getElementById('modal-symbols');
+                if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
+            });
+        });
+    }
+
+    // Зум (масштабирование страницы)
+    function initZoom() {
+        const slider = document.getElementById('zoom-slider');
+        const valText = document.getElementById('zoom-val');
+        const applyZoom = (val) => {
+            valText.innerText = `${val}%`;
+            const scale = val / 100;
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            if (wysiwyg) {
+                wysiwyg.style.transform = `scale(${scale})`;
+                wysiwyg.style.transformOrigin = 'top center';
+            }
+        };
+        slider?.addEventListener('input', (e) => applyZoom(e.target.value));
+        document.getElementById('zoom-in')?.addEventListener('click', () => {
+            let v = Math.min(150, parseInt(slider.value, 10) + 10);
+            slider.value = v;
+            applyZoom(v);
+        });
+        document.getElementById('zoom-out')?.addEventListener('click', () => {
+            let v = Math.max(50, parseInt(slider.value, 10) - 10);
+            slider.value = v;
+            applyZoom(v);
+        });
+    }
+
+    // Валидация решения (кнопка ПРОВЕРИТЬ ДОКУМЕНТ)
     document.getElementById('check-btn').addEventListener('click', () => {
         if (!editor) return;
         attempts++;
-        const content = editor.value;
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        const content = (wysiwyg && wysiwyg.innerHTML) ? wysiwyg.innerHTML : editor.value;
         const statusEl = document.getElementById('writer-status');
         
         const event = new CustomEvent('writer-check', { 
             detail: { 
                 html: content, 
                 resolve: (success, msg, isFinal = true) => {
-                    if(success) {
+                    if (success) {
                         statusEl.className = 'text-success fw-bold px-2';
                         statusEl.innerText = msg || '✅ Проверено. Задание выполнено!';
                         if (isFinal) {
@@ -210,7 +1116,7 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
                         statusEl.className = 'text-danger fw-bold px-2';
                         statusEl.innerText = msg || '❌ Ошибка форматирования!';
                         sendTelemetry('hardcore_reset', 'in_progress', false);
-                        if(hardcoreReset) {
+                        if (hardcoreReset) {
                             editor.value = ''; 
                         }
                     }
@@ -219,80 +1125,176 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
             }
         });
         
-        const eventFired = document.dispatchEvent(event);
-        if(!event.defaultPrevented) console.log("Контент отправлен:", content);
+        document.dispatchEvent(event);
     });
 </script>
 
 <style is:global>
-    /* ПРИБЛИЖАЕМ СТИЛИ К LIBREOFFICE WRITER (COLIBRE THEME) */
+    /* ================= СТИЛИЗАЦИЯ ПОД LIBREOFFICE WRITER (COLIBRE THEME) ================= */
 
-    /* Убираем скругления */
-    .jodit-toolbar__box, .jodit-workplace, .jodit-container { 
-        border-radius: 0 !important; 
-        border: none !important;
+    .lo-menu-item {
+        border-radius: 2px;
+        cursor: default;
     }
-    
-    /* Тулбар LibreOffice: серый фон, без рамок */
-    .jodit-toolbar__box {
-        background-color: #f0f0f0 !important;
-        border-bottom: 1px solid #ccc !important;
-        padding: 4px 6px !important;
+    .lo-menu-item:hover, .lo-menu-item[aria-expanded="true"] {
+        background-color: #d6e2ff !important;
+        color: #0b57d0 !important;
     }
 
-    /* Кнопки LibreOffice (квадратные, плоские, голубой hover) */
-    .jodit-toolbar-button__button {
-        border-radius: 2px !important;
-        margin: 0 1px !important;
-        min-height: 26px !important;
-        min-width: 26px !important;
+    .lo-dropdown-menu {
+        font-size: 13px !important;
+        border-color: #b5b5b5 !important;
+        border-radius: 0 !important;
+        box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.15) !important;
     }
-    
-    .jodit-toolbar-button__button:hover {
+    .lo-dropdown-menu .dropdown-item {
+        padding: 4px 14px !important;
+        color: #222 !important;
+    }
+    .lo-dropdown-menu .dropdown-item:hover {
+        background-color: #d6e2ff !important;
+        color: #000 !important;
+    }
+
+    /* Кнопки панели инструментов */
+    .lo-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 2px;
+        width: 28px;
+        height: 26px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: default;
+        transition: background-color 0.1s, border-color 0.1s;
+    }
+    .lo-btn:hover {
         background-color: #d6e2ff !important;
         border-color: #a4b9e0 !important;
     }
-    
-    /* Разделители тулбара */
-    .jodit-toolbar-button_separator {
-        border-left: 1px solid #ccc !important;
-        margin: 0 4px !important;
+    .lo-btn:active, .lo-btn.active {
+        background-color: #c2d7ff !important;
+        border-color: #79a6f6 !important;
     }
 
-    /* Внешний фон (Серый стол, на котором лежит белый лист) */
+    .lo-icon {
+        width: 18px;
+        height: 18px;
+        display: inline-block;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+    /* Разделители панели инструментов */
+    .lo-divider {
+        width: 1px;
+        height: 20px;
+        background-color: #ccc;
+        margin: 0 3px;
+        display: inline-block;
+    }
+
+    /* Выпадающие списки (стили, шрифты, кегль) */
+    .lo-select {
+        height: 24px;
+        font-size: 12px;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        border: 1px solid #b5b5b5;
+        border-radius: 2px;
+        background-color: #fff;
+        color: #222;
+        padding: 0 4px;
+        outline: none;
+    }
+    .lo-select:focus {
+        border-color: #0d6efd;
+    }
+
+    /* Рабочая область: серый стол и белый лист формата А4 */
+    .jodit-container {
+        border: none !important;
+        background-color: #e4e4e4 !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
     .jodit-workplace {
         background-color: #e4e4e4 !important;
-        padding: 20px 0 !important;
+        padding: 24px 0 60px 0 !important;
         overflow-y: auto !important;
-        /* Тень внутри рабочего пространства как в LibreOffice */
-        box-shadow: inset 0 0 10px rgba(0,0,0,0.05) !important;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.06) !important;
+        border: none !important;
+        border-radius: 0 !important;
     }
 
     /* Сам лист формата А4 */
     .jodit-wysiwyg {
         background-color: #ffffff !important;
-        max-width: 800px !important;
+        width: 800px !important;
         min-height: 1131px !important; /* Пропорция A4 */
         margin: 0 auto !important;
-        padding: 60px 80px !important; /* Поля документа по ГОСТу примерно */
-        box-shadow: 1px 2px 5px rgba(0,0,0,0.3) !important;
+        padding: 60px 80px !important; /* Поля документа (2.0 см) */
+        box-shadow: 1px 3px 10px rgba(0,0,0,0.25) !important;
         border: 1px solid #c0c0c0 !important;
         outline: none !important;
-        font-family: 'Times New Roman', serif !important; /* Шрифт по умолчанию */
+        font-family: 'Liberation Serif', 'Times New Roman', serif !important;
         font-size: 14pt !important;
         line-height: 1.5 !important;
+        color: #000 !important;
+        transition: transform 0.15s ease-out;
     }
 
-    /* Мелкие вспомогательные классы */
-    .hover-bg-light:hover {
+    /* Таблицы в стиле LibreOffice */
+    .jodit-wysiwyg table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        margin: 12px 0 !important;
+    }
+    .jodit-wysiwyg th, .jodit-wysiwyg td {
+        border: 1px solid #000000 !important;
+        padding: 6px 8px !important;
+    }
+
+    /* Режим непечатаемых символов (Ctrl+F10) */
+    .lo-show-nonprinting .jodit-wysiwyg p::after,
+    .lo-show-nonprinting .jodit-wysiwyg h1::after,
+    .lo-show-nonprinting .jodit-wysiwyg h2::after,
+    .lo-show-nonprinting .jodit-wysiwyg h3::after,
+    .lo-show-nonprinting .jodit-wysiwyg li::after {
+        content: " ¶";
+        color: #0066cc;
+        opacity: 0.65;
+        font-weight: normal;
+        user-select: none;
+    }
+    .lo-show-nonprinting .jodit-wysiwyg p:empty::before {
+        content: "¶";
+        color: #0066cc;
+        opacity: 0.65;
+        user-select: none;
+    }
+
+    /* Палитра спецсимволов */
+    .lo-symbols-palette .lo-sym-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .lo-symbols-palette .lo-sym-btn:hover {
         background-color: #d6e2ff;
-        cursor: pointer;
+        color: #000;
+        border-color: #0d6efd;
     }
-    
-    .cursor-pointer {
-        cursor: default; /* В нативных приложениях курсор обычный, не поинтер на меню */
-    }
-    
+
     /* Стилизация ползунка масштаба (zoom) в статусбаре */
     .form-range::-webkit-slider-thumb {
         background: #0d6efd;
@@ -300,56 +1302,4 @@ const { missionName, initialHTML = '<p></p>', hardcoreReset = false } = Astro.pr
     .form-range::-webkit-slider-runnable-track {
         background: #dee2e6;
     }
-
-    /* Заменяем иконки Jodit на оригинальные LibreOffice (Colibre SVG) */
-    .jodit-toolbar-button__icon {
-        display: none !important; /* Скрываем нативные SVG от Jodit */
-    }
-
-    .jodit-toolbar-button__button {
-        background-size: 16px 16px !important;
-        background-repeat: no-repeat !important;
-        background-position: center !important;
-    }
-
-    .jodit-toolbar-button_undo .jodit-toolbar-button__button { background-image: url('/static/colibre/undo.svg') !important; }
-    .jodit-toolbar-button_redo .jodit-toolbar-button__button { background-image: url('/static/colibre/redo.svg') !important; }
-    .jodit-toolbar-button_cut .jodit-toolbar-button__button { background-image: url('/static/colibre/cut.svg') !important; }
-    .jodit-toolbar-button_copy .jodit-toolbar-button__button { background-image: url('/static/colibre/copy.svg') !important; }
-    .jodit-toolbar-button_paste .jodit-toolbar-button__button { background-image: url('/static/colibre/paste.svg') !important; }
-    .jodit-toolbar-button_find .jodit-toolbar-button__button { background-image: url('/static/colibre/find.svg') !important; }
-    .jodit-toolbar-button_source .jodit-toolbar-button__button { background-image: url('/static/colibre/source.svg') !important; }
-    
-    .jodit-toolbar-button_paragraph .jodit-toolbar-button__button { background-image: url('/static/colibre/paragraph.svg') !important; }
-    .jodit-toolbar-button_font .jodit-toolbar-button__button { background-image: url('/static/colibre/font.svg') !important; }
-    .jodit-toolbar-button_fontsize .jodit-toolbar-button__button { background-image: url('/static/colibre/fontsize.svg') !important; }
-    
-    .jodit-toolbar-button_bold .jodit-toolbar-button__button { background-image: url('/static/colibre/bold.svg') !important; }
-    .jodit-toolbar-button_italic .jodit-toolbar-button__button { background-image: url('/static/colibre/italic.svg') !important; }
-    .jodit-toolbar-button_underline .jodit-toolbar-button__button { background-image: url('/static/colibre/underline.svg') !important; }
-    .jodit-toolbar-button_strikethrough .jodit-toolbar-button__button { background-image: url('/static/colibre/strikethrough.svg') !important; }
-    
-    .jodit-toolbar-button_superscript .jodit-toolbar-button__button { background-image: url('/static/colibre/superscript.svg') !important; }
-    .jodit-toolbar-button_subscript .jodit-toolbar-button__button { background-image: url('/static/colibre/subscript.svg') !important; }
-    
-    .jodit-toolbar-button_brush .jodit-toolbar-button__button { background-image: url('/static/colibre/brush.svg') !important; }
-    .jodit-toolbar-button_eraser .jodit-toolbar-button__button { background-image: url('/static/colibre/eraser.svg') !important; }
-    
-    .jodit-toolbar-button_align .jodit-toolbar-button__button { background-image: url('/static/colibre/align.svg') !important; }
-    .jodit-toolbar-button_ul .jodit-toolbar-button__button { background-image: url('/static/colibre/ul.svg') !important; }
-    .jodit-toolbar-button_ol .jodit-toolbar-button__button { background-image: url('/static/colibre/ol.svg') !important; }
-    
-    .jodit-toolbar-button_outdent .jodit-toolbar-button__button { background-image: url('/static/colibre/outdent.svg') !important; }
-    .jodit-toolbar-button_indent .jodit-toolbar-button__button { background-image: url('/static/colibre/indent.svg') !important; }
-    
-    .jodit-toolbar-button_table .jodit-toolbar-button__button { background-image: url('/static/colibre/table.svg') !important; }
-    .jodit-toolbar-button_link .jodit-toolbar-button__button { background-image: url('/static/colibre/link.svg') !important; }
-    .jodit-toolbar-button_image .jodit-toolbar-button__button { background-image: url('/static/colibre/image.svg') !important; }
-    .jodit-toolbar-button_hr .jodit-toolbar-button__button { background-image: url('/static/colibre/hr.svg') !important; }
-
-    .lo-menu-item:hover, .lo-menu-item[aria-expanded="true"] {
-        background-color: #d6e2ff;
-        cursor: default;
-    }
-    .jodit-toolbar-button_symbol .jodit-toolbar-button__button { background-image: url('/static/colibre/symbol.svg') !important; }
 </style>

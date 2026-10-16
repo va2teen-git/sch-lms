@@ -5,12 +5,13 @@ test.describe('7 класс - Урок 22', () => {
 
   test('Успешное форматирование текста (3 фазы)', async ({ page }) => {
     // В данном случае мы можем тестировать сам iframe / саму страницу напрямую, так как мы разрабатывали только ее
-    await page.goto('http://localhost:4321/tasks/7-класс/22/level1');
+    await page.goto('/tasks/7-класс/22/level1');
     
     for (let phase = 1; phase <= 3; phase++) {
       // Ждем загрузки задачи
       const taskDescription = page.locator('#task-description');
       await expect(taskDescription).toBeVisible();
+      await expect(taskDescription).not.toContainText('Загрузка');
       
       const text = await taskDescription.innerText();
       // Пример текста: "Напишите предложение, содержащее слово Процессор, и выделите это слово жирным шрифтом."
@@ -48,8 +49,8 @@ test.describe('7 класс - Урок 22', () => {
       const status = page.locator('#writer-status');
       if (phase < 3) {
         await expect(status).toContainText(`Фаза ${phase} пройдена!`);
-        // Ожидаем очистки статуса и генерации нового задания (1500мс в коде, подождем 2 сек)
-        await page.waitForTimeout(2000);
+        // Ожидаем очистки статуса и генерации нового задания (1500мс в коде)
+        await expect(status).toBeEmpty({ timeout: 5000 });
       } else {
         await expect(status).toContainText('Отлично! Уровень полностью пройден.');
       }
@@ -61,7 +62,7 @@ test.describe('7 класс - Урок 22', () => {
 
   test('Обработка ошибок в хардкор-режиме', async ({ page }) => {
     // Переход на страницу и включение хардкора
-    await page.goto('http://localhost:4321/tasks/7-класс/22/level1');
+    await page.goto('/tasks/7-класс/22/level1');
     await page.evaluate(() => { localStorage.setItem('hardcore_mode', 'true'); });
     await page.reload();
     
