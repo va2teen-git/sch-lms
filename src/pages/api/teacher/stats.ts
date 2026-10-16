@@ -10,6 +10,7 @@ export interface LevelMetric {
   timeSpentSec: number;
   rawTimeSpentSec?: number;
   firstTs?: Date | null;
+  startTime?: Date | null;
   errors: number;
   attempts: number;
   completed: boolean;
@@ -158,7 +159,7 @@ export const GET: APIRoute = async ({ request }) => {
       SELECT id, first_name, last_name, class_name, mission_name, action_type,
              time_spent_sec, attempts_count, success, status, action_log,
              is_hardcore, student_class, course_slug, lesson_id, level_number,
-             attempt_id, attempt_number, attempt_mode, timestamp
+             attempt_id, attempt_number, attempt_mode, timestamp, start_time
       FROM telemetry
       WHERE 1=1 ${dateCondition} ${classCondition} ${courseCondition} ${lessonCondition} ${testCondition}
       ORDER BY timestamp ASC
@@ -202,9 +203,9 @@ export const GET: APIRoute = async ({ request }) => {
           lastSeen: r.timestamp,
           isActiveNow: false,
           levels: {
-            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null },
-            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null },
-            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, lastUpdated: null }
+            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, startTime: null, lastUpdated: null },
+            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, startTime: null, lastUpdated: null },
+            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, startTime: null, lastUpdated: null }
           },
           normalCompletedLevels: new Set<number>(),
           allHardcoreCompletedLevels: new Set<number>(),
@@ -239,6 +240,8 @@ export const GET: APIRoute = async ({ request }) => {
       s.lastSeen = r.timestamp;
       s.latestIsHardcore = r.is_hardcore;
       const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
+      const rStart = r.start_time ? new Date(r.start_time) : null;
+      const validStart = rStart && !isNaN(rStart.getTime()) ? rStart : null;
 
       // Determine attempt assignment
       let attId = r.attempt_id;
@@ -269,9 +272,9 @@ export const GET: APIRoute = async ({ request }) => {
           errorsCount: 0,
           completedLevelsCount: 0,
           levels: {
-            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, lastUpdated: null },
-            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, lastUpdated: null },
-            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, lastUpdated: null }
+            1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null, lastUpdated: null },
+            2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null, lastUpdated: null },
+            3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null, lastUpdated: null }
           }
         };
       }
@@ -313,6 +316,9 @@ export const GET: APIRoute = async ({ request }) => {
         aLvl.attempts++;
         aLvl.lastUpdated = r.timestamp;
         if (aLvl.firstTs === null && rTs) aLvl.firstTs = rTs;
+        if (validStart && (!aLvl.startTime || (typeof r.time_spent_sec === 'number' && r.time_spent_sec >= (aLvl.rawTimeSpentSec || 0)))) {
+          aLvl.startTime = validStart;
+        }
         if (isError) aLvl.errors++;
         if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (aLvl.rawTimeSpentSec || 0)) {
           aLvl.rawTimeSpentSec = r.time_spent_sec;
@@ -340,6 +346,9 @@ export const GET: APIRoute = async ({ request }) => {
         lvl.lastUpdated = r.timestamp;
         if (lvl.firstTs === null && rTs) {
           lvl.firstTs = rTs;
+        }
+        if (validStart && (!lvl.startTime || (typeof r.time_spent_sec === 'number' && r.time_spent_sec >= (lvl.rawTimeSpentSec || 0)))) {
+          lvl.startTime = validStart;
         }
         if (isError) {
           lvl.errors++;
@@ -401,18 +410,27 @@ export const GET: APIRoute = async ({ request }) => {
         let a2Pure = a2Raw;
         let a3Pure = a3Raw;
 
-        const a1First = att.levels[1].firstTs;
-        const a2First = att.levels[2].firstTs;
-        const a3First = att.levels[3].firstTs;
+        const a1Start = att.levels[1].startTime;
+        const a2Start = att.levels[2].startTime;
+        const a3Start = att.levels[3].startTime;
 
-        if (a1First && a2First && a1Raw > 0 && a2Raw >= a1Raw) {
-          if (Math.abs(a2First.getTime() - a1First.getTime()) < 60000) {
-            a2Pure = a2Raw - a1Raw;
-          }
+        // Level 2 deduplication:
+        // Level 2 is cumulative with Level 1 if they started concurrently (start_time within 60s, or missing start_time within the same attempt)
+        const isConcurrent12 = (a1Start && a2Start) ? Math.abs(a2Start.getTime() - a1Start.getTime()) < 60000 : true;
+        if (isConcurrent12 && a1Raw > 0 && a2Raw >= a1Raw) {
+          a2Pure = a2Raw - a1Raw;
         }
-        if (a1First && a3First && a2Raw > 0 && a3Raw >= a2Raw) {
-          if (Math.abs(a3First.getTime() - a1First.getTime()) < 60000) {
-            a3Pure = a3Raw - a2Raw;
+
+        // Level 3 deduplication:
+        // Level 3 is cumulative with prior levels if started concurrently.
+        // It accumulates over Level 2 (if present) or Level 1.
+        const isConcurrent13 = (a1Start && a3Start)
+          ? Math.abs(a3Start.getTime() - a1Start.getTime()) < 60000
+          : ((a2Start && a3Start) ? Math.abs(a3Start.getTime() - a2Start.getTime()) < 60000 : true);
+        if (isConcurrent13) {
+          const prevCumulative = a2Raw > 0 ? a2Raw : a1Raw;
+          if (prevCumulative > 0 && a3Raw >= prevCumulative) {
+            a3Pure = a3Raw - prevCumulative;
           }
         }
 
@@ -475,22 +493,41 @@ export const GET: APIRoute = async ({ request }) => {
       let l1Pure = l1Raw;
       let l2Pure = l2Raw;
       let l3Pure = l3Raw;
-      const l1First = s.levels[1].firstTs;
-      const l2First = s.levels[2].firstTs;
-      const l3First = s.levels[3].firstTs;
-      if (l1First && l2First && l1Raw > 0 && l2Raw >= l1Raw) {
-        if (Math.abs(l2First.getTime() - l1First.getTime()) < 60000) {
-          l2Pure = l2Raw - l1Raw;
+      const l1Start = s.levels[1].startTime;
+      const l2Start = s.levels[2].startTime;
+      const l3Start = s.levels[3].startTime;
+
+      const isConcurrentL12 = (l1Start && l2Start) ? Math.abs(l2Start.getTime() - l1Start.getTime()) < 60000 : true;
+      if (isConcurrentL12 && l1Raw > 0 && l2Raw >= l1Raw) {
+        l2Pure = l2Raw - l1Raw;
+      }
+
+      const isConcurrentL13 = (l1Start && l3Start)
+        ? Math.abs(l3Start.getTime() - l1Start.getTime()) < 60000
+        : ((l2Start && l3Start) ? Math.abs(l3Start.getTime() - l2Start.getTime()) < 60000 : true);
+      if (isConcurrentL13) {
+        const prevCum = l2Raw > 0 ? l2Raw : l1Raw;
+        if (prevCum > 0 && l3Raw >= prevCum) {
+          l3Pure = l3Raw - prevCum;
         }
       }
-      if (l1First && l3First && l2Raw > 0 && l3Raw >= l2Raw) {
-        if (Math.abs(l3First.getTime() - l1First.getTime()) < 60000) {
-          l3Pure = l3Raw - l2Raw;
-        }
+
+      // Sync s.levels[n].timeSpentSec:
+      // If student has real attempts, pick pure times from completed attempt or latest attempt
+      if (s.attempts.length > 0) {
+        ([1, 2, 3] as const).forEach(n => {
+          const compAtt = s.attempts.find(a => a.levels[n].completed) || s.attempts.find(a => a.levels[n].timeSpentSec > 0);
+          if (compAtt && compAtt.levels[n].timeSpentSec > 0) {
+            s.levels[n].timeSpentSec = compAtt.levels[n].timeSpentSec;
+          } else {
+            s.levels[n].timeSpentSec = (n === 1 ? l1Pure : (n === 2 ? l2Pure : l3Pure));
+          }
+        });
+      } else {
+        s.levels[1].timeSpentSec = l1Pure;
+        s.levels[2].timeSpentSec = l2Pure;
+        s.levels[3].timeSpentSec = l3Pure;
       }
-      s.levels[1].timeSpentSec = l1Pure;
-      s.levels[2].timeSpentSec = l2Pure;
-      s.levels[3].timeSpentSec = l3Pure;
 
       ([1, 2, 3] as const).forEach(n => {
         const l = s.levels[n];
@@ -505,7 +542,7 @@ export const GET: APIRoute = async ({ request }) => {
         }
       });
 
-      s.totalActiveTimeSec = Math.max(attemptsTotalTime, l1Pure + l2Pure + l3Pure);
+      s.totalActiveTimeSec = Math.max(attemptsTotalTime, s.levels[1].timeSpentSec + s.levels[2].timeSpentSec + s.levels[3].timeSpentSec);
 
       const isHardcoreCompleted = s.isHardcoreLegend || s.hardcoreStreakLevels.size >= 3;
       const isNormalCompleted = s.isNormalMastered || s.normalCompletedLevels.size >= 3;
