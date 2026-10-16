@@ -199,7 +199,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         {
                             modelName: "Школьный глобус Земли",
                             modelDesc: "Материальный объект из пластмассы, передающий форму и геометрию планеты.",
-                            targetSequence: ["НАТУРНАЯ", "ОБРАЗНАЯ"],
+                            targetSequence: ["НАТУРНАЯ", "СТАТИЧЕСКАЯ"],
                             timeLimit: 12.0,
                             bufferLimit: 4
                         },
@@ -220,28 +220,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         {
                             modelName: "Траектория полета снаряда в вакууме",
                             modelDesc: "Движение материальной точки во времени с однозначным строгим расчетом.",
-                            targetSequence: ["ДИНАМИЧЕСКАЯ", "ДЕТЕРМИНИРОВАННАЯ", "ИНФОРМАЦИОННАЯ"],
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "ДИНАМИЧЕСКАЯ", "ДЕТЕРМИНИРОВАННАЯ"],
                             timeLimit: 9.5,
                             bufferLimit: 5
                         },
                         {
                             modelName: "Симуляция очередей в кассу методом Монте-Карло",
                             modelDesc: "Поведение потока покупателей с учетом случайных распределений и вероятностей.",
-                            targetSequence: ["ДИНАМИЧЕСКАЯ", "СТОХАСТИЧЕСКАЯ", "ИНФОРМАЦИОННАЯ"],
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "ДИНАМИЧЕСКАЯ", "СТОХАСТИЧЕСКАЯ"],
                             timeLimit: 9.0,
                             bufferLimit: 5
                         },
                         {
                             modelName: "Топографическая карта с изолиниями высот",
                             modelDesc: "Сочетание графического плана местности, масштаба и высотных отметок.",
-                            targetSequence: ["СМЕШАННАЯ", "СТАТИЧЕСКАЯ", "ИНФОРМАЦИОННАЯ"],
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "СТАТИЧЕСКАЯ", "СМЕШАННАЯ"],
                             timeLimit: 8.5,
                             bufferLimit: 5
                         },
                         {
-                            modelName: "Краш-тест автомобиля с манекеном",
-                            modelDesc: "Реальный физический эксперимент для динамической оценки деформаций.",
-                            targetSequence: ["НАТУРНАЯ", "ДИНАМИЧЕСКАЯ", "ОБРАЗНАЯ"],
+                            modelName: "3D-компьютерная анимация краш-теста автомобиля",
+                            modelDesc: "Цифровая покадровая визуализация динамической деформации кузова во времени.",
+                            targetSequence: ["ИНФОРМАЦИОННАЯ", "ДИНАМИЧЕСКАЯ", "ОБРАЗНАЯ"],
                             timeLimit: 7.5,
                             bufferLimit: 5
                         },
@@ -346,33 +346,48 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     const c0 = Math.floor(Math.random() * cols);
                     mat[0][c0] = { token: targetSeq[0], hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0') };
 
+                    const path = [{ r: 0, c: c0 }];
                     let curR = 0;
                     let curC = c0;
                     let curMode = 'col'; // следующий ход по столбцу curC
 
                     for (let i = 1; i < targetSeq.length; i++) {
                         if (curMode === 'col') {
-                            // Выбираем другую строку в текущем столбце curC
-                            const availableRows = [0, 1, 2, 3].filter(r => r !== curR);
+                            // Выбираем строку в текущем столбце curC, которая еще не посещена
+                            const availableRows = [0, 1, 2, 3].filter(r => r !== curR && !path.some(p => p.r === r && p.c === curC));
                             const nextR = availableRows[Math.floor(Math.random() * availableRows.length)];
                             mat[nextR][curC] = { token: targetSeq[i], hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0') };
+                            path.push({ r: nextR, c: curC });
                             curR = nextR;
                             curMode = 'row';
                         } else {
-                            // Выбираем другой столбец в текущей строке curR
-                            const availableCols = [0, 1, 2, 3].filter(c => c !== curC);
+                            // Выбираем столбец в текущей строке curR, который еще не посещен
+                            const availableCols = [0, 1, 2, 3].filter(c => c !== curC && !path.some(p => p.r === curR && p.c === c));
                             const nextC = availableCols[Math.floor(Math.random() * availableCols.length)];
                             mat[curR][nextC] = { token: targetSeq[i], hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0') };
+                            path.push({ r: curR, c: nextC });
                             curC = nextC;
                             curMode = 'col';
                         }
                     }
 
-                    // Заполняем оставшиеся ячейки случайными дистракторами
+                    // Заполняем оставшиеся ячейки случайными дистракторами.
+                    // Дистракторы не должны создавать ложных дубликатов на активных линиях пути, ведущих в тупик!
                     for (let r = 0; r < rows; r++) {
                         for (let c = 0; c < cols; c++) {
                             if (!mat[r][c]) {
-                                const distractor = this.tokensPool[Math.floor(Math.random() * this.tokensPool.length)];
+                                const forbidden = new Set();
+                                // В строке 0 запрещен первый целевой токен кроме истинной клетки path[0]
+                                if (r === 0) forbidden.add(targetSeq[0]);
+                                // В столбце path[0].c запрещен второй целевой токен кроме path[1]
+                                if (c === path[0].c && targetSeq[1]) forbidden.add(targetSeq[1]);
+                                // В строке path[1].r запрещен третий целевой токен кроме path[2]
+                                if (path[1] && r === path[1].r && targetSeq[2]) forbidden.add(targetSeq[2]);
+                                // В столбце path[2].c запрещен четвертый целевой токен кроме path[3]
+                                if (path[2] && c === path[2].c && targetSeq[3]) forbidden.add(targetSeq[3]);
+
+                                const validDistractors = this.tokensPool.filter(t => !forbidden.has(t));
+                                const distractor = validDistractors[Math.floor(Math.random() * validDistractors.length)];
                                 mat[r][c] = {
                                     token: distractor,
                                     hex: '0x' + Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0')
