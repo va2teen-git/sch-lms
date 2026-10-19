@@ -117,11 +117,19 @@ export function inspectOgeDocument(rootEl: HTMLElement | null, margins: PageMarg
 
     // Костыль 2: Пустые строки (двойной Enter) для разделения абзацев
     let emptyParasCount = 0;
-    for (const p of paras) {
-        const pText = (p.textContent || '').trim();
-        const inner = (p.innerHTML || '').trim();
-        if (pText === '' && (inner === '' || inner === '<br>' || inner === '&nbsp;')) {
-            emptyParasCount++;
+    for (let idx = 0; idx < paras.length; idx++) {
+        const p = paras[idx];
+        const pText = (p.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim();
+        const inner = (p.innerHTML || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim();
+        const isEmptyP = pText === '' && (inner === '' || inner === '<br>' || inner === '&nbsp;');
+        if (isEmptyP) {
+            const prevP = idx > 0 ? paras[idx - 1] : null;
+            const prevEmpty = prevP && (prevP.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim() === '';
+            const isTrailingSingle = idx === paras.length - 1 && !prevEmpty;
+            const isLeadingBeforeBlock = idx === 0 && paras.length === 1;
+            if (!isTrailingSingle && !isLeadingBeforeBlock) {
+                emptyParasCount++;
+            }
         }
     }
     if (emptyParasCount > 0) {
@@ -185,7 +193,7 @@ export function inspectOgeDocument(rootEl: HTMLElement | null, margins: PageMarg
     }
 
     // ================= 3. ПАРАМЕТРЫ АБЗАЦЕВ И ОСНОВНОГО ТЕКСТА =================
-    const contentParas = paras.filter(p => (p.textContent || '').trim().length > 0);
+    const contentParas = paras.filter(p => (p.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim().length > 0);
 
     if (contentParas.length === 0 && trimmedText.length > 0) {
         // Текст вне параграфов

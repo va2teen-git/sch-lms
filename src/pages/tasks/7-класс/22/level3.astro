@@ -22,12 +22,43 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
         const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
         function pickRandom(arr) {
+            if (typeof window.__FORCE_VARIANT_INDEX === 'number') {
+                return arr[window.__FORCE_VARIANT_INDEX % arr.length];
+            }
             return arr[Math.floor(Math.random() * arr.length)];
         }
 
         function normalizeSpaces(str) {
             return (str || '')
+                .replace(/[\uFEFF\u200B\u200C\u200D]/g, '')
                 .replace(/\u00A0/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function normalizeIndexDigits(str) {
+            return (str || '')
+                .replace(/⁰/g, '0')
+                .replace(/¹/g, '1')
+                .replace(/²/g, '2')
+                .replace(/³/g, '3')
+                .replace(/₀/g, '0')
+                .replace(/₁/g, '1')
+                .replace(/₂/g, '2')
+                .replace(/₃/g, '3');
+        }
+
+        // Нормализация текста для сравнения (учёт ё/е, кириллических/латинских букв-двойников C/С, x/х, A/А, H/Н, O/О и пробела перед °)
+        function normalizeComparable(str) {
+            const homoglyphMap = {
+                'A': 'А', 'B': 'В', 'C': 'С', 'E': 'Е', 'H': 'Н', 'K': 'К', 'M': 'М', 'O': 'О', 'P': 'Р', 'T': 'Т', 'X': 'Х',
+                'a': 'а', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р', 'x': 'х', 'y': 'у'
+            };
+            return normalizeSpaces(normalizeIndexDigits(str))
+                .replace(/ё/g, 'е')
+                .replace(/Ё/g, 'Е')
+                .replace(/[ABCEHKMOPTXaceopxy]/g, ch => homoglyphMap[ch] || ch)
+                .replace(/\s*°\s*/g, '°')
                 .replace(/\s+/g, ' ')
                 .trim();
         }
@@ -73,18 +104,21 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
             const w3Variant = pickRandom([
                 {
                     displayPrompt: 'Площадь поверхности составляет 25 м², а формула воды — H₂O.',
+                    htmlPrompt: 'Площадь поверхности составляет 25 м<sup>2</sup>, а формула воды — H<sub>2</sub>O.',
                     plainCheck: 'Площадь поверхности составляет 25 м2, а формула воды',
                     supText: '2',
                     subText: '2'
                 },
                 {
                     displayPrompt: 'Объём куба равен x³, а основание двоичной системы — 101₂.',
+                    htmlPrompt: 'Объём куба равен x<sup>3</sup>, а основание двоичной системы — 101<sub>2</sub>.',
                     plainCheck: 'Объём куба равен x3, а основание двоичной системы',
                     supText: '3',
                     subText: '2'
                 },
                 {
                     displayPrompt: 'Ускорение равно 10 м/с², а индекс элемента массива — A₁.',
+                    htmlPrompt: 'Ускорение равно 10 м/с<sup>2</sup>, а индекс элемента массива — A<sub>1</sub>.',
                     plainCheck: 'Ускорение равно 10 м/с2, а индекс элемента массива',
                     supText: '2',
                     subText: '1'
@@ -228,14 +262,14 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasText = textNorm.includes(normalizeSpaces(w1Variant.text));
+                        const textNorm = normalizeComparable(state.text);
+                        const hasText = textNorm.includes(normalizeComparable(w1Variant.text));
                         const wysiwyg = state.wysiwyg;
                         let hasBold = false;
                         if (wysiwyg) {
                             const boldNodes = wysiwyg.querySelectorAll('b, strong, [style*="font-weight: bold"], [style*="font-weight: 700"]');
                             boldNodes.forEach(n => {
-                                if (normalizeSpaces(n.innerText).includes(w1Variant.boldWord)) hasBold = true;
+                                if (normalizeComparable(n.innerText).includes(normalizeComparable(w1Variant.boldWord))) hasBold = true;
                             });
                         }
                         return [
@@ -264,17 +298,17 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasText = textNorm.includes(normalizeSpaces(w2Variant.text));
+                        const textNorm = normalizeComparable(state.text);
+                        const hasText = textNorm.includes(normalizeComparable(w2Variant.text));
                         const wysiwyg = state.wysiwyg;
                         let hasItalic = false;
                         let hasUnderline = false;
                         if (wysiwyg) {
                             wysiwyg.querySelectorAll('i, em, [style*="font-style: italic"]').forEach(n => {
-                                if (normalizeSpaces(n.innerText).includes(w2Variant.italicWord)) hasItalic = true;
+                                if (normalizeComparable(n.innerText).includes(normalizeComparable(w2Variant.italicWord))) hasItalic = true;
                             });
                             wysiwyg.querySelectorAll('u, [style*="text-decoration: underline"], [style*="text-decoration-line: underline"]').forEach(n => {
-                                if (normalizeSpaces(n.innerText).includes(w2Variant.underlineWord)) hasUnderline = true;
+                                if (normalizeComparable(n.innerText).includes(normalizeComparable(w2Variant.underlineWord))) hasUnderline = true;
                             });
                         }
                         return [
@@ -296,7 +330,7 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         <div class="mb-2"><span class="badge bg-danger">ВОЛНА 3 ИЗ 10</span> <strong>Математические и химические индексы</strong></div>
                         <p class="small mb-2">Наберите выражение, используя кнопки <b>X²</b> (верхний индекс, <code>#btn-sup</code>) и <b>X₂</b> (нижний индекс, <code>#btn-sub</code>) на панели форматирования:</p>
                         <div class="p-2 bg-white text-dark border border-dark mb-2" style="font-family: 'Liberation Serif', serif; font-size: 13pt;">
-                            ${w3Variant.displayPrompt}
+                            ${w3Variant.htmlPrompt || w3Variant.displayPrompt}
                         </div>
                         <ul class="small ps-3 mb-0">
                             <li>Верхний индекс (<code>&lt;sup&gt;</code>) должен содержать цифру <b>${w3Variant.supText}</b>.</li>
@@ -304,18 +338,32 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasBase = textNorm.includes(w3Variant.plainCheck.split(',')[0]);
+                        const rawText = state.text || '';
+                        const textNorm = normalizeComparable(rawText);
+                        const expectedPrefix = normalizeComparable(w3Variant.plainCheck.split(',')[0]);
+                        const textCompact = textNorm.replace(/\s+/g, '');
+                        const expectedCompact = expectedPrefix.replace(/\s+/g, '');
+                        const hasBase = textNorm.includes(expectedPrefix) || textCompact.includes(expectedCompact);
                         const wysiwyg = state.wysiwyg;
                         let hasSup = false;
                         let hasSub = false;
                         if (wysiwyg) {
-                            wysiwyg.querySelectorAll('sup').forEach(n => {
-                                if (normalizeSpaces(n.innerText) === w3Variant.supText) hasSup = true;
+                            wysiwyg.querySelectorAll('sup, [style*="vertical-align: super"]').forEach(n => {
+                                if (normalizeIndexDigits(normalizeSpaces(n.innerText)).includes(w3Variant.supText)) hasSup = true;
                             });
-                            wysiwyg.querySelectorAll('sub').forEach(n => {
-                                if (normalizeSpaces(n.innerText) === w3Variant.subText) hasSub = true;
+                            wysiwyg.querySelectorAll('sub, [style*="vertical-align: sub"]').forEach(n => {
+                                if (normalizeIndexDigits(normalizeSpaces(n.innerText)).includes(w3Variant.subText)) hasSub = true;
                             });
+                        }
+                        if (!hasSup) {
+                            if ((w3Variant.supText === '2' && rawText.includes('²')) || (w3Variant.supText === '3' && rawText.includes('³'))) {
+                                hasSup = true;
+                            }
+                        }
+                        if (!hasSub) {
+                            if ((w3Variant.subText === '1' && rawText.includes('₁')) || (w3Variant.subText === '2' && rawText.includes('₂'))) {
+                                hasSub = true;
+                            }
                         }
                         return [
                             { id: 'w3_base', label: 'Основа фразы набрана', passed: hasBase },
@@ -345,8 +393,8 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasText = textNorm.includes(normalizeSpaces(w4Variant.heading));
+                        const textNorm = normalizeComparable(state.text);
+                        const hasText = textNorm.includes(normalizeComparable(w4Variant.heading));
                         const wysiwyg = state.wysiwyg;
                         let hasFont = false;
                         let hasSize = false;
@@ -407,8 +455,8 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasText = textNorm.includes(normalizeSpaces(w5Variant.text));
+                        const textNorm = normalizeComparable(state.text);
+                        const hasText = textNorm.includes(normalizeComparable(w5Variant.text));
                         const wysiwyg = state.wysiwyg;
                         let hasFont = false;
                         let hasSize = false;
@@ -461,8 +509,8 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasText = textNorm.includes(normalizeSpaces(w6Variant.text));
+                        const textNorm = normalizeComparable(state.text);
+                        const hasText = textNorm.includes(normalizeComparable(w6Variant.text));
                         const wysiwyg = state.wysiwyg;
                         let hasIndent = false;
                         let hasLh = false;
@@ -517,11 +565,11 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasQuotes = textNorm.includes(w7Variant.quoted);
+                        const textNorm = normalizeComparable(state.text);
+                        const hasQuotes = textNorm.includes(normalizeComparable(w7Variant.quoted));
                         const hasDash = textNorm.includes('—') || textNorm.includes('–');
                         const hasSyms = textNorm.includes(w7Variant.sym1) && textNorm.includes(w7Variant.sym2);
-                        const hasFullText = textNorm.includes(normalizeSpaces(w7Variant.text));
+                        const hasFullText = textNorm.includes(normalizeComparable(w7Variant.text));
                         return [
                             { id: 'w7_quotes', label: `Кавычки ${w7Variant.quoted}`, passed: hasQuotes },
                             { id: 'w7_dash', label: 'Типографское тире (—)', passed: hasDash },
@@ -564,12 +612,15 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                             hasOl = !!ol;
                             const lis = wysiwyg.querySelectorAll('ol li');
                             hasThreeLi = lis.length >= 3;
-                            const boldText = Array.from(wysiwyg.querySelectorAll('li b, li strong, li [style*="font-weight: bold"]'))
-                                .map(el => normalizeSpaces(el.innerText))
+                            const boldText = Array.from(wysiwyg.querySelectorAll('li b, li strong, li [style*="font-weight: bold"], li [style*="font-weight: 700"]'))
+                                .map(el => normalizeComparable(el.innerText))
                                 .join(' ');
-                            hasBoldTerms = w8Variant.items.every(item => boldText.includes(item.bold));
-                            const fullListText = normalizeSpaces(wysiwyg.innerText);
-                            hasAllTexts = w8Variant.items.every(item => fullListText.includes(item.bold) && fullListText.includes(item.rest));
+                            hasBoldTerms = w8Variant.items.every(item => boldText.includes(normalizeComparable(item.bold)));
+                            const fullListText = normalizeComparable(wysiwyg.innerText);
+                            hasAllTexts = w8Variant.items.every(item =>
+                                fullListText.includes(normalizeComparable(item.bold)) &&
+                                fullListText.includes(normalizeComparable(item.rest.replace(/\.$/, '')))
+                            );
                         }
                         return [
                             { id: 'w8_ol', label: 'Контейнер списка <ol>', passed: hasOl },
@@ -622,28 +673,28 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                             const tbl = wysiwyg.querySelector('table');
                             if (tbl) {
                                 hasTable = true;
-                                if (tbl.style.marginLeft === 'auto' && tbl.style.marginRight === 'auto') {
+                                if ((tbl.style.marginLeft === 'auto' && tbl.style.marginRight === 'auto') || tbl.getAttribute('align') === 'center') {
                                     isCentered = true;
                                 }
                                 const trs = tbl.querySelectorAll('tr');
                                 if (trs.length >= 2) {
                                     const ths = trs[0].querySelectorAll('th, td');
                                     if (ths.length >= 2) {
-                                        const t0 = normalizeSpaces(ths[0].innerText);
-                                        const t1 = normalizeSpaces(ths[1].innerText);
+                                        const t0 = normalizeComparable(ths[0].innerText).toLowerCase();
+                                        const t1 = normalizeComparable(ths[1].innerText).toLowerCase();
                                         const aligned = Array.from(ths).every(cell => {
                                             const cStyle = window.getComputedStyle(cell);
                                             return cell.style.textAlign === 'center' || cStyle.textAlign === 'center';
                                         });
-                                        if (t0 === w9Variant.h1 && t1 === w9Variant.h2 && aligned) {
+                                        if (t0 === normalizeComparable(w9Variant.h1).toLowerCase() && t1 === normalizeComparable(w9Variant.h2).toLowerCase() && aligned) {
                                             headersOk = true;
                                         }
                                     }
                                     const tds = trs[1].querySelectorAll('td, th');
                                     if (tds.length >= 2) {
-                                        const d0 = normalizeSpaces(tds[0].innerText);
-                                        const d1 = normalizeSpaces(tds[1].innerText);
-                                        if (d0 === w9Variant.c1 && d1 === w9Variant.c2) {
+                                        const d0 = normalizeComparable(tds[0].innerText).toLowerCase();
+                                        const d1 = normalizeComparable(tds[1].innerText).toLowerCase();
+                                        if (d0 === normalizeComparable(w9Variant.c1).toLowerCase() && d1 === normalizeComparable(w9Variant.c2).toLowerCase()) {
                                             cellsOk = true;
                                         }
                                     }
@@ -702,12 +753,12 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                             Math.abs(state.pageMargins.topCm - 2.0) < 0.05 &&
                             Math.abs(state.pageMargins.bottomCm - 2.0) < 0.05;
 
-                        const textNorm = normalizeSpaces(state.text);
-                        const hasParaText = textNorm.includes(normalizeSpaces(w10Variant.para));
-                        const hasTableText = textNorm.includes(w10Variant.h1) &&
-                            textNorm.includes(w10Variant.h2) &&
-                            textNorm.includes(w10Variant.c1) &&
-                            textNorm.includes(w10Variant.c2);
+                        const textNorm = normalizeComparable(state.text);
+                        const hasParaText = textNorm.includes(normalizeComparable(w10Variant.para));
+                        const hasTableText = textNorm.includes(normalizeComparable(w10Variant.h1)) &&
+                            textNorm.includes(normalizeComparable(w10Variant.h2)) &&
+                            textNorm.includes(normalizeComparable(w10Variant.c1)) &&
+                            textNorm.includes(normalizeComparable(w10Variant.c2));
 
                         let ogeValid = false;
                         if (wysiwyg && window.inspectOgeDocument) {
@@ -967,6 +1018,11 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                     if (waveNum >= 1 && waveNum <= maxWaves) {
                         loadWave(waveNum, true);
                     }
+                };
+                window.forceLevel3Variant = (variantIdx) => {
+                    window.__FORCE_VARIANT_INDEX = variantIdx;
+                    waves.value = generateAllWaves();
+                    loadWave(currentWave.value, true);
                 };
 
                 onMounted(() => {
