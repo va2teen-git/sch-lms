@@ -262,5 +262,36 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
     expect(dynamicContrast.violations).toHaveLength(0);
   });
 
+  test('Стабильность геометрии страницы: при нажатии Пробела и наборе текста страница и рабочая область редактора не сжимаются', async ({ page }) => {
+    await page.goto('/tasks/7-класс/22/level3');
+    await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
+
+    const getDimensions = () => page.evaluate(() => ({
+      bodyH: document.body.clientHeight,
+      wrapperH: document.getElementById('workspace-wrapper')?.clientHeight || 0,
+      workplaceH: document.querySelector('.jodit-workplace')?.clientHeight || 0,
+      wysiwygH: document.querySelector('.jodit-wysiwyg')?.clientHeight || 0,
+      wysiwygW: document.querySelector('.jodit-wysiwyg')?.clientWidth || 0
+    }));
+
+    const initial = await getDimensions();
+    expect(initial.workplaceH).toBeGreaterThanOrEqual(1100);
+    expect(initial.wysiwygW).toBeGreaterThanOrEqual(790);
+
+    await page.locator('.jodit-wysiwyg').click();
+    await page.keyboard.type('Форматирование изменяет внешний вид текста без изменения его содержания.');
+    await page.keyboard.press('Space');
+    await page.keyboard.press('Space');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(150);
+
+    const afterTyping = await getDimensions();
+    expect(afterTyping.workplaceH).toBe(initial.workplaceH);
+    expect(afterTyping.wrapperH).toBe(initial.wrapperH);
+    expect(afterTyping.wysiwygH).toBe(initial.wysiwygH);
+    expect(afterTyping.wysiwygW).toBe(initial.wysiwygW);
+    expect(afterTyping.bodyH).toBe(initial.bodyH);
+  });
+
 });
 
