@@ -1,97 +1,93 @@
 import { test, expect } from '@playwright/test';
-import sqlite3 from 'better-sqlite3';
 
-test.describe('7 класс - Урок 22', () => {
+test.describe('7 класс - Урок 22 - Уровень 1 (Манипуляция мышью: 3 фазы)', () => {
 
-  test('Успешное форматирование текста (3 фазы)', async ({ page }) => {
-    // В данном случае мы можем тестировать сам iframe / саму страницу напрямую, так как мы разрабатывали только ее
+  test('Полное прохождение всех 3 фаз (Drag-to-Bucket, Slot & Snap, Калибратор параметров)', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level1');
-    
-    for (let phase = 1; phase <= 3; phase++) {
-      // Ждем загрузки задачи
-      const taskDescription = page.locator('#task-description');
-      await expect(taskDescription).toBeVisible();
-      await expect(taskDescription).not.toContainText('Загрузка');
-      
-      const text = await taskDescription.innerText();
-      // Пример текста: "Напишите предложение, содержащее слово Процессор, и выделите это слово жирным шрифтом."
-      const wordMatch = text.match(/слово\s+(.+?),/);
-      const actionMatch = text.match(/выделите это слово\s+(.+?)\s+шрифтом/);
-      
-      const targetWord = wordMatch ? wordMatch[1] : 'Процессор';
-      const action = actionMatch ? actionMatch[1] : 'жирным';
-      
-      // Взаимодействуем с Jodit editor
-      const editor = page.locator('.jodit-wysiwyg');
-      if (phase === 1) await editor.click();
-      
-      let html = `Вот мой ${targetWord} и он работает фаза ${phase}`;
-      if (action.includes('жирным')) html = `Вот мой <strong>${targetWord}</strong> и он работает фаза ${phase}`;
-      else if (action.includes('курсивом')) html = `Вот мой <em>${targetWord}</em> и он работает фаза ${phase}`;
-      else if (action.includes('подчеркнутым')) html = `Вот мой <u>${targetWord}</u> и он работает фаза ${phase}`;
-      
-      // Устанавливаем параметры страницы и HTML по критериям ОГЭ (поля 2 см, шрифт 14pt Liberation Serif, красная строка 1 см, выравнивание по ширине)
-      await page.evaluate((htmlContent) => {
-        // @ts-ignore
-        if (window.applyPageMargins) {
-          // @ts-ignore
-          window.applyPageMargins({ leftCm: 2.0, rightCm: 2.0, topCm: 2.0, bottomCm: 2.0 });
-        }
-        // @ts-ignore
-        const wysiwyg = document.querySelector('.jodit-wysiwyg');
-        wysiwyg.innerHTML = `<p style="text-indent: 1.0cm; text-align: justify; font-family: 'Liberation Serif', serif; font-size: 14pt; line-height: 1.15;">${htmlContent}</p>`;
-        // вызываем событие input чтобы Jodit обновил свой внутренний стейт если нужно
-        wysiwyg.dispatchEvent(new Event('input', { bubbles: true }));
-      }, html);
 
-      if (phase === 3) {
-        await page.screenshot({ path: 'dev_scripts/scr_7_22_before_check.png' });
-      }
-      
-      // Нажимаем кнопку ПРОВЕРИТЬ ДОКУМЕНТ
-      await page.locator('#check-btn').click();
-      
-      // Проверяем статус
-      const status = page.locator('#writer-status');
-      if (phase < 3) {
-        await expect(status).toContainText(`Фаза ${phase} пройдена!`);
-        // Ожидаем очистки статуса и генерации нового задания (1500мс в коде)
-        await expect(status).toBeEmpty({ timeout: 5000 });
-      } else {
-        await expect(status).toContainText('Отлично! Уровень полностью пройден.');
-      }
+    // === ФАЗА 1: Классификация 6 карточек по 3 шлюзам ===
+    await expect(page.locator('#phase1')).toBeVisible();
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 1 из 3');
+
+    for (let i = 0; i < 6; i++) {
+      const card = page.locator('#p1-cards-pool .p1-card').first();
+      const expectedBucket = await card.getAttribute('data-expected-bucket');
+      await card.click();
+      await page.locator(`.p1-dropzone[data-bucket="${expectedBucket}"]`).click();
     }
 
-    // Скриншот после
-    await page.screenshot({ path: 'dev_scripts/scr_7_22_after_check.png' });
+    await expect(page.locator('#btn-phase1')).toBeEnabled();
+    await page.locator('#btn-phase1').click();
+
+    // === ФАЗА 2: Слот-пазл непечатаемых символов и горячих клавиш ===
+    await expect(page.locator('#phase2')).toBeVisible();
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 2 из 3');
+
+    const slots = page.locator('#p2-slots-container .p2-slot-box');
+    const slotCount = await slots.count();
+    expect(slotCount).toBe(4);
+
+    for (let i = 0; i < slotCount; i++) {
+      const slot = slots.nth(i);
+      const expectedToken = await slot.getAttribute('data-expected');
+      await page.locator(`#p2-tokens-palette .p2-token-btn[data-token="${expectedToken}"]`).click();
+      await slot.click();
+    }
+
+    await expect(page.locator('#btn-phase2')).toBeEnabled();
+    await page.locator('#btn-phase2').click();
+
+    // === ФАЗА 3: Интерактивный калибратор параметров страницы и абзаца ===
+    await expect(page.locator('#phase3')).toBeVisible();
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 3 из 3');
+
+    const targetSize = await page.locator('#p3-target-size').getAttribute('data-val');
+    const targetIndent = await page.locator('#p3-target-indent').getAttribute('data-val');
+    const targetMargin = await page.locator('#p3-target-margin').getAttribute('data-val');
+    const targetAlign = await page.locator('#p3-target-align').getAttribute('data-val');
+    const targetLh = await page.locator('#p3-target-lh').getAttribute('data-val');
+
+    await page.evaluate(({ tSize, tIndent, tMargin }) => {
+      const sSize = document.getElementById('p3-slider-size');
+      const sIndent = document.getElementById('p3-slider-indent');
+      const sMargin = document.getElementById('p3-slider-margin');
+      if (sSize) { sSize.value = String(tSize); sSize.dispatchEvent(new Event('input')); }
+      if (sIndent) { sIndent.value = String(parseFloat(tIndent)); sIndent.dispatchEvent(new Event('input')); }
+      if (sMargin) { sMargin.value = String(parseFloat(tMargin)); sMargin.dispatchEvent(new Event('input')); }
+    }, { tSize: targetSize, tIndent: targetIndent, tMargin: targetMargin });
+
+    for (let clicks = 0; clicks < 5; clicks++) {
+      const curAlign = await page.locator('#p3-btn-align').getAttribute('data-align');
+      if (curAlign === targetAlign) break;
+      await page.locator('#p3-btn-align').click();
+    }
+
+    for (let clicks = 0; clicks < 5; clicks++) {
+      const curLh = await page.locator('#p3-btn-lh').getAttribute('data-lh');
+      if (curLh === targetLh) break;
+      await page.locator('#p3-btn-lh').click();
+    }
+
+    await page.locator('#btn-phase3').click();
+    await expect(page.locator('#success-screen')).toBeVisible();
   });
 
-  test('Обработка ошибок в хардкор-режиме', async ({ page }) => {
-    // Переход на страницу и включение хардкора
+  test('Обработка ошибки и процедурная регенерация на Фазе 1', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level1');
-    await page.evaluate(() => { localStorage.setItem('hardcore_mode', 'true'); });
-    await page.reload();
-    
-    // Запоминаем текущее задание
-    const taskDescription = page.locator('#task-description');
-    await expect(taskDescription).toBeVisible();
-    const originalText = await taskDescription.innerText();
-    
-    // Ошибаемся (отправляем пустой текст)
-    const checkBtn = page.locator('#check-btn');
-    await checkBtn.click();
-    
-    // В Astro/iframe платформы обычно перехватывается alert или dialog, но у нас локальная страница,
-    // если не отправляется alert, то просто проверим, что текст задания изменился (процедурная генерация сработала)
-    // Ждем полторы секунды (в коде setTimeout на 1500)
-    await page.waitForTimeout(2000);
-    
-    const newText = await taskDescription.innerText();
-    expect(newText).not.toEqual(originalText);
-    
-    // Проверка БД на запись hardcore_reset
-    const db = new sqlite3('telemetry.db');
-    const row = db.prepare(`SELECT * FROM telemetry WHERE action_type = 'hardcore_reset' ORDER BY id DESC LIMIT 1`).get();
-    expect(row).toBeDefined();
+    await expect(page.locator('#phase1')).toBeVisible();
+
+    // Намеренно кладем все 6 карточек в заведомо неверную корзину
+    for (let i = 0; i < 6; i++) {
+      const card = page.locator('#p1-cards-pool .p1-card').first();
+      const expectedBucket = await card.getAttribute('data-expected-bucket');
+      const wrongBucket = expectedBucket === 'edit' ? 'char' : 'edit';
+      await card.click();
+      await page.locator(`.p1-dropzone[data-bucket="${wrongBucket}"]`).click();
+    }
+
+    await page.locator('#btn-phase1').click();
+    await expect(page.locator('#error-box')).toBeVisible();
+    await expect(page.locator('#attempts-display')).toHaveText('1');
   });
+
 });

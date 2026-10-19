@@ -1,0 +1,592 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 2 (Продвинутый — Аналитический режим, 5 процедурных фаз)
+// 7 класс, Урок 22: Практическая работа: Форматирование текстовых документов
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2 border-bottom border-warning pb-2">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический расчет параметров верстки (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-black rounded-0 px-3 py-2">Аналитический режим // Ручной ввод</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Шапка прогресса и счетчика ошибок -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Типографская метрология: расчет кегля и интерлиньяжа</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки / Перекалибровки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Блок обратной связи при ошибке -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[АНАЛИТИЧЕСКИЙ СБОЙ] <span id="feedback-text">Неверный расчет!</span> Генерация нового варианта фазы...</span>
+                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: ТИПОГРАФСКАЯ МЕТРОЛОГИЯ (Пункты и дюймы) ================= -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Фаза 1 из 5: Типографская метрология (пункты, дюймы и междустрочный интервал)</h5>
+                    <p class="text-light small mb-3">
+                        В компьютерной типографике действует точное соотношение: <strong class="text-info">1 дюйм = 72 пункта (пт)</strong>.
+                        Эффективная высота одной строки с учетом междустрочного интервала <strong class="text-warning">I</strong> равна <code class="text-warning">K × I</code> пт, где <code class="text-warning">K</code> — кегль шрифта в пунктах.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТРЫ ТЕКСТОВОГО БЛОКА:</div>
+                        <div id="p1-problem-text" class="text-light fs-6"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p1-input" id="p1-label" class="form-label text-light small mb-2">
+                            Введите вычисленное числовое значение (в пунктах пт):
+                        </label>
+                        <div class="input-group w-100" style="max-width: 580px;">
+                            <input type="text" inputmode="decimal" id="p1-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 144" autocomplete="off" data-expected="">
+                            <button id="p1-btn" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: ГЕОМЕТРИЯ СТРАНИЦЫ А4 И ТАБЛИЦ ================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 2 из 5: Расчет рабочей ширины полосы набора и столбцов таблицы на листе А4</h5>
+                    <p class="text-light small mb-3">
+                        Стандартный лист формата <strong class="text-info">А4</strong> имеет размеры <strong class="text-warning">210 × 297 мм</strong>
+                        (в книжной ориентации ширина листа равна <strong>210 мм</strong>, в альбомной ориентации ширина листа равна <strong>297 мм</strong>).
+                        Рабочая ширина полосы набора равна ширине листа за вычетом левого и правого полей.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ГЕОМЕТРИЧЕСКАЯ СХЕМА ПОЛОСЫ НАБОРА:</div>
+                        <div id="p2-problem-text" class="text-light fs-6"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-light small mb-2">
+                            Введите точную ширину одного столбца таблицы (в миллиметрах, только число):
+                        </label>
+                        <div class="input-group w-100" style="max-width: 580px;">
+                            <input type="text" inputmode="decimal" id="p2-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Ширина в мм" autocomplete="off" data-expected="">
+                            <button id="p2-btn" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: ТРАССИРОВКА БУФЕРА ОБМЕНА ================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 3 из 5: Трассировка операций буфера обмена (Ctrl+C, Ctrl+X, Ctrl+V, Delete)</h5>
+                    <p class="text-light small mb-3">
+                        Проследите за изменением текстовой строки и состоянием буфера обмена. Помните: клавиша <code class="text-info">Delete</code> удаляет выделенный фрагмент, <strong>не меняя</strong> содержимое буфера обмена, а операция <code class="text-info">Вставить (Ctrl+V)</code> вставляет копию из буфера, сохраняя её в буфере для последующих вставок.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ЖУРНАЛ ОПЕРАЦИЙ РЕДАКТОРА:</div>
+                        <div id="p3-problem-text" class="text-light"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-light small mb-2">
+                            Введите итоговую текстовую строку, которая окажется в документе после выполнения всех 4 шагов:
+                        </label>
+                        <div class="input-group w-100" style="max-width: 580px;">
+                            <input type="text" id="p3-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Итоговая строка" autocomplete="off" data-expected="">
+                            <button id="p3-btn" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 4: АУДИТ НЕПЕЧАТАЕМЫХ СИМВОЛОВ ================= -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 4 из 5: Инспекция дампа непечатаемых символов (Ctrl+F10)</h5>
+                    <p class="text-light small mb-3">
+                        В текстовом процессоре включен режим отображения непечатаемых знаков:
+                        <code class="text-warning">¶</code> — конец абзаца (<kbd>Enter</kbd>),
+                        <code class="text-info">↵</code> — принудительный разрыв строки внутри абзаца (<kbd>Shift+Enter</kbd>),
+                        <code class="text-secondary">·</code> — обычный пробел,
+                        <code class="text-success">°</code> — неразрывный пробел (<kbd>Ctrl+Shift+Space</kbd>).
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ДАМП ФРАГМЕНТА ДОКУМЕНТА В РЕЖИМЕ [¶]:</div>
+                        <div id="p4-dump-display" class="p-3 bg-dark border border-secondary text-light fs-5 mb-2" style="line-height: 1.7; letter-spacing: 0.02em;"></div>
+                        <div id="p4-question-text" class="text-warning small"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-light small mb-2">
+                            Введите через пробел или двоеточие два числа — <strong>1) Количество абзацев</strong> и <strong>2) Количество типографских ошибок набора</strong> (например, <code>2 3</code> или <code>2:3</code>):
+                        </label>
+                        <div class="input-group w-100" style="max-width: 580px;">
+                            <input type="text" id="p4-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Абзацы Ошибки (например: 2 3)" autocomplete="off" data-expected="">
+                            <button id="p4-btn" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 5: ЭКСПЕРТИЗА СТАНДАРТА ОГЭ 13.2 И ГОРЯЧИХ КЛАВИШ ================= -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Фаза 5 из 5: Экспертиза документа по критериям ОГЭ (Задание 13.2)</h5>
+                    <p class="text-light small mb-3">
+                        Проанализируйте параметры сданного документа и определите:
+                        <strong>1) Балл за задание 13.2 ОГЭ</strong> (<code class="text-success">2</code> — всё идеально; <code class="text-warning">1</code> — допущено 1–2 мелких отклонения по шрифту/интервалу без «костылей»; <code class="text-danger">0</code> — использованы «костыли» вроде отступа пробелами, пустых строк двойным Enter или дефиса вместо тире) и
+                        <strong>2) Горячую клавишу LibreOffice Writer</strong>, требуемую в вопросе.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПРОТОКОЛ ИНСПЕКЦИИ ДОКУМЕНТА:</div>
+                        <div id="p5-problem-text" class="text-light"></div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-light small mb-2">
+                            Введите ответ в формате <strong>БАЛЛ:КЛАВИША</strong> (например: <code>2:CTRL+J</code> или <code>0:CTRL+F10</code>):
+                        </label>
+                        <div class="input-group w-100" style="max-width: 580px;">
+                            <input type="text" id="p5-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 2:CTRL+J" autocomplete="off" data-expected="">
+                            <button id="p5-btn" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ЗАВЕРШИТЬ АНАЛИЗ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ЭКРАН ПОБЕДЫ ================= -->
+                <div id="success-screen" class="card bg-black border-warning rounded-0 d-none mt-3">
+                    <div class="card-body text-center py-4">
+                        <h3 class="text-warning fw-bold mb-2">УРОВЕНЬ 2 УСПЕШНО ЗАВЕРШЕН!</h3>
+                        <p class="text-light mb-0">Все 5 фаз аналитического расчета типографики, полосы набора, буфера обмена и стандартов ОГЭ пройдены.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script>
+    const MISSION_NAME = 'Урок 22 :: Форматирование текстовых документов (Уровень 2)';
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    const actionLog = [];
+
+    function logAction(action, details = {}) {
+        actionLog.push({ time: new Date().toISOString(), action, ...details });
+    }
+
+    function sendTelemetry(actionType, status, success) {
+        const timeSpent = Math.round((Date.now() - startTime) / 1000);
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: MISSION_NAME,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success,
+            action_log: actionLog
+        }, '*');
+    }
+
+    function normalizeNumberInput(str) {
+        return String(str || '')
+            .replace(/,/g, '.')
+            .replace(/пт|pt|мм|mm|см|cm|дюйм(ов|а)?/gi, '')
+            .trim();
+    }
+
+    function triggerError(msg, regenCallback) {
+        attemptsCount++;
+        const attEl = document.getElementById('attempts-display');
+        if (attEl) attEl.textContent = String(attemptsCount);
+
+        sendTelemetry('hardcore_reset', 'in_progress', false);
+
+        const fbBox = document.getElementById('feedback-box');
+        const fbText = document.getElementById('feedback-text');
+        if (fbText) fbText.textContent = msg;
+        if (fbBox) fbBox.classList.remove('d-none');
+
+        setTimeout(() => {
+            if (fbBox) fbBox.classList.add('d-none');
+            if (regenCallback) regenCallback();
+        }, 1200);
+    }
+
+    function setPhaseHeader(stepNum, titleText) {
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        if (badge) badge.textContent = `Шаг ${stepNum} из 5`;
+        if (title) title.textContent = titleText;
+    }
+
+    // =========================================================================
+    // ФАЗА 1: ТИПОГРАФСКАЯ МЕТРОЛОГИЯ (Пункты и дюймы)
+    // =========================================================================
+    let p1Expected = 0;
+
+    function initPhase1() {
+        const configs = [
+            { lines: 6, fontPt: 12, lh: 1.5, totalInch: 1.5 },
+            { lines: 8, fontPt: 12, lh: 1.5, totalInch: 2.0 },
+            { lines: 6, fontPt: 16, lh: 1.5, totalInch: 2.0 },
+            { lines: 9, fontPt: 16, lh: 1.0, totalInch: 2.0 },
+            { lines: 8, fontPt: 18, lh: 1.0, totalInch: 2.0 },
+            { lines: 4, fontPt: 18, lh: 1.5, totalInch: 1.5 },
+            { lines: 10, fontPt: 12, lh: 1.5, totalInch: 2.5 },
+            { lines: 12, fontPt: 14, lh: 1.5, totalInch: 3.5 }
+        ];
+        const cfg = configs[Math.floor(Math.random() * configs.length)];
+        const totalPt = Math.round(cfg.lines * cfg.fontPt * cfg.lh);
+        p1Expected = totalPt;
+
+        const probEl = document.getElementById('p1-problem-text');
+        const inp = document.getElementById('p1-input');
+        if (probEl) {
+            probEl.innerHTML = `
+                Абзац документа состоит ровно из <strong class="text-warning">${cfg.lines} строк</strong>.
+                Текст набран кеглем <strong class="text-info">${cfg.fontPt} пт</strong> с междустрочным интервалом <strong class="text-success">${cfg.lh}</strong>.<br>
+                Вычислите суммарную вертикальную высоту этого текстового блока <strong>в типографских пунктах (пт)</strong> (подсказка: это составляет <code>${cfg.totalInch} дюйма</code> при соотношении <code>1 дюйм = 72 пт</code>).
+            `;
+        }
+        if (inp) {
+            inp.value = '';
+            inp.setAttribute('data-expected', String(p1Expected));
+        }
+    }
+
+    function checkPhase1() {
+        const inp = document.getElementById('p1-input');
+        const val = parseFloat(normalizeNumberInput(inp?.value || ''));
+        if (!isNaN(val) && Math.abs(val - p1Expected) < 0.01) {
+            logAction('phase1_complete', { answer: val });
+            document.getElementById('phase1')?.classList.add('d-none');
+            document.getElementById('phase2')?.classList.remove('d-none');
+            setPhaseHeader(2, 'Геометрия полосы набора и таблиц на листе А4');
+            initPhase2();
+        } else {
+            triggerError(`Неверно! Высота блока равна N × K × I (${p1Expected} пт).`, initPhase1);
+        }
+    }
+
+    document.getElementById('p1-btn')?.addEventListener('click', checkPhase1);
+    document.getElementById('p1-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase1();
+    });
+
+    // =========================================================================
+    // ФАЗА 2: ГЕОМЕТРИЯ СТРАНИЦЫ А4 И ТАБЛИЦ
+    // =========================================================================
+    let p2Expected = 0;
+
+    function initPhase2() {
+        const scenarios = [
+            { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 20, cols: 5 }, // (210-40)/5 = 34
+            { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 15, cols: 3 }, // (210-45)/3 = 55
+            { orient: 'книжной', pageW: 210, leftMm: 25, rightMm: 15, cols: 4 }, // (210-40)/4 = 42.5 -> let's keep integer!
+            { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 20, cols: 4 }, // 160 / 4 = 40
+            { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 10, cols: 6 }, // 180 / 6 = 30
+            { orient: 'альбомной', pageW: 297, leftMm: 27, rightMm: 20, cols: 5 }, // 250 / 5 = 50
+            { orient: 'альбомной', pageW: 297, leftMm: 22, rightMm: 15, cols: 4 }, // 260 / 4 = 65
+            { orient: 'альбомной', pageW: 297, leftMm: 17, rightMm: 10, cols: 3 }  // 270 / 3 = 90
+        ].filter(s => (s.pageW - s.leftMm - s.rightMm) % s.cols === 0);
+
+        const sc = scenarios[Math.floor(Math.random() * scenarios.length)];
+        p2Expected = (sc.pageW - sc.leftMm - sc.rightMm) / sc.cols;
+
+        const probEl = document.getElementById('p2-problem-text');
+        const inp = document.getElementById('p2-input');
+        if (probEl) {
+            probEl.innerHTML = `
+                Документ сверстан на листе формата <strong>А4 (210 × 297 мм)</strong> в <strong class="text-warning">${sc.orient} ориентации</strong> (ширина листа = <code>${sc.pageW} мм</code>).<br>
+                Установлены поля страницы: левое поле — <strong class="text-info">${sc.leftMm} мм</strong>, правое поле — <strong class="text-info">${sc.rightMm} мм</strong>.<br>
+                На всю доступную рабочую ширину полосы набора вставлена таблица, состоящая из <strong class="text-success">${sc.cols} равных по ширине столбцов</strong>. Чему равна ширина одного столбца таблицы (в мм)?
+            `;
+        }
+        if (inp) {
+            inp.value = '';
+            inp.setAttribute('data-expected', String(p2Expected));
+        }
+    }
+
+    function checkPhase2() {
+        const inp = document.getElementById('p2-input');
+        const val = parseFloat(normalizeNumberInput(inp?.value || ''));
+        if (!isNaN(val) && Math.abs(val - p2Expected) < 0.01) {
+            logAction('phase2_complete', { answer: val });
+            document.getElementById('phase2')?.classList.add('d-none');
+            document.getElementById('phase3')?.classList.remove('d-none');
+            setPhaseHeader(3, 'Трассировка операций буфера обмена');
+            initPhase3();
+        } else {
+            triggerError('Ошибка расчета ширины столбца! Проверьте формулу: (Ширина_листа − Левое_поле − Правое_поле) / Число_столбцов.', initPhase2);
+        }
+    }
+
+    document.getElementById('p2-btn')?.addEventListener('click', checkPhase2);
+    document.getElementById('p2-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase2();
+    });
+
+    // =========================================================================
+    // ФАЗА 3: ТРАССИРОВКА БУФЕРА ОБМЕНА
+    // =========================================================================
+    let p3Expected = '';
+
+    function initPhase3() {
+        const tasks = [
+            {
+                initial: 'ПРОТОКОЛ-СЕТЬ-БАЗА',
+                steps: [
+                    '1. Выделили слово «ПРОТОКОЛ» и нажали Ctrl+C (Копировать).',
+                    '2. Выделили фрагмент «-СЕТЬ» и нажали клавишу Delete (Удалить).',
+                    '3. Поставили курсор в самый конец строки (после слова «БАЗА»), ввели дефис «-» и нажали Ctrl+V (Вставить).',
+                    '4. Выделили первое слово «ПРОТОКОЛ-» в начале строки и нажали клавишу Delete.'
+                ],
+                result: 'БАЗА-ПРОТОКОЛ'
+            },
+            {
+                initial: 'КЕГЛЬ-ШРИФТ-АБЗАЦ',
+                steps: [
+                    '1. Выделили фрагмент «-ШРИФТ» и нажали Ctrl+X (Вырезать).',
+                    '2. Выделили слово «КЕГЛЬ-» в начале строки и нажали клавишу Delete (Удалить).',
+                    '3. Поставили курсор в конец строки (после слова «АБЗАЦ») и дважды подряд нажали Ctrl+V (Вставить).',
+                    '4. Никаких других действий не выполняли.'
+                ],
+                result: 'АБЗАЦ-ШРИФТ-ШРИФТ'
+            },
+            {
+                initial: 'ЛИНЕЙКА-ПОЛЕ-ЛИСТ',
+                steps: [
+                    '1. Выделили слово «ЛИСТ» и нажали Ctrl+C (Копировать).',
+                    '2. Выделили фрагмент «ЛИНЕЙКА-» и нажали клавишу Delete (Удалить).',
+                    '3. Поставили курсор в самое начало строки (перед словом «ПОЛЕ»), нажали Ctrl+V (Вставить) и дописали дефис «-».',
+                    '4. Выделили фрагмент «-ЛИСТ» в самом конце строки и нажали клавишу Delete.'
+                ],
+                result: 'ЛИСТ-ПОЛЕ'
+            },
+            {
+                initial: 'ТАБЛИЦА-СТРОКА-ЯЧЕЙКА',
+                steps: [
+                    '1. Выделили фрагмент «ТАБЛИЦА-» и нажали Ctrl+X (Вырезать).',
+                    '2. Выделили фрагмент «-ЯЧЕЙКА» и нажали клавишу Delete (Удалить).',
+                    '3. Поставили курсор в самое начало строки (перед словом «СТРОКА») и нажали Ctrl+V (Вставить).',
+                    '4. Поставили курсор в самый конец строки, ввели дефис «-» и нажалиписали слово «КОД».'
+                ],
+                result: 'ТАБЛИЦА-СТРОКА-КОД'
+            },
+            {
+                initial: 'КУРСИВ-ЖИРНЫЙ-СТИЛЬ',
+                steps: [
+                    '1. Выделили слово «СТИЛЬ» и нажали Ctrl+C (Копировать).',
+                    '2. Выделили фрагмент «-ЖИРНЫЙ-СТИЛЬ» и нажали клавишу Delete (Удалить).',
+                    '3. Поставили курсор в самое начало строки, нажали Ctrl+V (Вставить) и ввели дефис «-».',
+                    '4. Поставили курсор в самый конец строки, ввели дефис «-» и ещё раз нажали Ctrl+V (Вставить).'
+                ],
+                result: 'СТИЛЬ-КУРСИВ-СТИЛЬ'
+            }
+        ];
+
+        const t = tasks[Math.floor(Math.random() * tasks.length)];
+        p3Expected = t.result;
+
+        const probEl = document.getElementById('p3-problem-text');
+        const inp = document.getElementById('p3-input');
+        if (probEl) {
+            probEl.innerHTML = `
+                <div class="mb-2">Исходная строка в редакторе: <code class="fs-5 text-warning fw-bold">${t.initial}</code> (буфер обмена пуст).</div>
+                <ul class="list-unstyled mb-0 small d-flex flex-column gap-1">
+                    ${t.steps.map(s => `<li class="p-1 bg-dark border border-secondary px-2">${s}</li>`).join('')}
+                </ul>
+            `;
+        }
+        if (inp) {
+            inp.value = '';
+            inp.setAttribute('data-expected', p3Expected);
+        }
+    }
+
+    function checkPhase3() {
+        const inp = document.getElementById('p3-input');
+        const val = (inp?.value || '').trim().toUpperCase();
+        if (val === p3Expected.toUpperCase()) {
+            logAction('phase3_complete', { answer: val });
+            document.getElementById('phase3')?.classList.add('d-none');
+            document.getElementById('phase4')?.classList.remove('d-none');
+            setPhaseHeader(4, 'Аудит дампа непечатаемых символов (Ctrl+F10)');
+            initPhase4();
+        } else {
+            triggerError('Неверный результат трассировки буфера обмена! Помните: Delete не затирает буфер обмена.', initPhase3);
+        }
+    }
+
+    document.getElementById('p3-btn')?.addEventListener('click', checkPhase3);
+    document.getElementById('p3-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase3();
+    });
+
+    // =========================================================================
+    // ФАЗА 4: АУДИТ ДАМПА НЕПЕЧАТАЕМЫХ СИМВОЛОВ (¶, ↵, ·, °)
+    // =========================================================================
+    let p4ExpectedParas = 0;
+    let p4ExpectedErrors = 0;
+
+    function initPhase4() {
+        const dumps = [
+            {
+                html: `Алгоритм·—·это·точное·предписание.¶<br>Основные·свойства:↵<br>1)·дискретность·;·2)··массовость·-·универсальность.¶`,
+                paras: 2,
+                errors: 3,
+                hint: 'Проверьте: пробел перед точкой с запятой (·;), двойной пробел (··) и дефис вместо тире между пробелами (·-·). Знак ↵ не создает новый абзац!'
+            },
+            {
+                html: `···К.°Ю.°Поляков·—·автор·учебника·информатики.¶<br>¶<br>Объем·файла·равен·256°Кбайт·.¶`,
+                paras: 3,
+                errors: 3,
+                hint: 'Проверьте: 1) имитация красной строки пробелами (···), 2) пустой абзац (¶ в пустой строке), 3) пробел перед точкой (·.).'
+            },
+            {
+                html: `Текстовый·редактор·"Блокнот"·работает·с·файлами·.txt.¶<br>Формат·А4·-·210·×·297°мм.↵<br>Поля·листа··равны·20°мм.¶`,
+                paras: 2,
+                errors: 3,
+                hint: 'Проверьте: 1) прямые кавычки ("Блокнот") вместо «Блокнот», 2) дефис вместо тире (·-·), 3) двойной пробел (··). Разрыв строки ↵ входит во 2-й абзац!'
+            },
+            {
+                html: `Заголовок·раздела¶<br>Первая·строка·текста↵<br>Вторая·строка··текста·,·продолжение.¶<br>Третий·абзац·-·итог.¶`,
+                paras: 3,
+                errors: 3,
+                hint: 'Проверьте: 1) двойной пробел (··), 2) пробел перед запятой (·,), 3) дефис между пробелами (·-·). Всего маркеров ¶ ровно 3!'
+            }
+        ];
+
+        const d = dumps[Math.floor(Math.random() * dumps.length)];
+        p4ExpectedParas = d.paras;
+        p4ExpectedErrors = d.errors;
+
+        const dumpEl = document.getElementById('p4-dump-display');
+        const qEl = document.getElementById('p4-question-text');
+        const inp = document.getElementById('p4-input');
+
+        if (dumpEl) dumpEl.innerHTML = d.html;
+        if (qEl) qEl.textContent = 'Подсчитайте: 1) Общее число абзацев (включая пустые, если есть маркер ¶) и 2) Число типографских ошибок («костылей») в этом дампе.';
+        if (inp) {
+            inp.value = '';
+            inp.setAttribute('data-expected', `${p4ExpectedParas} ${p4ExpectedErrors}`);
+        }
+    }
+
+    function checkPhase4() {
+        const inp = document.getElementById('p4-input');
+        const raw = (inp?.value || '').trim();
+        const parts = raw.split(/[\s:;,-]+/).map(x => parseInt(x, 10)).filter(x => !isNaN(x));
+
+        if (parts.length === 2 && parts[0] === p4ExpectedParas && parts[1] === p4ExpectedErrors) {
+            logAction('phase4_complete', { answer: raw });
+            document.getElementById('phase4')?.classList.add('d-none');
+            document.getElementById('phase5')?.classList.remove('d-none');
+            setPhaseHeader(5, 'Экспертиза стандарта ОГЭ 13.2 и горячих клавиш');
+            initPhase5();
+        } else {
+            triggerError(`Неверно! Помните: число абзацев определяется маркерами ¶ (${p4ExpectedParas}), а не ↵. Ошибок набора: ${p4ExpectedErrors}.`, initPhase4);
+        }
+    }
+
+    document.getElementById('p4-btn')?.addEventListener('click', checkPhase4);
+    document.getElementById('p4-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase4();
+    });
+
+    // =========================================================================
+    // ФАЗА 5: ЭКСПЕРТИЗА ОГЭ 13.2 И ГОРЯЧИХ КЛАВИШ
+    // =========================================================================
+    let p5ExpectedScore = 0;
+    let p5ExpectedShortcut = '';
+
+    function initPhase5() {
+        const cases = [
+            {
+                desc: `
+                    <ul>
+                        <li>Текст набран без орфографических ошибок, гарнитура Liberation Serif, кегль 14 пт, красная строка 1,0 см через свойства абзаца, выравнивание по ширине.</li>
+                        <li>Таблица отцентрирована, шапка полужирная по центру, между абзацами и таблицей нет пустых строк.</li>
+                    </ul>
+                    <div class="text-info mt-2">Дополнительный вопрос: какая комбинация клавиш используется для выравнивания основного текста <strong>по ширине</strong>?</div>
+                `,
+                score: 2,
+                shortcut: 'CTRL+J'
+            },
+            {
+                desc: `
+                    <ul>
+                        <li>Текст набран шрифтом Liberation Serif 14 пт, но отступ первой строки (красная строка) в первом абзаце сделан <strong>пятью нажатиями клавиши Пробел</strong>, а между абзацем и таблицей вставлена пустая строка двойным нажатием Enter.</li>
+                    </ul>
+                    <div class="text-info mt-2">Дополнительный вопрос: какая комбинация клавиш включает отображение <strong>непечатаемых символов (¶)</strong> в LibreOffice Writer для выявления таких костылей?</div>
+                `,
+                score: 0,
+                shortcut: 'CTRL+F10'
+            },
+            {
+                desc: `
+                    <ul>
+                        <li>Текст набран без «костылей» (красная строка 1,0 см задана через диалог Абзац, тире и кавычки верные), таблица оформлена идеально, но в основном тексте случайно выбран размер шрифта <strong>12 пт вместо 14 пт</strong> (одно незначительное отклонение по оформлению).</li>
+                    </ul>
+                    <div class="text-info mt-2">Дополнительный вопрос: какая комбинация клавиш включает <strong>полужирное начертание</strong> для заголовков столбцов таблицы?</div>
+                `,
+                score: 1,
+                shortcut: 'CTRL+B'
+            },
+            {
+                desc: `
+                    <ul>
+                        <li>Текст набран без «костылей» (красная строка 1,0 см задана на линейке, поля 2,0 см, шрифт 14 пт), но заголовки столбцов в шапке таблицы выровнены по левому краю вместо центра (одно мелкое нарушение форматирования).</li>
+                    </ul>
+                    <div class="text-info mt-2">Дополнительный вопрос: какая комбинация клавиш выравнивает текст <strong>по центру</strong>?</div>
+                `,
+                score: 1,
+                shortcut: 'CTRL+E'
+            }
+        ];
+
+        const c = cases[Math.floor(Math.random() * cases.length)];
+        p5ExpectedScore = c.score;
+        p5ExpectedShortcut = c.shortcut;
+
+        const probEl = document.getElementById('p5-problem-text');
+        const inp = document.getElementById('p5-input');
+        if (probEl) probEl.innerHTML = c.desc;
+        if (inp) {
+            inp.value = '';
+            inp.setAttribute('data-expected', `${p5ExpectedScore}:${p5ExpectedShortcut}`);
+        }
+    }
+
+    function checkPhase5() {
+        const inp = document.getElementById('p5-input');
+        const raw = (inp?.value || '').trim().toUpperCase().replace(/\s+/g, '');
+        const expected = `${p5ExpectedScore}:${p5ExpectedShortcut}`;
+
+        if (raw === expected) {
+            logAction('phase5_complete', { answer: raw });
+            document.getElementById('phase5')?.classList.add('d-none');
+            document.getElementById('success-screen')?.classList.remove('d-none');
+            sendTelemetry('level_complete', 'completed', true);
+        } else {
+            triggerError(`Неверно! Проверьте балл по критериям ОГЭ (0, 1 или 2) и комбинацию клавиш (формат БАЛЛ:CTRL+КЛАВИША).`, initPhase5);
+        }
+    }
+
+    document.getElementById('p5-btn')?.addEventListener('click', checkPhase5);
+    document.getElementById('p5-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPhase5();
+    });
+
+    initPhase1();
+</script>
