@@ -23,6 +23,8 @@ const missionName = "9 класс :: Урок 5 :: Уровень 1";
             <WriterEmulator 
                 missionName={missionName} 
                 initialHTML="" 
+                checkOgeFormat={false}
+                hardcoreReset={false}
             />
         </div>
     </div>
@@ -78,31 +80,33 @@ const missionName = "9 класс :: Урок 5 :: Уровень 1";
 
     document.addEventListener('writer-check', (e) => {
         // @ts-ignore
-        const html = e.detail.html;
-        
-        // Очищаем HTML от лишних тегов Jodit, оставляем только суть для проверки
-        const cleanHtml = html.replace(/&nbsp;/g, ' ');
-        
-        // Регулярные выражения для проверки обертки конкретного слова
-        const regex1 = new RegExp(`<${targetFormat.tag}[^>]*>\\s*${targetWord}\\s*<\\/${targetFormat.tag}>`, 'i');
-        const regex2 = new RegExp(`<${targetFormat.tag2}[^>]*>\\s*${targetWord}\\s*<\\/${targetFormat.tag2}>`, 'i');
-        // Запасной вариант для underline, если Jodit использует span
-        const regex3 = new RegExp(`<span[^>]*style="[^"]*text-decoration[^"]*underline[^"]*"[^>]*>\\s*${targetWord}\\s*<\\/span>`, 'i'); 
+        const wysiwyg = e.detail.wysiwyg || document.querySelector('.jodit-wysiwyg');
+        // @ts-ignore
+        const rawText = e.detail.text || (wysiwyg ? (wysiwyg.innerText || wysiwyg.textContent || '') : '');
+        // @ts-ignore
+        const V = window.WriterValidator;
 
-        let success = regex1.test(cleanHtml) || regex2.test(cleanHtml) || (targetFormat.id === 'underline' && regex3.test(cleanHtml));
+        // 1. Проверка полного текста предложения через модуль валидации
+        const hasFullSentence = V ? V.hasText(rawText, currentSentence) : rawText.includes(currentSentence);
 
-        // Дополнительная проверка: ученик должен был набрать всё предложение, а не только одно слово
-        const strippedText = cleanHtml.replace(/<[^>]*>?/gm, '').trim();
-        const sentenceClean = currentSentence.replace(/[^а-яА-ЯёЁ0-9]/ig, '');
-        const studentClean = strippedText.replace(/[^а-яА-ЯёЁ0-9]/ig, '');
-
-        if (!studentClean.includes(sentenceClean)) {
-            success = false;
+        if (!hasFullSentence) {
             // @ts-ignore
             e.detail.resolve(false, 'Предложение набрано не полностью или содержит опечатки!');
             // При ошибке генерируем новую задачу (правило 1-2 уровней)
-            setTimeout(generatePhase, 1500); 
+            setTimeout(generatePhase, 1500);
             return;
+        }
+
+        // 2. Проверка форматирования целевого слова через DOM-методы WriterValidator
+        let success = false;
+        if (V) {
+            if (targetFormat.id === 'bold') {
+                success = V.hasBoldWord(wysiwyg, targetWord);
+            } else if (targetFormat.id === 'italic') {
+                success = V.hasItalicWord(wysiwyg, targetWord);
+            } else if (targetFormat.id === 'underline') {
+                success = V.hasUnderlineWord(wysiwyg, targetWord);
+            }
         }
 
         if (success) {
@@ -110,16 +114,18 @@ const missionName = "9 класс :: Урок 5 :: Уровень 1";
                 // @ts-ignore
                 e.detail.resolve(true, `Фаза ${currentPhase} пройдена!`);
                 currentPhase++;
+                if (phaseEl) phaseEl.innerText = currentPhase;
                 setTimeout(generatePhase, 1500);
             } else {
                 // @ts-ignore
                 e.detail.resolve(true, 'МИССИЯ ВЫПОЛНЕНА УСПЕШНО!');
                 instructionEl.innerHTML = '<span class="text-success fw-bold fs-4">ЗАДАНИЕ УСПЕШНО ВЫПОЛНЕНО!</span><br>Вы научились базовому форматированию документов.';
-                document.getElementById('check-btn').style.display = 'none'; // Прячем кнопку
+                const checkBtn = document.getElementById('check-btn');
+                if (checkBtn) checkBtn.style.display = 'none'; // Прячем кнопку
             }
         } else {
             // @ts-ignore
-            e.detail.resolve(false, `Слово "${targetWord}" не отформатировано правильно!`);
+            e.detail.resolve(false, `Слово "${targetWord}" не отформатировано правильно (${targetFormat.label})!`);
             setTimeout(generatePhase, 1500);
         }
     });
