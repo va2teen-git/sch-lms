@@ -624,7 +624,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
       await page.keyboard.type(d.text.slice(d.text.indexOf(d.underlineWord) + d.underlineWord.length));
       await page.locator('#check-btn').click();
 
-      // ВОЛНА 3: Человек печатает текст с обычной цифрой степени (например "25 м2"), выделяет цифру через Shift+ArrowLeft и нажимает #btn-sup, затем печатает вторую часть с индексом, выделяет цифру через Shift+ArrowLeft и нажимает #btn-sub
+      // ВОЛНА 3: Человек печатает текст с обычной цифрой степени (например "25 м2"), выделяет цифру через Shift+ArrowLeft и нажимает #btn-sup, затем печатает формулу на латинице (например, ", а формула воды — H2O"), выделяет индекс через Shift+ArrowLeft и нажимает #btn-sub
       await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 3 / 10');
       d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
       await page.locator('.jodit-wysiwyg').click();
@@ -637,14 +637,37 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
       if (await page.locator('#btn-sup').evaluate(el => el.classList.contains('active'))) {
         await page.locator('#btn-sup').click();
       }
-      await page.keyboard.type(`, индекс A${d.subText}`);
-      await page.keyboard.press('Shift+ArrowLeft');
-      await page.locator('#btn-sub').click();
-      await page.keyboard.press('End');
-      if (await page.locator('#btn-sub').evaluate(el => el.classList.contains('active'))) {
+      if (d.plainCheck.includes('25 м2')) {
+        await page.keyboard.type(', а формула воды — H'); // Латинская 'H'
+        await page.keyboard.type('2');
+        await page.keyboard.press('Shift+ArrowLeft');
         await page.locator('#btn-sub').click();
+        await page.keyboard.press('End');
+        if (await page.locator('#btn-sub').evaluate(el => el.classList.contains('active'))) {
+          await page.locator('#btn-sub').click();
+        }
+        await page.keyboard.type('O.'); // Латинская 'O'
+      } else if (d.plainCheck.includes('x3')) {
+        await page.keyboard.type(', а основание двоичной системы — 101');
+        await page.keyboard.type('2');
+        await page.keyboard.press('Shift+ArrowLeft');
+        await page.locator('#btn-sub').click();
+        await page.keyboard.press('End');
+        if (await page.locator('#btn-sub').evaluate(el => el.classList.contains('active'))) {
+          await page.locator('#btn-sub').click();
+        }
+        await page.keyboard.type('.');
+      } else {
+        await page.keyboard.type(', а индекс элемента массива — A'); // Латинская 'A'
+        await page.keyboard.type('1');
+        await page.keyboard.press('Shift+ArrowLeft');
+        await page.locator('#btn-sub').click();
+        await page.keyboard.press('End');
+        if (await page.locator('#btn-sub').evaluate(el => el.classList.contains('active'))) {
+          await page.locator('#btn-sub').click();
+        }
+        await page.keyboard.type('.');
       }
-      await page.keyboard.type('.');
       await page.locator('#check-btn').click();
 
       // ВОЛНА 4: Человек СНАЧАЛА выставляет шрифт, кегль и выравнивание по центру на пустом листе, а ЗАТЕМ кликает в лист и печатает заголовок
