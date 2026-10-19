@@ -7,9 +7,11 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
     await page.goto('/tasks/7-класс/22/level3');
     await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
 
-    // Получаем данные Волны 1
-    const wave1Data = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+    // Получаем данные Волны 1 и проверяем увеличенный таймер (85 сек)
+    const arcadeInit = await page.evaluate(() => window.getLevel3ArcadeState());
+    const wave1Data = arcadeInit.activeWaveData;
     expect(wave1Data).toBeDefined();
+    expect(arcadeInit.timeLeft).toBeGreaterThanOrEqual(80);
 
     // Изначально чек-лист показывает невыполненные требования (⏳)
     await expect(page.locator('#live-checklist')).toContainText('⏳');
