@@ -686,6 +686,26 @@ const {
             const r = sel.getRangeAt(0);
             if (wysiwyg.contains(r.commonAncestorContainer)) {
                 lastSavedRange = r.cloneRange();
+                const startEl = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
+                const p = startEl?.closest ? startEl.closest('p, h1, h2, h3, li') : null;
+                if (p && wysiwyg.contains(p)) lastActivePara = p;
+                const tbl = startEl?.closest ? startEl.closest('table') : null;
+                if (tbl && wysiwyg.contains(tbl)) lastActiveTable = tbl;
+            }
+        }
+    }
+
+    function restoreSavedEditorRange() {
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (!wysiwyg) return;
+        if (document.activeElement !== wysiwyg && !wysiwyg.contains(document.activeElement)) {
+            wysiwyg.focus();
+            if (lastSavedRange && wysiwyg.contains(lastSavedRange.commonAncestorContainer)) {
+                const sel = window.getSelection();
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(lastSavedRange.cloneRange());
+                }
             }
         }
     }
@@ -798,6 +818,37 @@ const {
                     if (jsb) jsb.style.display = 'none';
                     const wysiwyg = document.querySelector('.jodit-wysiwyg');
                     if (wysiwyg) {
+                        wysiwyg.addEventListener('keydown', (e) => {
+                            if (e.key === 'Tab') {
+                                const sel = window.getSelection();
+                                if (sel && sel.rangeCount > 0) {
+                                    const startNode = sel.getRangeAt(0).startContainer;
+                                    const startEl = startNode.nodeType === 1 ? startNode : startNode.parentElement;
+                                    const currentCell = startEl?.closest ? startEl.closest('th, td') : null;
+                                    if (currentCell && wysiwyg.contains(currentCell)) {
+                                        const tbl = currentCell.closest('table');
+                                        if (tbl) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const cells = Array.from(tbl.querySelectorAll('th, td'));
+                                            const idx = cells.indexOf(currentCell);
+                                            const nextIdx = e.shiftKey ? idx - 1 : idx + 1;
+                                            if (nextIdx >= 0 && nextIdx < cells.length) {
+                                                const nextCell = cells[nextIdx];
+                                                const r = document.createRange();
+                                                r.selectNodeContents(nextCell);
+                                                if (!/^(Заголовок\s+\d+|Ячейка\s+\d+,\d+)$/.test((nextCell.textContent || '').trim())) {
+                                                    r.collapse(false);
+                                                }
+                                                sel.removeAllRanges();
+                                                sel.addRange(r);
+                                                saveCurrentEditorRange();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }, true);
                         wysiwyg.addEventListener('input', () => {
                             saveCurrentEditorRange();
                             updateStatusbarWords();
@@ -819,11 +870,6 @@ const {
                                 }
                             }
                             saveCurrentEditorRange();
-                            const sel = editor.selection ? editor.selection.current() : null;
-                            if (sel) {
-                                const p = sel.closest ? sel.closest('p, h1, h2, h3, li') : (sel.parentElement ? sel.parentElement.closest('p, h1, h2, h3, li') : null);
-                                if (p) lastActivePara = p;
-                            }
                         });
                     }
                     updateStatusbarWords();
@@ -1091,8 +1137,11 @@ const {
         // Гарнитура шрифта
         const applyFontFromSelect = (e) => {
             const font = e.target.value;
-            try { editor.execCommand('fontname', false, font); } catch (_) {}
             const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && wysiwyg && wysiwyg.contains(sel.anchorNode)) {
+                try { editor.execCommand('fontname', false, font); } catch (_) {}
+            }
             let p = null;
             try {
                 const cur = editor.selection?.current();
@@ -1106,14 +1155,18 @@ const {
                     if (child.hasAttribute('face')) child.setAttribute('face', font);
                 });
             };
-            if (p) {
+            if (p && wysiwyg && wysiwyg.contains(p)) {
                 updateBlockFont(p);
+                if (p.tagName !== 'TD' && p.tagName !== 'TH') {
+                    wysiwyg.style.fontFamily = fallbackFont;
+                }
             } else if (lastActivePara && document.contains(lastActivePara)) {
                 updateBlockFont(lastActivePara);
+                if (wysiwyg) wysiwyg.style.fontFamily = fallbackFont;
             } else if (wysiwyg) {
+                wysiwyg.style.fontFamily = fallbackFont;
                 const allBlocks = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
                 if (allBlocks.length > 0) allBlocks.forEach(updateBlockFont);
-                else wysiwyg.style.fontFamily = fallbackFont;
             }
             recordWriterAction('font_family', { value: font });
         };
@@ -1122,8 +1175,11 @@ const {
         // Размер шрифта
         const applyFontSizeFromSelect = (e) => {
             const size = e.target.value;
-            try { editor.selection.applyStyle({ fontSize: size }); } catch (_) {}
             const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && wysiwyg && wysiwyg.contains(sel.anchorNode)) {
+                try { editor.selection.applyStyle({ fontSize: size }); } catch (_) {}
+            }
             let p = null;
             try {
                 const cur = editor.selection?.current();
@@ -1135,14 +1191,18 @@ const {
                     child.style.fontSize = size;
                 });
             };
-            if (p) {
+            if (p && wysiwyg && wysiwyg.contains(p)) {
                 updateBlockSize(p);
+                if (p.tagName !== 'TD' && p.tagName !== 'TH') {
+                    wysiwyg.style.fontSize = size;
+                }
             } else if (lastActivePara && document.contains(lastActivePara)) {
                 updateBlockSize(lastActivePara);
+                if (wysiwyg) wysiwyg.style.fontSize = size;
             } else if (wysiwyg) {
+                wysiwyg.style.fontSize = size;
                 const allBlocks = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
                 if (allBlocks.length > 0) allBlocks.forEach(updateBlockSize);
-                else wysiwyg.style.fontSize = size;
             }
             recordWriterAction('font_size', { value: size });
         };
@@ -1150,8 +1210,11 @@ const {
 
         // Форматирование текста
         const bindCmd = (btnId, menuId, cmd) => {
-            const fn = () => {
+            const fn = (e) => {
+                if (e) e.preventDefault();
+                restoreSavedEditorRange();
                 try { editor.execCommand(cmd); } catch (_) {}
+                saveCurrentEditorRange();
                 updateToolbarActiveStates();
                 recordWriterAction(`format_${cmd}`, { command: cmd });
             };
@@ -1205,6 +1268,7 @@ const {
         const bindAlign = (btnId, menuId, cmd, cssAlign) => {
             const fn = (e) => {
                 if (e) e.preventDefault();
+                restoreSavedEditorRange();
                 try { editor.execCommand(cmd); } catch (_) {}
                 applyParagraphStyle({ textAlign: cssAlign });
                 ['btn-align-left', 'btn-align-center', 'btn-align-right', 'btn-align-justify'].forEach(id => {
@@ -1222,11 +1286,15 @@ const {
 
         // Списки
         document.getElementById('btn-ul')?.addEventListener('click', () => {
+            restoreSavedEditorRange();
             editor.execCommand('insertunorderedlist');
+            saveCurrentEditorRange();
             recordWriterAction('list', { value: 'ul' });
         });
         document.getElementById('btn-ol')?.addEventListener('click', () => {
+            restoreSavedEditorRange();
             editor.execCommand('insertorderedlist');
+            saveCurrentEditorRange();
             recordWriterAction('list', { value: 'ol' });
         });
 
@@ -1269,9 +1337,13 @@ const {
 
         // Клик по линейке для быстрой установки красной строки 1 см (ОГЭ)
         document.getElementById('ruler-first-line')?.addEventListener('click', () => {
-            applyParagraphStyle({ textIndent: '1.0cm' });
+            applyParagraphStyle({ textIndent: '1.0cm', lineHeight: '1.15' });
             recordWriterAction('ruler_first_line', { textIndent: '1.0cm' });
-            alert('LibreOffice: для текущего абзаца установлен отступ первой строки (красная строка) 1,00 см');
+            const statusEl = document.getElementById('writer-status');
+            if (statusEl) {
+                statusEl.className = 'text-primary fw-bold px-2';
+                statusEl.innerText = 'Отступ первой строки (красная строка): 1,00 см';
+            }
         });
 
         // Сервис: статистика
@@ -1357,8 +1429,21 @@ const {
         let targets = [];
         const sel = editor.selection ? editor.selection.current() : null;
         if (sel) {
+            const cell = sel.closest ? sel.closest('th, td') : (sel.parentElement ? sel.parentElement.closest('th, td') : null);
             const p = sel.closest ? sel.closest('p, h1, h2, h3, li') : (sel.parentElement ? sel.parentElement.closest('p, h1, h2, h3, li') : null);
-            if (p) targets = [p];
+            if (p && (!cell || cell.contains(p))) {
+                targets = [p];
+            } else if (cell && wysiwyg.contains(cell)) {
+                targets = [cell];
+                if (styles.textAlign === 'center') {
+                    const tbl = cell.closest('table');
+                    if (tbl) {
+                        tbl.style.marginLeft = 'auto';
+                        tbl.style.marginRight = 'auto';
+                        tbl.setAttribute('align', 'center');
+                    }
+                }
+            }
         }
         if (targets.length === 0 && lastActivePara && document.contains(lastActivePara)) {
             targets = [lastActivePara];
@@ -1369,7 +1454,7 @@ const {
         }
 
         targets.forEach(target => {
-            if (styles.textIndent !== undefined) {
+            if (styles.textIndent !== undefined && target.tagName !== 'TD' && target.tagName !== 'TH') {
                 target.style.textIndent = styles.textIndent;
                 const cm = parseCm(styles.textIndent);
                 if (cm !== null) updateRulerFirstLineMarker(cm);

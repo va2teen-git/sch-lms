@@ -582,6 +582,228 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
     }
   });
 
+  test('Ручное человеческое прохождение всех 10 волн (пост-выделение текста клавишами Shift+Arrow после набора, клик по линейке #ruler-first-line, меню Формат/Вставка/Таблица и навигация Tab по ячейкам)', async ({ page }) => {
+    test.setTimeout(90000);
+    await page.goto('/tasks/7-класс/22/level3');
+
+    for (let variantIdx = 0; variantIdx < 3; variantIdx++) {
+      await page.evaluate((idx) => {
+        window.forceLevel3Variant(idx);
+        window.jumpToLevel3Wave(1);
+      }, variantIdx);
+
+      // ВОЛНА 1: Человек сначала печатает всё предложение целиком, затем нажимает Home, выделяет первое слово через Shift+ArrowRight и жмёт кнопку #btn-bold
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
+      let d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.text);
+      await page.keyboard.press('Home');
+      for (let i = 0; i < d.boldWord.length; i++) {
+        await page.keyboard.press('Shift+ArrowRight');
+      }
+      await page.locator('#btn-bold').click();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 2: Человек печатает первое слово, выделяет его через Shift+ArrowLeft и жмёт #btn-italic, допечатывает до второго слова, выделяет его и жмёт #btn-underline
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 2 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.italicWord);
+      for (let i = 0; i < d.italicWord.length; i++) {
+        await page.keyboard.press('Shift+ArrowLeft');
+      }
+      await page.locator('#btn-italic').click();
+      await page.keyboard.press('End');
+      const midPart = d.text.slice(d.italicWord.length, d.text.indexOf(d.underlineWord) + d.underlineWord.length);
+      await page.keyboard.type(midPart);
+      for (let i = 0; i < d.underlineWord.length; i++) {
+        await page.keyboard.press('Shift+ArrowLeft');
+      }
+      await page.locator('#btn-underline').click();
+      await page.keyboard.press('End');
+      await page.keyboard.type(d.text.slice(d.text.indexOf(d.underlineWord) + d.underlineWord.length));
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 3: Человек печатает текст с обычной цифрой степени (например "25 м2"), выделяет цифру через Shift+ArrowLeft и нажимает #btn-sup, затем печатает вторую часть с индексом, выделяет цифру через Shift+ArrowLeft и нажимает #btn-sub
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 3 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      const firstPartWithPlainDigit = d.plainCheck.split(',')[0]; // например "Площадь поверхности составляет 25 м2"
+      await page.keyboard.type(firstPartWithPlainDigit);
+      await page.keyboard.press('Shift+ArrowLeft');
+      await page.locator('#btn-sup').click();
+      await page.keyboard.press('End');
+      // Снимаем режим верхнего индекса если он активен, и допечатываем вторую часть
+      if (await page.locator('#btn-sup').evaluate(el => el.classList.contains('active'))) {
+        await page.locator('#btn-sup').click();
+      }
+      await page.keyboard.type(`, индекс A${d.subText}`);
+      await page.keyboard.press('Shift+ArrowLeft');
+      await page.locator('#btn-sub').click();
+      await page.keyboard.press('End');
+      if (await page.locator('#btn-sub').evaluate(el => el.classList.contains('active'))) {
+        await page.locator('#btn-sub').click();
+      }
+      await page.keyboard.type('.');
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 4: Человек СНАЧАЛА выставляет шрифт, кегль и выравнивание по центру на пустом листе, а ЗАТЕМ кликает в лист и печатает заголовок
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 4 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('#select-font').selectOption(d.font);
+      await page.locator('#select-fontsize').selectOption(`${d.sizePt}pt`);
+      await page.locator('#btn-align-center').click();
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.heading);
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 5: Человек печатает абзац, выделяет всё через Ctrl+A, выбирает шрифт Liberation Serif, 14pt и выравнивание через меню Формат -> Выравнивание: По ширине
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 5 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.text);
+      await page.keyboard.press('Control+a');
+      await page.locator('#select-font').selectOption('Liberation Serif');
+      await page.locator('#select-fontsize').selectOption('14pt');
+      await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+      await page.locator('#menu-format-align-justify').click();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 6: Человек использует быстрый способ из теории — кликает мышью по маркеру линейки #ruler-first-line, выбирает интервал через кнопку #btn-linespacing на тулбаре и жмёт #btn-align-justify
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 6 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.text);
+      await page.locator('#ruler-first-line').click();
+      await page.locator('#btn-linespacing').click();
+      await page.locator('[data-lineheight="1.15"]').click();
+      await page.locator('#btn-align-justify').click();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 7: Человек открывает спецсимволы как через меню «Вставка -> Специальные символы...», так и через кнопку Ω (#btn-symbol)
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 7 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      const beforeQuote = d.text.split('«')[0];
+      const insideQuote = d.quoted.slice(1, -1);
+      const afterDash = d.text.split('—')[1];
+      await page.keyboard.type(beforeQuote);
+      await page.locator('.lo-menu-item').filter({ hasText: /^Вставка$/ }).click();
+      await page.locator('#menu-insert-symbols').click();
+      await page.locator('.lo-sym-btn[data-sym="«"]').click();
+      await page.keyboard.type(insideQuote);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="»"]').click();
+      await page.keyboard.type(' ');
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="—"]').click();
+      const [partBeforeDeg1, restAfterDeg1] = afterDash.split('°C');
+      const [partBetweenDeg1AndPm, partAfterPm] = restAfterDeg1.split('±');
+      const [numBeforeDeg2] = partAfterPm.split('°C');
+      await page.keyboard.type(partBeforeDeg1);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="°"]').click();
+      await page.keyboard.type('C' + partBetweenDeg1AndPm);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="±"]').click();
+      await page.keyboard.type(numBeforeDeg2);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="°"]').click();
+      await page.keyboard.type('C.');
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 8: Человек включает список #btn-ol, печатает каждый термин, выделяет его через Shift+ArrowLeft и нажимает #btn-bold (или Формат -> Полужирный)
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 8 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.locator('#btn-ol').click();
+      for (let i = 0; i < 3; i++) {
+        await page.keyboard.type(d.items[i].bold);
+        for (let k = 0; k < d.items[i].bold.length; k++) {
+          await page.keyboard.press('Shift+ArrowLeft');
+        }
+        if (i === 0) {
+          await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+          await page.locator('#menu-format-bold').click();
+        } else {
+          await page.locator('#btn-bold').click();
+        }
+        await page.keyboard.press('End');
+        if (await page.locator('#btn-bold').evaluate(el => el.classList.contains('active'))) {
+          await page.locator('#btn-bold').click();
+        }
+        await page.keyboard.type(' — ' + d.items[i].rest);
+        if (i < 2) await page.keyboard.press('Enter');
+      }
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 9: Человек вставляет таблицу через меню «Таблица -> Вставить таблицу...», заполняет ячейки с переходом клавишей Tab и центрирует таблицу кнопкой #btn-align-center
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 9 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.lo-menu-item').filter({ hasText: /^Таблица$/ }).click();
+      await page.locator('#menu-table-insert').click();
+      await expect(page.locator('#modal-table')).toBeVisible();
+      await page.locator('#dialog-table-cols').fill('2');
+      await page.locator('#dialog-table-rows').fill('2');
+      await page.locator('#btn-apply-table').click();
+
+      const firstCell = page.locator('.jodit-wysiwyg th, .jodit-wysiwyg td').first();
+      await firstCell.click();
+      await page.keyboard.type(d.h1);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(d.h2);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(d.c1);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(d.c2);
+      await page.locator('#btn-align-center').click();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 10: Человек проходит финальный экзамен с использованием линейки #ruler-first-line, кнопки #btn-align-justify и клавиши Tab в таблице
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 10 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+
+      await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+      await page.locator('#menu-format-page').click();
+      await page.locator('#btn-page-set-oge').click();
+      await page.locator('#btn-apply-page').click();
+
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.para);
+      await page.keyboard.press('Home');
+      for (let i = 0; i < d.boldWord.length; i++) {
+        await page.keyboard.press('Shift+ArrowRight');
+      }
+      await page.locator('#btn-bold').click();
+      await page.locator('#select-font').selectOption('Liberation Serif');
+      await page.locator('#select-fontsize').selectOption('14pt');
+      await page.locator('#ruler-first-line').click();
+      await page.locator('#btn-align-justify').click();
+
+      await page.locator('#btn-table').click();
+      await page.locator('#dialog-table-cols').fill('2');
+      await page.locator('#dialog-table-rows').fill('2');
+      await page.locator('#btn-apply-table').click();
+
+      const w10FirstCell = page.locator('.jodit-wysiwyg th, .jodit-wysiwyg td').first();
+      await w10FirstCell.click();
+      await page.keyboard.type(d.h1);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(d.h2);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(d.c1);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(d.c2);
+
+      await page.locator('.lo-menu-item').filter({ hasText: /^Таблица$/ }).click();
+      await page.locator('#menu-table-props').click();
+      await page.locator('#btn-apply-table-props').click();
+
+      await page.locator('#check-btn').click();
+      await expect(page.locator('#victory-banner')).toBeVisible();
+    }
+  });
+
 });
 
 
