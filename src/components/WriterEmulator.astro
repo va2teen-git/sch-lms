@@ -672,6 +672,8 @@ const {
     let lastActivePara = null;
     let lastActiveTable = null;
     let lastOgeReport = null;
+    let dynamicCheckOgeFormat = checkOgeFormat !== false;
+    let writerActionLog = [];
 
     // Поля страницы по умолчанию (сырой режим: сброшены в 1.0 см)
     let pageMargins = {
@@ -681,7 +683,41 @@ const {
         bottomCm: 1.0
     };
 
+    function recordWriterAction(type, details = {}) {
+        const entry = {
+            timestamp: new Date().toISOString(),
+            elapsedMs: Date.now() - startTime,
+            type,
+            ...details
+        };
+        writerActionLog.push(entry);
+        document.dispatchEvent(new CustomEvent('writer-action', { detail: entry }));
+        emitWriterChange();
+    }
+
+    function getWriterState() {
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        const html = (wysiwyg && wysiwyg.innerHTML !== undefined) ? wysiwyg.innerHTML : (editor ? editor.value : '');
+        const text = wysiwyg ? (wysiwyg.innerText || wysiwyg.textContent || '') : (editor ? editor.text : '');
+        return {
+            html,
+            text,
+            wysiwyg,
+            pageMargins: { ...pageMargins },
+            isNonPrintingActive,
+            isRulerActive,
+            actionLog: [...writerActionLog],
+            editor
+        };
+    }
+
+    function emitWriterChange() {
+        document.dispatchEvent(new CustomEvent('writer-change', { detail: getWriterState() }));
+    }
+
     function sendTelemetry(actionType, status, success = false) {
+        const levelMatch = String(missionName || '').match(/Уровень\s*(\d+)/i) || window.location.pathname.match(/level(\d+)/i);
+        const resolvedLevel = levelMatch ? parseInt(levelMatch[1], 10) : 1;
         const msg = {
             type: 'TELEMETRY_EVENT',
             mission_name: missionName,
@@ -690,7 +726,8 @@ const {
             start_time: new Date(startTime).toISOString(),
             time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
             attempts_count: attempts,
-            success: success
+            success: success,
+            action_log: writerActionLog.slice(-50)
         };
         window.parent.postMessage(msg, '*');
 
@@ -704,13 +741,14 @@ const {
                     student_class: '7-класс',
                     course_slug: '7-класс',
                     lesson_id: '22',
-                    level_number: 1,
+                    level_number: resolvedLevel,
                     mission_name: missionName,
                     action_type: actionType,
                     status: status,
                     time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
                     attempts_count: attempts,
                     success: success,
+                    action_log: writerActionLog.slice(-50),
                     is_hardcore: typeof localStorage !== 'undefined' && localStorage.getItem('hardcore_mode') === 'true'
                 })
             }).catch(() => {});
@@ -733,13 +771,32 @@ const {
             events: {
                 change: () => {
                     updateStatusbarWords();
+                    emitWriterChange();
                 },
                 afterInit: () => {
                     // Скрываем родной статусбар Jodit
                     const jsb = document.querySelector('.jodit-status-bar');
                     if (jsb) jsb.style.display = 'none';
+                    const wysiwyg = document.querySelector('.jodit-wysiwyg');
+                    if (wysiwyg) {
+                        wysiwyg.addEventListener('input', () => {
+                            updateStatusbarWords();
+                            emitWriterChange();
+                        });
+                        wysiwyg.addEventListener('keyup', () => {
+                            emitWriterChange();
+                        });
+                        wysiwyg.addEventListener('mouseup', () => {
+                            const sel = editor.selection ? editor.selection.current() : null;
+                            if (sel) {
+                                const p = sel.closest ? sel.closest('p, h1, h2, h3, li') : (sel.parentElement ? sel.parentElement.closest('p, h1, h2, h3, li') : null);
+                                if (p) lastActivePara = p;
+                            }
+                        });
+                    }
                     updateStatusbarWords();
                     applyPageMargins(pageMargins);
+                    emitWriterChange();
                 }
             }
         });
@@ -983,29 +1040,61 @@ const {
         document.getElementById('select-style')?.addEventListener('change', (e) => {
             const tag = e.target.value;
             editor.execCommand('formatBlock', false, tag);
+            recordWriterAction('style_block', { value: tag });
         });
 
         // Гарнитура шрифта
         document.getElementById('select-font')?.addEventListener('change', (e) => {
             const font = e.target.value;
-            editor.execCommand('fontname', false, font);
-            const cur = editor.selection?.current();
-            const p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
-            if (p) p.style.fontFamily = `'${font}', serif`;
+            try { editor.execCommand('fontname', false, font); } catch (_) {}
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            let p = null;
+            try {
+                const cur = editor.selection?.current();
+                p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
+            } catch (_) {}
+            const fallbackFont = (font.includes('Serif') || font.includes('Times')) ? `'${font}', serif` : (font.includes('Courier') ? `'${font}', monospace` : `'${font}', sans-serif`);
+            if (p) {
+                p.style.fontFamily = fallbackFont;
+            } else if (lastActivePara && document.contains(lastActivePara)) {
+                lastActivePara.style.fontFamily = fallbackFont;
+            } else if (wysiwyg) {
+                const allBlocks = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
+                if (allBlocks.length > 0) allBlocks.forEach(el => { el.style.fontFamily = fallbackFont; });
+                else wysiwyg.style.fontFamily = fallbackFont;
+            }
+            recordWriterAction('font_family', { value: font });
         });
 
         // Размер шрифта
         document.getElementById('select-fontsize')?.addEventListener('change', (e) => {
             const size = e.target.value;
-            editor.selection.applyStyle({ fontSize: size });
-            const cur = editor.selection?.current();
-            const p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
-            if (p) p.style.fontSize = size;
+            try { editor.selection.applyStyle({ fontSize: size }); } catch (_) {}
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            let p = null;
+            try {
+                const cur = editor.selection?.current();
+                p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
+            } catch (_) {}
+            if (p) {
+                p.style.fontSize = size;
+            } else if (lastActivePara && document.contains(lastActivePara)) {
+                lastActivePara.style.fontSize = size;
+            } else if (wysiwyg) {
+                const allBlocks = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
+                if (allBlocks.length > 0) allBlocks.forEach(el => { el.style.fontSize = size; });
+                else wysiwyg.style.fontSize = size;
+            }
+            recordWriterAction('font_size', { value: size });
         });
 
         // Форматирование текста
         const bindCmd = (btnId, menuId, cmd) => {
-            const fn = () => { editor.execCommand(cmd); updateToolbarActiveStates(); };
+            const fn = () => {
+                try { editor.execCommand(cmd); } catch (_) {}
+                updateToolbarActiveStates();
+                recordWriterAction(`format_${cmd}`, { command: cmd });
+            };
             document.getElementById(btnId)?.addEventListener('click', fn);
             if (menuId) document.getElementById(menuId)?.addEventListener('click', fn);
         };
@@ -1018,11 +1107,11 @@ const {
         
         // Очистить прямое форматирование (Ctrl+M)
         const onClearFormat = () => {
-            editor.execCommand('removeFormat');
+            try { editor.execCommand('removeFormat'); } catch (_) {}
             // Очищаем локальные инлайн-стили абзаца
-            const block = editor.selection.current();
+            const block = editor.selection ? editor.selection.current() : null;
             if (block) {
-                const p = block.closest('p, h1, h2, h3, li');
+                const p = block.closest ? block.closest('p, h1, h2, h3, li') : block.parentElement?.closest('p, h1, h2, h3, li');
                 if (p) {
                     p.style.textIndent = '';
                     p.style.lineHeight = '';
@@ -1031,6 +1120,7 @@ const {
                     p.style.marginBottom = '';
                 }
             }
+            recordWriterAction('clear_format');
         };
         document.getElementById('btn-eraser')?.addEventListener('click', onClearFormat);
         document.getElementById('menu-format-clear')?.addEventListener('click', onClearFormat);
@@ -1038,26 +1128,57 @@ const {
         // Цвета
         document.getElementById('btn-fontcolor')?.addEventListener('click', () => {
             const color = prompt('Введите цвет текста (например: #ff0000, blue, black):', '#000000');
-            if (color) editor.execCommand('foreColor', false, color);
+            if (color) {
+                try { editor.execCommand('foreColor', false, color); } catch (_) {}
+                recordWriterAction('fore_color', { value: color });
+            }
         });
         document.getElementById('btn-backcolor')?.addEventListener('click', () => {
             const color = prompt('Введите цвет фона/выделения (например: yellow, #e0e0e0):', '#ffff00');
-            if (color) editor.execCommand('hiliteColor', false, color);
+            if (color) {
+                try { editor.execCommand('hiliteColor', false, color); } catch (_) {}
+                recordWriterAction('hilite_color', { value: color });
+            }
         });
 
         // Выравнивание
-        bindCmd('btn-align-left', 'menu-format-align-left', 'justifyleft');
-        bindCmd('btn-align-center', 'menu-format-align-center', 'justifycenter');
-        bindCmd('btn-align-right', 'menu-format-align-right', 'justifyright');
-        bindCmd('btn-align-justify', 'menu-format-align-justify', 'justifyfull');
+        const bindAlign = (btnId, menuId, cmd, cssAlign) => {
+            const fn = (e) => {
+                if (e) e.preventDefault();
+                try { editor.execCommand(cmd); } catch (_) {}
+                applyParagraphStyle({ textAlign: cssAlign });
+                ['btn-align-left', 'btn-align-center', 'btn-align-right', 'btn-align-justify'].forEach(id => {
+                    toggleBtnActive(id, id === btnId);
+                });
+                recordWriterAction(`align_${cssAlign}`, { value: cssAlign });
+            };
+            document.getElementById(btnId)?.addEventListener('click', fn);
+            if (menuId) document.getElementById(menuId)?.addEventListener('click', fn);
+        };
+        bindAlign('btn-align-left', 'menu-format-align-left', 'justifyleft', 'left');
+        bindAlign('btn-align-center', 'menu-format-align-center', 'justifycenter', 'center');
+        bindAlign('btn-align-right', 'menu-format-align-right', 'justifyright', 'right');
+        bindAlign('btn-align-justify', 'menu-format-align-justify', 'justifyfull', 'justify');
 
         // Списки
-        document.getElementById('btn-ul')?.addEventListener('click', () => editor.execCommand('insertunorderedlist'));
-        document.getElementById('btn-ol')?.addEventListener('click', () => editor.execCommand('insertorderedlist'));
+        document.getElementById('btn-ul')?.addEventListener('click', () => {
+            editor.execCommand('insertunorderedlist');
+            recordWriterAction('list', { value: 'ul' });
+        });
+        document.getElementById('btn-ol')?.addEventListener('click', () => {
+            editor.execCommand('insertorderedlist');
+            recordWriterAction('list', { value: 'ol' });
+        });
 
         // Отступы
-        document.getElementById('btn-outdent')?.addEventListener('click', () => editor.execCommand('outdent'));
-        document.getElementById('btn-indent')?.addEventListener('click', () => editor.execCommand('indent'));
+        document.getElementById('btn-outdent')?.addEventListener('click', () => {
+            editor.execCommand('outdent');
+            recordWriterAction('outdent');
+        });
+        document.getElementById('btn-indent')?.addEventListener('click', () => {
+            editor.execCommand('indent');
+            recordWriterAction('indent');
+        });
 
         // Междустрочный интервал
         document.querySelectorAll('[data-lineheight]').forEach(el => {
@@ -1065,6 +1186,7 @@ const {
                 e.preventDefault();
                 const lh = el.getAttribute('data-lineheight');
                 applyParagraphStyle({ lineHeight: lh });
+                recordWriterAction('line_height', { value: lh });
             });
         });
 
@@ -1072,19 +1194,23 @@ const {
         document.getElementById('act-para-add-bottom')?.addEventListener('click', (e) => {
             e.preventDefault();
             applyParagraphStyle({ marginBottom: '6pt' });
+            recordWriterAction('para_space', { marginBottom: '6pt' });
         });
         document.getElementById('act-para-add-top')?.addEventListener('click', (e) => {
             e.preventDefault();
             applyParagraphStyle({ marginTop: '6pt' });
+            recordWriterAction('para_space', { marginTop: '6pt' });
         });
         document.getElementById('act-para-remove')?.addEventListener('click', (e) => {
             e.preventDefault();
             applyParagraphStyle({ marginTop: '0', marginBottom: '0' });
+            recordWriterAction('para_space', { marginTop: '0', marginBottom: '0' });
         });
 
         // Клик по линейке для быстрой установки красной строки 1 см (ОГЭ)
         document.getElementById('ruler-first-line')?.addEventListener('click', () => {
             applyParagraphStyle({ textIndent: '1.0cm' });
+            recordWriterAction('ruler_first_line', { textIndent: '1.0cm' });
             alert('LibreOffice: для текущего абзаца установлен отступ первой строки (красная строка) 1,00 см');
         });
 
@@ -1234,7 +1360,9 @@ const {
         }
 
         // 2. Шапка таблицы: выравнивание текста и полужирный шрифт
-        const headerCells = table.querySelectorAll('th, thead td, tr:first-child th, tr:first-child td');
+        const headerCells = (table.rows && table.rows.length > 0)
+            ? Array.from(table.rows[0].cells)
+            : Array.from(table.querySelectorAll('th'));
         headerCells.forEach(cell => {
             if (props.headerAlign) {
                 cell.style.textAlign = props.headerAlign;
@@ -1557,7 +1685,9 @@ const {
                 }
 
                 // Шапка таблицы
-                const headerCells = Array.from(tbl.querySelectorAll('th, thead td, tr:first-child th, tr:first-child td'));
+                const headerCells = (tbl.rows && tbl.rows.length > 0)
+                    ? Array.from(tbl.rows[0].cells)
+                    : Array.from(tbl.querySelectorAll('th'));
                 let headersCentered = true;
                 for (const hCell of headerCells) {
                     const cStyle = window.getComputedStyle(hCell);
@@ -1720,8 +1850,9 @@ const {
                 lineHeight: lh,
                 textAlign: alignRadio
             });
+            recordWriterAction('modal_paragraph', { firstLine, left, right, top, bottom, lh, align: alignRadio });
 
-            const modalEl = document.getElementById('modal-paragraph');
+            const modalEl = document.getElementById('modal-table-fake') || document.getElementById('modal-paragraph');
             if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
         });
 
@@ -1753,6 +1884,9 @@ const {
             }
             html += '</tbody></table><p></p>';
             editor.selection.insertHTML(html);
+            recordWriterAction('insert_table', { cols, rows });
+            updateStatusbarWords();
+            emitWriterChange();
 
             const modalEl = document.getElementById('modal-table');
             if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
@@ -1766,6 +1900,8 @@ const {
                 const newTr = tr.cloneNode(true);
                 Array.from(newTr.children).forEach(td => td.innerHTML = '&nbsp;');
                 tr.parentNode.insertBefore(newTr, tr);
+                recordWriterAction('table_row_above');
+                emitWriterChange();
             }
         });
         document.getElementById('menu-table-row-below')?.addEventListener('click', () => {
@@ -1775,13 +1911,19 @@ const {
                 const newTr = tr.cloneNode(true);
                 Array.from(newTr.children).forEach(td => td.innerHTML = '&nbsp;');
                 tr.after(newTr);
+                recordWriterAction('table_row_below');
+                emitWriterChange();
             }
         });
         document.getElementById('menu-table-row-delete')?.addEventListener('click', () => {
             editor.selection.current()?.closest('tr')?.remove();
+            recordWriterAction('table_row_delete');
+            emitWriterChange();
         });
         document.getElementById('menu-table-delete')?.addEventListener('click', () => {
             editor.selection.current()?.closest('table')?.remove();
+            recordWriterAction('table_delete');
+            emitWriterChange();
         });
 
         // 3. Диалог «Свойства таблицы...»
@@ -1813,6 +1955,7 @@ const {
                 fontSize,
                 headerBold
             });
+            recordWriterAction('modal_table_props', { align, headerAlign, fontSize, headerBold });
 
             const modalEl = document.getElementById('modal-table-props');
             if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
@@ -1858,6 +2001,7 @@ const {
                 topCm: top,
                 bottomCm: bottom
             });
+            recordWriterAction('modal_page_margins', { left, right, top, bottom });
 
             const modalEl = document.getElementById('modal-page');
             if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
@@ -1875,7 +2019,12 @@ const {
         document.querySelectorAll('.lo-sym-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const sym = btn.getAttribute('data-sym');
-                if (sym) editor.selection.insertHTML(sym);
+                if (sym) {
+                    editor.selection.insertHTML(sym);
+                    recordWriterAction('insert_symbol', { sym });
+                    updateStatusbarWords();
+                    emitWriterChange();
+                }
                 const modalEl = document.getElementById('modal-symbols');
                 if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
             });
@@ -1926,6 +2075,25 @@ const {
     window.applyPageMargins = applyPageMargins;
     window.applyParagraphStyle = applyParagraphStyle;
     window.applyTableProps = applyTableProps;
+    window.getWriterState = getWriterState;
+    window.setWriterOgeCheck = (val) => { dynamicCheckOgeFormat = !!val; };
+    window.resetWriterState = (initialHtml = '<p><br></p>', resetLog = false, resetMargins = false) => {
+        if (editor) {
+            editor.value = initialHtml;
+        }
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (wysiwyg) {
+            wysiwyg.innerHTML = initialHtml;
+        }
+        if (resetLog) {
+            writerActionLog.length = 0;
+        }
+        if (resetMargins) {
+            applyPageMargins({ leftCm: 1.0, rightCm: 1.0, topCm: 1.0, bottomCm: 1.0 });
+        }
+        updateStatusbarWords();
+        emitWriterChange();
+    };
 
     // Валидация решения (кнопка ПРОВЕРИТЬ ДОКУМЕНТ)
     document.getElementById('check-btn').addEventListener('click', () => {
@@ -1936,43 +2104,45 @@ const {
         const statusEl = document.getElementById('writer-status');
         const reportBtn = document.getElementById('btn-show-report');
 
-        // ЯДЕРНАЯ ФИЧА: Если включена проверка формата ОГЭ
-        // Сначала проводим автоматическую экспертную проверку документа
-        if (checkOgeFormat !== false) {
-            const report = inspectOgeDocument(wysiwyg, pageMargins);
-            lastOgeReport = report;
+        // ЯДЕРНАЯ ФИЧА: Автоматическая экспертная проверка документа и детектор костылей ОГЭ 13.2
+        const report = inspectOgeDocument(wysiwyg, pageMargins);
+        lastOgeReport = report;
 
-            if (!report.valid) {
-                if (statusEl) {
-                    statusEl.className = 'text-danger fw-bold px-2';
-                    statusEl.innerText = `❌ Ошибка ОГЭ 13.2 (${report.score}/2 баллов): несоответствие стандарту!`;
-                }
-                if (reportBtn) {
-                    reportBtn.style.display = 'inline-block';
-                }
-                renderOgeReportModal(report);
-                const modalEl = document.getElementById('modal-oge-report');
-                if (modalEl && window.bootstrap) {
-                    new bootstrap.Modal(modalEl).show();
-                }
-                sendTelemetry('hardcore_reset', 'in_progress', false);
-                if (hardcoreReset) {
-                    editor.value = '';
-                }
-                document.dispatchEvent(new CustomEvent('writer-error', { detail: { report } }));
-                return; // БЛОКИРУЕМ прохождение задания, пока оформление не приведено в норму
-            } else {
-                if (reportBtn) {
-                    reportBtn.style.display = 'inline-block';
-                }
-                renderOgeReportModal(report);
+        if ((dynamicCheckOgeFormat && !report.valid) || report.crutchesFound) {
+            if (statusEl) {
+                statusEl.className = 'text-danger fw-bold px-2';
+                statusEl.innerText = `❌ Ошибка ОГЭ 13.2 (${report.score}/2 баллов): несоответствие стандарту!`;
             }
+            if (reportBtn) {
+                reportBtn.style.display = 'inline-block';
+            }
+            renderOgeReportModal(report);
+            const modalEl = document.getElementById('modal-oge-report');
+            if (modalEl && window.bootstrap) {
+                new bootstrap.Modal(modalEl).show();
+            }
+            sendTelemetry('hardcore_reset', 'in_progress', false);
+            if (hardcoreReset) {
+                editor.value = '';
+            }
+            document.dispatchEvent(new CustomEvent('writer-error', { detail: { report } }));
+            return; // БЛОКИРУЕМ прохождение задания, пока оформление не приведено в норму
+        } else if (dynamicCheckOgeFormat) {
+            if (reportBtn) {
+                reportBtn.style.display = 'inline-block';
+            }
+            renderOgeReportModal(report);
         }
         
-        // Если оформление соответствует стандарту ОГЭ, переходим к проверке условий урока
+        // Если оформление не содержит костылей (и соответствует ОГЭ при включенном флаге), переходим к проверке условий волны/урока
         const event = new CustomEvent('writer-check', { 
             detail: { 
-                html: content, 
+                html: content,
+                text: wysiwyg ? (wysiwyg.innerText || '') : '',
+                wysiwyg: wysiwyg,
+                pageMargins: { ...pageMargins },
+                actionLog: writerActionLog.slice(),
+                ogeReport: report,
                 resolve: (success, msg, isFinal = true) => {
                     if (success) {
                         statusEl.className = 'text-success fw-bold px-2';

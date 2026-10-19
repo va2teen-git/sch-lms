@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('LibreOffice Writer Emulator Suite', () => {
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/tasks/7-класс/22/level1');
+    await page.goto('/tasks/7-класс/22/level3');
     const taskDescription = page.locator('#task-description');
     await expect(taskDescription).toBeVisible();
     await expect(taskDescription).not.toContainText('Загрузка');
