@@ -1,0 +1,639 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 10 технологический класс (углубленный), Урок 26
+// Тема: Информация, данные и знания. Информационные процессы в природе, технике и обществе
+// Архетипы (ранее НЕ использованные в 10 углубленном классе):
+// Гибрид Архетипа 2 («Packet Flow Router / Data Pipelines»), Архетипа 3 («Logic Pulse Runner / Circuit Overdrive»)
+// и Архетипа 8 («Signal Wave Resonance / Oscilloscope Decryption»).
+// 10 процедурных волн, динамический таймер (10.0с -> 6.0с), 3-узловая пространственная коммутация импульса + форсаж [ПРОБЕЛ / Enter].
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ АРКАДНОГО БОССА) -->
+        <div v-if="gameState === 'intro'" id="intro-screen" class="card bg-dark border-danger rounded-0 p-3 p-md-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 gap-2">
+                <h2 class="h4 text-danger mb-0 fw-bold">⚡ CYBERNETIC FLOW ROUTER &amp; WAVE RESONANCE // АРХЕТИПЫ 2 + 3 + 8</h2>
+                <span class="badge bg-danger text-dark rounded-0 fw-bold px-3 py-2">АРКАДНЫЙ БОСС // УРОВЕНЬ 3</span>
+            </div>
+
+            <p class="text-light mb-3">
+                По магистрали кибернетического центра управления со сверхвысокой скоростью движется информационный импульс.
+                На каждой из <strong class="text-danger">10 волн</strong> вам необходимо провести <strong>многомерный анализ сигнала</strong>,
+                переключить <strong>3 каскадных узла пространственной матрицы</strong> (Узел 1 — <em>Канал связи К. Шеннона</em>, Узел 2 — <em>Энтропийный кодер</em>, Узел 3 — <em>Контур обратной связи Н. Винера</em>)
+                и нажать <strong>ФОРСАЖ ИМПУЛЬСА</strong> до затухания волны!
+            </p>
+
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light py-2">
+                <div class="fw-bold text-danger mb-1">[ПРОТОКОЛ СКОРОСТНОЙ КОММУТАЦИИ — HARDCORE MODE]:</div>
+                <ul class="mb-0 ps-3 small">
+                    <li class="mb-1"><strong>Узел 1 (Фильтр Шеннона и Тезаурус):</strong> при помехах в канале (<code>d_H &gt; 0</code>) включайте <code>[ДЕКОДЕР ХЭММИНГА]</code>; при чужой кодировке (<code>S &lt; S_min</code>) — <code>[ТРАНСЛЯТОР ТЕЗАУРУСА]</code>; при чистом понятном сигнале — <code>[ПРЯМОЙ КАНАЛ]</code>.</li>
+                    <li class="mb-1"><strong>Узел 2 (Энтропийный шлюз):</strong> если реальная энтропия меньше максимальной (<code>H &lt; H_max</code>, избыточность <code>D &gt; 0</code>) — направляйте в <code>[СЖАТИЕ ХАФФМАНА]</code>; если состояния равновероятны (<code>H = H_max</code>, <code>D = 0</code>) — включайте <code>[БЕЗ СЖАТИЯ (D=0)]</code>.</li>
+                    <li class="mb-1"><strong>Узел 3 (Контур обратной связи Винера):</strong> компенсируйте отклонение <code>ΔX</code> отрицательной обратной связью (ООС): при <code>X_факт &gt; X_цель</code> — <code>[ООС: СНИЖЕНИЕ (-)]</code>; при <code>X_факт &lt; X_цель</code> — <code>[ООС: УСИЛЕНИЕ (+)]</code>; при <code>X_факт = X_цель</code> — <code>[СТАБИЛЬНО (0)]</code>.</li>
+                    <li><strong>Тотальный сброс (Hardcore Reset):</strong> любая ошибка в любом из 3 узлов или истечение таймера сбрасывает прогресс на <strong>Волну 1</strong>!</li>
+                </ul>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="text-secondary small">
+                    Горячие клавиши: <kbd class="bg-black text-info border border-secondary">1</kbd> — Узел 1 (Шеннон),
+                    <kbd class="bg-black text-warning border border-secondary">2</kbd> — Узел 2 (Энтропия),
+                    <kbd class="bg-black text-success border border-secondary">3</kbd> — Узел 3 (Винер),
+                    <kbd class="bg-black text-danger border border-secondary">Space / Enter</kbd> — Форсаж
+                </div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger rounded-0 fw-bold px-4 py-2">
+                    АКТИВИРОВАТЬ КИБЕРНЕТИЧЕСКИЙ КОНТУР [ENTER]
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. ИГРОВОЙ ЭКРАН (КОММУТАЦИОННАЯ МАТРИЦА, ОСЦИЛЛОГРАММА И БЕГУЩИЙ ИМПУЛЬС) -->
+        <div v-else-if="gameState === 'playing'" id="game-screen" class="card bg-dark border-danger rounded-0 p-3 p-md-4">
+
+            <!-- Верхняя панель: Волна, Попытки, Таймер затухания сигнала -->
+            <div class="row g-2 align-items-center border-bottom border-secondary pb-2 mb-3">
+                <div class="col-12 col-md-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-secondary small">РУБЕЖ СИНХРОНИЗАЦИИ:</span>
+                        <span id="phase-counter" class="badge bg-danger text-dark rounded-0 fs-6 fw-bold">
+                            ВОЛНА <span v-text="currentWave + 1"></span> / 10
+                        </span>
+                    </div>
+                    <div class="progress bg-black border border-secondary rounded-0" style="height: 10px;">
+                        <div class="progress-bar bg-danger" :style="{ width: ((currentWave) * 10) + '%' }"></div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 text-center">
+                    <div class="text-secondary small">СБРОСОВ КОНТУРА: <span id="attempts-counter" class="text-warning fw-bold" v-text="attempts"></span></div>
+                    <div class="small text-info fw-bold" v-text="waveData.subsystemTitle"></div>
+                </div>
+
+                <div class="col-12 col-md-4 text-md-end">
+                    <div class="d-flex justify-content-between justify-content-md-end align-items-center gap-2 mb-1">
+                        <span class="text-secondary small">ЗАТУХАНИЕ НЕСУЩЕЙ ВОЛНЫ:</span>
+                        <span id="timer-display" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'" class="fs-5 fw-bold">
+                            <span v-text="phaseTimeLeft.toFixed(1)"></span> с
+                        </span>
+                    </div>
+                    <div class="progress bg-black border border-secondary rounded-0" style="height: 10px;">
+                        <div class="progress-bar" :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'" :style="{ width: timerPercent + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сирена короткого замыкания (Hardcore Reset) -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black border-danger rounded-0 text-center py-2 mb-3" role="alert">
+                <div class="fw-bold text-danger">[РАЗРЫВ КОНТУРА УПРАВЛЕНИЯ // HARDCORE RESET]</div>
+                <div class="text-light small" v-text="alarmReason"></div>
+                <div class="text-warning small">Полный сброс магистрали на Волну 1 и перегенерация телеметрии...</div>
+            </div>
+
+            <!-- Визуальная трасса бегущего импульса и резонанс осциллографа (Архетипы 2 + 3 + 8) -->
+            <div class="card bg-black border-info rounded-0 p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center small mb-1">
+                    <span class="text-info fw-bold">⚡ ФРОНТ СИГНАЛА В КАНАЛЕ СВЯЗИ &amp; РЕЗОНАНС ОСЦИЛЛОГРАФА:</span>
+                    <span class="text-warning fw-bold" v-text="pulseProgress + '% МАГИСТРАЛИ | СИНХРОНИЗАЦИЯ: ' + resonancePercent + '%'"></span>
+                </div>
+                <div class="progress bg-dark border border-info rounded-0 mb-1" style="height: 10px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" :style="{ width: pulseProgress + '%' }"></div>
+                </div>
+                <div class="d-flex justify-content-between text-secondary" style="font-size: 0.72rem;">
+                    <span>[ИСТОЧНИК] ➔ [УЗЕЛ 1: ШЕННОН]</span>
+                    <span>➔ [УЗЕЛ 2: ЭНТРОПИЯ] ➔</span>
+                    <span>[УЗЕЛ 3: КОНТУР ВИНЕРА] ➔ [ОБЪЕКТ]</span>
+                </div>
+            </div>
+
+            <!-- Многомерная телеметрия входящего пакета (3 параметра по модели Коуэна) -->
+            <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                <div class="text-secondary small mb-2 fw-bold">ТЕЛЕМЕТРИЯ ВХОДЯЩЕГО ИНФОРМАЦИОННОГО ПОТОКА (3 ПАРАМЕТРА):</div>
+                <div class="row g-2">
+                    <!-- Признак 1: Состояние канала и тезауруса -->
+                    <div class="col-12 col-md-4">
+                        <div class="p-2 border border-secondary bg-dark h-100">
+                            <div class="text-info small fw-bold mb-1">1. КАНАЛ ШЕННОНА И ТЕЗАУРУС:</div>
+                            <div id="telemetry-channel" class="text-light small fw-bold mb-1" v-text="waveData.channelTitle"></div>
+                            <div class="text-secondary small" style="font-size: 0.75rem;" v-text="waveData.channelDetail"></div>
+                        </div>
+                    </div>
+
+                    <!-- Признак 2: Статистика источника и энтропия -->
+                    <div class="col-12 col-md-4">
+                        <div class="p-2 border border-secondary bg-dark h-100">
+                            <div class="text-warning small fw-bold mb-1">2. ЭНТРОПИЯ ИСТОЧНИКА H:</div>
+                            <div id="telemetry-entropy" class="text-light small fw-bold mb-1" v-text="waveData.entropyTitle"></div>
+                            <div class="text-secondary small" style="font-size: 0.75rem;" v-text="waveData.entropyDetail"></div>
+                        </div>
+                    </div>
+
+                    <!-- Признак 3: Датчики объекта управления -->
+                    <div class="col-12 col-md-4">
+                        <div class="p-2 border border-secondary bg-dark h-100">
+                            <div class="text-success small fw-bold mb-1">3. ДАТЧИКИ ОБЪЕКТА УПРАВЛЕНИЯ:</div>
+                            <div id="telemetry-cyber" class="text-light small fw-bold mb-1" v-text="waveData.cyberTitle"></div>
+                            <div class="text-secondary small" style="font-size: 0.75rem;" v-text="waveData.cyberDetail"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Пространственная матрица 3 каскадных шлюзов (Узлы 1, 2, 3) -->
+            <div class="row g-3 mb-3 align-items-stretch">
+
+                <!-- УЗЕЛ 1: Шлюз канала связи К. Шеннона -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between border-info">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-info text-dark rounded-0">УЗЕЛ 1: ШЛЮЗ ШЕННОНА</span>
+                                <span class="text-secondary small">Клавиша [1]</span>
+                            </div>
+                            <div class="text-secondary small mb-2">Кликайте для поворота коммутатора канала:</div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-1"
+                                @click="cycleNode(1)"
+                                :disabled="alarmActive"
+                                :data-val="node1"
+                                :data-expected="waveData.expectedNode1"
+                                class="btn rounded-0 w-100 py-2 fs-6 fw-bold router-node"
+                                :class="node1 === 0 ? 'btn-outline-info text-light' : node1 === 1 ? 'btn-info text-dark' : 'btn-warning text-dark'">
+                            <span v-text="node1Label"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ 2: Энтропийный компрессор -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between border-warning">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-warning text-dark rounded-0">УЗЕЛ 2: ЭНТРОПИЙНЫЙ ШЛЮЗ</span>
+                                <span class="text-secondary small">Клавиша [2]</span>
+                            </div>
+                            <div class="text-secondary small mb-2">Кликайте для переключения режима сжатия:</div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-2"
+                                @click="cycleNode(2)"
+                                :disabled="alarmActive"
+                                :data-val="node2"
+                                :data-expected="waveData.expectedNode2"
+                                class="btn rounded-0 w-100 py-2 fs-6 fw-bold router-node"
+                                :class="node2 === 0 ? 'btn-outline-warning text-light' : 'btn-warning text-dark'">
+                            <span v-text="node2Label"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ 3: Регулятор обратной связи Н. Винера -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between border-success">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-success text-dark rounded-0">УЗЕЛ 3: КОНТУР ВИНЕРА (ООС)</span>
+                                <span class="text-secondary small">Клавиша [3]</span>
+                            </div>
+                            <div class="text-secondary small mb-2">Кликайте для выбора управляющего импульса:</div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-3"
+                                @click="cycleNode(3)"
+                                :disabled="alarmActive"
+                                :data-val="node3"
+                                :data-expected="waveData.expectedNode3"
+                                class="btn rounded-0 w-100 py-2 fs-6 fw-bold router-node"
+                                :class="node3 === 0 ? 'btn-outline-success text-light' : node3 === 1 ? 'btn-danger text-light' : 'btn-success text-dark'">
+                            <span v-text="node3Label"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопка ФОРСАЖ ИМПУЛЬСА -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top border-secondary">
+                <div class="text-secondary small">
+                    Согласуйте все 3 узла контура и нажмите <strong>ФОРСАЖ ИМПУЛЬСА</strong> до затухания несущей волны!
+                </div>
+                <button type="button"
+                        id="btn-boost"
+                        @click="firePulse"
+                        :disabled="alarmActive"
+                        class="btn btn-outline-success rounded-0 fw-bold px-4 py-2">
+                    ⚡ ФОРСАЖ ИМПУЛЬСА [ПРОБЕЛ / ENTER]
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. ЭКРАН ПОБЕДЫ (10/10 ВОЛН ПРОЙДЕНЫ) -->
+        <div v-else-if="gameState === 'success'" id="success-screen" class="card bg-dark border-success rounded-0 p-4 text-center py-5">
+            <div class="display-4 text-success mb-2">⚡ КИБЕРНЕТИЧЕСКИЙ КОНТУР СИНХРОНИЗИРОВАН</div>
+            <h3 class="text-light mb-3">Все 10 скоростных волн управления информационными потоками пройдены безошибочно!</h3>
+            <p class="text-secondary mx-auto mb-4">
+                Вы довели до моторного автоматизма фильтрацию помех в канале К. Шеннона, согласование семантических тезаурусов Ю. А. Шрейдера, оценку избыточности кода и балансировку контуров отрицательной обратной связи Н. Винера.
+            </p>
+            <div class="d-inline-block border border-success bg-black p-3 text-start small mx-auto mb-3">
+                <div>СТАТУС МИССИИ: <span class="text-success fw-bold">УРОВЕНЬ 3 ЗАВЕРШЕН (10 / 10)</span></div>
+                <div>АВАРИЙНЫХ СБРОСОВ: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+            </div>
+            <div>
+                <button type="button" @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2">
+                    ПОВТОРИТЬ ЗАБЕГ
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const missionName = 'Урок 26 :: Информация, данные и знания. Информационные процессы в природе, технике и обществе (Уровень 3)';
+        const startTime = Date.now();
+        let attemptsCount = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attemptsCount,
+                success: success
+            }, '*');
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const gameState = ref('intro');
+                const currentWave = ref(0);
+                const phaseTimeLeft = ref(10.0);
+                const waveMaxTime = ref(10.0);
+                const attempts = ref(0);
+                const alarmActive = ref(false);
+                const alarmReason = ref('');
+
+                // Состояния 3 переключаемых узлов:
+                // node1: 0 = ПРЯМОЙ КАНАЛ, 1 = ДЕКОДЕР ХЭММИНГА, 2 = ТРАНСЛЯТОР ТЕЗАУРУСА
+                // node2: 0 = БЕЗ СЖАТИЯ (D=0), 1 = СЖАТИЕ ХАФФМАНА (D>0)
+                // node3: 0 = СТАБИЛЬНО (0), 1 = ООС: СНИЖЕНИЕ (-), 2 = ООС: УСИЛЕНИЕ (+)
+                const node1 = ref(0);
+                const node2 = ref(0);
+                const node3 = ref(0);
+
+                const waveData = ref({
+                    subsystemTitle: '',
+                    channelTitle: '',
+                    channelDetail: '',
+                    entropyTitle: '',
+                    entropyDetail: '',
+                    cyberTitle: '',
+                    cyberDetail: '',
+                    expectedNode1: 0,
+                    expectedNode2: 0,
+                    expectedNode3: 0
+                });
+
+                const SUBSYSTEMS = [
+                    'КОНТУР 1: ОХЛАЖДЕНИЕ АКТИВНОЙ ЗОНЫ РЕАКТОРА',
+                    'КОНТУР 2: НАВИГАЦИЯ ОРБИТАЛЬНОГО СПУТНИКА СВЯЗИ',
+                    'КОНТУР 3: АВТОПИЛОТ БЕСПИЛОТНОГО ЛОКОМОТИВА',
+                    'КОНТУР 4: ГОМЕОСТАЗ БИОТЕХНИЧЕСКОГО ИНКУБАТОРА',
+                    'КОНТУР 5: СТАБИЛИЗАЦИЯ ЧАСТОТЫ ЭНЕРГОСЕТИ',
+                    'КОНТУР 6: УПРАВЛЕНИЕ ТЯГОЙ МАГНИТНОЙ ЛЕВИТАЦИИ',
+                    'КОНТУР 7: ГИДРАВЛИЧЕСКИЙ ШЛЮЗ ГЛУБОКОВОДНОГО БАТИСКАФА',
+                    'КОНТУР 8: КВАНТОВЫЙ КАНАЛ МЕЖСЕРВЕРНОЙ МАГИСТРАЛИ',
+                    'КОНТУР 9: СИНТЕЗ БЕЛКА НА РИБОСОМНОМ КОНВЕЙЕРЕ',
+                    'КОНТУР 10: ФИНАЛЬНЫЙ РУБЕЖ — ЦЕНТРАЛЬНОЕ ЯДРО КИБЕРНЕТИКИ'
+                ];
+
+                const CHANNEL_SCENARIOS = [
+                    // 0 = ПРЯМОЙ КАНАЛ
+                    {
+                        expected: 0,
+                        title: 'Шум = 0 дБ (d_H = 0) | Протокол: Родной UTF-8',
+                        detail: 'Ошибок передачи нет, тезаурус приемника полностью согласован (S = S_опт)'
+                    },
+                    {
+                        expected: 0,
+                        title: 'CRC32: СОВПАДЕНИЕ | Кодировка: Стандарт ГОСТ',
+                        detail: 'Помехи отсутствуют, синтаксис и семантика пакета понятны контроллеру'
+                    },
+                    // 1 = ДЕКОДЕР ХЭММИНГА
+                    {
+                        expected: 1,
+                        title: 'Импульсная помеха ξ(t)! Синдром ошибки d_H = 1 бит',
+                        detail: 'Синтаксический сбой в канале связи: требуется коррекция кода Хэмминга'
+                    },
+                    {
+                        expected: 1,
+                        title: 'Сбой четности кадра! Искажение 3-го разряда в линии',
+                        detail: 'Наложение электромагнитного шума в канале Шеннона (нужна фильтрация)'
+                    },
+                    // 2 = ТРАНСЛЯТОР ТЕЗАУРУСА
+                    {
+                        expected: 2,
+                        title: 'Шум = 0 (CRC OK), но формат: Внешний телекод Baudot',
+                        detail: 'Семантический разрыв (S < S_min): требуется трансляция в тезаурус приемника'
+                    },
+                    {
+                        expected: 2,
+                        title: 'Канал чист (d_H = 0) | Язык пакета: Протокол EDIFACT',
+                        detail: 'Несовпадение словаря кодов между источником и приемником (нужен перевод)'
+                    }
+                ];
+
+                const ENTROPY_SCENARIOS = [
+                    // 0 = БЕЗ СЖАТИЯ (D = 0, равновероятный поток)
+                    {
+                        expected: 0,
+                        title: 'N = 8 состояний | H = 3,0 бит (H_max = 3,0 бит)',
+                        detail: 'Все состояния равновероятны (p = 1/8), избыточность D = 0% — сжатие невозможно'
+                    },
+                    {
+                        expected: 0,
+                        title: 'N = 16 символов | H = 4,0 бит (H_max = 4,0 бит)',
+                        detail: 'Максимальная энтропия Хартли (D = 0 бит) — архивация не уменьшит объем'
+                    },
+                    {
+                        expected: 0,
+                        title: 'N = 4 нуклеотида | H = 2,0 бит (p_k = 0,25)',
+                        detail: 'Равномерное распределение частот (избыточность D = 0%) — пропуск без сжатия'
+                    },
+                    // 1 = СЖАТИЕ ХАФФМАНА (D > 0, неравновероятный избыточный поток)
+                    {
+                        expected: 1,
+                        title: 'N = 8 состояний | Реальная H = 1,8 бит (H_max = 3,0)',
+                        detail: 'Высокая статистическая избыточность D = 1,2 бита (R = 40%) — сжать кодом Хаффмана!'
+                    },
+                    {
+                        expected: 1,
+                        title: 'N = 16 символов | Реальная H = 2,4 бит (H_max = 4,0)',
+                        detail: 'Частоты символов резко неравномерны (D = 1,6 бита) — требуется префиксное сжатие'
+                    },
+                    {
+                        expected: 1,
+                        title: 'N = 4 состояния | Реальная H = 1,2 бит (H_max = 2,0)',
+                        detail: 'Относительная избыточность R = 40% (p_1 = 0,7) — активировать энтропийный кодер'
+                    }
+                ];
+
+                const CYBER_SCENARIOS = [
+                    // 0 = СТАБИЛЬНО (0)
+                    {
+                        expected: 0,
+                        title: 'X_цель = 36,6 °C | X_факт = 36,6 °C (ΔX = 0)',
+                        detail: 'Параметр строго в пределах нормы гомеостаза — корректирующий импульс не нужен'
+                    },
+                    {
+                        expected: 0,
+                        title: 'X_цель = 50,0 Гц | X_факт = 50,0 Гц (ΔX = 0)',
+                        detail: 'Частота синхронна с эталоном — удерживать нейтральное состояние контура'
+                    },
+                    // 1 = ООС: СНИЖЕНИЕ (-) (так как X_факт > X_цель)
+                    {
+                        expected: 1,
+                        title: 'X_цель = 220 В | X_факт = 258 В (Превышение нормы!)',
+                        detail: 'X_факт > X_цель: по закону ООС подать противодействующий импульс СНИЖЕНИЯ (-)'
+                    },
+                    {
+                        expected: 1,
+                        title: 'X_цель = 90 км/ч | X_факт = 118 км/ч (Разгон!)',
+                        detail: 'Скорость выше уставки: замкнуть отрицательную обратную связь на ТОРМОЖЕНИЕ (-)'
+                    },
+                    {
+                        expected: 1,
+                        title: 'X_цель = 85 °C | X_факт = 112 °C (Перегрев ядра!)',
+                        detail: 'Температура превысила норму: подать команду ОХЛАЖДЕНИЯ / СНИЖЕНИЯ (-)'
+                    },
+                    // 2 = ООС: УСИЛЕНИЕ (+) (так как X_факт < X_цель)
+                    {
+                        expected: 2,
+                        title: 'X_цель = 100 атм | X_факт = 68 атм (Падение давления!)',
+                        detail: 'X_факт < X_цель: по закону ООС подать компенсирующий импульс ПОДКАЧКИ / УСИЛЕНИЯ (+)'
+                    },
+                    {
+                        expected: 2,
+                        title: 'X_цель = 750 км | X_факт = 710 км (Просадка орбиты!)',
+                        detail: 'Высота ниже целевой: подать управляющий импульс ТЯГИ / УСИЛЕНИЯ (+)'
+                    },
+                    {
+                        expected: 2,
+                        title: 'X_цель = 5,0 ммоль/л | X_факт = 3,1 ммоль/л (Дефицит!)',
+                        detail: 'Показатель упал ниже нормы: включить контур ПОДАЧИ / УСИЛЕНИЯ (+)'
+                    }
+                ];
+
+                function generateWave(waveIdx) {
+                    // Динамическое сжатие времени: от 10.0 с на 1-й волне до 6.0 с на 10-й волне
+                    const maxT = Number((10.0 - waveIdx * 0.44).toFixed(1));
+                    waveMaxTime.value = maxT;
+                    phaseTimeLeft.value = maxT;
+
+                    const ch = pickRandom(CHANNEL_SCENARIOS);
+                    const en = pickRandom(ENTROPY_SCENARIOS);
+                    const cy = pickRandom(CYBER_SCENARIOS);
+
+                    waveData.value = {
+                        subsystemTitle: SUBSYSTEMS[waveIdx] || SUBSYSTEMS[0],
+                        channelTitle: ch.title,
+                        channelDetail: ch.detail,
+                        entropyTitle: en.title,
+                        entropyDetail: en.detail,
+                        cyberTitle: cy.title,
+                        cyberDetail: cy.detail,
+                        expectedNode1: ch.expected,
+                        expectedNode2: en.expected,
+                        expectedNode3: cy.expected
+                    };
+
+                    // Начальные положения шлюзов выставляем так, чтобы как минимум 2 узла требовали переключения
+                    node1.value = (ch.expected + 1) % 3;
+                    node2.value = (en.expected + 1) % 2;
+                    node3.value = (cy.expected + 2) % 3;
+                }
+
+                const node1Label = computed(() => {
+                    if (node1.value === 0) return '0: [ПРЯМОЙ КАНАЛ]';
+                    if (node1.value === 1) return '1: [ДЕКОДЕР ХЭММИНГА]';
+                    return '2: [ТРАНСЛЯТОР ТЕЗАУРУСА]';
+                });
+
+                const node2Label = computed(() => {
+                    if (node2.value === 0) return '0: [БЕЗ СЖАТИЯ (D = 0)]';
+                    return '1: [СЖАТИЕ ХАФФМАНА (D > 0)]';
+                });
+
+                const node3Label = computed(() => {
+                    if (node3.value === 0) return '0: [СТАБИЛЬНО (ΔX = 0)]';
+                    if (node3.value === 1) return '1: [ООС: СНИЖЕНИЕ (-)]';
+                    return '2: [ООС: УСИЛЕНИЕ (+)]';
+                });
+
+                const timerPercent = computed(() => {
+                    if (waveMaxTime.value <= 0) return 0;
+                    return Math.max(0, Math.min(100, Math.round((phaseTimeLeft.value / waveMaxTime.value) * 100)));
+                });
+
+                const pulseProgress = computed(() => {
+                    return 100 - timerPercent.value;
+                });
+
+                const resonancePercent = computed(() => {
+                    let matched = 0;
+                    if (node1.value === waveData.value.expectedNode1) matched++;
+                    if (node2.value === waveData.value.expectedNode2) matched++;
+                    if (node3.value === waveData.value.expectedNode3) matched++;
+                    return Math.round((matched / 3) * 100);
+                });
+
+                let timerId = null;
+
+                function stopTimer() {
+                    if (timerId) {
+                        clearInterval(timerId);
+                        timerId = null;
+                    }
+                }
+
+                function startWaveTimer() {
+                    stopTimer();
+                    timerId = setInterval(() => {
+                        if (gameState.value !== 'playing' || alarmActive.value) return;
+                        phaseTimeLeft.value = Number((phaseTimeLeft.value - 0.1).toFixed(1));
+                        if (phaseTimeLeft.value <= 0) {
+                            phaseTimeLeft.value = 0;
+                            triggerHardcoreReset('Несущая волна затухла до замыкания контура (Тайм-аут)!');
+                        }
+                    }, 100);
+                }
+
+                function startGame() {
+                    alarmActive.value = false;
+                    currentWave.value = 0;
+                    gameState.value = 'playing';
+                    generateWave(0);
+                    startWaveTimer();
+                }
+
+                function cycleNode(which) {
+                    if (gameState.value !== 'playing' || alarmActive.value) return;
+                    if (which === 1) node1.value = (node1.value + 1) % 3;
+                    if (which === 2) node2.value = (node2.value + 1) % 2;
+                    if (which === 3) node3.value = (node3.value + 1) % 3;
+                }
+
+                function triggerHardcoreReset(reason) {
+                    if (alarmActive.value) return;
+                    stopTimer();
+                    alarmActive.value = true;
+                    alarmReason.value = reason;
+                    attempts.value++;
+                    attemptsCount = attempts.value;
+                    sendTelemetry('hardcore_reset', false);
+
+                    setTimeout(() => {
+                        alarmActive.value = false;
+                        currentWave.value = 0;
+                        generateWave(0);
+                        startWaveTimer();
+                    }, 1400);
+                }
+
+                function firePulse() {
+                    if (gameState.value !== 'playing' || alarmActive.value) return;
+
+                    const ok1 = node1.value === waveData.value.expectedNode1;
+                    const ok2 = node2.value === waveData.value.expectedNode2;
+                    const ok3 = node3.value === waveData.value.expectedNode3;
+
+                    if (!ok1 || !ok2 || !ok3) {
+                        let details = [];
+                        if (!ok1) details.push('Узел 1 (Канал Шеннона)');
+                        if (!ok2) details.push('Узел 2 (Энтропийный шлюз)');
+                        if (!ok3) details.push('Узел 3 (Контур ООС Винера)');
+                        triggerHardcoreReset(`Рассинхронизация шлюзов: ${details.join(', ')}!`);
+                        return;
+                    }
+
+                    // Успешный такт волны
+                    if (currentWave.value + 1 >= 10) {
+                        stopTimer();
+                        gameState.value = 'success';
+                        sendTelemetry('level_complete', true);
+                    } else {
+                        currentWave.value++;
+                        generateWave(currentWave.value);
+                    }
+                }
+
+                function handleKeydown(e) {
+                    if (gameState.value === 'intro') {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            startGame();
+                        }
+                        return;
+                    }
+                    if (gameState.value !== 'playing' || alarmActive.value) return;
+
+                    if (e.key === '1') {
+                        e.preventDefault();
+                        cycleNode(1);
+                    } else if (e.key === '2') {
+                        e.preventDefault();
+                        cycleNode(2);
+                    } else if (e.key === '3') {
+                        e.preventDefault();
+                        cycleNode(3);
+                    } else if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        firePulse();
+                    }
+                }
+
+                onMounted(() => {
+                    sendTelemetry('in_progress', false);
+                    window.addEventListener('keydown', handleKeydown);
+                });
+
+                onUnmounted(() => {
+                    stopTimer();
+                    window.removeEventListener('keydown', handleKeydown);
+                });
+
+                return {
+                    gameState,
+                    currentWave,
+                    phaseTimeLeft,
+                    attempts,
+                    alarmActive,
+                    alarmReason,
+                    node1,
+                    node2,
+                    node3,
+                    node1Label,
+                    node2Label,
+                    node3Label,
+                    waveData,
+                    timerPercent,
+                    pulseProgress,
+                    resonancePercent,
+                    startGame,
+                    cycleNode,
+                    firePulse
+                };
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>

@@ -1,0 +1,1006 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Информация, данные, знания и информационные процессы (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок и индикатор прогресса -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Иерархия DIKW: сырые данные, информация, декларативные и процедурные знания</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сброса -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СИСТЕМНЫЙ СБОЙ] <span id="feedback-text">Неверное действие!</span> Перегенерация варианта...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 1: Сортировка по контейнерам DIKW (Drag-to-Bucket) -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-3">
+                        В информационно-аналитический узел поступил поток разнородных объектов.
+                        Используя мышь, <strong>перетащите каждую карточку</strong> (или кликните по карточке, затем по целевому контейнеру) в один из четырех уровней иерархии DIKW и инженерии знаний.
+                    </p>
+
+                    <!-- Пул карточек Фазы 1 -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ВХОДНОЙ ПОТОК ОБЪЕКТОВ (ПЕРЕТАЩИТЕ В ЦЕЛЕВЫЕ КОНТЕЙНЕРЫ):</span>
+                            <button id="p1-reset-btn" type="button" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Карточки генерируются динамически через JS -->
+                        </div>
+                    </div>
+
+                    <!-- 4 целевых контейнера Фазы 1 -->
+                    <div class="row g-2 mb-3">
+                        <!-- Бакет 1: Сырые данные (Data) -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-secondary rounded-0 h-100 target-bucket-p1" data-category="data" id="bucket-data">
+                                <div class="card-header bg-dark border-bottom border-secondary text-light d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">1. СЫРЫЕ ДАННЫЕ (DATA)</span>
+                                    <span class="badge border border-secondary text-light bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Зарегистрированные сигналы, коды и числа без контекста и правил интерпретации.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-secondary bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: Информация (Information) -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-info rounded-0 h-100 target-bucket-p1" data-category="info" id="bucket-info">
+                                <div class="card-header bg-dark border-bottom border-info text-info d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">2. ИНФОРМАЦИЯ (INFORMATION)</span>
+                                    <span class="badge border border-info text-info bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Осмысленные данные, помещенные в конкретный контекст и снабженные интерпретацией.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-info bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 3: Декларативные знания -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket-p1" data-category="declarative" id="bucket-declarative">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">3. ДЕКЛАРАТИВНЫЕ («ЗНАЮ ЧТО»)</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Научные законы, аксиомы, определения и фундаментальные свойства объектов.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 4: Процедурные знания -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket-p1" data-category="procedural" id="bucket-procedural">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">4. ПРОЦЕДУРНЫЕ («ЗНАЮ КАК»)</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Пошаговые алгоритмы, инструкции и методики преобразования объектов для достижения цели.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 font-monospace fw-bold">
+                            ВЕРИФИЦИРОВАТЬ ИЕРАРХИЮ DIKW →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 2: Архитектурный конструктор Шеннона и Винера (Slot & Snap) -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Соберите единую структурную схему <strong>канала передачи информации К. Шеннона</strong> и <strong>кибернетического контура управления Н. Винера с обратной связью</strong>.
+                        Перетащите функциональные узлы (или кликните по блоку, затем по целевому слоту) в строгой последовательности этапов от 1 до 6. Остерегайтесь ошибочных дистракторов!
+                    </p>
+
+                    <!-- Пул доступных блоков Фазы 2 -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ДОСТУПНЫЕ ФУНКЦИОНАЛЬНЫЕ БЛОКИ (ПЕРЕТАЩИТЕ В СЛОТЫ СХЕМЫ НИЖЕ):</span>
+                            <button id="p2-reset-btn" type="button" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p2-blocks-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Блоки генерируются динамически через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Целевые слоты Фазы 2 -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">КАНАЛ СВЯЗИ ШЕННОНА И КОНТУР УПРАВЛЕНИЯ С ОБРАТНОЙ СВЯЗЬЮ (ЭТАПЫ 1–6):</div>
+                        <div class="row g-2">
+                            <!-- Слот 1 -->
+                            <div class="col-12 col-md-6">
+                                <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark h-100" data-step="1">
+                                    <div class="text-secondary small mb-1 fw-bold text-success">УЗЕЛ 1: ГЕНЕРАЦИЯ ИСХОДНОГО СООБЩЕНИЯ</div>
+                                    <div class="pipeline-slot p-2 border border-dashed border-success bg-black d-flex align-items-center" style="min-height: 64px;" data-slot="1">
+                                        <span class="text-secondary small placeholder-text">Перетащите сюда блок узла 1...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Слот 2 -->
+                            <div class="col-12 col-md-6">
+                                <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark h-100" data-step="2">
+                                    <div class="text-secondary small mb-1 fw-bold text-info">УЗЕЛ 2: Прямое преобразование в сигнал</div>
+                                    <div class="pipeline-slot p-2 border border-dashed border-info bg-black d-flex align-items-center" style="min-height: 64px;" data-slot="2">
+                                        <span class="text-secondary small placeholder-text">Перетащите сюда блок узла 2...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Слот 3 -->
+                            <div class="col-12 col-md-6">
+                                <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark h-100" data-step="3">
+                                    <div class="text-secondary small mb-1 fw-bold text-warning">УЗЕЛ 3: ФИЗИЧЕСКАЯ СРЕДА ПЕРЕДАЧИ И ПОМЕХИ</div>
+                                    <div class="pipeline-slot p-2 border border-dashed border-warning bg-black d-flex align-items-center" style="min-height: 64px;" data-slot="3">
+                                        <span class="text-secondary small placeholder-text">Перетащите сюда блок узла 3...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Слот 4 -->
+                            <div class="col-12 col-md-6">
+                                <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark h-100" data-step="4">
+                                    <div class="text-secondary small mb-1 fw-bold text-primary">УЗЕЛ 4: ВОССТАНОВЛЕНИЕ СООБЩЕНИЯ ИЗ СИГНАЛА</div>
+                                    <div class="pipeline-slot p-2 border border-dashed border-primary bg-black d-flex align-items-center" style="min-height: 64px;" data-slot="4">
+                                        <span class="text-secondary small placeholder-text">Перетащите сюда блок узла 4...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Слот 5 -->
+                            <div class="col-12 col-md-6">
+                                <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark h-100" data-step="5">
+                                    <div class="text-secondary small mb-1 fw-bold text-danger">УЗЕЛ 5: ПРЯМАЯ СВЯЗЬ В КОНТУРЕ УПРАВЛЕНИЯ</div>
+                                    <div class="pipeline-slot p-2 border border-dashed border-danger bg-black d-flex align-items-center" style="min-height: 64px;" data-slot="5">
+                                        <span class="text-secondary small placeholder-text">Перетащите сюда блок узла 5...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Слот 6 -->
+                            <div class="col-12 col-md-6">
+                                <div class="pipeline-slot-wrapper p-2 border border-secondary bg-dark h-100" data-step="6">
+                                    <div class="text-secondary small mb-1 fw-bold text-success">УЗЕЛ 6: ЦЕПЬ ОБРАТНОЙ СВЯЗИ КОНТУРА ВИНЕРА</div>
+                                    <div class="pipeline-slot p-2 border border-dashed border-success bg-black d-flex align-items-center" style="min-height: 64px;" data-slot="6">
+                                        <span class="text-secondary small placeholder-text">Перетащите сюда блок узла 6...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 font-monospace fw-bold">
+                            ЗАПУСТИТЬ КОНТУР ШЕННОНА — ВИНЕРА →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 3: Классификация 4 типов обработки информации (Drag-to-Bucket) -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Согласно курсу К. Ю. Полякова, все операции по обработке информации делятся на <strong>четыре фундаментальных типа</strong>.
+                        Используя мышь, <strong>перетащите каждую операцию</strong> (или кликните по карточке, затем по контейнеру) в соответствующий класс информационного процесса.
+                    </p>
+
+                    <!-- Пул карточек Фазы 3 -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ОПЕРАЦИИ ОБРАБОТКИ ИНФОРМАЦИИ (ПЕРЕТАЩИТЕ В ЦЕЛЕВЫЕ КОНТЕЙНЕРЫ):</span>
+                            <button id="p3-reset-btn" type="button" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p3-cards-pool" class="d-flex flex-wrap gap-2 p-2 border border-dashed border-secondary bg-dark min-vh-10">
+                            <!-- Карточки генерируются динамически через JS -->
+                        </div>
+                    </div>
+
+                    <!-- 4 целевых контейнера Фазы 3 -->
+                    <div class="row g-2 mb-3">
+                        <!-- Бакет 1: Получение новой информации -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket-p3" data-category="create" id="bucket-create">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">1. ПОЛУЧЕНИЕ НОВОЙ ИНФОРМАЦИИ</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Вычисления по формулам, логический вывод и принятие решений с созданием новых сведений.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: Изменение формы представления -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-info rounded-0 h-100 target-bucket-p3" data-category="encode" id="bucket-encode">
+                                <div class="card-header bg-dark border-bottom border-info text-info d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">2. ИЗМЕНЕНИЕ ФОРМЫ (КОДИРОВАНИЕ)</span>
+                                    <span class="badge border border-info text-info bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Смена знаковой системы, шифрование или сжатие при полном сохранении исходного смысла.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-info bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 3: Структурирование (систематизация) -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket-p3" data-category="structure" id="bucket-structure">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">3. СТРУКТУРИРОВАНИЕ ДАННЫХ</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Сортировка, группировка, индексирование, построение таблиц, графов и каталогов.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 4: Поиск информации -->
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="card bg-black border-primary rounded-0 h-100 target-bucket-p3" data-category="search" id="bucket-search">
+                                <div class="card-header bg-dark border-bottom border-primary text-primary d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold small">4. ПОИСК ИНФОРМАЦИИ</span>
+                                    <span class="badge border border-primary text-primary bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Извлечение из хранилища подмножества записей, удовлетворяющих заданному критерию запроса.</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-primary bg-dark d-flex flex-column gap-2" style="min-height: 150px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 font-monospace fw-bold">
+                            ПРОВЕРИТЬ КЛАССИФИКАЦИЮ ПРОЦЕССОВ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Экран победы -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-success font-monospace display-4">✓ УРОВЕНЬ 1 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light font-monospace mb-3">Иерархия DIKW, схема Шеннона — Винера и информационные процессы освоены</h3>
+                    <p class="text-secondary max-w-md mx-auto mb-4">
+                        Вы безошибочно разграничили сырые данные, информацию, декларативные и процедурные знания, сконструировали помехоустойчивый канал связи и контур обратной связи, а также классифицировали четыре типа обработки информации.
+                    </p>
+                    <div class="badge border border-success text-success bg-black p-3 font-monospace fs-6 rounded-0">
+                        Переходите к Уровню 2 (Аналитические расчеты по формулам Шеннона и Харкевича) на верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    // ----------------------------------------------------
+    // СОСТОЯНИЕ И ТЕЛЕМЕТРИЯ
+    // ----------------------------------------------------
+    const MISSION_NAME = 'Урок 26 :: Информация, данные и знания. Информационные процессы в природе, технике и обществе (Уровень 1)';
+    const startTime = Date.now();
+    let attempts = 0;
+    let currentPhase = 1;
+    let isProcessingError = false;
+
+    // Таймер
+    setInterval(() => {
+        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+        const secs = String(elapsedSec % 60).padStart(2, '0');
+        const el = document.getElementById('timer-display');
+        if (el) el.textContent = mins + ':' + secs;
+    }, 1000);
+
+    function updateAttempts() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attempts);
+    }
+
+    function sendTelemetry(actionType, status, success) {
+        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+        if (window.parent) {
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: actionType,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: elapsedSec,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+    }
+
+    // Инициализация при загрузке
+    sendTelemetry('in_progress', 'in_progress', false);
+
+    function triggerError(msg, callback) {
+        if (isProcessingError) return;
+        isProcessingError = true;
+        attempts++;
+        updateAttempts();
+        sendTelemetry('hardcore_reset', 'in_progress', false);
+
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+        if (feedbackBox && feedbackText) {
+            feedbackText.textContent = msg;
+            feedbackBox.classList.remove('d-none');
+        }
+
+        setTimeout(() => {
+            if (feedbackBox) feedbackBox.classList.add('d-none');
+            isProcessingError = false;
+            if (callback) callback();
+        }, 1300);
+    }
+
+    function setPhase(phaseNum) {
+        currentPhase = phaseNum;
+        ['phase1', 'phase2', 'phase3', 'success-screen'].forEach((id, idx) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (idx + 1 === phaseNum) {
+                el.classList.remove('d-none');
+            } else {
+                el.classList.add('d-none');
+            }
+        });
+
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        if (phaseNum === 1) {
+            if (badge) badge.textContent = 'Шаг 1 из 3';
+            if (title) title.textContent = 'Иерархия DIKW: сырые данные, информация, декларативные и процедурные знания';
+        } else if (phaseNum === 2) {
+            if (badge) badge.textContent = 'Шаг 2 из 3';
+            if (title) title.textContent = 'Конструктор канала связи Шеннона и контура управления Винера';
+        } else if (phaseNum === 3) {
+            if (badge) badge.textContent = 'Шаг 3 из 3';
+            if (title) title.textContent = 'Классификация четырех типов обработки информации';
+        } else if (phaseNum === 4) {
+            if (badge) badge.textContent = 'Победа!';
+            if (title) title.textContent = 'Уровень 1 завершен';
+            const screen = document.getElementById('success-screen');
+            if (screen) screen.classList.remove('d-none');
+            sendTelemetry('level_complete', 'completed', true);
+        }
+    }
+
+    // ----------------------------------------------------
+    // ФАЗА 1: Сортировка по контейнерам DIKW (Drag-to-Bucket)
+    // ----------------------------------------------------
+    const P1_BANK = [
+        // 1. Сырые данные (data) - никаких пересечений с примерами из theory.md
+        { id: 'p1-data-1', cat: 'data', title: 'Бинарный поток 11010010 01101111', desc: 'Неразмеченная последовательность битов в буфере сетевой карты без заголовка протокола' },
+        { id: 'p1-data-2', cat: 'data', title: 'Шестнадцатеричный срез 7F B4 E1 9C', desc: 'Содержимое четырех ячеек оперативной памяти без указания типа переменных' },
+        { id: 'p1-data-3', cat: 'data', title: 'Числа 418, 392, 405, 411', desc: 'Неподписанный столбец целых значений в CSV-файле без единиц измерения' },
+        { id: 'p1-data-4', cat: 'data', title: 'Строка символов «K9-774-XZ»', desc: 'Набор алфавитно-цифровых знаков на перфоленте без справочника кодировки' },
+        { id: 'p1-data-5', cat: 'data', title: 'Массив импульсов [0.82, 0.79, 0.85]', desc: 'Отсчеты напряжения на входе осциллографа до калибровки шкалы датчика' },
+
+        // 2. Информация (info)
+        { id: 'p1-info-1', cat: 'info', title: 'Влажность воздуха в теплице № 2 равна 68%', desc: 'Интерпретированное показание гигрометра с привязкой к объекту и единицам измерения' },
+        { id: 'p1-info-2', cat: 'info', title: 'Поезд № 016 отправляется с 3-го пути в 18:45', desc: 'Осмысленное сообщение для пассажиров, снимающее неопределенность посадки' },
+        { id: 'p1-info-3', cat: 'info', title: 'Свободный остаток на складе: 140 микросхем', desc: 'Фактическое сведение из учетной базы, пригодное для планирования закупки' },
+        { id: 'p1-info-4', cat: 'info', title: 'Давление масла в гидросистеме упало до 1,2 бар', desc: 'Контекстное сообщение бортового датчика о текущем состоянии агрегата' },
+        { id: 'p1-info-5', cat: 'info', title: 'Задержка пакетов до узла DNS составляет 14 мс', desc: 'Результат диагностики канала связи с указанием узла и размерности времени' },
+
+        // 3. Декларативные знания (declarative - «Знаю ЧТО»)
+        { id: 'p1-decl-1', cat: 'declarative', title: 'Теорема Пифагора: a² + b² = c²', desc: 'Фундаментальное математическое соотношение сторон прямоугольного треугольника' },
+        { id: 'p1-decl-2', cat: 'declarative', title: 'Второй закон Ньютона: F = m · a', desc: 'Физический закон, связывающий равнодействующую силу, массу и ускорение тела' },
+        { id: 'p1-decl-3', cat: 'declarative', title: 'Кодон ДНК всегда состоит из 3 нуклеотидов', desc: 'Структурный инвариант молекулярной биологии (триплетность генетического кода)' },
+        { id: 'p1-decl-4', cat: 'declarative', title: 'Один байт памяти содержит ровно 8 бит', desc: 'Базовое определение единицы измерения емкости в цифровой вычислительной технике' },
+        { id: 'p1-decl-5', cat: 'declarative', title: 'Сумма углов любого треугольника на плоскости равна 180°', desc: 'Геометрическое утверждение (теорема), описывающее неизменное свойство фигуры' },
+
+        // 4. Процедурные знания (procedural - «Знаю КАК»)
+        { id: 'p1-proc-1', cat: 'procedural', title: 'Алгоритм бинарного поиска в отсортированном массиве', desc: 'Пошаговая инструкция деления отрезка пополам для быстрого нахождения ключа' },
+        { id: 'p1-proc-2', cat: 'procedural', title: 'Методика обжима витой пары по стандарту T568B', desc: 'Последовательность действий по раскладке 8 проводников и фиксации разъема RJ-45' },
+        { id: 'p1-proc-3', cat: 'procedural', title: 'Регламент экстренного торможения реактора при перегреве', desc: 'Инструкция оператора по вводу поглощающих стержней и включению контура охлаждения' },
+        { id: 'p1-proc-4', cat: 'procedural', title: 'Правило нахождения НОД двух чисел алгоритмом Евклида', desc: 'Циклическая процедура замены большего числа остатком от деления на меньшее' },
+        { id: 'p1-proc-5', cat: 'procedural', title: 'Порядок сортировки массива методом быстрой сортировки (QuickSort)', desc: 'Алгоритм выбора опорного элемента и рекурсивного разбиения подмассивов' }
+    ];
+
+    let p1SelectedCard = null;
+    let p1ListenersBound = false;
+
+    function initPhase1() {
+        const pool = document.getElementById('p1-cards-pool');
+        if (!pool) return;
+        pool.innerHTML = '';
+        p1SelectedCard = null;
+
+        document.querySelectorAll('#phase1 .bucket-slot').forEach(slot => {
+            slot.innerHTML = '';
+        });
+        updateP1BucketCounts();
+
+        // Отобрать по 2 карточки каждого из 4 классов (всего 8 карточек)
+        const dataCards = P1_BANK.filter(c => c.cat === 'data').sort(() => Math.random() - 0.5).slice(0, 2);
+        const infoCards = P1_BANK.filter(c => c.cat === 'info').sort(() => Math.random() - 0.5).slice(0, 2);
+        const declCards = P1_BANK.filter(c => c.cat === 'declarative').sort(() => Math.random() - 0.5).slice(0, 2);
+        const procCards = P1_BANK.filter(c => c.cat === 'procedural').sort(() => Math.random() - 0.5).slice(0, 2);
+
+        const currentCards = [...dataCards, ...infoCards, ...declCards, ...procCards].sort(() => Math.random() - 0.5);
+
+        currentCards.forEach(item => {
+            const card = document.createElement('div');
+            card.id = item.id;
+            card.className = 'card bg-dark border-secondary rounded-0 p-2 text-light font-monospace cursor-pointer user-select-none p1-draggable-card';
+            card.style.cursor = 'grab';
+            card.style.minWidth = '210px';
+            card.style.maxWidth = '280px';
+            card.draggable = true;
+            card.dataset.category = item.cat;
+            card.dataset.cardId = item.id;
+
+            card.innerHTML = `
+                <div class="fw-bold text-light small mb-1">${item.title}</div>
+                <div class="text-secondary small" style="font-size: 0.75rem;">${item.desc}</div>
+            `;
+
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.id);
+                card.classList.add('opacity-50');
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-50');
+            });
+
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (p1SelectedCard === card) {
+                    card.classList.remove('border-warning', 'border-2');
+                    p1SelectedCard = null;
+                } else {
+                    if (p1SelectedCard) p1SelectedCard.classList.remove('border-warning', 'border-2');
+                    p1SelectedCard = card;
+                    card.classList.add('border-warning', 'border-2');
+                }
+            });
+
+            pool.appendChild(card);
+        });
+
+        if (!p1ListenersBound) {
+            p1ListenersBound = true;
+            document.querySelectorAll('#phase1 .target-bucket-p1').forEach(bucket => {
+                const slot = bucket.querySelector('.bucket-slot');
+
+                bucket.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    bucket.classList.add('border-white');
+                });
+                bucket.addEventListener('dragleave', () => {
+                    bucket.classList.remove('border-white');
+                });
+                bucket.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    bucket.classList.remove('border-white');
+                    const cardId = e.dataTransfer.getData('text/plain');
+                    const cardEl = document.getElementById(cardId);
+                    if (cardEl && cardEl.classList.contains('p1-draggable-card') && slot) {
+                        slot.appendChild(cardEl);
+                        updateP1BucketCounts();
+                    }
+                });
+
+                bucket.addEventListener('click', () => {
+                    if (p1SelectedCard && slot) {
+                        slot.appendChild(p1SelectedCard);
+                        p1SelectedCard.classList.remove('border-warning', 'border-2');
+                        p1SelectedCard = null;
+                        updateP1BucketCounts();
+                    }
+                });
+            });
+
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const cardId = e.dataTransfer.getData('text/plain');
+                const cardEl = document.getElementById(cardId);
+                if (cardEl && cardEl.classList.contains('p1-draggable-card')) {
+                    pool.appendChild(cardEl);
+                    updateP1BucketCounts();
+                }
+            });
+            pool.addEventListener('click', () => {
+                if (p1SelectedCard && p1SelectedCard.parentElement !== pool) {
+                    pool.appendChild(p1SelectedCard);
+                    p1SelectedCard.classList.remove('border-warning', 'border-2');
+                    p1SelectedCard = null;
+                    updateP1BucketCounts();
+                }
+            });
+        }
+    }
+
+    function updateP1BucketCounts() {
+        document.querySelectorAll('#phase1 .target-bucket-p1').forEach(bucket => {
+            const count = bucket.querySelectorAll('.p1-draggable-card').length;
+            const badge = bucket.querySelector('.count-badge');
+            if (badge) badge.textContent = String(count);
+        });
+    }
+
+    document.getElementById('p1-reset-btn')?.addEventListener('click', () => {
+        const pool = document.getElementById('p1-cards-pool');
+        document.querySelectorAll('#phase1 .p1-draggable-card').forEach(c => pool?.appendChild(c));
+        updateP1BucketCounts();
+    });
+
+    document.getElementById('p1-verify-btn')?.addEventListener('click', () => {
+        if (isProcessingError) return;
+
+        const pool = document.getElementById('p1-cards-pool');
+        const remaining = pool?.querySelectorAll('.p1-draggable-card').length || 0;
+        if (remaining > 0) {
+            triggerError('Распределите все 8 карточек из входного пула по четырем контейнерам DIKW!');
+            return;
+        }
+
+        let isCorrect = true;
+        document.querySelectorAll('#phase1 .target-bucket-p1').forEach(bucket => {
+            const targetCat = bucket.dataset.category;
+            bucket.querySelectorAll('.p1-draggable-card').forEach(card => {
+                if (card.dataset.category !== targetCat) {
+                    isCorrect = false;
+                }
+            });
+        });
+
+        if (!isCorrect) {
+            triggerError('Ошибка в классификации уровней пирамиды DIKW или видов знаний!', () => {
+                initPhase1();
+            });
+            return;
+        }
+
+        setPhase(2);
+        initPhase2();
+    });
+
+    // ----------------------------------------------------
+    // ФАЗА 2: Архитектурный конструктор Шеннона и Винера (Slot & Snap)
+    // ----------------------------------------------------
+    const P2_CORRECT_BLOCKS = [
+        { id: 'p2-b1', step: 1, title: 'Источник информации', formula: 'Генерация сообщения M (энтропия H)', desc: 'Формирует исходное сообщение из алфавита состояний для передачи' },
+        { id: 'p2-b2', step: 2, title: 'Кодирующее устройство (Передатчик)', formula: 'Сообщение M → Сигнал S(t)', desc: 'Преобразует дискретное сообщение в физический сигнал (модуляция и помехоустойчивый код)' },
+        { id: 'p2-b3', step: 3, title: 'Канал связи под воздействием Шума', formula: 'Сигнал S(t) + Помехи ξ(t) → S*(t)', desc: 'Физическая среда распространения, в которой на сигнал накладываются внешние помехи' },
+        { id: 'p2-b4', step: 4, title: 'Декодирующее устройство и Приемник', formula: 'Принятый сигнал S*(t) → Сообщение M*', desc: 'Демодулирует сигнал, исправляет ошибки кода Хэмминга и доставляет сообщение адресату' },
+        { id: 'p2-b5', step: 5, title: 'Прямая связь: Контроллер → Объект', formula: 'Управляющие команды u(t)', desc: 'Управляющее устройство вырабатывает и направляет команды исполнительному механизму' },
+        { id: 'p2-b6', step: 6, title: 'Обратная связь: Датчики → Контроллер', formula: 'Контроль состояния x(t) (ООС ΔX)', desc: 'Сенсоры передают фактические параметры объекта обратно в управляющее устройство' }
+    ];
+
+    const P2_DISTRACTORS = [
+        { id: 'p2-d1', step: null, title: 'Генератор шума внутри Контроллера', formula: 'Алгоритм + Шум ξ(t) → Сбой', desc: 'ОШИБКА: источник помех в схеме Шеннона воздействует на канал связи, а не на алгоритм' },
+        { id: 'p2-d2', step: null, title: 'Инверсная прямая связь', formula: 'Объект управления → Команды → Контроллер', desc: 'ОШИБКА: объект управления не отдает команды управляющему устройству' },
+        { id: 'p2-d3', step: null, title: 'Прямой прием без Декодера', formula: 'Физический сигнал S*(t) → Сразу в Тезаурус', desc: 'ОШИБКА: приемник не может интерпретировать модулированный сигнал без декодирования' }
+    ];
+
+    let p2SelectedBlock = null;
+    let p2ListenersBound = false;
+
+    function initPhase2() {
+        const pool = document.getElementById('p2-blocks-pool');
+        if (!pool) return;
+        pool.innerHTML = '';
+        p2SelectedBlock = null;
+
+        document.querySelectorAll('#phase2 .pipeline-slot').forEach(slot => {
+            slot.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите сюда блок узла ' + slot.dataset.slot + '...</span>';
+            slot.classList.remove('bg-dark');
+            slot.classList.add('bg-black');
+        });
+
+        const shuffledDistractors = [...P2_DISTRACTORS].sort(() => Math.random() - 0.5).slice(0, 2);
+        const allBlocks = [...P2_CORRECT_BLOCKS, ...shuffledDistractors].sort(() => Math.random() - 0.5);
+
+        allBlocks.forEach(item => {
+            const card = document.createElement('div');
+            card.id = item.id;
+            card.className = 'card bg-dark border-secondary rounded-0 p-2 text-light font-monospace cursor-pointer user-select-none p2-draggable-block';
+            card.style.cursor = 'grab';
+            card.style.minWidth = '220px';
+            card.style.maxWidth = '310px';
+            card.draggable = true;
+            card.dataset.blockId = item.id;
+            if (item.step) card.dataset.correctStep = String(item.step);
+
+            card.innerHTML = `
+                <div class="fw-bold text-success small mb-1">${item.title}</div>
+                <div class="badge bg-black border border-secondary text-info rounded-0 p-1 mb-1 font-monospace text-wrap">${item.formula}</div>
+                <div class="text-secondary small" style="font-size: 0.75rem;">${item.desc}</div>
+            `;
+
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.id);
+                card.classList.add('opacity-50');
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-50');
+            });
+
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (p2SelectedBlock === card) {
+                    card.classList.remove('border-warning', 'border-2');
+                    p2SelectedBlock = null;
+                } else {
+                    if (p2SelectedBlock) {
+                        p2SelectedBlock.classList.remove('border-warning', 'border-2');
+                    }
+                    p2SelectedBlock = card;
+                    card.classList.add('border-warning', 'border-2');
+                }
+            });
+
+            pool.appendChild(card);
+        });
+
+        if (!p2ListenersBound) {
+            p2ListenersBound = true;
+            document.querySelectorAll('#phase2 .pipeline-slot').forEach(slot => {
+                slot.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    slot.classList.add('border-white');
+                });
+
+                slot.addEventListener('dragleave', () => {
+                    slot.classList.remove('border-white');
+                });
+
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    slot.classList.remove('border-white');
+                    const blockId = e.dataTransfer.getData('text/plain');
+                    const blockEl = document.getElementById(blockId);
+                    if (blockEl && blockEl.classList.contains('p2-draggable-block')) {
+                        placeP2BlockInSlot(blockEl, slot);
+                    }
+                });
+
+                slot.addEventListener('click', () => {
+                    if (p2SelectedBlock) {
+                        placeP2BlockInSlot(p2SelectedBlock, slot);
+                        p2SelectedBlock.classList.remove('border-warning', 'border-2');
+                        p2SelectedBlock = null;
+                    }
+                });
+            });
+
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const blockId = e.dataTransfer.getData('text/plain');
+                const blockEl = document.getElementById(blockId);
+                if (blockEl && blockEl.classList.contains('p2-draggable-block')) {
+                    returnP2BlockToPool(blockEl);
+                }
+            });
+            pool.addEventListener('click', () => {
+                if (p2SelectedBlock && p2SelectedBlock.parentElement !== pool) {
+                    returnP2BlockToPool(p2SelectedBlock);
+                    p2SelectedBlock.classList.remove('border-warning', 'border-2');
+                    p2SelectedBlock = null;
+                }
+            });
+        }
+    }
+
+    function placeP2BlockInSlot(blockEl, slot) {
+        const existingBlock = slot.querySelector('.p2-draggable-block');
+        if (existingBlock && existingBlock !== blockEl) {
+            returnP2BlockToPool(existingBlock);
+        }
+
+        const parentSlot = blockEl.closest('.pipeline-slot');
+        if (parentSlot && parentSlot !== slot) {
+            parentSlot.classList.remove('bg-dark');
+            parentSlot.classList.add('bg-black');
+            if (!parentSlot.querySelector('.placeholder-text')) {
+                parentSlot.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите сюда блок узла ' + parentSlot.dataset.slot + '...</span>';
+            }
+        }
+
+        const placeholder = slot.querySelector('.placeholder-text');
+        if (placeholder) placeholder.remove();
+
+        slot.appendChild(blockEl);
+        slot.classList.remove('bg-black');
+        slot.classList.add('bg-dark');
+    }
+
+    function returnP2BlockToPool(blockEl) {
+        const pool = document.getElementById('p2-blocks-pool');
+        const parentSlot = blockEl.closest('.pipeline-slot');
+        if (parentSlot) {
+            parentSlot.classList.remove('bg-dark');
+            parentSlot.classList.add('bg-black');
+            if (!parentSlot.querySelector('.placeholder-text')) {
+                parentSlot.innerHTML = '<span class="text-secondary small placeholder-text">Перетащите сюда блок узла ' + parentSlot.dataset.slot + '...</span>';
+            }
+        }
+        if (pool) pool.appendChild(blockEl);
+    }
+
+    document.getElementById('p2-reset-btn')?.addEventListener('click', () => {
+        document.querySelectorAll('#phase2 .p2-draggable-block').forEach(b => returnP2BlockToPool(b));
+    });
+
+    document.getElementById('p2-verify-btn')?.addEventListener('click', () => {
+        if (isProcessingError) return;
+
+        let allFilled = true;
+        let isCorrect = true;
+
+        for (let step = 1; step <= 6; step++) {
+            const slot = document.querySelector('#phase2 .pipeline-slot[data-slot="' + step + '"]');
+            const block = slot ? slot.querySelector('.p2-draggable-block') : null;
+            if (!block) {
+                allFilled = false;
+                break;
+            }
+            if (block.dataset.correctStep !== String(step)) {
+                isCorrect = false;
+            }
+        }
+
+        if (!allFilled) {
+            triggerError('Заполните все 6 узлов схемы канала связи Шеннона и контура управления Винера!');
+            return;
+        }
+
+        if (!isCorrect) {
+            triggerError('Нарушена топология канала связи Шеннона / контура Винера или использованы дистракторы!', () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        setPhase(3);
+        initPhase3();
+    });
+
+    // ----------------------------------------------------
+    // ФАЗА 3: Классификация 4 типов обработки информации (Drag-to-Bucket)
+    // ----------------------------------------------------
+    const P3_BANK = [
+        // 1. Получение новой информации (create) - без примеров из theory.md
+        { id: 'p3-cr-1', cat: 'create', title: 'Расчет тормозного пути поезда по массе и уклону', desc: 'Математическое вычисление нового параметра безопасности движения по физическим формулам' },
+        { id: 'p3-cr-2', cat: 'create', title: 'Прогноз смещения циклона по барометрической модели', desc: 'Численное моделирование метеорологической обстановки с выработкой нового знания' },
+        { id: 'p3-cr-3', cat: 'create', title: 'Постановка диагноза экспертной системой по симптомам', desc: 'Логический вывод нового заключения на базе правил продукционной базы знаний' },
+        { id: 'p3-cr-4', cat: 'create', title: 'Вычисление КПД теплового двигателя по замерам работы', desc: 'Получение итоговой энергетической характеристики агрегата путем арифметического расчета' },
+        { id: 'p3-cr-5', cat: 'create', title: 'Определение оптимального маршрута доставки алгоритмом Дейкстры', desc: 'Анализ взвешенного графа дорог с нахождением кратчайшего пути следования' },
+
+        // 2. Изменение формы представления / кодирование (encode)
+        { id: 'p3-en-1', cat: 'encode', title: 'Оцифровка виниловой пластинки в поток импульсно-кодовой модуляции PCM', desc: 'Дискретизация и квантование аналогового звука без изменения музыкального содержания' },
+        { id: 'p3-en-2', cat: 'encode', title: 'Зашифрование базы чертежей блочным шифром «Кузнечик»', desc: 'Криптографическое преобразование открытого текста в шифротекст при сохранении смысла' },
+        { id: 'p3-en-3', cat: 'encode', title: 'Сжатие лог-файлов сервера алгоритмом LZ77 без потерь', desc: 'Уменьшение битового объема данных путем замены повторяющихся цепочек ссылками' },
+        { id: 'p3-en-4', cat: 'encode', title: 'Транслитерация русских фамилий латиницей для загранпаспорта', desc: 'Перевод записи из кириллического алфавита в латинский по таблице соответствия' },
+        { id: 'p3-en-5', cat: 'encode', title: 'Генерация матричного QR-кода из текстовой ссылки на портал', desc: 'Графическое перекодирование символьной строки URL в двумерную черно-белую матрицу' },
+
+        // 3. Структурирование / систематизация (structure)
+        { id: 'p3-st-1', cat: 'structure', title: 'Упорядочивание журнала вызовов по убыванию длительности сессии', desc: 'Перестановка записей лога по числовому ключу без изменения самих данных' },
+        { id: 'p3-st-2', cat: 'structure', title: 'Разбиение складского реестра запчастей по категориям агрегатов', desc: 'Классификация и группировка номенклатуры в иерархические разделы каталога' },
+        { id: 'p3-st-3', cat: 'structure', title: 'Построение сбалансированного B-дерева индексов для таблицы СУБД', desc: 'Организация связей между ключами записей для ускорения последующего доступа' },
+        { id: 'p3-st-4', cat: 'structure', title: 'Сведение разрозненных анкет абитуриентов в единую электронную таблицу', desc: 'Табличная систематизация однотипных записей по строкам и типизированным столбцам' },
+        { id: 'p3-st-5', cat: 'structure', title: 'Хронологическая раскладка архивных снимков спутника по годам и месяцам', desc: 'Упорядочивание медиафайлов в древовидную структуру папок по временному признаку' },
+
+        // 4. Поиск информации (search)
+        { id: 'p3-sr-1', cat: 'search', title: 'Выборка из базы ГАИ всех автомобилей с регионом 77 и годом выпуска 2023', desc: 'Фильтрация записей хранилища по сложному логическому условию (И / ИЛИ)' },
+        { id: 'p3-sr-2', cat: 'search', title: 'Определение IP-адреса узла по доменному имени в таблице маршрутизатора', desc: 'Извлечение существующей записи из справочной таблицы по уникальному ключу запроса' },
+        { id: 'p3-sr-3', cat: 'search', title: 'Обнаружение всех вхождений подстроки «ERROR_CRC» в системном журнале', desc: 'Сканирование текстового массива для выделения строк, совпадающих с образцом' },
+        { id: 'p3-sr-4', cat: 'search', title: 'Нахождение свободного места в схеме зрительного зала перед покупкой билета', desc: 'Запрос к информационной базе для выделения объектов с признаком «свободно»' },
+        { id: 'p3-sr-5', cat: 'search', title: 'Отбор резюме инженеров со знанием Python и стажем от 3 лет в кадровой системе', desc: 'Извлечение подмножества анкет, удовлетворяющих заданным квалификационным рамкам' }
+    ];
+
+    let p3SelectedCard = null;
+    let p3ListenersBound = false;
+
+    function initPhase3() {
+        const pool = document.getElementById('p3-cards-pool');
+        if (!pool) return;
+        pool.innerHTML = '';
+        p3SelectedCard = null;
+
+        document.querySelectorAll('#phase3 .bucket-slot').forEach(slot => {
+            slot.innerHTML = '';
+        });
+        updateP3BucketCounts();
+
+        const createCards = P3_BANK.filter(c => c.cat === 'create').sort(() => Math.random() - 0.5).slice(0, 2);
+        const encodeCards = P3_BANK.filter(c => c.cat === 'encode').sort(() => Math.random() - 0.5).slice(0, 2);
+        const structCards = P3_BANK.filter(c => c.cat === 'structure').sort(() => Math.random() - 0.5).slice(0, 2);
+        const searchCards = P3_BANK.filter(c => c.cat === 'search').sort(() => Math.random() - 0.5).slice(0, 2);
+
+        const currentCards = [...createCards, ...encodeCards, ...structCards, ...searchCards].sort(() => Math.random() - 0.5);
+
+        currentCards.forEach(item => {
+            const card = document.createElement('div');
+            card.id = item.id;
+            card.className = 'card bg-dark border-secondary rounded-0 p-2 text-light font-monospace cursor-pointer user-select-none p3-draggable-card';
+            card.style.cursor = 'grab';
+            card.style.minWidth = '210px';
+            card.style.maxWidth = '280px';
+            card.draggable = true;
+            card.dataset.category = item.cat;
+            card.dataset.cardId = item.id;
+
+            card.innerHTML = `
+                <div class="fw-bold text-light small mb-1">${item.title}</div>
+                <div class="text-secondary small" style="font-size: 0.75rem;">${item.desc}</div>
+            `;
+
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.id);
+                card.classList.add('opacity-50');
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-50');
+            });
+
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (p3SelectedCard === card) {
+                    card.classList.remove('border-warning', 'border-2');
+                    p3SelectedCard = null;
+                } else {
+                    if (p3SelectedCard) p3SelectedCard.classList.remove('border-warning', 'border-2');
+                    p3SelectedCard = card;
+                    card.classList.add('border-warning', 'border-2');
+                }
+            });
+
+            pool.appendChild(card);
+        });
+
+        if (!p3ListenersBound) {
+            p3ListenersBound = true;
+            document.querySelectorAll('#phase3 .target-bucket-p3').forEach(bucket => {
+                const slot = bucket.querySelector('.bucket-slot');
+
+                bucket.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    bucket.classList.add('border-white');
+                });
+                bucket.addEventListener('dragleave', () => {
+                    bucket.classList.remove('border-white');
+                });
+                bucket.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    bucket.classList.remove('border-white');
+                    const cardId = e.dataTransfer.getData('text/plain');
+                    const cardEl = document.getElementById(cardId);
+                    if (cardEl && cardEl.classList.contains('p3-draggable-card') && slot) {
+                        slot.appendChild(cardEl);
+                        updateP3BucketCounts();
+                    }
+                });
+
+                bucket.addEventListener('click', () => {
+                    if (p3SelectedCard && slot) {
+                        slot.appendChild(p3SelectedCard);
+                        p3SelectedCard.classList.remove('border-warning', 'border-2');
+                        p3SelectedCard = null;
+                        updateP3BucketCounts();
+                    }
+                });
+            });
+
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const cardId = e.dataTransfer.getData('text/plain');
+                const cardEl = document.getElementById(cardId);
+                if (cardEl && cardEl.classList.contains('p3-draggable-card')) {
+                    pool.appendChild(cardEl);
+                    updateP3BucketCounts();
+                }
+            });
+            pool.addEventListener('click', () => {
+                if (p3SelectedCard && p3SelectedCard.parentElement !== pool) {
+                    pool.appendChild(p3SelectedCard);
+                    p3SelectedCard.classList.remove('border-warning', 'border-2');
+                    p3SelectedCard = null;
+                    updateP3BucketCounts();
+                }
+            });
+        }
+    }
+
+    function updateP3BucketCounts() {
+        document.querySelectorAll('#phase3 .target-bucket-p3').forEach(bucket => {
+            const count = bucket.querySelectorAll('.p3-draggable-card').length;
+            const badge = bucket.querySelector('.count-badge');
+            if (badge) badge.textContent = String(count);
+        });
+    }
+
+    document.getElementById('p3-reset-btn')?.addEventListener('click', () => {
+        const pool = document.getElementById('p3-cards-pool');
+        document.querySelectorAll('#phase3 .p3-draggable-card').forEach(c => pool?.appendChild(c));
+        updateP3BucketCounts();
+    });
+
+    document.getElementById('p3-verify-btn')?.addEventListener('click', () => {
+        if (isProcessingError) return;
+
+        const pool = document.getElementById('p3-cards-pool');
+        const remainingInPool = pool?.querySelectorAll('.p3-draggable-card').length || 0;
+        if (remainingInPool > 0) {
+            triggerError('Распределите все 8 карточек операций по четырем контейнерам!');
+            return;
+        }
+
+        let isCorrect = true;
+        document.querySelectorAll('#phase3 .target-bucket-p3').forEach(bucket => {
+            const targetCat = bucket.dataset.category;
+            bucket.querySelectorAll('.p3-draggable-card').forEach(card => {
+                if (card.dataset.category !== targetCat) {
+                    isCorrect = false;
+                }
+            });
+        });
+
+        if (!isCorrect) {
+            triggerError('Обнаружены ошибки в классификации четырех типов обработки информации!', () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        // Завершение Уровня 1!
+        setPhase(4);
+    });
+
+    // ----------------------------------------------------
+    // СТАРТ
+    // ----------------------------------------------------
+    initPhase1();
+})();
+</script>

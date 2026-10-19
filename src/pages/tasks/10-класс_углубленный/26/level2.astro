@@ -1,0 +1,651 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитические расчеты информации, энтропии и ценности (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок и индикатор прогресса -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Количество информации частного события i = log2(1 / p)</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сброса -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА РАСЧЕТА] <span id="feedback-text">Неверно вычисленное значение!</span> Перегенерация параметров...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 1: Индивидуальное количество информации частного события i = log2(1 / p) -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Шаг 1: Вычисление количества информации частного события (Вероятностный подход)</h5>
+                    <p class="text-light">
+                        В неоднородной технической системе проведена серия наблюдений. Из общего числа испытаний <strong>K<sub>общ</sub></strong> целевое событие <strong>A</strong> («срабатывание резервного контура») произошло ровно <strong>K<sub>A</sub></strong> раз.
+                        Вычислите вероятность события <strong>p = K<sub>A</sub> / K<sub>общ</sub></strong> и определите количество информации <strong>i</strong> (в битах), которое несет сообщение о наступлении события A, по формуле:
+                        <strong class="text-warning">i = log<sub>2</sub>(1 / p) = - log<sub>2</sub> p</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">ВСЕГО ИСПЫТАНИЙ (K<sub>общ</sub>):</span>
+                                <span id="p1-total-k" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">ЧАСТОТА СОБЫТИЯ A (K<sub>A</sub>):</span>
+                                <span id="p1-event-k" class="fs-4 text-info fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">ФОРМУЛА ВЕРОЯТНОСТИ:</span>
+                                <span class="fs-5 text-warning fw-bold">p = K<sub>A</sub> / K<sub>общ</sub> = 1 / 2<sup>i</sup></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-2">
+                        Сократите дробь <strong>p = K<sub>A</sub> / K<sub>общ</sub></strong> до вида <strong>1 / 2<sup>i</sup></strong> и введите точное количество информации <strong>i</strong> (в битах):
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Количество информации i (бит)" autocomplete="off">
+                        <button id="p1-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 2: Информационная энтропия системы по формуле К. Шеннона -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 2: Расчет информационной энтропии системы по формуле К. Шеннона</h5>
+                    <p class="text-light">
+                        Датчик телеметрии передает сообщения о нахождении агрегата в одном из <strong>N</strong> неравновероятных состояний с вероятностями <strong>p<sub>1</sub>, p<sub>2</sub>, ..., p<sub>N</sub></strong>.
+                        Вычислите среднюю информационную энтропию системы <strong>H</strong> (в битах на одно сообщение) по формуле Клода Шеннона:
+                        <strong class="text-warning">H = ∑ p<sub>k</sub> · log<sub>2</sub>(1 / p<sub>k</sub>)</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">РАСПРЕДЕЛЕНИЕ ВЕРОЯТНОСТЕЙ СОСТОЯНИЙ СИСТЕМЫ (∑ p<sub>k</sub> = 1):</div>
+                        <div id="p2-probs-table" class="row g-2 text-light">
+                            <!-- Генерируется динамически через JS -->
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-2">
+                        Вычислите взвешенную сумму <strong>H</strong> в битах (допускается ввод десятичной дроби через точку или запятую, например <code>1.875</code> или <code>1,875</code>):
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Энтропия H (бит)" autocomplete="off">
+                        <button id="p2-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 3: Абсолютная и относительная статистическая избыточность источника -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 3: Статистическая избыточность источника сообщений (Теория сжатия)</h5>
+                    <p class="text-light">
+                        Источник порождает символы из алфавита мощностью <strong>N</strong> знаков. Из-за неравномерной частоты встречаемости символов реальная энтропия источника по Шеннону составляет <strong>H</strong> бит/символ (что меньше максимальной энтропии Хартли <strong>H<sub>max</sub> = log<sub>2</sub> N</strong>).
+                        Вычислите <strong>абсолютную избыточность D = H<sub>max</sub> - H</strong> (бит) и <strong>относительную избыточность R = ((H<sub>max</sub> - H) / H<sub>max</sub>) · 100%</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">МОЩНОСТЬ АЛФАВИТА (N):</span>
+                                <span id="p3-alphabet-n" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">РЕАЛЬНАЯ ЭНТРОПИЯ ШЕННОНА (H):</span>
+                                <span id="p3-real-h" class="fs-4 text-info fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">МАКСИМУМ ХАРТЛИ (H<sub>max</sub>):</span>
+                                <span class="fs-5 text-warning fw-bold">H<sub>max</sub> = log<sub>2</sub> N</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <label for="p3-input-d" class="form-label text-secondary small">Абсолютная избыточность D = H<sub>max</sub> - H (бит):</label>
+                            <input type="text" id="p3-input-d" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Например: 1.5" autocomplete="off">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="p3-input-r" class="form-label text-secondary small">Относительная избыточность R (в процентах %):</label>
+                            <input type="text" id="p3-input-r" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Без знака %, например: 25" autocomplete="off">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button id="p3-btn" type="button" class="btn btn-outline-warning rounded-0 w-100 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 4: Прагматическая ценность информации по формуле А. А. Харкевича -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 4: Прагматическая ценность информации по формуле А. А. Харкевича</h5>
+                    <p class="text-light">
+                        Автономный кибернетический модуль решает задачу достижения целевого состояния. До получения корректирующего сообщения априорная вероятность достижения цели составляла <strong>P<sub>0</sub></strong>. После приема и обработки сообщения апостериорная вероятность выросла до <strong>P<sub>1</sub></strong>.
+                        Вычислите прагматическую ценность полученной информации <strong>V</strong> (в битах) по формуле А. А. Харкевича:
+                        <strong class="text-warning">V = log<sub>2</sub>(P<sub>1</sub> / P<sub>0</sub>)</strong>.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">АПРИОРНАЯ ВЕРОЯТНОСТЬ ДО СООБЩЕНИЯ (P<sub>0</sub>):</span>
+                                <span id="p4-prob-p0" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-secondary small d-block">АПОСТЕРИОРНАЯ ВЕРОЯТНОСТЬ ПОСЛЕ СООБЩЕНИЯ (P<sub>1</sub>):</span>
+                                <span id="p4-prob-p1" class="fs-4 text-info fw-bold">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-2">
+                        Найдите отношение <strong>P<sub>1</sub> / P<sub>0</sub></strong> и вычислите двоичный логарифм <strong>V = log<sub>2</sub>(P<sub>1</sub> / P<sub>0</sub>)</strong> (в битах):
+                    </p>
+
+                    <div class="input-group mb-3 w-50">
+                        <input type="number" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Ценность информации V (бит)" autocomplete="off">
+                        <button id="p4-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ПРОВЕРИТЬ</button>
+                    </div>
+                </div>
+
+                <!-- ФАЗА 5: Информационный объем триплетного генетического кода ДНК/РНК -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 5: Расчет информационного объема участка ДНК в байтах (Информационные процессы в природе)</h5>
+                    <p class="text-light">
+                        В живой клетке генетический код записан в молекуле ДНК с помощью алфавита из <strong>N = 4</strong> нуклеотидов (<code>А, Т, Г, Ц</code>). Каждая аминокислота синтезируемого белка кодируется одним триплетом (кодоном) из <strong>3 нуклеотидов</strong>.
+                        Известно, что синтезированная полипептидная цепь белка состоит из <strong>K<sub>амин</sub></strong> аминокислот.
+                    </p>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-light">
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">ЧИСЛО АМИНОКИСЛОТ В БЕЛКЕ (K<sub>амин</sub>):</span>
+                                <span id="p5-amino-count" class="fs-4 text-light fw-bold">--</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">СТРУКТУРА КОДОНА ДНК:</span>
+                                <span class="fs-5 text-info fw-bold">1 аминокислота = 3 нуклеотида</span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="text-secondary small d-block">МОЩНОСТЬ АЛФАВИТА ДНК:</span>
+                                <span class="fs-5 text-warning fw-bold">N = 4 (вес i = log<sub>2</sub> 4 = 2 бита)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-2">
+                        Вычислите общее число нуклеотидов <strong>L = 3 · K<sub>амин</sub></strong> и информационный объем кодирующего участка гена в <strong>БАЙТАХ</strong> (<code>I<sub>байт</sub> = (L · 2) / 8</code>):
+                    </p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <label for="p5-input-nucl" class="form-label text-secondary small">Общее число нуклеотидов L = 3 · K<sub>амин</sub>:</label>
+                            <input type="number" id="p5-input-nucl" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Число нуклеотидов L" autocomplete="off">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="p5-input-bytes" class="form-label text-secondary small">Информационный объем гена I<sub>байт</sub> (в байтах):</label>
+                            <input type="number" id="p5-input-bytes" class="form-control bg-black text-warning border-warning rounded-0" placeholder="Объем в байтах" autocomplete="off">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button id="p5-btn" type="button" class="btn btn-outline-warning rounded-0 w-100 fw-bold">ПРОВЕРИТЬ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Экран победы -->
+                <div id="success-screen" class="phase-container d-none text-center py-5">
+                    <div class="mb-3 text-warning font-monospace display-4">✓ УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН</div>
+                    <h3 class="text-light font-monospace mb-3">Аналитический аппарат теории информации освоен в полном объеме</h3>
+                    <p class="text-secondary max-w-md mx-auto mb-4">
+                        Вы успешно рассчитали количество информации частных событий, информационную энтропию неравновероятных систем по К. Шеннону, абсолютную и относительную статистическую избыточность кода, прагматическую ценность по А. А. Харкевичу и емкость генетического кода ДНК.
+                    </p>
+                    <div class="badge border border-warning text-warning bg-black p-3 font-monospace fs-6 rounded-0">
+                        Переходите к Уровню 3 (Аркадный симулятор управления информационными потоками и контурами Винера) на верхней панели!
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    // ----------------------------------------------------
+    // СОСТОЯНИЕ И ТЕЛЕМЕТРИЯ
+    // ----------------------------------------------------
+    const MISSION_NAME = 'Урок 26 :: Информация, данные и знания. Информационные процессы в природе, технике и обществе (Уровень 2)';
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    let currentPhase = 1;
+    let isProcessingError = false;
+
+    // Таймер
+    setInterval(() => {
+        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        const el = document.getElementById('timer-display');
+        if (el) el.textContent = `${m}:${s}`;
+    }, 1000);
+
+    function updateAttempts() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    function sendTelemetry(actionType, status, success) {
+        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+        if (window.parent) {
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: MISSION_NAME,
+                action_type: actionType,
+                status: status,
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: elapsedSec,
+                attempts_count: attemptsCount,
+                success: success
+            }, '*');
+        }
+    }
+
+    // Первичная телеметрия
+    sendTelemetry('in_progress', 'in_progress', false);
+
+    function triggerError(msg, callback) {
+        if (isProcessingError) return;
+        isProcessingError = true;
+        attemptsCount++;
+        updateAttempts();
+        sendTelemetry('hardcore_reset', 'in_progress', false);
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isProcessingError = false;
+            if (callback) callback();
+        }, 1300);
+    }
+
+    function setPhase(phaseNum) {
+        currentPhase = phaseNum;
+        ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'success-screen'].forEach((id, idx) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (idx + 1 === phaseNum) {
+                el.classList.remove('d-none');
+            } else {
+                el.classList.add('d-none');
+            }
+        });
+
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        const titles = [
+            'Количество информации частного события i = log2(1 / p)',
+            'Информационная энтропия системы по формуле К. Шеннона',
+            'Абсолютная и относительная статистическая избыточность кода',
+            'Прагматическая ценность информации по формуле А. А. Харкевича',
+            'Информационный объем генетического кода ДНК в байтах',
+            'Уровень 2 завершен'
+        ];
+
+        if (phaseNum <= 5) {
+            if (badge) badge.textContent = `Шаг ${phaseNum} из 5`;
+            if (title) title.textContent = titles[phaseNum - 1];
+        } else {
+            if (badge) badge.textContent = 'Победа!';
+            if (title) title.textContent = 'Уровень 2 завершен';
+            const screen = document.getElementById('success-screen');
+            if (screen) screen.classList.remove('d-none');
+            sendTelemetry('level_complete', 'completed', true);
+        }
+    }
+
+    function parseNum(raw) {
+        if (!raw) return NaN;
+        return parseFloat(String(raw).trim().replace(',', '.'));
+    }
+
+    // ----------------------------------------------------
+    // ФАЗА 1: Количество информации частного события i = log2(1 / p)
+    // ----------------------------------------------------
+    // Генерируем K_A и K_общ так, чтобы K_A / K_общ = 1 / 2^i, где i in {3, 4, 5, 6, 7}
+    const P1_MULTIPLIERS = [3, 5, 6, 7, 9, 10, 11, 12, 15];
+    const P1_BITS = [3, 4, 5, 6, 7];
+    let p1TargetBits = 4;
+
+    function initPhase1() {
+        p1TargetBits = P1_BITS[Math.floor(Math.random() * P1_BITS.length)];
+        const mult = P1_MULTIPLIERS[Math.floor(Math.random() * P1_MULTIPLIERS.length)];
+        const eventK = mult;
+        const totalK = mult * Math.pow(2, p1TargetBits);
+
+        const elTotal = document.getElementById('p1-total-k');
+        const elEvent = document.getElementById('p1-event-k');
+        if (elTotal) elTotal.textContent = String(totalK);
+        if (elEvent) elEvent.textContent = String(eventK);
+
+        const inp = document.getElementById('p1-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase1() {
+        if (isProcessingError) return;
+        const val = parseNum(document.getElementById('p1-input')?.value);
+
+        if (isNaN(val)) {
+            triggerError('Введите числовое значение количества информации i в битах!');
+            return;
+        }
+
+        if (Math.abs(val - p1TargetBits) > 0.001) {
+            triggerError('Ошибка расчета! Найдите p = K_A / K_общ и вычислите i = log2(1 / p).', () => {
+                initPhase1();
+            });
+            return;
+        }
+
+        setPhase(2);
+        initPhase2();
+    }
+
+    document.getElementById('p1-btn')?.addEventListener('click', verifyPhase1);
+    document.getElementById('p1-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase1(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 2: Энтропия системы по формуле Шеннона H = sum p_k * log2(1/p_k)
+    // ----------------------------------------------------
+    // Наборы распределений (без распределения [0.5, 0.25, 0.125, 0.125] из theory.md)
+    const P2_DISTRIBUTIONS = [
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3'],
+            probs: [0.5, 0.25, 0.25],
+            // H = 0.5*1 + 0.25*2 + 0.25*2 = 1.5
+            entropy: 1.5
+        },
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3', 'Состояние S4', 'Состояние S5'],
+            probs: [0.5, 0.125, 0.125, 0.125, 0.125],
+            // H = 0.5*1 + 4*(0.125*3) = 0.5 + 1.5 = 2.0
+            entropy: 2.0
+        },
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3', 'Состояние S4', 'Состояние S5'],
+            probs: [0.25, 0.25, 0.25, 0.125, 0.125],
+            // H = 3*(0.25*2) + 2*(0.125*3) = 1.5 + 0.75 = 2.25
+            entropy: 2.25
+        },
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3', 'Состояние S4', 'Состояние S5', 'Состояние S6'],
+            probs: [0.5, 0.25, 0.0625, 0.0625, 0.0625, 0.0625],
+            // H = 0.5*1 + 0.25*2 + 4*(0.0625*4) = 0.5 + 0.5 + 1.0 = 2.0
+            entropy: 2.0
+        },
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3', 'Состояние S4', 'Состояние S5'],
+            probs: [0.5, 0.25, 0.125, 0.0625, 0.0625],
+            // H = 0.5*1 + 0.25*2 + 0.125*3 + 2*(0.0625*4) = 0.5 + 0.5 + 0.375 + 0.5 = 1.875
+            entropy: 1.875
+        },
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3', 'Состояние S4', 'Состояние S5', 'Состояние S6'],
+            probs: [0.25, 0.25, 0.125, 0.125, 0.125, 0.125],
+            // H = 2*(0.25*2) + 4*(0.125*3) = 1.0 + 1.5 = 2.5
+            entropy: 2.5
+        },
+        {
+            labels: ['Состояние S1', 'Состояние S2', 'Состояние S3', 'Состояние S4', 'Состояние S5', 'Состояние S6', 'Состояние S7'],
+            probs: [0.25, 0.25, 0.25, 0.0625, 0.0625, 0.0625, 0.0625],
+            // H = 3*(0.25*2) + 4*(0.0625*4) = 1.5 + 1.0 = 2.5
+            entropy: 2.5
+        }
+    ];
+
+    let p2TargetH = 1.5;
+
+    function initPhase2() {
+        const dist = P2_DISTRIBUTIONS[Math.floor(Math.random() * P2_DISTRIBUTIONS.length)];
+        // Перемешаем порядок вероятностей для уникальности отображения
+        const pairs = dist.probs.map((p, idx) => ({ label: `Состояние S${idx + 1}`, p }));
+        p2TargetH = dist.entropy;
+
+        const container = document.getElementById('p2-probs-table');
+        if (container) {
+            container.innerHTML = '';
+            pairs.forEach(item => {
+                const bits = Math.round(Math.log2(1 / item.p));
+                const frac = `1/${Math.pow(2, bits)}`;
+                const col = document.createElement('div');
+                col.className = 'col-6 col-md-4 col-lg-3';
+                col.innerHTML = `
+                    <div class="p-2 border border-secondary bg-dark">
+                        <span class="text-secondary small d-block">${item.label}:</span>
+                        <span class="text-warning fw-bold fs-5">p = ${item.p}</span>
+                        <span class="text-info small ms-1">(${frac})</span>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        }
+
+        const inp = document.getElementById('p2-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase2() {
+        if (isProcessingError) return;
+        const val = parseNum(document.getElementById('p2-input')?.value);
+
+        if (isNaN(val)) {
+            triggerError('Введите вычисленное значение энтропии Шеннона H!');
+            return;
+        }
+
+        if (Math.abs(val - p2TargetH) > 0.001) {
+            triggerError('Неверное значение энтропии! H = ∑ p_k · log2(1 / p_k).', () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        setPhase(3);
+        initPhase3();
+    }
+
+    document.getElementById('p2-btn')?.addEventListener('click', verifyPhase2);
+    document.getElementById('p2-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase2(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 3: Абсолютная D и относительная избыточность R (%)
+    // ----------------------------------------------------
+    // Исключаем пример из theory.md (N = 8, H = 2.4 -> D = 0.6, R = 20%)
+    const P3_CONFIGS = [
+        { n: 4, hmax: 2, h: 1.5, d: 0.5, r: 25 },
+        { n: 4, hmax: 2, h: 1.2, d: 0.8, r: 40 },
+        { n: 8, hmax: 3, h: 2.25, d: 0.75, r: 25 },
+        { n: 8, hmax: 3, h: 1.5, d: 1.5, r: 50 },
+        { n: 16, hmax: 4, h: 3.0, d: 1.0, r: 25 },
+        { n: 16, hmax: 4, h: 3.2, d: 0.8, r: 20 },
+        { n: 16, hmax: 4, h: 2.6, d: 1.4, r: 35 },
+        { n: 32, hmax: 5, h: 3.5, d: 1.5, r: 30 },
+        { n: 32, hmax: 5, h: 4.0, d: 1.0, r: 20 },
+        { n: 64, hmax: 6, h: 4.5, d: 1.5, r: 25 }
+    ];
+
+    let p3TargetD = 0.5;
+    let p3TargetR = 25;
+
+    function initPhase3() {
+        const cfg = P3_CONFIGS[Math.floor(Math.random() * P3_CONFIGS.length)];
+        p3TargetD = cfg.d;
+        p3TargetR = cfg.r;
+
+        const elN = document.getElementById('p3-alphabet-n');
+        const elH = document.getElementById('p3-real-h');
+        if (elN) elN.textContent = `${cfg.n} символов`;
+        if (elH) elH.textContent = `${cfg.h} бит/символ`;
+
+        const inD = document.getElementById('p3-input-d');
+        const inR = document.getElementById('p3-input-r');
+        if (inD) inD.value = '';
+        if (inR) inR.value = '';
+    }
+
+    function verifyPhase3() {
+        if (isProcessingError) return;
+        const valD = parseNum(document.getElementById('p3-input-d')?.value);
+        const rawR = String(document.getElementById('p3-input-r')?.value || '').replace('%', '').trim();
+        const valR = parseNum(rawR);
+
+        if (isNaN(valD) || isNaN(valR)) {
+            triggerError('Заполните оба поля: абсолютную избыточность D и относительную избыточность R!');
+            return;
+        }
+
+        if (Math.abs(valD - p3TargetD) > 0.001 || Math.abs(valR - p3TargetR) > 0.01) {
+            triggerError('Ошибка расчета избыточности! D = log2(N) - H, а R = (D / log2(N)) · 100%.', () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        setPhase(4);
+        initPhase4();
+    }
+
+    document.getElementById('p3-btn')?.addEventListener('click', verifyPhase3);
+    document.getElementById('p3-input-d')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase3(); });
+    document.getElementById('p3-input-r')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase3(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 4: Прагматическая ценность по Харкевичу V = log2(P1 / P0)
+    // ----------------------------------------------------
+    // Исключаем пары из theory.md (0.25 -> 1.0 и 0.125 -> 0.5)
+    const P4_CONFIGS = [
+        { p0Text: '0,0625 (1/16)', p1Text: '0,5 (1/2)', v: 3 },
+        { p0Text: '0,0625 (1/16)', p1Text: '1,0 (достоверно)', v: 4 },
+        { p0Text: '0,03125 (1/32)', p1Text: '0,5 (1/2)', v: 4 },
+        { p0Text: '0,03125 (1/32)', p1Text: '0,25 (1/4)', v: 3 },
+        { p0Text: '0,03125 (1/32)', p1Text: '1,0 (достоверно)', v: 5 },
+        { p0Text: '0,125 (1/8)', p1Text: '1,0 (достоверно)', v: 3 },
+        { p0Text: '0,015625 (1/64)', p1Text: '0,5 (1/2)', v: 5 },
+        { p0Text: '0,015625 (1/64)', p1Text: '0,25 (1/4)', v: 4 },
+        { p0Text: '0,05 (1/20)', p1Text: '0,8 (16/20)', v: 4 },
+        { p0Text: '0,1 (1/10)', p1Text: '0,8 (8/10)', v: 3 }
+    ];
+
+    let p4TargetV = 3;
+
+    function initPhase4() {
+        const cfg = P4_CONFIGS[Math.floor(Math.random() * P4_CONFIGS.length)];
+        p4TargetV = cfg.v;
+
+        const elP0 = document.getElementById('p4-prob-p0');
+        const elP1 = document.getElementById('p4-prob-p1');
+        if (elP0) elP0.textContent = cfg.p0Text;
+        if (elP1) elP1.textContent = cfg.p1Text;
+
+        const inp = document.getElementById('p4-input');
+        if (inp) inp.value = '';
+    }
+
+    function verifyPhase4() {
+        if (isProcessingError) return;
+        const val = parseNum(document.getElementById('p4-input')?.value);
+
+        if (isNaN(val)) {
+            triggerError('Введите числовое значение ценности информации V в битах!');
+            return;
+        }
+
+        if (Math.abs(val - p4TargetV) > 0.001) {
+            triggerError('Неверный расчет ценности по Харкевичу! Формула: V = log2(P1 / P0).', () => {
+                initPhase4();
+            });
+            return;
+        }
+
+        setPhase(5);
+        initPhase5();
+    }
+
+    document.getElementById('p4-btn')?.addEventListener('click', verifyPhase4);
+    document.getElementById('p4-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase4(); });
+
+    // ----------------------------------------------------
+    // ФАЗА 5: Информационный объем триплетного кода ДНК в байтах
+    // ----------------------------------------------------
+    // K_амин кратно 4, чтобы L = 3 * K_амин и I_байт = (6 * K_амин) / 8 были целыми
+    const P5_AMINO_COUNTS = [40, 60, 80, 120, 140, 160, 200, 240, 280, 320, 360, 400];
+    let p5TargetNucl = 240;
+    let p5TargetBytes = 60;
+
+    function initPhase5() {
+        const kAmino = P5_AMINO_COUNTS[Math.floor(Math.random() * P5_AMINO_COUNTS.length)];
+        p5TargetNucl = kAmino * 3;
+        p5TargetBytes = (p5TargetNucl * 2) / 8;
+
+        const elAmino = document.getElementById('p5-amino-count');
+        if (elAmino) elAmino.textContent = `${kAmino} аминокислот`;
+
+        const inNucl = document.getElementById('p5-input-nucl');
+        const inBytes = document.getElementById('p5-input-bytes');
+        if (inNucl) inNucl.value = '';
+        if (inBytes) inBytes.value = '';
+    }
+
+    function verifyPhase5() {
+        if (isProcessingError) return;
+        const valNucl = parseInt(document.getElementById('p5-input-nucl')?.value, 10);
+        const valBytes = parseInt(document.getElementById('p5-input-bytes')?.value, 10);
+
+        if (isNaN(valNucl) || isNaN(valBytes)) {
+            triggerError('Заполните оба числовых поля: число нуклеотидов L и объем гена в байтах!');
+            return;
+        }
+
+        if (valNucl !== p5TargetNucl || valBytes !== p5TargetBytes) {
+            triggerError('Ошибка расчета! L = 3 · K_амин, а объем в байтах I_байт = (L · 2) / 8.', () => {
+                initPhase5();
+            });
+            return;
+        }
+
+        setPhase(6); // Победа!
+    }
+
+    document.getElementById('p5-btn')?.addEventListener('click', verifyPhase5);
+    document.getElementById('p5-input-nucl')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase5(); });
+    document.getElementById('p5-input-bytes')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyPhase5(); });
+
+    // ----------------------------------------------------
+    // СТАРТ
+    // ----------------------------------------------------
+    initPhase1();
+})();
+</script>
