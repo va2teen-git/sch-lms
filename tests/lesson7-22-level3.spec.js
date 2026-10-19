@@ -293,5 +293,293 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
     expect(afterTyping.bodyH).toBe(initial.bodyH);
   });
 
+  test('Глубокое тестирование Волны 3 (все 3 процедурных варианта и способы ввода: кнопки #btn-sup/#btn-sub при наборе, спецсимволы Ω, копирование образца, ввод е/ё, кириллических аналогов и дефиса)', async ({ page }) => {
+    await page.goto('/tasks/7-класс/22/level3');
+
+    for (let variantIdx = 0; variantIdx < 3; variantIdx++) {
+      await page.evaluate((idx) => {
+        window.forceLevel3Variant(idx);
+        window.jumpToLevel3Wave(3);
+      }, variantIdx);
+      const d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+
+      // 1) Способ A: Реальный набор с клавиатуры с переключением кнопок #btn-sup и #btn-sub (проверка фильтрации \uFEFF от Jodit, е/ё, кириллицы и дефиса '-')
+      await page.locator('.jodit-wysiwyg').click();
+
+      if (d.plainCheck.includes('25 м2')) {
+        await page.keyboard.type('Площадь поверхности составляет 25 м');
+        await page.locator('#btn-sup').click();
+        await page.keyboard.type('2');
+        await page.locator('#btn-sup').click();
+        await page.keyboard.type(', а формула воды - Н'); // кириллическая Н и дефис -
+        await page.locator('#btn-sub').click();
+        await page.keyboard.type('2');
+        await page.locator('#btn-sub').click();
+        await page.keyboard.type('О.'); // кириллическая О
+      } else if (d.plainCheck.includes('x3')) {
+        await page.keyboard.type('Объем куба равен х'); // 'е' вместо 'ё' и кириллическая 'х' вместо латинской 'x'
+        await page.locator('#btn-sup').click();
+        await page.keyboard.type('3');
+        await page.locator('#btn-sup').click();
+        await page.keyboard.type(', а основание двоичной системы - 101');
+        await page.locator('#btn-sub').click();
+        await page.keyboard.type('2');
+        await page.locator('#btn-sub').click();
+        await page.keyboard.type('.');
+      } else {
+        await page.keyboard.type('Ускорение равно 10 м/с');
+        await page.locator('#btn-sup').click();
+        await page.keyboard.type('2');
+        await page.locator('#btn-sup').click();
+        await page.keyboard.type(', а индекс элемента массива - А'); // кириллическая А и дефис -
+        await page.locator('#btn-sub').click();
+        await page.keyboard.type('1');
+        await page.locator('#btn-sub').click();
+        await page.keyboard.type('.');
+      }
+
+      let checks = await page.evaluate(() => window.getLevel3ArcadeState().liveChecks);
+      expect(checks.every(c => c.passed), `Способ A не прошёл для варианта #${variantIdx}: ${d.displayPrompt}, checks=${JSON.stringify(checks)}`).toBe(true);
+
+      // Нажимаем #check-btn и убеждаемся, что переход на Волну 4 происходит без ложного сброса детектором костылей
+      await page.locator('#check-btn').click();
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 4 / 10');
+
+      // 2) Способ B: Вставка спецсимволов ²/³ и ₁/₂ через диалоговое окно «Специальные символы» (#btn-symbol)
+      await page.evaluate(() => window.jumpToLevel3Wave(3));
+      await page.locator('.jodit-wysiwyg').click();
+      const basePrefix = d.plainCheck.split(',')[0].slice(0, -1); // без последней цифры индекса
+      await page.keyboard.type(basePrefix);
+      await page.locator('#btn-symbol').click();
+      await expect(page.locator('#modal-symbols')).toBeVisible();
+      await page.locator(`.lo-sym-btn[data-sym="${d.supText === '3' ? '³' : '²'}"]`).click();
+      await expect(page.locator('#modal-symbols')).toBeHidden();
+      await page.keyboard.type(', индекс ');
+      await page.locator('#btn-symbol').click();
+      await expect(page.locator('#modal-symbols')).toBeVisible();
+      await page.locator(`.lo-sym-btn[data-sym="${d.subText === '1' ? '₁' : '₂'}"]`).click();
+      await expect(page.locator('#modal-symbols')).toBeHidden();
+
+      checks = await page.evaluate(() => window.getLevel3ArcadeState().liveChecks);
+      expect(checks.every(c => c.passed), `Способ B (через Ω) не прошёл для варианта #${variantIdx}: ${d.displayPrompt}`).toBe(true);
+
+      // 3) Способ C: Копирование образца из блока задания в редактор
+      await page.evaluate(() => window.jumpToLevel3Wave(3));
+      await page.evaluate(() => {
+        const sampleHtml = document.querySelector('#task-description .bg-white').innerHTML;
+        const editor = document.querySelector('.jodit-wysiwyg');
+        editor.innerHTML = `<p>${sampleHtml}</p>`;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      checks = await page.evaluate(() => window.getLevel3ArcadeState().liveChecks);
+      expect(checks.every(c => c.passed), `Способ C (копирование образца) не прошёл для варианта #${variantIdx}: ${d.displayPrompt}`).toBe(true);
+    }
+  });
+
+  test('Реалистичное клавиатурно-мышечное прохождение всех 10 волн по всем 3 процедурным вариантам (30 комбинаций волн через реальный ввод текста, кнопки тулбара, спецсимволы Ω, списки и таблицы)', async ({ page }) => {
+    test.setTimeout(60000);
+    await page.goto('/tasks/7-класс/22/level3');
+
+    for (let variantIdx = 0; variantIdx < 3; variantIdx++) {
+      await page.evaluate((idx) => {
+        window.forceLevel3Variant(idx);
+        window.jumpToLevel3Wave(1);
+      }, variantIdx);
+
+      // ВОЛНА 1: Реальный ввод с клавиатуры и кнопка #btn-bold
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
+      let d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.locator('#btn-bold').click();
+      await page.keyboard.type(d.boldWord);
+      await page.locator('#btn-bold').click();
+      await page.keyboard.type(d.text.slice(d.boldWord.length));
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 2: Реальный ввод с клавиатуры + #btn-italic + #btn-underline (с заменой ё -> е)
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 2 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.locator('#btn-italic').click();
+      await page.keyboard.type(d.italicWord);
+      await page.locator('#btn-italic').click();
+      const midPart = d.text.slice(d.italicWord.length, d.text.indexOf(d.underlineWord)).replace(/ё/g, 'е');
+      await page.keyboard.type(midPart);
+      await page.locator('#btn-underline').click();
+      await page.keyboard.type(d.underlineWord);
+      await page.locator('#btn-underline').click();
+      await page.keyboard.type(d.text.slice(d.text.indexOf(d.underlineWord) + d.underlineWord.length));
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 3: Реальный ввод с клавиатуры + #btn-sup + #btn-sub
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 3 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      const prefixWithoutDigit = d.plainCheck.split(',')[0].slice(0, -1).replace(/ё/g, 'е');
+      await page.keyboard.type(prefixWithoutDigit);
+      await page.locator('#btn-sup').click();
+      await page.keyboard.type(d.supText);
+      await page.locator('#btn-sup').click();
+      await page.keyboard.type(', индекс ');
+      await page.locator('#btn-sub').click();
+      await page.keyboard.type(d.subText);
+      await page.locator('#btn-sub').click();
+      await page.keyboard.type('.');
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 4: Выпадающие списки #select-font, #select-fontsize и кнопка #btn-align-center + клавиатурный ввод
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 4 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.heading);
+      await page.locator('#select-font').selectOption(d.font);
+      await page.locator('#select-fontsize').selectOption(`${d.sizePt}pt`);
+      await page.locator('#btn-align-center').click();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 5: Набор текста + Liberation Serif + 14pt + #btn-align-justify
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 5 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.text);
+      await page.locator('#select-font').selectOption('Liberation Serif');
+      await page.locator('#select-fontsize').selectOption('14pt');
+      await page.locator('#btn-align-justify').click();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 6: Набор текста (с е вместо ё) + диалог Формат -> Абзац... (по умолчанию 1.0 см, 1.15, По ширине)
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 6 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.type(d.text.replace(/ё/g, 'е'));
+      await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+      await page.locator('#menu-format-paragraph').click();
+      await expect(page.locator('#modal-paragraph')).toBeVisible();
+      await page.locator('#btn-apply-paragraph').click();
+      await expect(page.locator('#modal-paragraph')).toBeHidden();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 7: Пошаговый клавиатурный набор с реальной вставкой спецсимволов через диалог Ω (#btn-symbol) и кириллической 'С'
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 7 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      const beforeQuote = d.text.split('«')[0];
+      const insideQuote = d.quoted.slice(1, -1);
+      const afterQuoteToDash = ' ';
+      const afterDash = d.text.split('—')[1];
+      await page.keyboard.type(beforeQuote);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="«"]').click();
+      await page.keyboard.type(insideQuote);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="»"]').click();
+      await page.keyboard.type(afterQuoteToDash);
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="—"]').click();
+      const [partBeforeDeg1, restAfterDeg1] = afterDash.split('°C');
+      const [partBetweenDeg1AndPm, partAfterPm] = restAfterDeg1.split('±');
+      const [numBeforeDeg2] = partAfterPm.split('°C');
+      await page.keyboard.type(partBeforeDeg1.trimEnd());
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="°"]').click();
+      await page.keyboard.type('С' + partBetweenDeg1AndPm); // кириллическая С
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="±"]').click();
+      await page.keyboard.type(numBeforeDeg2.trim());
+      await page.locator('#btn-symbol').click();
+      await page.locator('.lo-sym-btn[data-sym="°"]').click();
+      await page.keyboard.type('С.');
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 8: Создание нумерованного списка через #btn-ol и #btn-bold с клавишей Enter
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 8 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('.jodit-wysiwyg').click();
+      await page.locator('#btn-ol').click();
+      for (let i = 0; i < 3; i++) {
+        await page.locator('#btn-bold').click();
+        await page.keyboard.type(d.items[i].bold);
+        await page.locator('#btn-bold').click();
+        await page.keyboard.type(' - ' + d.items[i].rest);
+        if (i < 2) await page.keyboard.press('Enter');
+      }
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 9: Вставка таблицы 2×2 через диалог #btn-table, заполнение ячеек и центрирование через Свойства таблицы
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 9 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+      await page.locator('#btn-table').click();
+      await expect(page.locator('#modal-table')).toBeVisible();
+      await page.locator('#dialog-table-cols').fill('2');
+      await page.locator('#dialog-table-rows').fill('2');
+      await page.locator('#btn-apply-table').click();
+      await expect(page.locator('#modal-table')).toBeHidden();
+
+      const cells = page.locator('.jodit-wysiwyg th, .jodit-wysiwyg td');
+      await cells.nth(0).click();
+      await page.keyboard.type(d.h1);
+      await cells.nth(1).click();
+      await page.keyboard.type(d.h2);
+      await cells.nth(2).click();
+      await page.keyboard.type(d.c1);
+      await cells.nth(3).click();
+      await page.keyboard.type(d.c2);
+
+      await page.locator('.lo-menu-item').filter({ hasText: /^Таблица$/ }).click();
+      await page.locator('#menu-table-props').click();
+      await expect(page.locator('#modal-table-props')).toBeVisible();
+      await page.locator('#btn-apply-table-props').click();
+      await expect(page.locator('#modal-table-props')).toBeHidden();
+      await page.locator('#check-btn').click();
+
+      // ВОЛНА 10: Финальный босс через реальный UI (Поля 2.0 см, шрифт Liberation Serif 14 пт, Абзац, Таблица 2×2)
+      await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 10 / 10');
+      d = await page.evaluate(() => window.getLevel3ArcadeState().activeWaveData);
+
+      await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+      await page.locator('#menu-format-page').click();
+      await page.locator('#btn-page-set-oge').click();
+      await page.locator('#btn-apply-page').click();
+
+      await page.locator('.jodit-wysiwyg').click();
+      await page.locator('#btn-bold').click();
+      await page.keyboard.type(d.boldWord);
+      await page.locator('#btn-bold').click();
+      await page.keyboard.type(d.para.slice(d.boldWord.length).replace(/ё/g, 'е'));
+      await page.locator('#select-font').selectOption('Liberation Serif');
+      await page.locator('#select-fontsize').selectOption('14pt');
+      await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+      await page.locator('#menu-format-paragraph').click();
+      await page.locator('#btn-apply-paragraph').click();
+
+      await page.locator('.jodit-wysiwyg').click();
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+
+      await page.locator('#btn-table').click();
+      await page.locator('#dialog-table-cols').fill('2');
+      await page.locator('#dialog-table-rows').fill('2');
+      await page.locator('#btn-apply-table').click();
+
+      const w10Cells = page.locator('.jodit-wysiwyg th, .jodit-wysiwyg td');
+      await w10Cells.nth(0).click();
+      await page.keyboard.type(d.h1);
+      await w10Cells.nth(1).click();
+      await page.keyboard.type(d.h2.replace(/ё/g, 'е'));
+      await w10Cells.nth(2).click();
+      await page.keyboard.type(d.c1);
+      await w10Cells.nth(3).click();
+      await page.keyboard.type(d.c2);
+
+      await page.locator('.lo-menu-item').filter({ hasText: /^Таблица$/ }).click();
+      await page.locator('#menu-table-props').click();
+      await page.locator('#btn-apply-table-props').click();
+
+      await page.locator('#check-btn').click();
+      await expect(page.locator('#victory-banner')).toBeVisible();
+    }
+  });
+
 });
+
 

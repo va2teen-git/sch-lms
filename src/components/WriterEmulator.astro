@@ -377,8 +377,8 @@ const {
                             <div class="col-6">
                                 <label class="form-label mb-1">Междустрочный интервал:</label>
                                 <select class="form-select form-select-sm rounded-0" id="dialog-para-lineheight">
-                                    <option value="1.0" selected>Одинарный (1.0)</option>
-                                    <option value="1.15">1.15 строки</option>
+                                    <option value="1.0">Одинарный (1.0)</option>
+                                    <option value="1.15" selected>1.15 строки</option>
                                     <option value="1.5">Полуторный (1.5)</option>
                                     <option value="2.0">Двойной (2.0)</option>
                                 </select>
@@ -491,6 +491,8 @@ const {
                     <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="×" title="Знак умножения (×)">×</button>
                     <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="²" title="Квадрат (²)">²</button>
                     <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="³" title="Куб (³)">³</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="₁" title="Нижний индекс 1 (₁)">₁</button>
+                    <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="₂" title="Нижний индекс 2 (₂)">₂</button>
                     <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≤" title="Меньше или равно (≤)">≤</button>
                     <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≥" title="Больше или равно (≥)">≥</button>
                     <button type="button" class="btn btn-outline-dark rounded-0 lo-sym-btn" data-sym="≠" title="Не равно (≠)">≠</button>
@@ -671,9 +673,22 @@ const {
     let isRulerActive = true;
     let lastActivePara = null;
     let lastActiveTable = null;
+    let lastSavedRange = null;
     let lastOgeReport = null;
     let dynamicCheckOgeFormat = checkOgeFormat !== false;
     let writerActionLog = [];
+
+    function saveCurrentEditorRange() {
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (!wysiwyg) return;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const r = sel.getRangeAt(0);
+            if (wysiwyg.contains(r.commonAncestorContainer)) {
+                lastSavedRange = r.cloneRange();
+            }
+        }
+    }
 
     // Поля страницы по умолчанию (сырой режим: сброшены в 1.0 см)
     let pageMargins = {
@@ -697,8 +712,10 @@ const {
 
     function getWriterState() {
         const wysiwyg = document.querySelector('.jodit-wysiwyg');
-        const html = (wysiwyg && wysiwyg.innerHTML !== undefined) ? wysiwyg.innerHTML : (editor ? editor.value : '');
-        const text = wysiwyg ? (wysiwyg.innerText || wysiwyg.textContent || '') : (editor ? editor.text : '');
+        const rawHtml = (wysiwyg && wysiwyg.innerHTML !== undefined) ? wysiwyg.innerHTML : (editor ? editor.value : '');
+        const rawText = wysiwyg ? (wysiwyg.innerText || wysiwyg.textContent || '') : (editor ? editor.text : '');
+        const html = rawHtml.replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
+        const text = rawText.replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
         return {
             html,
             text,
@@ -782,13 +799,26 @@ const {
                     const wysiwyg = document.querySelector('.jodit-wysiwyg');
                     if (wysiwyg) {
                         wysiwyg.addEventListener('input', () => {
+                            saveCurrentEditorRange();
                             updateStatusbarWords();
                             emitWriterChange();
                         });
                         wysiwyg.addEventListener('keyup', () => {
+                            saveCurrentEditorRange();
                             emitWriterChange();
                         });
-                        wysiwyg.addEventListener('mouseup', () => {
+                        wysiwyg.addEventListener('mouseup', (e) => {
+                            const targetCell = e.target?.closest ? e.target.closest('th, td') : null;
+                            if (targetCell && /^(Заголовок\s+\d+|Ячейка\s+\d+,\d+)$/.test((targetCell.textContent || '').trim())) {
+                                const sel = window.getSelection();
+                                if (sel && sel.isCollapsed) {
+                                    const r = document.createRange();
+                                    r.selectNodeContents(targetCell);
+                                    sel.removeAllRanges();
+                                    sel.addRange(r);
+                                }
+                            }
+                            saveCurrentEditorRange();
                             const sel = editor.selection ? editor.selection.current() : null;
                             if (sel) {
                                 const p = sel.closest ? sel.closest('p, h1, h2, h3, li') : (sel.parentElement ? sel.parentElement.closest('p, h1, h2, h3, li') : null);
@@ -804,7 +834,10 @@ const {
         });
 
         // Слушатель смены выделения в документе для обновления активных кнопок панели
-        document.addEventListener('selectionchange', updateToolbarActiveStates);
+        document.addEventListener('selectionchange', () => {
+            saveCurrentEditorRange();
+            updateToolbarActiveStates();
+        });
         
         // Привязка действий тулбара и меню
         bindToolbarAndMenuActions();
@@ -1037,6 +1070,16 @@ const {
             if (url) editor.selection.insertHTML(`<img src="${url}" style="max-width: 100%; height: auto;" />`);
         });
 
+        // Предотвращаем потерю фокуса и выделения в редакторе при клике на кнопки панели инструментов и линейку
+        document.querySelectorAll('button.lo-btn, #ruler-first-line, .lo-menu-item').forEach(btn => {
+            btn.addEventListener('mousedown', (e) => {
+                saveCurrentEditorRange();
+                if (btn.classList.contains('lo-btn') || btn.id === 'ruler-first-line') {
+                    e.preventDefault();
+                }
+            });
+        });
+
         // --- ПАНЕЛЬ ФОРМАТИРОВАНИЯ И МЕНЮ ФОРМАТ ---
         // Стиль абзаца
         document.getElementById('select-style')?.addEventListener('change', (e) => {
@@ -1046,7 +1089,7 @@ const {
         });
 
         // Гарнитура шрифта
-        document.getElementById('select-font')?.addEventListener('change', (e) => {
+        const applyFontFromSelect = (e) => {
             const font = e.target.value;
             try { editor.execCommand('fontname', false, font); } catch (_) {}
             const wysiwyg = document.querySelector('.jodit-wysiwyg');
@@ -1056,20 +1099,28 @@ const {
                 p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
             } catch (_) {}
             const fallbackFont = (font.includes('Serif') || font.includes('Times')) ? `'${font}', serif` : (font.includes('Courier') ? `'${font}', monospace` : `'${font}', sans-serif`);
+            const updateBlockFont = (el) => {
+                el.style.fontFamily = fallbackFont;
+                el.querySelectorAll('[style*="font-family"], font[face]').forEach(child => {
+                    child.style.fontFamily = fallbackFont;
+                    if (child.hasAttribute('face')) child.setAttribute('face', font);
+                });
+            };
             if (p) {
-                p.style.fontFamily = fallbackFont;
+                updateBlockFont(p);
             } else if (lastActivePara && document.contains(lastActivePara)) {
-                lastActivePara.style.fontFamily = fallbackFont;
+                updateBlockFont(lastActivePara);
             } else if (wysiwyg) {
                 const allBlocks = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
-                if (allBlocks.length > 0) allBlocks.forEach(el => { el.style.fontFamily = fallbackFont; });
+                if (allBlocks.length > 0) allBlocks.forEach(updateBlockFont);
                 else wysiwyg.style.fontFamily = fallbackFont;
             }
             recordWriterAction('font_family', { value: font });
-        });
+        };
+        document.getElementById('select-font')?.addEventListener('change', applyFontFromSelect);
 
         // Размер шрифта
-        document.getElementById('select-fontsize')?.addEventListener('change', (e) => {
+        const applyFontSizeFromSelect = (e) => {
             const size = e.target.value;
             try { editor.selection.applyStyle({ fontSize: size }); } catch (_) {}
             const wysiwyg = document.querySelector('.jodit-wysiwyg');
@@ -1078,17 +1129,24 @@ const {
                 const cur = editor.selection?.current();
                 p = cur?.closest ? cur.closest('p, h1, h2, h3, li, td, th') : (cur?.parentElement?.closest('p, h1, h2, h3, li, td, th') || null);
             } catch (_) {}
+            const updateBlockSize = (el) => {
+                el.style.fontSize = size;
+                el.querySelectorAll('[style*="font-size"]').forEach(child => {
+                    child.style.fontSize = size;
+                });
+            };
             if (p) {
-                p.style.fontSize = size;
+                updateBlockSize(p);
             } else if (lastActivePara && document.contains(lastActivePara)) {
-                lastActivePara.style.fontSize = size;
+                updateBlockSize(lastActivePara);
             } else if (wysiwyg) {
                 const allBlocks = wysiwyg.querySelectorAll('p, h1, h2, h3, li');
-                if (allBlocks.length > 0) allBlocks.forEach(el => { el.style.fontSize = size; });
+                if (allBlocks.length > 0) allBlocks.forEach(updateBlockSize);
                 else wysiwyg.style.fontSize = size;
             }
             recordWriterAction('font_size', { value: size });
-        });
+        };
+        document.getElementById('select-fontsize')?.addEventListener('change', applyFontSizeFromSelect);
 
         // Форматирование текста
         const bindCmd = (btnId, menuId, cmd) => {
@@ -1432,13 +1490,22 @@ const {
             });
         }
 
-        // Костыль 2: Двойной Enter для пустых строк
+        // Костыль 2: Двойной Enter для пустых строк (игнорируем одиночный технический пустой <p> в самом начале или в самом конце документа, который создаёт браузер/Jodit вокруг таблиц и списков)
         let emptyParasCount = 0;
-        for (const p of paras) {
-            const pText = (p.textContent || '').trim();
-            const inner = (p.innerHTML || '').trim();
-            if (pText === '' && (inner === '' || inner === '<br>' || inner === '&nbsp;')) {
-                emptyParasCount++;
+        for (let idx = 0; idx < paras.length; idx++) {
+            const p = paras[idx];
+            const pText = (p.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim();
+            const inner = (p.innerHTML || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim();
+            const isEmptyP = pText === '' && (inner === '' || inner === '<br>' || inner === '&nbsp;');
+            if (isEmptyP) {
+                // Игнорируем технический замыкающий пустой параграф в самом конце документа (или единственный пустой параграф перед таблицей/списком), если за ним/перед ним нет второго пустого параграфа подряд
+                const prevP = idx > 0 ? paras[idx - 1] : null;
+                const prevEmpty = prevP && (prevP.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim() === '';
+                const isTrailingSingle = idx === paras.length - 1 && !prevEmpty;
+                const isLeadingBeforeBlock = idx === 0 && paras.length === 1;
+                if (!isTrailingSingle && !isLeadingBeforeBlock) {
+                    emptyParasCount++;
+                }
             }
         }
         if (emptyParasCount > 0) {
@@ -1501,7 +1568,7 @@ const {
         }
 
         // 3. ПАРАМЕТРЫ АБЗАЦЕВ И ОСНОВНОГО ТЕКСТА
-        const contentParas = paras.filter(p => (p.textContent || '').trim().length > 0);
+        const contentParas = paras.filter(p => (p.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim().length > 0);
 
         if (contentParas.length === 0 && trimmedText.length > 0) {
             items.push({
@@ -1821,6 +1888,7 @@ const {
         // 1. Диалог «Абзац...»
         const openParaDialog = (e) => {
             if (e) e.preventDefault();
+            saveCurrentEditorRange();
             const wysiwyg = document.querySelector('.jodit-wysiwyg');
             const sel = editor.selection ? editor.selection.current() : null;
             if (sel) {
@@ -1828,6 +1896,16 @@ const {
             }
             if (!lastActivePara && wysiwyg) {
                 lastActivePara = wysiwyg.querySelector('p, h1, h2, h3, li');
+            }
+            if (lastActivePara && lastActivePara.style) {
+                if (lastActivePara.style.lineHeight) {
+                    const lhSel = document.getElementById('dialog-para-lineheight');
+                    if (lhSel) lhSel.value = lastActivePara.style.lineHeight;
+                }
+                if (lastActivePara.style.textAlign) {
+                    const radio = document.querySelector(`input[name="dialog-align"][value="${lastActivePara.style.textAlign}"]`);
+                    if (radio) radio.checked = true;
+                }
             }
             const modalEl = document.getElementById('modal-paragraph');
             if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
@@ -1840,7 +1918,7 @@ const {
             const right = document.getElementById('dialog-para-right')?.value || '0.0';
             const top = document.getElementById('dialog-para-top')?.value || '0';
             const bottom = document.getElementById('dialog-para-bottom')?.value || '0';
-            const lh = document.getElementById('dialog-para-lineheight')?.value || '1.0';
+            const lh = document.getElementById('dialog-para-lineheight')?.value || '1.15';
             const alignRadio = document.querySelector('input[name="dialog-align"]:checked')?.value || 'justify';
 
             applyParagraphStyle({
@@ -1861,6 +1939,7 @@ const {
         // 2. Диалог «Вставить таблицу...»
         const openTableDialog = (e) => {
             if (e) e.preventDefault();
+            saveCurrentEditorRange();
             const modalEl = document.getElementById('modal-table');
             if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
         };
@@ -1884,14 +1963,34 @@ const {
                 }
                 html += '</tr>';
             }
-            html += '</tbody></table><p></p>';
-            editor.selection.insertHTML(html);
-            recordWriterAction('insert_table', { cols, rows });
-            updateStatusbarWords();
-            emitWriterChange();
+            html += '</tbody></table>';
 
             const modalEl = document.getElementById('modal-table');
             if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
+
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            if (wysiwyg) {
+                // Удаляем пустые параграфы-заглушки (<p><br></p>) перед вставкой блочной таблицы, чтобы таблица вставлялась чистым блочным соседом <p>
+                Array.from(wysiwyg.querySelectorAll('p')).forEach(p => {
+                    const pText = (p.textContent || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim();
+                    const pInner = (p.innerHTML || '').replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim();
+                    if (pText === '' && (pInner === '' || pInner === '<br>' || pInner === '&nbsp;') && !p.querySelector('table, img')) {
+                        p.remove();
+                    }
+                });
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                const tblNode = tempDiv.firstElementChild;
+                if (tblNode) {
+                    wysiwyg.appendChild(tblNode);
+                    lastActiveTable = tblNode;
+                }
+            } else {
+                editor.selection.insertHTML(html);
+            }
+            recordWriterAction('insert_table', { cols, rows });
+            updateStatusbarWords();
+            emitWriterChange();
         });
 
         // Операции над таблицей (строки / столбцы)
@@ -2012,6 +2111,7 @@ const {
         // 5. Диалог «Специальные символы...»
         const openSymbolsDialog = (e) => {
             if (e) e.preventDefault();
+            saveCurrentEditorRange();
             const modalEl = document.getElementById('modal-symbols');
             if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
         };
@@ -2021,14 +2121,43 @@ const {
         document.querySelectorAll('.lo-sym-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const sym = btn.getAttribute('data-sym');
+                const modalEl = document.getElementById('modal-symbols');
+                if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
                 if (sym) {
-                    editor.selection.insertHTML(sym);
+                    const wysiwyg = document.querySelector('.jodit-wysiwyg');
+                    if (wysiwyg) {
+                        wysiwyg.focus();
+                        const sel = window.getSelection();
+                        let range = null;
+                        if (lastSavedRange && wysiwyg.contains(lastSavedRange.commonAncestorContainer)) {
+                            range = lastSavedRange.cloneRange();
+                        } else {
+                            const lastBlock = wysiwyg.querySelector('p:last-of-type, li:last-of-type, td:last-of-type, th:last-of-type') || wysiwyg;
+                            range = document.createRange();
+                            range.selectNodeContents(lastBlock);
+                            range.collapse(false);
+                        }
+                        if (range && sel) {
+                            const containerEl = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+                            if (containerEl && containerEl.tagName === 'P' && containerEl.innerHTML.trim() === '<br>') {
+                                containerEl.innerHTML = '';
+                                range.selectNodeContents(containerEl);
+                                range.collapse(false);
+                            }
+                            range.deleteContents();
+                            const textNode = document.createTextNode(sym);
+                            range.insertNode(textNode);
+                            range.setStartAfter(textNode);
+                            range.setEndAfter(textNode);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                            lastSavedRange = range.cloneRange();
+                        }
+                    }
                     recordWriterAction('insert_symbol', { sym });
                     updateStatusbarWords();
                     emitWriterChange();
                 }
-                const modalEl = document.getElementById('modal-symbols');
-                if (modalEl && window.bootstrap) bootstrap.Modal.getInstance(modalEl)?.hide();
             });
         });
 
@@ -2080,13 +2209,27 @@ const {
     window.getWriterState = getWriterState;
     window.setWriterOgeCheck = (val) => { dynamicCheckOgeFormat = !!val; };
     window.resetWriterState = (initialHtml = '<p><br></p>', resetLog = false, resetMargins = false) => {
+        lastActivePara = null;
+        lastActiveTable = null;
+        lastSavedRange = null;
         if (editor) {
             editor.value = initialHtml;
         }
         const wysiwyg = document.querySelector('.jodit-wysiwyg');
         if (wysiwyg) {
             wysiwyg.innerHTML = initialHtml;
+            wysiwyg.style.fontFamily = '';
+            wysiwyg.style.fontSize = '';
         }
+        const selFont = document.getElementById('select-font');
+        const selSize = document.getElementById('select-fontsize');
+        const selStyle = document.getElementById('select-style');
+        if (selFont) selFont.value = 'Liberation Sans';
+        if (selSize) selSize.value = '11pt';
+        if (selStyle) selStyle.value = 'p';
+        ['btn-bold', 'btn-italic', 'btn-underline', 'btn-strikethrough', 'btn-sup', 'btn-sub', 'btn-align-center', 'btn-align-right', 'btn-align-justify', 'btn-ul', 'btn-ol'].forEach(id => toggleBtnActive(id, false));
+        toggleBtnActive('btn-align-left', true);
+        updateRulerFirstLineMarker(0);
         if (resetLog) {
             writerActionLog.length = 0;
         }
@@ -2110,7 +2253,7 @@ const {
         const report = inspectOgeDocument(wysiwyg, pageMargins);
         lastOgeReport = report;
 
-        if ((dynamicCheckOgeFormat && !report.valid) || report.crutchesFound) {
+        if (dynamicCheckOgeFormat && (!report.valid || report.crutchesFound)) {
             if (statusEl) {
                 statusEl.className = 'text-danger fw-bold px-2';
                 statusEl.innerText = `❌ Ошибка ОГЭ 13.2 (${report.score}/2 баллов): несоответствие стандарту!`;
