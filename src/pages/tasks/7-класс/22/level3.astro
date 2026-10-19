@@ -29,6 +29,9 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
         }
 
         function normalizeSpaces(str) {
+            if (window.WriterValidator && window.WriterValidator.normalizeSpaces) {
+                return window.WriterValidator.normalizeSpaces(str);
+            }
             return (str || '')
                 .replace(/[\uFEFF\u200B\u200C\u200D]/g, '')
                 .replace(/\u00A0/g, ' ')
@@ -37,6 +40,9 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
         }
 
         function normalizeIndexDigits(str) {
+            if (window.WriterValidator && window.WriterValidator.normalizeIndexDigits) {
+                return window.WriterValidator.normalizeIndexDigits(str);
+            }
             return (str || '')
                 .replace(/⁰/g, '0')
                 .replace(/¹/g, '1')
@@ -49,7 +55,10 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
         }
 
         // Нормализация текста для сравнения (учёт ё/е, кириллических/латинских букв-двойников C/С, x/х, A/А, H/Н, O/О и пробела перед °)
-        function normalizeComparable(str) {
+        function normalizeComparable(str, options) {
+            if (window.WriterValidator && window.WriterValidator.normalizeComparable) {
+                return window.WriterValidator.normalizeComparable(str, options);
+            }
             const homoglyphMap = {
                 'A': 'А', 'B': 'В', 'C': 'С', 'E': 'Е', 'H': 'Н', 'K': 'К', 'M': 'М', 'O': 'О', 'P': 'Р', 'T': 'Т', 'X': 'Х',
                 'a': 'а', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р', 'x': 'х', 'y': 'у'
@@ -262,16 +271,9 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeComparable(state.text);
-                        const hasText = textNorm.includes(normalizeComparable(w1Variant.text));
-                        const wysiwyg = state.wysiwyg;
-                        let hasBold = false;
-                        if (wysiwyg) {
-                            const boldNodes = wysiwyg.querySelectorAll('b, strong, [style*="font-weight: bold"], [style*="font-weight: 700"]');
-                            boldNodes.forEach(n => {
-                                if (normalizeComparable(n.innerText).includes(normalizeComparable(w1Variant.boldWord))) hasBold = true;
-                            });
-                        }
+                        const V = window.WriterValidator;
+                        const hasText = V ? V.hasText(state.wysiwyg || state.text, w1Variant.text) : normalizeComparable(state.text).includes(normalizeComparable(w1Variant.text));
+                        const hasBold = V ? V.hasBoldWord(state.wysiwyg, w1Variant.boldWord) : false;
                         return [
                             { id: 'w1_text', label: 'Точный текст фразы', passed: hasText },
                             { id: 'w1_bold', label: `Полужирный: «${w1Variant.boldWord}»`, passed: hasBold }
@@ -298,19 +300,10 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeComparable(state.text);
-                        const hasText = textNorm.includes(normalizeComparable(w2Variant.text));
-                        const wysiwyg = state.wysiwyg;
-                        let hasItalic = false;
-                        let hasUnderline = false;
-                        if (wysiwyg) {
-                            wysiwyg.querySelectorAll('i, em, [style*="font-style: italic"]').forEach(n => {
-                                if (normalizeComparable(n.innerText).includes(normalizeComparable(w2Variant.italicWord))) hasItalic = true;
-                            });
-                            wysiwyg.querySelectorAll('u, [style*="text-decoration: underline"], [style*="text-decoration-line: underline"]').forEach(n => {
-                                if (normalizeComparable(n.innerText).includes(normalizeComparable(w2Variant.underlineWord))) hasUnderline = true;
-                            });
-                        }
+                        const V = window.WriterValidator;
+                        const hasText = V ? V.hasText(state.wysiwyg || state.text, w2Variant.text) : normalizeComparable(state.text).includes(normalizeComparable(w2Variant.text));
+                        const hasItalic = V ? V.hasItalicWord(state.wysiwyg, w2Variant.italicWord) : false;
+                        const hasUnderline = V ? V.hasUnderlineWord(state.wysiwyg, w2Variant.underlineWord) : false;
                         return [
                             { id: 'w2_text', label: 'Точный текст фразы', passed: hasText },
                             { id: 'w2_italic', label: `Курсив: «${w2Variant.italicWord}»`, passed: hasItalic },
@@ -339,33 +332,12 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
+                        const V = window.WriterValidator;
                         const rawText = state.text || '';
-                        const textNorm = normalizeComparable(rawText);
                         const expectedPrefix = normalizeComparable(w3Variant.plainCheck.split(',')[0]);
-                        const textCompact = textNorm.replace(/\s+/g, '');
-                        const expectedCompact = expectedPrefix.replace(/\s+/g, '');
-                        const hasBase = textNorm.includes(expectedPrefix) || textCompact.includes(expectedCompact);
-                        const wysiwyg = state.wysiwyg;
-                        let hasSup = false;
-                        let hasSub = false;
-                        if (wysiwyg) {
-                            wysiwyg.querySelectorAll('sup, [style*="vertical-align: super"]').forEach(n => {
-                                if (normalizeIndexDigits(normalizeSpaces(n.innerText)).includes(w3Variant.supText)) hasSup = true;
-                            });
-                            wysiwyg.querySelectorAll('sub, [style*="vertical-align: sub"]').forEach(n => {
-                                if (normalizeIndexDigits(normalizeSpaces(n.innerText)).includes(w3Variant.subText)) hasSub = true;
-                            });
-                        }
-                        if (!hasSup) {
-                            if ((w3Variant.supText === '2' && rawText.includes('²')) || (w3Variant.supText === '3' && rawText.includes('³'))) {
-                                hasSup = true;
-                            }
-                        }
-                        if (!hasSub) {
-                            if ((w3Variant.subText === '1' && rawText.includes('₁')) || (w3Variant.subText === '2' && rawText.includes('₂'))) {
-                                hasSub = true;
-                            }
-                        }
+                        const hasBase = V ? V.hasText(state.wysiwyg || rawText, expectedPrefix) : normalizeComparable(rawText).includes(expectedPrefix);
+                        const hasSup = V ? V.hasSuperscript(state.wysiwyg, w3Variant.supText) : false;
+                        const hasSub = V ? V.hasSubscript(state.wysiwyg, w3Variant.subText) : false;
                         return [
                             { id: 'w3_base', label: 'Основа фразы набрана', passed: hasBase },
                             { id: 'w3_sup', label: `Верхний индекс <sup>${w3Variant.supText}</sup>`, passed: hasSup },
@@ -566,15 +538,21 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const textNorm = normalizeComparable(state.text);
-                        const hasQuotes = textNorm.includes(normalizeComparable(w7Variant.quoted));
-                        const hasDash = textNorm.includes('—') || textNorm.includes('–');
-                        const hasSyms = textNorm.includes(w7Variant.sym1) && textNorm.includes(w7Variant.sym2);
-                        const hasFullText = textNorm.includes(normalizeComparable(w7Variant.text));
+                        const V = window.WriterValidator;
+                        const typo = V ? V.checkTypography(state.wysiwyg || state.text, {
+                            quotes: w7Variant.quoted,
+                            dash: true,
+                            symbols: [w7Variant.sym1, w7Variant.sym2]
+                        }) : {
+                            quotesOk: normalizeComparable(state.text).includes(normalizeComparable(w7Variant.quoted)),
+                            dashOk: normalizeComparable(state.text).includes('—') || normalizeComparable(state.text).includes('–'),
+                            symbolsOk: normalizeComparable(state.text).includes(w7Variant.sym1) && normalizeComparable(state.text).includes(w7Variant.sym2)
+                        };
+                        const hasFullText = V ? V.hasText(state.wysiwyg || state.text, w7Variant.text) : normalizeComparable(state.text).includes(normalizeComparable(w7Variant.text));
                         return [
-                            { id: 'w7_quotes', label: `Кавычки ${w7Variant.quoted}`, passed: hasQuotes },
-                            { id: 'w7_dash', label: 'Типографское тире (—)', passed: hasDash },
-                            { id: 'w7_syms', label: 'Спецсимволы ° и ±', passed: hasSyms },
+                            { id: 'w7_quotes', label: `Кавычки ${w7Variant.quoted}`, passed: typo.quotesOk },
+                            { id: 'w7_dash', label: 'Типографское тире (—)', passed: typo.dashOk },
+                            { id: 'w7_syms', label: 'Спецсимволы ° и ±', passed: typo.symbolsOk },
                             { id: 'w7_full', label: 'Полное совпадение фразы', passed: hasFullText }
                         ];
                     }
@@ -603,31 +581,18 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const wysiwyg = state.wysiwyg;
-                        let hasOl = false;
-                        let hasThreeLi = false;
-                        let hasBoldTerms = false;
-                        let hasAllTexts = false;
-                        if (wysiwyg) {
-                            const ol = wysiwyg.querySelector('ol');
-                            hasOl = !!ol;
-                            const lis = wysiwyg.querySelectorAll('ol li');
-                            hasThreeLi = lis.length >= 3;
-                            const boldText = Array.from(wysiwyg.querySelectorAll('li b, li strong, li [style*="font-weight: bold"], li [style*="font-weight: 700"]'))
-                                .map(el => normalizeComparable(el.innerText))
-                                .join(' ');
-                            hasBoldTerms = w8Variant.items.every(item => boldText.includes(normalizeComparable(item.bold)));
-                            const fullListText = normalizeComparable(wysiwyg.innerText);
-                            hasAllTexts = w8Variant.items.every(item =>
-                                fullListText.includes(normalizeComparable(item.bold)) &&
-                                fullListText.includes(normalizeComparable(item.rest.replace(/\.$/, '')))
-                            );
-                        }
+                        const V = window.WriterValidator;
+                        const listRes = V ? V.checkListStructure(state.wysiwyg, {
+                            type: 'ol',
+                            minItems: 3,
+                            boldTerms: w8Variant.items.map(i => i.bold),
+                            texts: w8Variant.items.map(i => i.rest.replace(/\.$/, ''))
+                        }) : { listOk: false, countOk: false, boldOk: false, textsOk: false };
                         return [
-                            { id: 'w8_ol', label: 'Контейнер списка <ol>', passed: hasOl },
-                            { id: 'w8_count', label: 'Три пункта <li>', passed: hasThreeLi },
-                            { id: 'w8_bold', label: 'Термины полужирным', passed: hasBoldTerms },
-                            { id: 'w8_text', label: 'Текст всех пунктов', passed: hasAllTexts }
+                            { id: 'w8_ol', label: 'Контейнер списка <ol>', passed: listRes.listOk },
+                            { id: 'w8_count', label: 'Три пункта <li>', passed: listRes.countOk },
+                            { id: 'w8_bold', label: 'Термины полужирным', passed: listRes.boldOk },
+                            { id: 'w8_text', label: 'Текст всех пунктов', passed: listRes.textsOk }
                         ];
                     }
                 },
@@ -665,48 +630,18 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                         </ul>
                     `,
                     evaluate(state) {
-                        const wysiwyg = state.wysiwyg;
-                        let hasTable = false;
-                        let isCentered = false;
-                        let headersOk = false;
-                        let cellsOk = false;
-                        if (wysiwyg) {
-                            const tbl = wysiwyg.querySelector('table');
-                            if (tbl) {
-                                hasTable = true;
-                                if ((tbl.style.marginLeft === 'auto' && tbl.style.marginRight === 'auto') || tbl.getAttribute('align') === 'center') {
-                                    isCentered = true;
-                                }
-                                const trs = tbl.querySelectorAll('tr');
-                                if (trs.length >= 2) {
-                                    const ths = trs[0].querySelectorAll('th, td');
-                                    if (ths.length >= 2) {
-                                        const t0 = normalizeComparable(ths[0].innerText).toLowerCase();
-                                        const t1 = normalizeComparable(ths[1].innerText).toLowerCase();
-                                        const aligned = Array.from(ths).every(cell => {
-                                             const cStyle = window.getComputedStyle(cell);
-                                             return cell.style.textAlign === 'center' || cStyle.textAlign === 'center';
-                                        });
-                                        if (t0 === normalizeComparable(w9Variant.h1).toLowerCase() && t1 === normalizeComparable(w9Variant.h2).toLowerCase() && aligned) {
-                                            headersOk = true;
-                                        }
-                                    }
-                                    const tds = trs[1].querySelectorAll('td, th');
-                                    if (tds.length >= 2) {
-                                        const d0 = normalizeComparable(tds[0].innerText).toLowerCase();
-                                        const d1 = normalizeComparable(tds[1].innerText).toLowerCase();
-                                        if (d0 === normalizeComparable(w9Variant.c1).toLowerCase() && d1 === normalizeComparable(w9Variant.c2).toLowerCase()) {
-                                            cellsOk = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        const V = window.WriterValidator;
+                        const tblRes = V ? V.checkTableStructure(state.wysiwyg, {
+                            centered: true,
+                            headers: [w9Variant.h1, w9Variant.h2],
+                            cells: [w9Variant.c1, w9Variant.c2],
+                            alignHeadersCenter: true
+                        }) : { tableOk: false, centerOk: false, headersOk: false, cellsOk: false };
                         return [
-                            { id: 'w9_table', label: 'Таблица вставлена', passed: hasTable },
-                            { id: 'w9_center', label: 'Таблица по центру листа', passed: isCentered },
-                            { id: 'w9_headers', label: `Шапка: ${w9Variant.h1} | ${w9Variant.h2}`, passed: headersOk },
-                            { id: 'w9_cells', label: `Данные: ${w9Variant.c1} | ${w9Variant.c2}`, passed: cellsOk }
+                            { id: 'w9_table', label: 'Таблица вставлена', passed: tblRes.tableOk },
+                            { id: 'w9_center', label: 'Таблица по центру листа', passed: tblRes.centerOk },
+                            { id: 'w9_headers', label: `Шапка: ${w9Variant.h1} | ${w9Variant.h2}`, passed: tblRes.headersOk },
+                            { id: 'w9_cells', label: `Данные: ${w9Variant.c1} | ${w9Variant.c2}`, passed: tblRes.cellsOk }
                         ];
                     }
                 },
