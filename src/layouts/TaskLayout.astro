@@ -26,5 +26,124 @@ const finalBodyClass = bodyClass ? `${defaultBodyClass} ${bodyClass}` : defaultB
 </head>
 <body class={finalBodyClass}>
     <slot />
+    <script is:inline>
+        (function initPlatformContrastGuard() {
+            const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'SVG', 'PATH', 'CANVAS', 'IMG', 'VIDEO', 'AUDIO', 'INPUT', 'HR', 'BR']);
+            const SURFACE_SELECTOR = '.bg-white, .bg-light, .bg-body, .bg-dark, .bg-black, .modal-content, [style*="background"]';
+
+            function parseRgba(str) {
+                if (!str || str === 'transparent') return null;
+                const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/i);
+                if (!m) return null;
+                return {
+                    r: Number(m[1]),
+                    g: Number(m[2]),
+                    b: Number(m[3]),
+                    a: m[4] !== undefined ? Number(m[4]) : 1
+                };
+            }
+
+            function srgbToLinear(c) {
+                const v = c / 255;
+                return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+            }
+
+            function getLuminance(rgb) {
+                return (
+                    0.2126 * srgbToLinear(rgb.r) +
+                    0.7152 * srgbToLinear(rgb.g) +
+                    0.0722 * srgbToLinear(rgb.b)
+                );
+            }
+
+            function getContrastRatio(l1, l2) {
+                const lighter = Math.max(l1, l2);
+                const darker = Math.min(l1, l2);
+                return (lighter + 0.05) / (darker + 0.05);
+            }
+
+            function checkAndFixElement(el) {
+                if (!el || el.nodeType !== 1 || SKIP_TAGS.has(el.tagName)) return;
+                if (
+                    el.classList.contains('progress') ||
+                    el.classList.contains('progress-bar') ||
+                    el.classList.contains('spinner-border') ||
+                    el.classList.contains('lo-icon') ||
+                    el.classList.contains('lo-divider') ||
+                    el.classList.contains('btn-close')
+                ) {
+                    return;
+                }
+
+                const comp = window.getComputedStyle(el);
+                const bg = parseRgba(comp.backgroundColor);
+                if (!bg || bg.a < 0.8) return;
+
+                const fg = parseRgba(comp.color);
+                if (!fg) return;
+
+                const bgLum = getLuminance(bg);
+                const fgLum = getLuminance(fg);
+                const ratio = getContrastRatio(bgLum, fgLum);
+
+                // Коллизия «светлый текст на светлом фоне» (например, белый текст на белом листе образца)
+                if (bgLum > 0.65 && fgLum > 0.55 && ratio < 2.5) {
+                    el.style.setProperty('color', '#212529', 'important');
+                    el.style.setProperty('--bs-body-color', '#212529');
+                    el.style.setProperty('--bs-table-color', '#212529');
+                    el.setAttribute('data-contrast-fixed', 'dark-on-light');
+                }
+                // Коллизия «темный текст на темном фоне»
+                else if (bgLum < 0.06 && fgLum < 0.08 && ratio < 2.0) {
+                    el.style.setProperty('color', '#f8f9fa', 'important');
+                    el.style.setProperty('--bs-body-color', '#f8f9fa');
+                    el.style.setProperty('--bs-table-color', '#f8f9fa');
+                    el.setAttribute('data-contrast-fixed', 'light-on-dark');
+                }
+            }
+
+            function enforceSurfaceContrast(root = document.body) {
+                if (!root || root.nodeType !== 1) return;
+                if (root.matches && root.matches(SURFACE_SELECTOR)) {
+                    checkAndFixElement(root);
+                }
+                const nodes = root.querySelectorAll ? root.querySelectorAll(SURFACE_SELECTOR) : [];
+                for (let i = 0; i < nodes.length; i++) {
+                    checkAndFixElement(nodes[i]);
+                }
+            }
+
+            window.__enforcePlatformContrast = enforceSurfaceContrast;
+
+            let rafScheduled = false;
+            function scheduleCheck() {
+                if (rafScheduled) return;
+                rafScheduled = true;
+                requestAnimationFrame(() => {
+                    rafScheduled = false;
+                    enforceSurfaceContrast(document.body);
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => enforceSurfaceContrast(document.body));
+            } else {
+                enforceSurfaceContrast(document.body);
+            }
+
+            const observer = new MutationObserver(() => {
+                scheduleCheck();
+            });
+
+            if (document.body) {
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['class', 'style']
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
