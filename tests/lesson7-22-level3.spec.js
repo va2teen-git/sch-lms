@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { verifySurfaceContrast } from './procedural-contracts.js';
 
 test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в LibreOffice Writer: 10 волн)', () => {
 
@@ -210,4 +211,56 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
     await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
   });
 
+  test('Контрастность текста образца (Surface-Foreground Pairing) на всех 10 волнах и защита от белого текста на белом фоне на уровне платформы', async ({ page }) => {
+    await page.goto('/tasks/7-класс/22/level3');
+
+    for (let waveNum = 1; waveNum <= 10; waveNum++) {
+      await page.evaluate((w) => window.jumpToLevel3Wave(w), waveNum);
+      await expect(page.locator('#wave-badge')).toContainText(`ВОЛНА ${waveNum} / 10`);
+
+      // Проверяем контрастность блока-образца (.bg-white) и всех его дочерних текстовых узлов внутри #task-description
+      const contrastReport = await verifySurfaceContrast(
+        page,
+        '#task-description .bg-white, #task-description .bg-white *',
+        10.0 // Строгий порог: тёмный текст (#212529) на белом фоне (#ffffff) даёт ~15.4:1
+      );
+
+      expect(contrastReport.checkedCount).toBeGreaterThan(0);
+      expect(
+        contrastReport.violations,
+        `На Волне ${waveNum} обнаружен нечитаемый текст в образце: ${JSON.stringify(contrastReport.violations, null, 2)}`
+      ).toHaveLength(0);
+    }
+
+    // Проверяем платформенную защиту (CSS + MutationObserver в TaskLayout) при динамической генерации
+    // элемента с белым фоном без явного указания класса text-dark внутри контейнера .text-light
+    await page.evaluate(() => {
+      const desc = document.getElementById('task-description');
+      const dynamicBox = document.createElement('div');
+      dynamicBox.id = 'dynamic-untyped-white-surface';
+      dynamicBox.className = 'p-2 bg-white border border-dark';
+      dynamicBox.textContent = 'Автоматически сгенерированная строка без класса text-dark';
+      desc.appendChild(dynamicBox);
+
+      const inlineWhiteBox = document.createElement('div');
+      inlineWhiteBox.id = 'dynamic-inline-white-surface';
+      inlineWhiteBox.setAttribute('style', 'background-color: rgb(252, 252, 252); padding: 8px;');
+      inlineWhiteBox.textContent = 'Динамический блок со светлым inline-фоном';
+      desc.appendChild(inlineWhiteBox);
+
+      if (window.__enforcePlatformContrast) {
+        window.__enforcePlatformContrast(desc);
+      }
+    });
+
+    const dynamicContrast = await verifySurfaceContrast(
+      page,
+      '#dynamic-untyped-white-surface, #dynamic-inline-white-surface',
+      10.0
+    );
+    expect(dynamicContrast.checkedCount).toBe(2);
+    expect(dynamicContrast.violations).toHaveLength(0);
+  });
+
 });
+

@@ -278,3 +278,94 @@ export function lintOntologySequence(tokens, rules = INFORMATICS_ONTOLOGY_RULES)
 
   return violations;
 }
+
+/**
+ * 6. CONTRACT: Surface–Foreground Contrast & Visibility Integrity (WCAG 2.1)
+ * Evaluates computed background and foreground colors of target DOM elements
+ * (walking up the ancestor tree to resolve effective opaque background)
+ * and verifies that contrast ratio >= minContrastRatio (no white-on-white or dark-on-dark text).
+ */
+export async function verifySurfaceContrast(page, selector = '.bg-white, .bg-light, [style*="background"]', minContrastRatio = 4.5) {
+  return await page.evaluate(({ sel, minRatio }) => {
+    function parseRgba(str) {
+      if (!str || str === 'transparent') return null;
+      const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/i);
+      if (!m) return null;
+      return {
+        r: Number(m[1]),
+        g: Number(m[2]),
+        b: Number(m[3]),
+        a: m[4] !== undefined ? Number(m[4]) : 1
+      };
+    }
+
+    function srgbToLinear(c) {
+      const v = c / 255;
+      return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+
+    function getLuminance(rgb) {
+      return (
+        0.2126 * srgbToLinear(rgb.r) +
+        0.7152 * srgbToLinear(rgb.g) +
+        0.0722 * srgbToLinear(rgb.b)
+      );
+    }
+
+    function getContrastRatio(l1, l2) {
+      const lighter = Math.max(l1, l2);
+      const darker = Math.min(l1, l2);
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    function resolveEffectiveBg(el) {
+      let cur = el;
+      while (cur && cur.nodeType === 1) {
+        const bg = parseRgba(window.getComputedStyle(cur).backgroundColor);
+        if (bg && bg.a >= 0.8) return bg;
+        cur = cur.parentElement;
+      }
+      return { r: 0, g: 0, b: 0, a: 1 };
+    }
+
+    const elements = Array.from(document.querySelectorAll(sel));
+    const violations = [];
+    const checked = [];
+
+    for (const el of elements) {
+      const text = (el.innerText || '').trim();
+      if (!text) continue;
+
+      const comp = window.getComputedStyle(el);
+      if (comp.display === 'none' || comp.visibility === 'hidden' || Number(comp.opacity) === 0) continue;
+
+      const fg = parseRgba(comp.color);
+      const bg = resolveEffectiveBg(el);
+      if (!fg || !bg) continue;
+
+      const fgLum = getLuminance(fg);
+      const bgLum = getLuminance(bg);
+      const ratio = Number(getContrastRatio(fgLum, bgLum).toFixed(2));
+
+      const record = {
+        tag: el.tagName,
+        className: el.className,
+        textPreview: text.slice(0, 60),
+        color: comp.color,
+        backgroundColor: `rgb(${bg.r}, ${bg.g}, ${bg.b})`,
+        contrastRatio: ratio
+      };
+      checked.push(record);
+
+      if (ratio < minRatio) {
+        violations.push({
+          ...record,
+          reason: `Contrast ratio ${ratio}:1 is below minimum ${minRatio}:1 (fg=${comp.color}, bg=rgb(${bg.r},${bg.g},${bg.b}))`
+        });
+      }
+    }
+
+    return { checkedCount: checked.length, checked, violations };
+  }, { sel: selector, minRatio: minContrastRatio });
+}
+

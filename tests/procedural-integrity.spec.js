@@ -4,7 +4,8 @@ import {
   generateInputMutations, 
   verifyMatrixProceduralSolvability, 
   lintOntologySequence,
-  INFORMATICS_ONTOLOGY_RULES 
+  INFORMATICS_ONTOLOGY_RULES,
+  verifySurfaceContrast
 } from './procedural-contracts.js';
 
 test.describe('Universal Procedural & Interaction Integrity Suite (School LMS Contracts)', () => {
@@ -271,4 +272,21 @@ test.describe('Universal Procedural & Interaction Integrity Suite (School LMS Co
     await expect(page.locator('#phase-badge')).toHaveText('Шаг 2 из 3');
   });
 
+  // =========================================================================
+  // CONTRACT 6: Surface–Foreground Contrast & Visibility Integrity (WCAG 2.1)
+  // =========================================================================
+  test('Contract 6: Platform Surface-Foreground Pairing prevents white-on-white text in procedurally generated blocks', async ({ page }) => {
+    await page.goto('/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/22/level3');
+    await page.waitForLoadState('domcontentloaded');
+
+    const report = await verifySurfaceContrast(
+      page,
+      '#task-description .bg-white, #task-description .bg-white *',
+      10.0
+    );
+    expect(report.checkedCount).toBeGreaterThan(0);
+    expect(report.violations).toHaveLength(0);
+  });
+
 });
+
