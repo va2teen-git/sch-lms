@@ -172,6 +172,12 @@ test.describe('LibreOffice Writer Emulator Suite', () => {
   });
 
   test('Детектор костылей ОГЭ: отступ пробелами и дефис блокируют проверку с выводом протокола', async ({ page }) => {
+    // Включаем валидацию ОГЭ
+    await page.evaluate(() => {
+      // @ts-ignore
+      if (window.setWriterOgeCheck) window.setWriterOgeCheck(true);
+    });
+
     // Вводим текст с типичными ошибками-костылями (отступ пробелами, дефис вместо тире, прямые кавычки)
     await page.evaluate(() => {
       // @ts-ignore
@@ -284,6 +290,179 @@ test.describe('LibreOffice Writer Emulator Suite', () => {
       return p?.style.textIndent;
     });
     expect(indent).toMatch(/^1(\.0)?cm$/);
+  });
+
+  test('Issue #514: Управляемый ввод формулы H2O (посимвольный набор H -> sub -> 2 -> sub -> O)', async ({ page }) => {
+    const editor = page.locator('.jodit-wysiwyg');
+    await editor.click();
+    
+    // Очищаем и ставим курсор
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      wysiwyg.innerHTML = '<p></p>';
+      const p = wysiwyg.querySelector('p');
+      const r = document.createRange();
+      r.setStart(p, 0);
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    });
+
+    const btnSub = page.locator('#btn-sub');
+
+    // 1. Вводим букву H
+    await page.keyboard.type('H');
+    await expect(btnSub).not.toHaveClass(/active/);
+
+    // 2. Включаем нижний индекс
+    await btnSub.click();
+    await expect(btnSub).toHaveClass(/active/);
+
+    // 3. Вводим индексную цифру 2
+    await page.keyboard.type('2');
+    await expect(btnSub).toHaveClass(/active/);
+
+    // 4. Выключаем нижний индекс повторным кликом
+    await btnSub.click();
+    await expect(btnSub).not.toHaveClass(/active/);
+
+    // 5. Вводим букву O базового начертания
+    await page.keyboard.type('O');
+    await expect(btnSub).not.toHaveClass(/active/);
+
+    // Проверяем структуру DOM: буква O не должна оказаться внутри <sub>!
+    const domCheck = await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      const sub = wysiwyg.querySelector('sub');
+      const cleanHtml = wysiwyg.innerHTML.replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
+      const subText = sub ? sub.textContent.replace(/[\uFEFF\u200B\u200C\u200D]/g, '') : null;
+      return {
+        cleanHtml,
+        subFound: !!sub,
+        subText,
+        hasSub2: subText === '2',
+        fullText: wysiwyg.textContent.replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim()
+      };
+    });
+
+    expect(domCheck.subFound).toBe(true);
+    expect(domCheck.subText).toBe('2');
+    expect(domCheck.cleanHtml).toContain('<sub>2</sub>');
+    expect(domCheck.cleanHtml).not.toContain('<sub>2O</sub>');
+    expect(domCheck.cleanHtml).not.toContain('<sub>2o</sub>');
+    expect(domCheck.fullText).toBe('H2O');
+  });
+
+  test('Issue #514: Управляемый ввод надстрочного индекса (x -> sup -> 2 -> sup -> + -> y)', async ({ page }) => {
+    const editor = page.locator('.jodit-wysiwyg');
+    await editor.click();
+
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      wysiwyg.innerHTML = '<p></p>';
+      const p = wysiwyg.querySelector('p');
+      const r = document.createRange();
+      r.setStart(p, 0);
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    });
+
+    const btnSup = page.locator('#btn-sup');
+
+    await page.keyboard.type('x');
+    await expect(btnSup).not.toHaveClass(/active/);
+
+    await btnSup.click();
+    await expect(btnSup).toHaveClass(/active/);
+
+    await page.keyboard.type('2');
+    await expect(btnSup).toHaveClass(/active/);
+
+    await btnSup.click();
+    await expect(btnSup).not.toHaveClass(/active/);
+
+    await page.keyboard.type('+y');
+
+    const domCheck = await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      const sup = wysiwyg.querySelector('sup');
+      const cleanHtml = wysiwyg.innerHTML.replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
+      const supText = sup ? sup.textContent.replace(/[\uFEFF\u200B\u200C\u200D]/g, '') : null;
+      return {
+        supFound: !!sup,
+        supText,
+        cleanHtml,
+        fullText: wysiwyg.textContent.replace(/[\uFEFF\u200B\u200C\u200D]/g, '').trim()
+      };
+    });
+
+    expect(domCheck.supFound).toBe(true);
+    expect(domCheck.supText).toBe('2');
+    expect(domCheck.cleanHtml).toContain('<sup>2</sup>');
+    expect(domCheck.cleanHtml).not.toContain('<sup>2+</sup>');
+    expect(domCheck.fullText).toBe('x2+y');
+  });
+
+  test('Issue #514: Инспекция кнопок тулбара (выравнивание, списки и шрифтовые кнопки при навигации)', async ({ page }) => {
+    const editor = page.locator('.jodit-wysiwyg');
+    await editor.click();
+
+    // 1. По умолчанию для базового абзаца активно только левое выравнивание
+    await expect(page.locator('#btn-align-left')).toHaveClass(/active/);
+    await expect(page.locator('#btn-align-center')).not.toHaveClass(/active/);
+    await expect(page.locator('#btn-align-right')).not.toHaveClass(/active/);
+    await expect(page.locator('#btn-align-justify')).not.toHaveClass(/active/);
+
+    // 2. Клик по центру: активно ровно центральное выравнивание
+    await page.locator('#btn-align-center').click();
+    await expect(page.locator('#btn-align-center')).toHaveClass(/active/);
+    await expect(page.locator('#btn-align-left')).not.toHaveClass(/active/);
+    await expect(page.locator('#btn-align-right')).not.toHaveClass(/active/);
+
+    // 3. Проверка кнопок списков ul/ol
+    await page.locator('#btn-ul').click();
+    await expect(page.locator('#btn-ul')).toHaveClass(/active/);
+    await expect(page.locator('#btn-ol')).not.toHaveClass(/active/);
+
+    // 4. Проверка инспекции жирного начертания при навигации курсором
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      wysiwyg.innerHTML = '<p id="p-bold">Обычный <b>жирный</b> текст</p>';
+      const b = wysiwyg.querySelector('b');
+      const r = document.createRange();
+      r.setStart(b.firstChild, 2); // курсор внутри слова "жирный"
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+
+    await expect(page.locator('#btn-bold')).toHaveClass(/active/);
+
+    // Перемещаем курсор в обычный текст
+    await page.evaluate(() => {
+      // @ts-ignore
+      const wysiwyg = document.querySelector('.jodit-wysiwyg');
+      const p = document.getElementById('p-bold');
+      const r = document.createRange();
+      r.setStart(p.lastChild, 2); // внутри слова "текст"
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+
+    await expect(page.locator('#btn-bold')).not.toHaveClass(/active/);
   });
 
 });

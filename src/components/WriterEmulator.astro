@@ -678,6 +678,14 @@ const {
     let lastOgeReport = null;
     let dynamicCheckOgeFormat = checkOgeFormat !== false;
     let writerActionLog = [];
+    const pendingInlineStates = {
+        bold: false,
+        italic: false,
+        underline: false,
+        strikethrough: false,
+        superscript: false,
+        subscript: false
+    };
 
     function saveCurrentEditorRange() {
         const wysiwyg = document.querySelector('.jodit-wysiwyg');
@@ -851,12 +859,15 @@ const {
                             }
                         }, true);
                         wysiwyg.addEventListener('input', () => {
+                            Object.keys(pendingInlineStates).forEach(k => { pendingInlineStates[k] = false; });
                             saveCurrentEditorRange();
+                            updateToolbarActiveStates();
                             updateStatusbarWords();
                             emitWriterChange();
                         });
                         wysiwyg.addEventListener('keyup', () => {
                             saveCurrentEditorRange();
+                            updateToolbarActiveStates();
                             emitWriterChange();
                         });
                         wysiwyg.addEventListener('mouseup', (e) => {
@@ -871,6 +882,7 @@ const {
                                 }
                             }
                             saveCurrentEditorRange();
+                            updateToolbarActiveStates();
                         });
                     }
                     updateStatusbarWords();
@@ -922,22 +934,37 @@ const {
         }
     }
 
-    // Подсветка активных кнопок форматирования в зависимости от положения курсора
+    // Подсветка активных кнопок форматирования в зависимости от положения курсора (DOM-инспекция closest)
     function updateToolbarActiveStates() {
-        if (!editor || !document.activeElement) return;
-        
-        const isBold = document.queryCommandState('bold');
-        const isItalic = document.queryCommandState('italic');
-        const isUnderline = document.queryCommandState('underline');
-        const isStrike = document.queryCommandState('strikethrough');
-        const isSup = document.queryCommandState('superscript');
-        const isSub = document.queryCommandState('subscript');
-        const isJustifyLeft = document.queryCommandState('justifyleft');
-        const isJustifyCenter = document.queryCommandState('justifycenter');
-        const isJustifyRight = document.queryCommandState('justifyright');
-        const isJustifyFull = document.queryCommandState('justifyfull');
-        const isUL = document.queryCommandState('insertunorderedlist');
-        const isOL = document.queryCommandState('insertorderedlist');
+        const wysiwyg = document.querySelector('.jodit-wysiwyg');
+        if (!editor || !wysiwyg) return;
+
+        let range = null;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const r = sel.getRangeAt(0);
+            if (wysiwyg.contains(r.commonAncestorContainer)) {
+                range = r;
+            }
+        }
+        if (!range && lastSavedRange && wysiwyg.contains(lastSavedRange.commonAncestorContainer)) {
+            range = lastSavedRange;
+        }
+
+        let startEl = null;
+        if (range) {
+            startEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+                ? range.startContainer
+                : range.startContainer.parentElement;
+        }
+
+        // 1. Шрифтовое инлайн-начертание
+        const isBold = !!(startEl?.closest('b, strong, [style*="font-weight: bold"], [style*="font-weight: 700"], [style*="font-weight: 800"], [style*="font-weight: 900"]') || pendingInlineStates.bold);
+        const isItalic = !!(startEl?.closest('i, em, [style*="font-style: italic"]') || pendingInlineStates.italic);
+        const isUnderline = !!(startEl?.closest('u, [style*="text-decoration: underline"], [style*="text-decoration-line: underline"]') || pendingInlineStates.underline);
+        const isStrike = !!(startEl?.closest('s, strike, del, [style*="text-decoration: line-through"], [style*="text-decoration-line: line-through"]') || pendingInlineStates.strikethrough);
+        const isSup = !!(startEl?.closest('sup, [style*="vertical-align: super"]') || pendingInlineStates.superscript);
+        const isSub = !!(startEl?.closest('sub, [style*="vertical-align: sub"]') || pendingInlineStates.subscript);
 
         toggleBtnActive('btn-bold', isBold);
         toggleBtnActive('btn-italic', isItalic);
@@ -945,12 +972,40 @@ const {
         toggleBtnActive('btn-strikethrough', isStrike);
         toggleBtnActive('btn-sup', isSup);
         toggleBtnActive('btn-sub', isSub);
-        toggleBtnActive('btn-align-left', isJustifyLeft);
-        toggleBtnActive('btn-align-center', isJustifyCenter);
-        toggleBtnActive('btn-align-right', isJustifyRight);
-        toggleBtnActive('btn-align-justify', isJustifyFull);
+
+        // 2. Списки (ul / ol)
+        const isUL = !!(startEl?.closest('ul') && wysiwyg.contains(startEl.closest('ul')));
+        const isOL = !!(startEl?.closest('ol') && wysiwyg.contains(startEl.closest('ol')));
         toggleBtnActive('btn-ul', isUL);
         toggleBtnActive('btn-ol', isOL);
+
+        // 3. Выравнивание абзаца (гарантированная подсветка ровно одной кнопки)
+        let activeBlock = (startEl && wysiwyg.contains(startEl)) ? startEl.closest('p, h1, h2, h3, li, td, th') : null;
+        if (!activeBlock) {
+            if (lastActivePara && wysiwyg.contains(lastActivePara)) {
+                activeBlock = lastActivePara;
+            } else {
+                activeBlock = wysiwyg.querySelector('p, h1, h2, h3, li, td, th');
+            }
+        }
+        let align = 'left';
+        if (activeBlock) {
+            const inlineAlign = activeBlock.style.textAlign;
+            if (inlineAlign) {
+                align = inlineAlign.toLowerCase();
+            } else {
+                try {
+                    const compAlign = window.getComputedStyle(activeBlock).textAlign;
+                    if (compAlign) align = compAlign.toLowerCase();
+                } catch (_) {}
+            }
+        }
+        if (align === 'start') align = 'left';
+
+        toggleBtnActive('btn-align-left', align === 'left');
+        toggleBtnActive('btn-align-center', align === 'center');
+        toggleBtnActive('btn-align-right', align === 'right');
+        toggleBtnActive('btn-align-justify', align === 'justify');
     }
 
     function toggleBtnActive(id, isActive) {
@@ -1209,15 +1264,111 @@ const {
         };
         document.getElementById('select-fontsize')?.addEventListener('change', applyFontSizeFromSelect);
 
-        // Форматирование текста
-        const bindCmd = (btnId, menuId, cmd) => {
-            const fn = (e) => {
-                if (e) e.preventDefault();
-                restoreSavedEditorRange();
+        // Инлайн-форматирование текста с управляемым выводом курсора за пределы тега
+        const INLINE_TAG_MAP = {
+            'subscript': { selector: 'sub, [style*="vertical-align: sub"]', btnId: 'btn-sub' },
+            'superscript': { selector: 'sup, [style*="vertical-align: super"]', btnId: 'btn-sup' },
+            'bold': { selector: 'b, strong, [style*="font-weight: bold"], [style*="font-weight: 700"], [style*="font-weight: 800"], [style*="font-weight: 900"]', btnId: 'btn-bold' },
+            'italic': { selector: 'i, em, [style*="font-style: italic"]', btnId: 'btn-italic' },
+            'underline': { selector: 'u, [style*="text-decoration: underline"], [style*="text-decoration-line: underline"]', btnId: 'btn-underline' },
+            'strikethrough': { selector: 's, strike, del, [style*="text-decoration: line-through"], [style*="text-decoration-line: line-through"]', btnId: 'btn-strikethrough' }
+        };
+
+        const executeInlineFormat = (cmd, btnId) => {
+            restoreSavedEditorRange();
+            const wysiwyg = document.querySelector('.jodit-wysiwyg');
+            const sel = window.getSelection();
+
+            if (!wysiwyg || !sel || sel.rangeCount === 0) {
                 try { editor.execCommand(cmd); } catch (_) {}
                 saveCurrentEditorRange();
                 updateToolbarActiveStates();
                 recordWriterAction(`format_${cmd}`, { command: cmd });
+                return;
+            }
+
+            const range = sel.getRangeAt(0);
+            const mapping = INLINE_TAG_MAP[cmd];
+
+            // 1. Если выделен фрагмент текста (не свёрнутый курсор)
+            if (!range.collapsed) {
+                try { editor.execCommand(cmd); } catch (_) {}
+                if (mapping) pendingInlineStates[cmd] = false;
+                saveCurrentEditorRange();
+                updateToolbarActiveStates();
+                recordWriterAction(`format_${cmd}`, { command: cmd });
+                return;
+            }
+
+            // 2. Свёрнутый курсор: проверяем, находимся ли мы внутри соответствующего инлайн-тега
+            const startEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+                ? range.startContainer
+                : range.startContainer.parentElement;
+            const enclosingTag = (startEl && mapping) ? startEl.closest(mapping.selector) : null;
+
+            if (enclosingTag && wysiwyg.contains(enclosingTag)) {
+                // Курсор внутри тега, ученик нажал кнопку повторно для ВЫКЛЮЧЕНИЯ форматирования
+                const testRange = document.createRange();
+                testRange.setStart(range.endContainer, range.endOffset);
+                testRange.setEndAfter(enclosingTag);
+                const textAfter = testRange.toString().replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
+
+                if (textAfter.length === 0) {
+                    // Выводим курсор за пределы тега с созданием безопасной позиции ввода
+                    let targetNode = enclosingTag.nextSibling;
+                    let targetOffset = 0;
+
+                    if (targetNode && targetNode.nodeType === Node.TEXT_NODE) {
+                        targetOffset = 0;
+                    } else {
+                        const zwsp = document.createTextNode('\u200B');
+                        enclosingTag.parentNode.insertBefore(zwsp, enclosingTag.nextSibling);
+                        targetNode = zwsp;
+                        targetOffset = 1;
+                    }
+
+                    const newRange = document.createRange();
+                    newRange.setStart(targetNode, targetOffset);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+
+                    try {
+                        if (document.queryCommandState(cmd)) {
+                            document.execCommand(cmd, false, null);
+                        }
+                    } catch (_) {}
+                    pendingInlineStates[cmd] = false;
+                } else {
+                    try { editor.execCommand(cmd); } catch (_) {}
+                    pendingInlineStates[cmd] = false;
+                }
+            } else {
+                // Курсор вне тега: ученик включает форматирование для последующего набора
+                try { editor.execCommand(cmd); } catch (_) {}
+                if (mapping) {
+                    pendingInlineStates[cmd] = true;
+                }
+            }
+
+            saveCurrentEditorRange();
+            updateToolbarActiveStates();
+            recordWriterAction(`format_${cmd}`, { command: cmd });
+        };
+
+        // Форматирование текста
+        const bindCmd = (btnId, menuId, cmd) => {
+            const fn = (e) => {
+                if (e) e.preventDefault();
+                if (INLINE_TAG_MAP[cmd]) {
+                    executeInlineFormat(cmd, btnId);
+                } else {
+                    restoreSavedEditorRange();
+                    try { editor.execCommand(cmd); } catch (_) {}
+                    saveCurrentEditorRange();
+                    updateToolbarActiveStates();
+                    recordWriterAction(`format_${cmd}`, { command: cmd });
+                }
             };
             document.getElementById(btnId)?.addEventListener('click', fn);
             if (menuId) document.getElementById(menuId)?.addEventListener('click', fn);
@@ -1231,6 +1382,7 @@ const {
         
         // Очистить прямое форматирование (Ctrl+M)
         const onClearFormat = () => {
+            Object.keys(pendingInlineStates).forEach(k => { pendingInlineStates[k] = false; });
             try { editor.execCommand('removeFormat'); } catch (_) {}
             // Очищаем локальные инлайн-стили абзаца
             const block = editor.selection ? editor.selection.current() : null;
@@ -1272,9 +1424,8 @@ const {
                 restoreSavedEditorRange();
                 try { editor.execCommand(cmd); } catch (_) {}
                 applyParagraphStyle({ textAlign: cssAlign });
-                ['btn-align-left', 'btn-align-center', 'btn-align-right', 'btn-align-justify'].forEach(id => {
-                    toggleBtnActive(id, id === btnId);
-                });
+                saveCurrentEditorRange();
+                updateToolbarActiveStates();
                 recordWriterAction(`align_${cssAlign}`, { value: cssAlign });
             };
             document.getElementById(btnId)?.addEventListener('click', fn);
@@ -1455,6 +1606,9 @@ const {
         }
 
         targets.forEach(target => {
+            if (target && target.tagName !== 'DIV') {
+                lastActivePara = target;
+            }
             if (styles.textIndent !== undefined && target.tagName !== 'TD' && target.tagName !== 'TH') {
                 target.style.textIndent = styles.textIndent;
                 const cm = parseCm(styles.textIndent);
@@ -2313,6 +2467,7 @@ const {
         if (selFont) selFont.value = 'Liberation Sans';
         if (selSize) selSize.value = '11pt';
         if (selStyle) selStyle.value = 'p';
+        Object.keys(pendingInlineStates).forEach(k => { pendingInlineStates[k] = false; });
         ['btn-bold', 'btn-italic', 'btn-underline', 'btn-strikethrough', 'btn-sup', 'btn-sub', 'btn-align-center', 'btn-align-right', 'btn-align-justify', 'btn-ul', 'btn-ol'].forEach(id => toggleBtnActive(id, false));
         toggleBtnActive('btn-align-left', true);
         updateRulerFirstLineMarker(0);
