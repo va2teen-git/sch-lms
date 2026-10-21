@@ -234,3 +234,46 @@ $$\mathbf{CCS} = F_{depth} + F_{memory} + F_{search} + F_{inversion} + F_{stress
 5. **Санитарный контроль:**
    - [ ] Числа подобраны так, чтобы исключить деление с бесконечной дробной частью (проверено через инварианты).
    - [ ] Отсутствует Fake Difficulty (крупные кнопки, четкий контраст, детерминированное решение).
+
+
+---
+
+## 7. Автоматизированная оценка сложности в тестах Playwright (DifficultyBenchmarker)
+
+В тестовую систему School LMS внедрен автоматический измеритель когнитивной сложности tests/difficulty-benchmarker.js ([DifficultyBenchmarker](file:///D:/school-lms/tests/difficulty-benchmarker.js)), интегрированный с виртуальными персонами [StudentSimulator](file:///D:/school-lms/tests/student-simulator.js).
+
+### 7.1. Пример интеграции в тесты персон урока (*-student-personas.spec.js):
+```javascript
+test('Level 2 - Cognitive Difficulty Calibration & Sawtooth Profile Audit', async () => {
+  const sim = new StudentSimulator(null, {
+    persona: LearnerPersona.DILIGENT,
+    courseSlug: '10-класс_углубленный',
+    lessonId: 27,
+    levelNumber: 2
+  });
+
+  // Фиксация структуры пяти аналитических фаз тренажера
+  sim.recordPhaseDifficulty(1, { title: 'Прямой расчет Kotelnikov', depth: 2, memory: 2 });
+  sim.recordPhaseDifficulty(2, { title: 'Квантование и АЦП', depth: 3, memory: 3 });
+  sim.recordPhaseDifficulty(3, { title: 'Погрешность и SQNR (Пик 1)', depth: 3, memory: 3, inversion: 2 });
+  sim.recordPhaseDifficulty(4, { title: 'Битрейт (Долина консолидации)', depth: 2, memory: 3 });
+  sim.recordPhaseDifficulty(5, { title: 'Паразитный алиасинг (Кульминация)', depth: 4, memory: 3, inversion: 2 });
+
+  // Проверка соответствия методическому стандарту
+  sim.assertDifficultyCompliance({
+    sawtooth: true,         // Проверка Sawtooth 2-1-2 (Phase 4 < Phase 3!)
+    corridor: true,         // Проверка коридора 10 класса [5; 10]
+    noFakeDifficulty: true, // Проверка на отсутствие Flat Plateau и Arithmetic Grind
+    renderReport: true      // Вывод ASCII-диаграммы кривой в лог
+  });
+});
+```
+
+### 7.2. Команды запуска тестов калибровки сложности:
+```bash
+# Запуск общего набора тестов бенчмаркера сложности
+npm run test:difficulty
+
+# Проверка калибровки сложности конкретного урока
+npx playwright test tests/lesson27-grade10-student-personas.spec.js -g "Cognitive Difficulty"
+```

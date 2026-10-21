@@ -168,8 +168,32 @@ test.describe('10th Grade Lesson 27: Discretization & Signals (Student Personas 
       await page.goto('/tasks/10-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/27/level2');
 
       // Attempt forbidden clipboard paste
+            // Attempt forbidden clipboard paste
       await sim.attemptProhibitedPaste(page.locator('#p1-input-fd'), '500');
       sim.assertCleanSession();
+    });
+
+    test('Level 2 - Cognitive Difficulty Calibration & Sawtooth Profile Audit', async () => {
+      const sim = new StudentSimulator(null, {
+        persona: LearnerPersona.DILIGENT,
+        courseSlug: '10-класс_углубленный',
+        lessonId: 27,
+        levelNumber: 2
+      });
+
+      // Benchmark the 5 analytical phases of Lesson 27 Level 2
+      sim.recordPhaseDifficulty(1, { title: 'Теорема Котельникова (f_d min, Δt max)', depth: 2, memory: 2 });
+      sim.recordPhaseDifficulty(2, { title: 'Уровни квантования N=2^b и шаг ΔU', depth: 3, memory: 3 });
+      sim.recordPhaseDifficulty(3, { title: 'Погрешность |e_max| и SQNR (Пик 1)', depth: 3, memory: 3, inversion: 2 });
+      sim.recordPhaseDifficulty(4, { title: 'Битрейт и объем звуковых данных (Долина)', depth: 2, memory: 3 });
+      sim.recordPhaseDifficulty(5, { title: 'Паразитный алиасинг и частота Найквиста (Кульминация)', depth: 4, memory: 3, inversion: 2 });
+
+      sim.assertDifficultyCompliance({
+        sawtooth: true,
+        corridor: true,
+        noFakeDifficulty: true,
+        renderReport: true
+      });
     });
 
   });
