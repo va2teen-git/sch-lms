@@ -121,4 +121,40 @@ test.describe('Curriculum & Architecture Linting Suite (10th Grade Advanced - Le
     expect(code).toContain('container-fluid');
     expect(code.includes('class="container"')).toBe(false);
   });
+
+  test('Level 3 adheres to architectural and game design requirements (Archetype 6)', async () => {
+    const level3File = path.join(tasksPath, 'level3.astro');
+    expect(fs.existsSync(level3File)).toBe(true);
+
+    const code = fs.readFileSync(level3File, 'utf-8');
+
+    // TaskLayout component usage
+    expect(code).toContain('import TaskLayout');
+    expect(code).toContain('<TaskLayout level={3}');
+
+    // Telemetry events
+    expect(code).toContain('TELEMETRY_EVENT');
+    expect(code).toContain('level_complete');
+    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('Урок 27');
+
+    // Zero-Style Policy (no <style> tags)
+    expect(code.includes('<style>')).toBe(false);
+    expect(code.includes('<style ')).toBe(false);
+
+    // Zero Multiple Choice Policy
+    expect(code.includes('type="radio"')).toBe(false);
+    expect(code.includes('<select')).toBe(false);
+
+    // Container Responsiveness
+    expect(code).toContain('container-fluid');
+    expect(code.includes('class="container"')).toBe(false);
+
+    // Archetype 6 mechanics
+    expect(code).toContain('АРХЕТИП 6');
+    expect(code).toContain('id="osc-canvas"');
+    expect(code).toContain('isApertureOpen');
+    expect(code).toContain('id="strobe-btn"');
+    expect(code).toContain('WAVE_DEFINITIONS');
+  });
 });
