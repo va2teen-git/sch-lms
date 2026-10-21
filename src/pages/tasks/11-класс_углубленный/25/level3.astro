@@ -1,0 +1,631 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг миссии) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">⚠️ КРИТИЧЕСКИЙ СБОЙ ВЫЧИСЛИТЕЛЬНОГО ЯДРА ⚠️</div>
+            <h2 class="text-light mb-3">COMPLEXITY BREACH: NEURAL MATRIX DECRYPTOR</h2>
+            <div class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-2 mb-4 fs-6">
+                АРХЕТИП 1: CYBER MATRIX PROTOCOL BREACH // ХАРДКОР-РЕЖИМ
+            </div>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                Криптографический кластер подвергся экспоненциальной перегрузке. 
+                Чтобы стабилизировать ядро и предотвратить комбинаторный коллапс системы, 
+                вам необходимо преодолеть <span class="text-danger fw-bold">8 нарастающих волн дешифрования</span> 
+                путем навигации по кибер-матрице состояний.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-4 mx-auto mb-4 text-start small" style="max-width: 680px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ ВЗЛОМА КИБЕР-МАТРИЦЫ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Попеременная навигация (Строка ↔ Столбец):</span> Вы начинаете с активной строки. Клик по ячейке фиксирует столбец для следующего хода; клик в столбце фиксирует новую строку!</div>
+                <div class="text-light mb-1">• <span class="text-info fw-bold">Целевая последовательность:</span> Соберите в буфере памяти точную цепочку токенов сложности (классы P/NP/NPC, сведение Карпа, асимптотики).</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Ограниченный буфер памяти:</span> Длина буфера строго лимитирована (4–6 слотов). Лишние токены переполняют буфер!</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">Тотальный хардкор-сброс:</span> Любое ошибочное заполнение буфера или истечение таймера вызывают взрыв ядра и <span class="text-danger fw-bold">ПОЛНЫЙ СБРОС НА ВОЛНУ 1</span>!</div>
+                <div class="text-light">• <span class="text-success fw-bold">Убывающий таймер:</span> От 10.0 до 6.0 секунд на волну с нарастающим ускорением. Нажмите <span class="badge bg-danger text-light rounded-0">ПРОБЕЛ</span> для мгновенного подтверждения при досрочной сборке.</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace fw-bold px-5 py-3 shadow">
+                    ИНИЦИИРОВАТЬ ВЗЛОМ МАТРИЦЫ [ENTER / SPACE] →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой интерфейс взлома -->
+        <div v-else-if="gameState === 'playing'" class="card bg-dark border-danger rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+                
+                <!-- Шапка: Номер волны, таймер и статус -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-danger pb-2 gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger text-light rounded-0 fs-6 px-3 py-2">
+                            ВОЛНА <span v-text="currentWaveIndex + 1"></span> / <span v-text="waves.length"></span>
+                        </span>
+                        <span class="text-light fw-bold fs-6" v-text="currentWave.title"></span>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-secondary small">
+                            Ошибок: <span class="text-warning fw-bold" v-text="attemptsCount"></span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary small">ТАЙМЕР ЯДРА:</span>
+                            <span class="badge bg-black border border-danger text-danger fs-5 px-3 py-1 font-monospace" style="min-width: 90px;">
+                                <span v-text="timeLeftFormatted"></span>s
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Пульсирующая полоса таймера -->
+                <div class="progress rounded-0 bg-black border border-secondary mb-3" style="height: 8px;">
+                    <div class="progress-bar bg-danger progress-bar-striped progress-bar-animated transition-all" 
+                         role="progressbar" 
+                         :style="{ width: timerPercent + '%' }"></div>
+                </div>
+
+                <!-- Индикатор ошибки / перегрузки -->
+                <div v-if="errorMessage" class="alert alert-danger bg-black text-danger border border-danger rounded-0 py-2 mb-3 d-flex align-items-center justify-content-between" role="alert">
+                    <span><strong>[СБОЙ ЯДРА]</strong> <span v-text="errorMessage"></span> Полный сброс параметров...</span>
+                    <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                </div>
+
+                <!-- Панель буфера памяти и целевой последовательности -->
+                <div class="row g-3 mb-3">
+                    <!-- Целевая последовательность -->
+                    <div class="col-12 col-lg-7">
+                        <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-secondary small fw-bold">[ЦЕЛЕВАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ ВЗЛОМА]:</span>
+                                <span class="text-info small fw-bold">Собрать строго по порядку →</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <div v-for="(targetToken, tIdx) in currentWave.targetSequence" 
+                                     :key="'tgt-' + tIdx"
+                                     class="badge rounded-0 p-2 font-monospace transition-all border d-flex flex-column align-items-center"
+                                     :class="isTargetMatched(tIdx) ? 'bg-success text-dark border-success' : 'bg-dark text-warning border-secondary'"
+                                     style="min-width: 100px;">
+                                    <span class="small opacity-75" style="font-size: 0.65rem;">ШАГ <span v-text="tIdx + 1"></span></span>
+                                    <span class="fw-bold fs-6" v-text="targetToken"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Буфер памяти игрока -->
+                    <div class="col-12 col-lg-5">
+                        <div class="card bg-black border-danger rounded-0 p-3 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-danger small fw-bold">[БУФЕР ВЫЧИСЛИТЕЛЬНОЙ ПАМЯТИ]:</span>
+                                <span class="text-secondary small">Свободно: <span v-text="currentWave.bufferSize - memoryBuffer.length"></span></span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <div v-for="bIdx in currentWave.bufferSize" 
+                                     :key="'buf-' + bIdx"
+                                     class="border rounded-0 flex-fill p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-center"
+                                     :class="memoryBuffer[bIdx - 1] ? 'bg-dark border-danger text-danger' : 'bg-black border-secondary text-secondary'"
+                                     style="min-height: 55px; min-width: 0;">
+                                    <span v-if="memoryBuffer[bIdx - 1]" class="fw-bold fs-6 text-truncate w-100" v-text="memoryBuffer[bIdx - 1]"></span>
+                                    <span v-else class="text-secondary opacity-50 small">_</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Подсказка текущего направления навигации -->
+                <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge rounded-0 px-2 py-1"
+                              :class="currentDirection === 'horizontal' ? 'bg-warning text-dark' : 'bg-secondary text-light'">
+                            ГОРИЗОНТАЛЬ (СТРОКА <span v-text="activeRow + 1"></span>)
+                        </span>
+                        <span class="text-secondary">➔</span>
+                        <span class="badge rounded-0 px-2 py-1"
+                              :class="currentDirection === 'vertical' ? 'bg-warning text-dark' : 'bg-secondary text-light'">
+                            ВЕРТИКАЛЬ (СТОЛБЕЦ <span v-text="activeCol + 1"></span>)
+                        </span>
+                    </div>
+                    <div class="text-secondary small d-none d-md-block">
+                        Кликайте по подсвеченным ячейкам активной линии.
+                    </div>
+                </div>
+
+                <!-- 2D КИБЕР-МАТРИЦА 5x5 -->
+                <div class="card bg-black border-danger rounded-0 p-2 p-md-3 mb-3">
+                    <div class="d-flex flex-column gap-2">
+                        <div v-for="(row, rIdx) in matrix" 
+                             :key="'row-' + rIdx" 
+                             class="d-flex gap-2 transition-all p-1"
+                             :class="{ 'border border-warning border-opacity-50 bg-dark bg-opacity-25': currentDirection === 'horizontal' && activeRow === rIdx }">
+                            
+                            <button v-for="(cell, cIdx) in row" 
+                                    :key="'cell-' + rIdx + '-' + cIdx"
+                                    type="button"
+                                    @click="onCellClick(rIdx, cIdx)"
+                                    :disabled="!isCellClickable(rIdx, cIdx) || isLocked"
+                                    class="btn rounded-0 flex-fill p-2 text-center font-monospace fw-bold transition-all d-flex flex-column justify-content-center align-items-center position-relative"
+                                    :class="getCellClass(rIdx, cIdx)"
+                                    style="min-width: 0; min-height: 60px; overflow: hidden; word-break: break-word;">
+                                
+                                <span class="lh-1 text-wrap" style="font-size: clamp(0.7rem, 1.8vw, 0.95rem);" v-text="cell.token">
+                                </span>
+                                <span class="text-secondary opacity-75 small d-none d-sm-block mt-1" style="font-size: 0.65rem;" v-text="cell.sub">
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Панель управления форсажем -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">
+                        Горячие клавиши: <kbd class="bg-black text-danger border border-secondary rounded-0 px-2 py-1">ПРОБЕЛ</kbd> — подтвердить сборку
+                    </span>
+                    <button @click="forceCompleteWave" 
+                            :disabled="!canForceComplete || isLocked"
+                            class="btn btn-outline-danger rounded-0 px-4 py-2 font-monospace fw-bold">
+                        ФОРСАЖ ЯДРА (ПОДТВЕРДИТЬ) →
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Экран триумфа / Победы -->
+        <div v-else-if="gameState === 'victory'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">⚡ СИСТЕМА ДЕШИФРОВАНА ⚡</div>
+            <h2 class="text-light mb-2 font-monospace">МАТРИЦА СЛОЖНОСТИ ВЫЧИСЛЕНИЙ ПОКОРЕНА!</h2>
+            <div class="badge border border-success text-success bg-dark rounded-0 px-3 py-2 mb-4 fs-6">
+                ХАРДКОР-РЕЖИМ ПРОЙДЕН // АРХЕТИП 1 ПОЛНОСТЬЮ СТАБИЛИЗИРОВАН
+            </div>
+            <p class="text-light mb-4 mx-auto" style="max-width: 650px;">
+                Вы продемонстрировали исключительную скорость пространственной навигации и алгоритмического анализа: 
+                успешно отразили все 8 волн матричного взлома, собрали полные цепочки сведений Карпа и предотвратили комбинаторный взрыв ядра.
+            </p>
+
+            <div class="card bg-dark border-danger rounded-0 d-inline-block p-4 mb-4 text-start font-monospace">
+                <div class="text-danger small mb-2 border-bottom border-danger pb-1">[ФИНАЛЬНЫЙ СЕРТИФИКАТ ТЕЛЕМЕТРИИ]</div>
+                <div class="text-light mb-1">Статус ядра: <span class="text-success fw-bold">BREACH SECURED (100%)</span></div>
+                <div class="text-light mb-1">Пройдено волн матрицы: <span class="text-warning fw-bold">8 / 8</span></div>
+                <div class="text-light mb-1">Аварийных сбросов: <span class="text-danger fw-bold" v-text="attemptsCount"></span></div>
+                <div class="text-light mb-1">Итоговое чистое время: <span class="text-info fw-bold" v-text="totalTimeFormatted"></span></div>
+                <div class="text-light">Режим проверки: <span class="text-success fw-bold">Zero Multiple Choice OK</span></div>
+            </div>
+
+            <div>
+                <button @click="startGame" class="btn btn-outline-danger rounded-0 px-5 py-3 font-monospace fw-bold">
+                    ПРОЙТИ АРКАДУ ЗАНОВО
+                </button>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<!-- Локальный Vue 3 (Zero-Dependency) -->
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+(function() {
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const gameState = ref('intro'); // 'intro', 'playing', 'victory'
+            const currentWaveIndex = ref(0);
+            const attemptsCount = ref(0);
+            const startTime = ref(Date.now());
+            const totalElapsedSec = ref(0);
+            const isLocked = ref(false);
+            const errorMessage = ref('');
+
+            // Навигация матрицы
+            const currentDirection = ref('horizontal'); // 'horizontal' или 'vertical'
+            const activeRow = ref(0);
+            const activeCol = ref(0);
+            const memoryBuffer = ref([]);
+
+            // Таймер текущей волны
+            const waveTimeLimit = ref(10.0);
+            const waveTimeLeft = ref(10.0);
+            let timerInterval = null;
+
+            // =================================================================
+            // 8 ВОЛН СЛОЖНОСТИ (АРХЕТИП 1: CYBER MATRIX PROTOCOL BREACH)
+            // =================================================================
+            const waves = [
+                {
+                    title: 'Волна 1: Асимптотический ряд сложности',
+                    timeLimit: 10.0,
+                    bufferSize: 4,
+                    targetSequence: ['O(1)', 'O(n)', 'O(2ⁿ)'],
+                    pool: [
+                        { token: 'O(1)', sub: 'Константа' },
+                        { token: 'O(n)', sub: 'Линейная' },
+                        { token: 'O(2ⁿ)', sub: 'Экспонента' },
+                        { token: 'O(n²)', sub: 'Квадрат' },
+                        { token: 'O(log n)', sub: 'Логарифм' },
+                        { token: 'O(n!)', sub: 'Факториал' }
+                    ]
+                },
+                {
+                    title: 'Волна 2: Иерархия классов вычислимости',
+                    timeLimit: 9.5,
+                    bufferSize: 4,
+                    targetSequence: ['КЛАСС P', 'КЛАСС NP', 'NP-ПОЛНЫЕ'],
+                    pool: [
+                        { token: 'КЛАСС P', sub: 'Полином' },
+                        { token: 'КЛАСС NP', sub: 'Верификация' },
+                        { token: 'NP-ПОЛНЫЕ', sub: 'Ядро NPC' },
+                        { token: 'NP-ТРУДНЫЕ', sub: 'Вне NP' },
+                        { token: 'НЕРАЗРЕШИМЫЕ', sub: 'Останов' },
+                        { token: 'LOGSPACE', sub: 'Память' }
+                    ]
+                },
+                {
+                    title: 'Волна 3: Цепочка Кука — Левина — Карпа',
+                    timeLimit: 9.0,
+                    bufferSize: 5,
+                    targetSequence: ['SAT', '3-SAT', 'КЛИКА'],
+                    pool: [
+                        { token: 'SAT', sub: 'Кук-Левин' },
+                        { token: '3-SAT', sub: 'КНФ-3' },
+                        { token: 'КЛИКА', sub: 'Полный граф' },
+                        { token: '2-SAT', sub: 'Класс P' },
+                        { token: 'СОРТИРОВКА', sub: 'O(n log n)' },
+                        { token: 'ПОИСК ПУТИ', sub: 'Дейкстра' }
+                    ]
+                },
+                {
+                    title: 'Волна 4: Графовые редукции Карпа',
+                    timeLimit: 8.5,
+                    bufferSize: 5,
+                    targetSequence: ['КЛИКА', 'НЕЗАВИСИМОЕ', 'ВЕРШИННОЕ'],
+                    pool: [
+                        { token: 'КЛИКА', sub: 'Смежные k' },
+                        { token: 'НЕЗАВИСИМОЕ', sub: 'Несмежные k' },
+                        { token: 'ВЕРШИННОЕ', sub: 'Покрытие' },
+                        { token: 'ГАМИЛЬТОНОВ', sub: 'Цикл' },
+                        { token: 'ЭЙЛЕРОВ', sub: 'Класс P' },
+                        { token: 'ОСТОВНОЕ', sub: 'Краскал' }
+                    ]
+                },
+                {
+                    title: 'Волна 5: Разрешимость против Трудности',
+                    timeLimit: 8.0,
+                    bufferSize: 5,
+                    targetSequence: ['2-SAT', 'BFS', '3-SAT', 'КОММИВОЯЖЕР'],
+                    pool: [
+                        { token: '2-SAT', sub: 'Класс P' },
+                        { token: 'BFS', sub: 'Ширина P' },
+                        { token: '3-SAT', sub: 'NPC' },
+                        { token: 'КОММИВОЯЖЕР', sub: 'NP-hard' },
+                        { token: 'ДЕЙКСТРА', sub: 'Класс P' },
+                        { token: 'РЮКЗАК', sub: 'NPC' }
+                    ]
+                },
+                {
+                    title: 'Волна 6: Преодоление экспоненты (Эвристики)',
+                    timeLimit: 7.5,
+                    bufferSize: 6,
+                    targetSequence: ['РЮКЗАК', 'ДИНАМИЧЕСКОЕ', 'ПРИБЛИЖЕННЫЙ', 'ЖАДНЫЙ'],
+                    pool: [
+                        { token: 'РЮКЗАК', sub: 'NPC задача' },
+                        { token: 'ДИНАМИЧЕСКОЕ', sub: 'O(n·W)' },
+                        { token: 'ПРИБЛИЖЕННЫЙ', sub: '(1+ε)' },
+                        { token: 'ЖАДНЫЙ', sub: 'Эвристика' },
+                        { token: 'ПОЛНЫЙ ПЕРЕБОР', sub: '2ⁿ сбой' },
+                        { token: 'МУРАВЬИНЫЙ', sub: 'Метаэвристика' }
+                    ]
+                },
+                {
+                    title: 'Волна 7: Криптографический барьер',
+                    timeLimit: 7.0,
+                    bufferSize: 6,
+                    targetSequence: ['RSA', 'ФАКТОРИЗАЦИЯ', 'P=NP', 'ВЗЛОМ'],
+                    pool: [
+                        { token: 'RSA', sub: 'Асимметрия' },
+                        { token: 'ФАКТОРИЗАЦИЯ', sub: 'Класс NP' },
+                        { token: 'P=NP', sub: 'Гипотеза' },
+                        { token: 'ВЗЛОМ', sub: 'Коллапс' },
+                        { token: 'SHA-256', sub: 'Хэш' },
+                        { token: 'AES', sub: 'Симметрия' }
+                    ]
+                },
+                {
+                    title: 'Волна 8: Финальный синтез сложности',
+                    timeLimit: 6.5,
+                    bufferSize: 6,
+                    targetSequence: ['КЛАСС P', 'КЛАСС NP', '3-SAT', 'NP-ПОЛНЫЕ', 'NP-ТРУДНЫЕ'],
+                    pool: [
+                        { token: 'КЛАСС P', sub: 'Полином' },
+                        { token: 'КЛАСС NP', sub: 'Свидетель' },
+                        { token: '3-SAT', sub: 'Формула' },
+                        { token: 'NP-ПОЛНЫЕ', sub: 'Ядро' },
+                        { token: 'NP-ТРУДНЫЕ', sub: 'Вершина' },
+                        { token: 'ОСТАНОВ', sub: 'Неразрешим' }
+                    ]
+                }
+            ];
+
+            const currentWave = computed(() => waves[currentWaveIndex.value]);
+
+            const timeLeftFormatted = computed(() => {
+                return Math.max(0, waveTimeLeft.value).toFixed(2);
+            });
+
+            const timerPercent = computed(() => {
+                return (waveTimeLeft.value / waveTimeLimit.value) * 100;
+            });
+
+            const totalTimeFormatted = computed(() => {
+                const mins = String(Math.floor(totalElapsedSec.value / 60)).padStart(2, '0');
+                const secs = String(totalElapsedSec.value % 60).padStart(2, '0');
+                return `${mins}:${secs}`;
+            });
+
+            // 5x5 Матрица токенов
+            const matrix = ref([]);
+
+            function generateMatrix() {
+                const wave = currentWave.value;
+                const pool = wave.pool;
+                const target = wave.targetSequence;
+                const newMatrix = [];
+
+                for (let r = 0; r < 5; r++) {
+                    const row = [];
+                    for (let c = 0; c < 5; c++) {
+                        const randomItem = pool[Math.floor(Math.random() * pool.length)];
+                        row.push({ ...randomItem, row: r, col: c });
+                    }
+                    newMatrix.push(row);
+                }
+
+                // Гарантируем проходимый маршрут для targetSequence
+                let curR = 0;
+                let curC = Math.floor(Math.random() * 5);
+                let dir = 'horizontal';
+
+                for (let step = 0; step < target.length; step++) {
+                    const tgtToken = target[step];
+                    const itemData = pool.find(p => p.token === tgtToken) || { token: tgtToken, sub: 'Цель' };
+                    
+                    if (step === 0) {
+                        newMatrix[curR][curC] = { ...itemData, row: curR, col: curC };
+                    } else {
+                        if (dir === 'vertical') {
+                            let newR = (curR + 1 + Math.floor(Math.random() * 4)) % 5;
+                            curR = newR;
+                            newMatrix[curR][curC] = { ...itemData, row: curR, col: curC };
+                            dir = 'horizontal';
+                        } else {
+                            let newC = (curC + 1 + Math.floor(Math.random() * 4)) % 5;
+                            curC = newC;
+                            newMatrix[curR][curC] = { ...itemData, row: curR, col: curC };
+                            dir = 'vertical';
+                        }
+                    }
+                }
+
+                matrix.value = newMatrix;
+                activeRow.value = 0;
+                activeCol.value = 0;
+                currentDirection.value = 'horizontal';
+                memoryBuffer.value = [];
+            }
+
+            function isCellClickable(r, c) {
+                if (currentDirection.value === 'horizontal') {
+                    return r === activeRow.value;
+                } else {
+                    return c === activeCol.value;
+                }
+            }
+
+            function getCellClass(r, c) {
+                const clickable = isCellClickable(r, c);
+                if (clickable) {
+                    return 'btn-outline-warning border-warning text-warning shadow-sm';
+                }
+                return 'btn-dark border-secondary text-secondary opacity-50';
+            }
+
+            function onCellClick(r, c) {
+                if (isLocked.value || !isCellClickable(r, c)) return;
+
+                const cell = matrix.value[r][c];
+                memoryBuffer.value.push(cell.token);
+
+                if (currentDirection.value === 'horizontal') {
+                    activeCol.value = c;
+                    currentDirection.value = 'vertical';
+                } else {
+                    activeRow.value = r;
+                    currentDirection.value = 'horizontal';
+                }
+
+                checkBufferStatus();
+            }
+
+            function isTargetMatched(index) {
+                const target = currentWave.value.targetSequence;
+                const buf = memoryBuffer.value;
+                
+                for (let start = 0; start <= buf.length - (index + 1); start++) {
+                    let matched = true;
+                    for (let k = 0; k <= index; k++) {
+                        if (buf[start + k] !== target[k]) {
+                            matched = false;
+                            break;
+                        }
+                    }
+                    if (matched) return true;
+                }
+                return false;
+            }
+
+            const canForceComplete = computed(() => {
+                const target = currentWave.value.targetSequence;
+                const buf = memoryBuffer.value;
+                if (buf.length < target.length) return false;
+                
+                for (let start = 0; start <= buf.length - target.length; start++) {
+                    let match = true;
+                    for (let k = 0; k < target.length; k++) {
+                        if (buf[start + k] !== target[k]) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) return true;
+                }
+                return false;
+            });
+
+            function checkBufferStatus() {
+                const target = currentWave.value.targetSequence;
+                const buf = memoryBuffer.value;
+
+                if (canForceComplete.value) {
+                    onWaveSuccess();
+                    return;
+                }
+
+                if (buf.length >= currentWave.value.bufferSize) {
+                    triggerHardcoreReset('БУФЕР ПЕРЕПОЛНЕН: Неверная траектория обхода матрицы!');
+                }
+            }
+
+            function onWaveSuccess() {
+                if (timerInterval) clearInterval(timerInterval);
+
+                if (currentWaveIndex.value + 1 < waves.length) {
+                    currentWaveIndex.value++;
+                    startWave();
+                } else {
+                    gameState.value = 'victory';
+                    totalElapsedSec.value = Math.floor((Date.now() - startTime.value) / 1000);
+
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Урок 25 :: Сложность вычислений (Уровень 3)',
+                        action_type: 'level_complete',
+                        success: true,
+                        attempts_count: attemptsCount.value,
+                        time_spent_sec: totalElapsedSec.value
+                    }, '*');
+                }
+            }
+
+            function forceCompleteWave() {
+                if (canForceComplete.value) {
+                    onWaveSuccess();
+                }
+            }
+
+            function triggerHardcoreReset(reason) {
+                if (timerInterval) clearInterval(timerInterval);
+                isLocked.value = true;
+                attemptsCount.value++;
+                errorMessage.value = reason;
+
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 25 :: Сложность вычислений (Уровень 3)',
+                    action_type: 'hardcore_reset'
+                }, '*');
+
+                setTimeout(() => {
+                    errorMessage.value = '';
+                    isLocked.value = false;
+                    currentWaveIndex.value = 0;
+                    startWave();
+                }, 2200);
+            }
+
+            function startWave() {
+                const wave = currentWave.value;
+                waveTimeLimit.value = wave.timeLimit;
+                waveTimeLeft.value = wave.timeLimit;
+                generateMatrix();
+
+                if (timerInterval) clearInterval(timerInterval);
+                const stepMs = 50;
+                timerInterval = setInterval(() => {
+                    if (isLocked.value) return;
+                    waveTimeLeft.value -= stepMs / 1000;
+                    if (waveTimeLeft.value <= 0) {
+                        waveTimeLeft.value = 0;
+                        clearInterval(timerInterval);
+                        triggerHardcoreReset('ВРЕМЯ ИСТЕКЛО: Экспоненциальный взрыв ядра!');
+                    }
+                }, stepMs);
+            }
+
+            function startGame() {
+                gameState.value = 'playing';
+                currentWaveIndex.value = 0;
+                attemptsCount.value = 0;
+                startTime.value = Date.now();
+                startWave();
+            }
+
+            function handleKeyDown(e) {
+                if (gameState.value === 'intro') {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        startGame();
+                    }
+                } else if (gameState.value === 'playing') {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                        if (canForceComplete.value) {
+                            e.preventDefault();
+                            forceCompleteWave();
+                        }
+                    }
+                }
+            }
+
+            onMounted(() => {
+                window.addEventListener('keydown', handleKeyDown);
+            });
+
+            onUnmounted(() => {
+                window.removeEventListener('keydown', handleKeyDown);
+                if (timerInterval) clearInterval(timerInterval);
+            });
+
+            return {
+                gameState,
+                currentWaveIndex,
+                currentWave,
+                waves,
+                attemptsCount,
+                timeLeftFormatted,
+                timerPercent,
+                totalTimeFormatted,
+                errorMessage,
+                isLocked,
+                matrix,
+                memoryBuffer,
+                currentDirection,
+                activeRow,
+                activeCol,
+                isCellClickable,
+                getCellClass,
+                onCellClick,
+                isTargetMatched,
+                canForceComplete,
+                forceCompleteWave,
+                startGame
+            };
+        }
+    }).mount('#app');
+})();
+</script>
