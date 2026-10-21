@@ -28,7 +28,34 @@ const TARGET_MAP = {
   '«k кратно 7 без остатка»': 'not_statement'
 };
 
-test.describe('Lesson 8-7 Level 3: WAF Arcade Interceptor (Vue 3)', () => {
+async function alignRouterAndLaunch(frame, target) {
+  const getActiveTerminal = async () => {
+    if (await frame.locator('#terminal-true.bg-success').count() > 0) return 'true';
+    if (await frame.locator('#terminal-false.bg-danger').count() > 0) return 'false';
+    if (await frame.locator('#terminal-not-statement.bg-warning').count() > 0) return 'not_statement';
+    return null;
+  };
+
+  let active = await getActiveTerminal();
+
+  if (target === 'not_statement') {
+    if (active !== 'not_statement') {
+      await frame.locator('#router-node-1').click();
+    }
+  } else {
+    if (active === 'not_statement') {
+      await frame.locator('#router-node-1').click();
+    }
+    active = await getActiveTerminal();
+    if (active !== target) {
+      await frame.locator('#router-node-2').click();
+    }
+  }
+
+  await frame.locator('#launch-packet-btn').click();
+}
+
+test.describe('Lesson 8-7 Level 3: WAF Packet Router Arcade (Archetype 2)', () => {
 
   test('should complete all 8 waves successfully and save level_complete telemetry', async ({ page }) => {
     await page.goto('http://localhost:4321/lesson/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/7');
@@ -56,21 +83,14 @@ test.describe('Lesson 8-7 Level 3: WAF Arcade Interceptor (Vue 3)', () => {
       await expect(frame.locator('#phase-counter')).toContainText(`ВОЛНА ${wave} ИЗ 8`);
 
       // Read payload
-      const payloadEl = frame.locator('.fs-4.text-light.fw-bold.my-2');
+      const payloadEl = frame.locator('.fs-4.text-light.fw-bold.my-1');
       await expect(payloadEl).toBeVisible();
       const payload = (await payloadEl.innerText()).trim();
 
       const target = TARGET_MAP[payload];
       expect(target).toBeDefined();
 
-      if (target === 'true') {
-        await frame.locator('button.btn-outline-success').click();
-      } else if (target === 'false') {
-        await frame.locator('button.btn-outline-danger').click();
-      } else {
-        await frame.locator('button.btn-outline-warning').click();
-      }
-
+      await alignRouterAndLaunch(frame, target);
       await page.waitForTimeout(150);
     }
 
@@ -116,11 +136,14 @@ test.describe('Lesson 8-7 Level 3: WAF Arcade Interceptor (Vue 3)', () => {
     const prevRow = db.prepare(`SELECT max(id) as maxId FROM telemetry`).get();
     const prevId = prevRow?.maxId || 0;
 
-    // Read payload and choose OPPOSITE/WRONG target
-    const payloadEl = frame.locator('.fs-4.text-light.fw-bold.my-2');
+    // Read payload and choose intentionally incorrect route
+    const payloadEl = frame.locator('.fs-4.text-light.fw-bold.my-1');
     await expect(payloadEl).toBeVisible();
     const payload = (await payloadEl.innerText()).trim();
     const correctTarget = TARGET_MAP[payload];
+
+    // Deliberately route to wrong destination
+    const wrongTarget = correctTarget === 'true' ? 'false' : 'true';
 
     // Listen for alert on parent page
     page.once('dialog', async dialog => {
@@ -128,11 +151,7 @@ test.describe('Lesson 8-7 Level 3: WAF Arcade Interceptor (Vue 3)', () => {
       await dialog.accept();
     });
 
-    if (correctTarget === 'true') {
-      await frame.locator('button.btn-outline-danger').click();
-    } else {
-      await frame.locator('button.btn-outline-success').click();
-    }
+    await alignRouterAndLaunch(frame, wrongTarget);
 
     // Check DB for hardcore_reset
     await expect.poll(() => {
