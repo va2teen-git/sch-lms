@@ -1,0 +1,901 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 text-success mb-0">Тренажер: Сложность вычислений (Уровень 1)</h2>
+                <div class="text-secondary small">Урок 25 // Технологический профиль (углубленный курс)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Манипуляция мышью // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса и таймер -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Конструирование асимптотического ряда сложности</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ЛОГИЧЕСКИЙ СБОЙ]</strong> <span id="feedback-text">Неверное распределение параметров!</span> 
+                            Регенерация условий...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: Слот-конструирование асимптотик -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-3">
+                        В асимптотическом анализе порядок роста функций определяет практическую вычислимость алгоритмов.
+                        <br>
+                        <strong>Манипуляция мышью:</strong> перетащите функции из палитры (или кликните по токену, затем по свободному слоту), 
+                        чтобы расположить их <strong>строго в порядке возрастания скорости роста</strong> при стремлении входа к бесконечности (<code>n → ∞</code>).
+                        Обратите внимание: в палитре присутствуют дистракторы!
+                    </p>
+
+                    <!-- Палитра токенов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small fw-bold">ПАЛИТРА АСИМПТОТИЧЕСКИХ ТОКЕНОВ (ВЫБЕРИТЕ И ПЕРЕМЕСТИТЕ В СЛОТЫ):</span>
+                            <button id="p1-clear-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в палитру
+                            </button>
+                        </div>
+                        <div id="p1-tokens-palette" class="d-flex flex-wrap gap-2 p-3 border border-secondary bg-dark" style="min-height: 80px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Целевые слоты упорядочивания -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4">
+                        <div class="text-success small fw-bold mb-3 border-bottom border-success pb-1">
+                            ЦЕЛЕВОЙ РЯД СЛОЖНОСТИ (СЛЕВА НАПРАВО: ОТ НАИМЕНЬШЕЙ К НАИБОЛЬШЕЙ):
+                        </div>
+                        <div id="p1-slots-container" class="d-flex flex-wrap gap-2 justify-content-center p-3 bg-dark border border-success">
+                            <!-- Слоты генерируются через JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold font-monospace">
+                            ПРОВЕРИТЬ АСИМПТОТИЧЕСКИЙ РЯД →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: Бакеты P / NP-полные / NP-трудные -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        В теории сложности задачи разделяются на фундаментальные классы по признаку их детерминированной полиномиальной разрешимости 
+                        и свойствам сводимости.
+                        <br>
+                        <strong>Манипуляция мышью:</strong> распределите предложенные вычислительные задачи по трем функциональным контейнерам 
+                        (перетащите карточку мышью или кликните по ней, а затем кликните по целевому контейнеру).
+                    </p>
+
+                    <!-- Пул карточек задач -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small fw-bold">ПУЛ ВЫЧИСЛИТЕЛЬНЫХ ЗАДАЧ (ПЕРЕТАЩИТЕ В БАКЕТЫ НИЖЕ):</span>
+                            <button id="p2-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p2-cards-pool" class="d-flex flex-wrap gap-2 p-3 border border-secondary bg-dark" style="min-height: 80px;">
+                            <!-- Карточки генерируются через JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3 Контейнера (Бакеты) -->
+                    <div class="row g-3 mb-4">
+                        <!-- Бакет 1: Класс P -->
+                        <div class="col-12 col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="class-p" id="bucket-class-p">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">1. КЛАСС P (ПОЛИНОМ)</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">
+                                        Задачи, быстро разрешимые детерминированным алгоритмом за время <code>O(n<sup>k</sup>)</code>.
+                                    </p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2" style="min-height: 180px;">
+                                        <!-- Карточки класса P -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: NP-полные задачи -->
+                        <div class="col-12 col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="class-npc" id="bucket-class-npc">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">2. NP-ПОЛНЫЕ (NPC)</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">
+                                        Сложнейшие задачи в NP: решение проверяется полиномиально, и к ним сводится любая задача из NP.
+                                    </p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2" style="min-height: 180px;">
+                                        <!-- Карточки NPC -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 3: NP-трудные / Неразрешимые -->
+                        <div class="col-12 col-md-4">
+                            <div class="card bg-black border-danger rounded-0 h-100 target-bucket" data-category="class-nphard" id="bucket-class-nphard">
+                                <div class="card-header bg-dark border-bottom border-danger text-danger d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">3. NP-ТРУДНЫЕ / ВНЕ NP</span>
+                                    <span class="badge border border-danger text-danger bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">
+                                        Задачи, как минимум такие же трудные, как NP, но сами не обязательно лежащие в NP (оптимизация, неразрешимость).
+                                    </p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-danger bg-dark d-flex flex-column gap-2" style="min-height: 180px;">
+                                        <!-- Карточки NP-hard -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold font-monospace">
+                            ПРОВЕРИТЬ КЛАССИФИКАЦИЮ ЗАДАЧ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: Коммутация сведений Ричарда Карпа -->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        <strong>Полиномиальная сводимость по Карпу (A ≤<sub>p</sub> B):</strong> 
+                        для доказательства NP-полноты новых задач строится полиномиальный транслятор от уже известной NP-полной задачи.
+                        <br>
+                        <strong>Манипуляция мышью:</strong> соедините исходящие порты известных задач слева с целевыми сводимыми задачами справа 
+                        в соответствии с классической схемой сведений Кука — Левина — Карпа. 
+                        Кликните сначала по исходящему порту слева, а затем по целевому узлу справа.
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Источники сведений -->
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-success rounded-0 p-3 h-100">
+                                <div class="text-success small fw-bold mb-3 border-bottom border-secondary pb-1">
+                                    [ИСТОЧНИКИ ПОЛИНОМИАЛЬНОГО СВЕДЕНИЯ (A)]
+                                </div>
+                                <div id="p3-sources" class="d-flex flex-column gap-3">
+                                    <!-- Генерируется JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Целевые задачи сведений -->
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-warning rounded-0 p-3 h-100">
+                                <div class="text-warning small fw-bold mb-3 border-bottom border-secondary pb-1">
+                                    [ЦЕЛЕВЫЕ СВОДИМЫЕ ЗАДАЧИ (B) И ДИСТРАКТОРЫ]
+                                </div>
+                                <div id="p3-targets" class="d-flex flex-column gap-3">
+                                    <!-- Генерируется JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button id="p3-reset-btn" class="btn btn-outline-secondary rounded-0 font-monospace">
+                            СБРОСИТЬ СОЕДИНЕНИЯ
+                        </button>
+                        <button id="p3-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold font-monospace">
+                            ПРОВЕРИТЬ ГРАФ СВЕДЕНИЙ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="display-3 text-success mb-3">✓</div>
+                    <h3 class="h2 text-success font-monospace mb-2">УРОВЕНЬ 1 УСПЕШНО ЗАВЕРШЕН!</h3>
+                    <p class="text-light mb-4">
+                        Вы успешно сконструировали асимптотический ряд сложности вычислений, 
+                        классифицировали задачи по классам P, NP-полных и NP-трудных, 
+                        а также восстановили ключевые цепочки полиномиальных сведений Ричарда Карпа.
+                    </p>
+
+                    <div class="card bg-black border-success rounded-0 d-inline-block p-4 mb-4 text-start font-monospace">
+                        <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">[ФИНАЛЬНЫЙ ПРОТОКОЛ ТЕЛЕМЕТРИИ]</div>
+                        <div class="text-light mb-1">Статус миссии: <span class="text-success fw-bold">COMPLETED</span></div>
+                        <div class="text-light mb-1">Число ошибок / сбросов: <span id="final-attempts" class="text-warning">0</span></div>
+                        <div class="text-light mb-1">Затраченное время: <span id="final-time" class="text-info">00:00</span></div>
+                        <div class="text-light">Режим проверки: <span class="text-success">Zero Multiple Choice OK</span></div>
+                    </div>
+
+                    <div>
+                        <button id="btn-restart-level" class="btn btn-outline-success rounded-0 px-4 py-2 font-monospace">
+                            Пройти уровень заново
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    // --- Состояние игры и метрики ---
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Таймер
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            const el = document.getElementById('timer-display');
+            if (el) el.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+    startTimer();
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Телеметрия: Ошибка / Сброс
+    function triggerErrorReset(msg, callback) {
+        attemptsCount++;
+        updateAttemptsDisplay();
+        isLocked = true;
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        // Отправка сигнала телеметрии hardcore_reset
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 25 :: Сложность вычислений (Уровень 1)',
+            action_type: 'hardcore_reset'
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 2200);
+    }
+
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        // Телеметрия завершения
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 25 :: Сложность вычислений (Уровень 1)',
+            action_type: 'level_complete',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // БАНК ДАННЫХ ДЛЯ ФАЗЫ 1: Асимптотические функции и ранг сложности
+    // =========================================================================
+    const ASYMPTOTIC_BANK = [
+        { id: 't_c', label: 'O(1)', rank: 1, desc: 'Константная' },
+        { id: 't_log', label: 'O(log n)', rank: 2, desc: 'Логарифмическая' },
+        { id: 't_lin', label: 'O(n)', rank: 3, desc: 'Линейная' },
+        { id: 't_nlogn', label: 'O(n log n)', rank: 4, desc: 'Квазилинейная' },
+        { id: 't_sq', label: 'O(n²)', rank: 5, desc: 'Квадратичная' },
+        { id: 't_cub', label: 'O(n³)', rank: 6, desc: 'Кубическая' },
+        { id: 't_exp', label: 'O(2ⁿ)', rank: 7, desc: 'Экспоненциальная' },
+        { id: 't_fact', label: 'O(n!)', rank: 8, desc: 'Факториальная' }
+    ];
+
+    // Дистракторы для палитры
+    const ASYMPTOTIC_DISTRACTORS = [
+        { id: 'd_zer', label: 'O(1/n)', rank: -1, desc: 'Убывающая (дистрактор)' },
+        { id: 'd_inf', label: 'O(nⁿ)', rank: 99, desc: 'Гиперэкспонента (дистрактор)' }
+    ];
+
+    let p1SelectedToken = null;
+    let p1CurrentSlots = [];
+    let p1TargetCount = 6;
+
+    function initPhase1() {
+        const palette = document.getElementById('p1-tokens-palette');
+        const slotsCont = document.getElementById('p1-slots-container');
+        if (!palette || !slotsCont) return;
+
+        palette.innerHTML = '';
+        slotsCont.innerHTML = '';
+        p1SelectedToken = null;
+
+        // Выбираем 6 функций из канонического ряда по возрастанию ранга
+        // Гарантируем, что они образуют строго возрастающую последовательность
+        const shuffledIndices = [0, 1, 2, 3, 4, 5, 6, 7];
+        // Выбираем 6 случайных позиций
+        for (let i = shuffledIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+        }
+        const chosen = shuffledIndices.slice(0, p1TargetCount).sort((a, b) => a - b).map(idx => ASYMPTOTIC_BANK[idx]);
+        
+        // Создаем слоты под количество выбранных токенов
+        p1CurrentSlots = new Array(p1TargetCount).fill(null);
+        for (let i = 0; i < p1TargetCount; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'p1-slot border border-secondary bg-black d-flex flex-column align-items-center justify-content-center p-2 text-center';
+            slot.style.width = '140px';
+            slot.style.minHeight = '80px';
+            slot.dataset.slotIndex = String(i);
+            slot.innerHTML = `<span class="text-secondary small mb-1">Слот ${i + 1}</span><span class="p1-slot-content text-success fw-bold">---</span>`;
+
+            slot.addEventListener('click', () => {
+                if (isLocked) return;
+                handleSlotClick(i);
+            });
+            slotsCont.appendChild(slot);
+        }
+
+        // В палитру добавляем выбранные функции + 2 дистрактора и перемешиваем
+        const pool = [...chosen, ...ASYMPTOTIC_DISTRACTORS];
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+
+        pool.forEach(item => {
+            const token = document.createElement('div');
+            token.className = 'p1-token btn btn-outline-success rounded-0 font-monospace p-2 d-flex flex-column align-items-center';
+            token.style.cursor = 'pointer';
+            token.style.minWidth = '130px';
+            token.dataset.id = item.id;
+            token.dataset.rank = String(item.rank);
+            token.innerHTML = `<span class="fw-bold fs-6">${item.label}</span><span class="text-secondary small" style="font-size: 0.7rem;">${item.desc}</span>`;
+
+            token.addEventListener('click', () => {
+                if (isLocked) return;
+                handleTokenClick(token, item);
+            });
+
+            palette.appendChild(token);
+        });
+    }
+
+    function handleTokenClick(tokenEl, item) {
+        if (tokenEl.classList.contains('disabled') || tokenEl.classList.contains('opacity-25')) {
+            // Если токен уже в слоте, можно кликнуть для возврата
+            return;
+        }
+
+        // Снимаем выделение со всех
+        document.querySelectorAll('.p1-token').forEach(t => t.classList.remove('border-warning', 'text-warning'));
+
+        if (p1SelectedToken && p1SelectedToken.item.id === item.id) {
+            p1SelectedToken = null;
+            return;
+        }
+
+        p1SelectedToken = { el: tokenEl, item: item };
+        tokenEl.classList.add('border-warning', 'text-warning');
+
+        // Если есть первый свободный слот, помещаем туда автоматически
+        const firstEmptySlot = p1CurrentSlots.findIndex(s => s === null);
+        if (firstEmptySlot !== -1) {
+            placeTokenInSlot(firstEmptySlot, item, tokenEl);
+        }
+    }
+
+    function handleSlotClick(slotIndex) {
+        if (p1CurrentSlots[slotIndex]) {
+            // Очищаем слот и возвращаем токен
+            const prevTokenId = p1CurrentSlots[slotIndex].id;
+            const tokenEl = document.querySelector(`.p1-token[data-id="${prevTokenId}"]`);
+            if (tokenEl) {
+                tokenEl.classList.remove('opacity-25', 'disabled');
+            }
+            p1CurrentSlots[slotIndex] = null;
+            updateSlotUI(slotIndex);
+            return;
+        }
+
+        if (p1SelectedToken) {
+            placeTokenInSlot(slotIndex, p1SelectedToken.item, p1SelectedToken.el);
+        }
+    }
+
+    function placeTokenInSlot(slotIndex, item, tokenEl) {
+        // Если этот токен уже где-то стоял, убираем его оттуда
+        const existingIdx = p1CurrentSlots.findIndex(s => s && s.id === item.id);
+        if (existingIdx !== -1) {
+            p1CurrentSlots[existingIdx] = null;
+            updateSlotUI(existingIdx);
+        }
+
+        p1CurrentSlots[slotIndex] = item;
+        updateSlotUI(slotIndex);
+
+        tokenEl.classList.add('opacity-25', 'disabled');
+        tokenEl.classList.remove('border-warning', 'text-warning');
+        p1SelectedToken = null;
+    }
+
+    function updateSlotUI(slotIndex) {
+        const slotEl = document.querySelector(`.p1-slot[data-slot-index="${slotIndex}"]`);
+        if (!slotEl) return;
+        const item = p1CurrentSlots[slotIndex];
+        const contentSpan = slotEl.querySelector('.p1-slot-content');
+        if (item) {
+            contentSpan.textContent = item.label;
+            contentSpan.className = 'p1-slot-content text-success fw-bold fs-6';
+            slotEl.classList.add('border-success');
+            slotEl.classList.remove('border-secondary');
+        } else {
+            contentSpan.textContent = '---';
+            contentSpan.className = 'p1-slot-content text-secondary';
+            slotEl.classList.remove('border-success');
+            slotEl.classList.add('border-secondary');
+        }
+    }
+
+    document.getElementById('p1-clear-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        p1CurrentSlots = new Array(p1TargetCount).fill(null);
+        document.querySelectorAll('.p1-slot').forEach((_, i) => updateSlotUI(i));
+        document.querySelectorAll('.p1-token').forEach(t => t.classList.remove('opacity-25', 'disabled', 'border-warning', 'text-warning'));
+        p1SelectedToken = null;
+    });
+
+    document.getElementById('p1-verify-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+
+        // Проверяем заполненность всех слотов
+        if (p1CurrentSlots.some(s => s === null)) {
+            triggerErrorReset('Заполните все целевые слоты асимптотического ряда!');
+            return;
+        }
+
+        // Проверяем наличие дистракторов
+        if (p1CurrentSlots.some(s => s.rank < 0 || s.rank > 50)) {
+            triggerErrorReset('В ряду обнаружен некорректный дистрактор!', () => initPhase1());
+            return;
+        }
+
+        // Проверяем строгий монотонный рост рангов
+        let isCorrect = true;
+        for (let i = 0; i < p1CurrentSlots.length - 1; i++) {
+            if (p1CurrentSlots[i].rank >= p1CurrentSlots[i + 1].rank) {
+                isCorrect = false;
+                break;
+            }
+        }
+
+        if (isCorrect) {
+            currentPhase = 2;
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Классификация задач по фундаментальным классам (P, NPC, NP-hard)';
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            initPhase2();
+        } else {
+            triggerErrorReset('Порядок роста нарушен! Функции должны быть упорядочены от медленнее растущих к быстрее растущим.', () => initPhase1());
+        }
+    });
+
+    // =========================================================================
+    // БАНК ДАННЫХ ДЛЯ ФАЗЫ 2: Классификация вычислительных задач (Бакеты)
+    // =========================================================================
+    const ALL_CLASS_P_CARDS = [
+        { id: 'p_dijkstra', text: 'Поиск кратчайшего пути Дейкстры O(V²)', cat: 'class-p' },
+        { id: 'p_merge', text: 'Сортировка слиянием MergeSort O(n log n)', cat: 'class-p' },
+        { id: 'p_bfs', text: 'Обход графа в ширину BFS O(V + E)', cat: 'class-p' },
+        { id: 'p_2sat', text: 'Выполнимость булевых формул 2-SAT', cat: 'class-p' },
+        { id: 'p_bipartite', text: 'Проверка двудольности графа O(V + E)', cat: 'class-p' },
+        { id: 'p_euclid', text: 'Алгоритм Евклида для поиска НОД O(log n)', cat: 'class-p' }
+    ];
+
+    const ALL_CLASS_NPC_CARDS = [
+        { id: 'npc_3sat', text: 'Выполнимость булевых формул 3-SAT', cat: 'class-npc' },
+        { id: 'npc_clique', text: 'Поиск клики размера k в графе', cat: 'class-npc' },
+        { id: 'npc_vertex', text: 'Задача о вершинном покрытии (Vertex Cover)', cat: 'class-npc' },
+        { id: 'npc_hamilton', text: 'Проверка существования гамильтонова цикла', cat: 'class-npc' },
+        { id: 'npc_color', text: 'Раскраска вершин графа в 3 цвета (3-Coloring)', cat: 'class-npc' },
+        { id: 'npc_knapsack', text: 'Задача о рюкзаке (разрешение: ценность ≥ V)', cat: 'class-npc' }
+    ];
+
+    const ALL_CLASS_NPHARD_CARDS = [
+        { id: 'nph_tsp', text: 'Точная оптимизационная задача коммивояжера', cat: 'class-nphard' },
+        { id: 'nph_halting', text: 'Задача останова машины Тьюринга (Неразрешимая)', cat: 'class-nphard' },
+        { id: 'nph_pcp', text: 'Проблема соответствий Поста ПСП (Неразрешимая)', cat: 'class-nphard' },
+        { id: 'nph_rice', text: 'Анализ нетривиальных семантических свойств по Райсу', cat: 'class-nphard' },
+        { id: 'nph_opt_knap', text: 'Поиск абсолютно максимальной ценности рюкзака', cat: 'class-nphard' }
+    ];
+
+    let p2SelectedCard = null;
+    let p2ActiveCards = [];
+
+    function initPhase2() {
+        const poolEl = document.getElementById('p2-cards-pool');
+        if (!poolEl) return;
+        poolEl.innerHTML = '';
+        p2SelectedCard = null;
+
+        // Очищаем слоты бакетов
+        document.querySelectorAll('.target-bucket .bucket-slot').forEach(slot => {
+            slot.innerHTML = '';
+        });
+        document.querySelectorAll('.target-bucket .count-badge').forEach(badge => {
+            badge.textContent = '0';
+        });
+
+        // Случайно выбираем по 2 задачи из каждой группы
+        function pickRandom(arr, count) {
+            const copy = [...arr];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy.slice(0, count);
+        }
+
+        const chosenP = pickRandom(ALL_CLASS_P_CARDS, 2);
+        const chosenNPC = pickRandom(ALL_CLASS_NPC_CARDS, 2);
+        const chosenNPHard = pickRandom(ALL_CLASS_NPHARD_CARDS, 2);
+
+        p2ActiveCards = [...chosenP, ...chosenNPC, ...chosenNPHard];
+        // Перемешиваем общий пул
+        for (let i = p2ActiveCards.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [p2ActiveCards[i], p2ActiveCards[j]] = [p2ActiveCards[j], p2ActiveCards[i]];
+        }
+
+        p2ActiveCards.forEach(card => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'p2-task-card btn btn-outline-light rounded-0 text-start p-2 font-monospace';
+            cardEl.style.cursor = 'pointer';
+            cardEl.dataset.id = card.id;
+            cardEl.dataset.cat = card.cat;
+            cardEl.textContent = card.text;
+
+            cardEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isLocked) return;
+                handleP2CardClick(cardEl, card);
+            });
+
+            poolEl.appendChild(cardEl);
+        });
+
+        // Привязываем клики к бакетам
+        document.querySelectorAll('.target-bucket').forEach(bucket => {
+            bucket.onclick = () => {
+                if (isLocked || !p2SelectedCard) return;
+                moveCardToBucket(p2SelectedCard.el, bucket);
+            };
+        });
+    }
+
+    function handleP2CardClick(cardEl, card) {
+        document.querySelectorAll('.p2-task-card').forEach(c => c.classList.remove('border-warning', 'text-warning'));
+
+        if (p2SelectedCard && p2SelectedCard.card.id === card.id) {
+            p2SelectedCard = null;
+            return;
+        }
+
+        p2SelectedCard = { el: cardEl, card: card };
+        cardEl.classList.add('border-warning', 'text-warning');
+    }
+
+    function moveCardToBucket(cardEl, bucketEl) {
+        const slot = bucketEl.querySelector('.bucket-slot');
+        if (!slot) return;
+
+        cardEl.classList.remove('border-warning', 'text-warning');
+        slot.appendChild(cardEl);
+        p2SelectedCard = null;
+        updateBucketCounts();
+    }
+
+    function updateBucketCounts() {
+        document.querySelectorAll('.target-bucket').forEach(bucket => {
+            const count = bucket.querySelectorAll('.p2-task-card').length;
+            const badge = bucket.querySelector('.count-badge');
+            if (badge) badge.textContent = String(count);
+        });
+    }
+
+    document.getElementById('p2-reset-pool-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const poolEl = document.getElementById('p2-cards-pool');
+        document.querySelectorAll('.p2-task-card').forEach(cardEl => {
+            poolEl.appendChild(cardEl);
+            cardEl.classList.remove('border-warning', 'text-warning');
+        });
+        p2SelectedCard = null;
+        updateBucketCounts();
+    });
+
+    document.getElementById('p2-verify-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+
+        const poolEl = document.getElementById('p2-cards-pool');
+        if (poolEl && poolEl.children.length > 0) {
+            triggerErrorReset('Распределите все карточки по трем контейнерам!');
+            return;
+        }
+
+        // Проверяем принадлежность карточек в каждом бакете
+        let isCorrect = true;
+        document.querySelectorAll('.target-bucket').forEach(bucket => {
+            const targetCat = bucket.dataset.category;
+            bucket.querySelectorAll('.p2-task-card').forEach(cardEl => {
+                if (cardEl.dataset.cat !== targetCat) {
+                    isCorrect = false;
+                }
+            });
+        });
+
+        if (isCorrect) {
+            currentPhase = 3;
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Коммутация графа сведений Ричарда Карпа (≤ₚ)';
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            initPhase3();
+        } else {
+            triggerErrorReset('Некоторые задачи помещены в неверный класс сложности!', () => initPhase2());
+        }
+    });
+
+    // =========================================================================
+    // БАНК ДАННЫХ ДЛЯ ФАЗЫ 3: Коммутация полиномиальных сведений Карпа
+    // =========================================================================
+    const KARP_REDUCTIONS_BANK = [
+        {
+            src: { id: 's_sat', title: 'SAT (Кук-Левин)', desc: 'Общая выполнимость булевой формулы в КНФ' },
+            tgt: { id: 't_3sat', title: '3-SAT', desc: 'КНФ с ровно 3 литералами в дизъюнкте' }
+        },
+        {
+            src: { id: 's_3sat', title: '3-SAT (КНФ-3)', desc: 'Формула из троек литералов' },
+            tgt: { id: 't_clique', title: 'КЛИКА (CLIQUE)', desc: 'Поиск полного подграфа из k вершин' }
+        },
+        {
+            src: { id: 's_clique', title: 'КЛИКА (CLIQUE)', desc: 'Полный подграф k вершин' },
+            tgt: { id: 't_indset', title: 'НЕЗАВИСИМОЕ МНОЖЕСТВО', desc: 'k попарно несмежных вершин в дополнительном графе' }
+        },
+        {
+            src: { id: 's_vcover', title: 'ВЕРШИННОЕ ПОКРЫТИЕ', desc: 'Инцидентность всем ребрам графа' },
+            tgt: { id: 't_hamilton', title: 'ГАМИЛЬТОНОВ ЦИКЛ (TSP)', desc: 'Обход всех вершин графа ровно по одному разу' }
+        }
+    ];
+
+    const DISTRACTOR_TARGETS = [
+        { id: 'd_quicksort', title: 'Быстрая сортировка QuickSort', desc: 'Алгоритм класса P O(n log n) (дистрактор)' },
+        { id: 'd_floyd', title: 'Алгоритм Флойда-Уоршелла', desc: 'Полиномиальный поиск путей O(n³) (дистрактор)' }
+    ];
+
+    let p3Connections = {}; // srcId -> tgtId
+    let p3SelectedSrc = null;
+
+    function initPhase3() {
+        const sourcesCont = document.getElementById('p3-sources');
+        const targetsCont = document.getElementById('p3-targets');
+        if (!sourcesCont || !targetsCont) return;
+
+        sourcesCont.innerHTML = '';
+        targetsCont.innerHTML = '';
+        p3Connections = {};
+        p3SelectedSrc = null;
+
+        // Источники
+        KARP_REDUCTIONS_BANK.forEach(item => {
+            const srcCard = document.createElement('div');
+            srcCard.className = 'p3-node-source btn btn-outline-success rounded-0 text-start p-3 font-monospace d-flex justify-content-between align-items-center';
+            srcCard.dataset.srcId = item.src.id;
+            srcCard.innerHTML = `
+                <div>
+                    <div class="fw-bold fs-6">${item.src.title}</div>
+                    <div class="text-secondary small">${item.src.desc}</div>
+                </div>
+                <span class="badge border border-success text-success bg-dark rounded-0 p3-src-status">ВЫБРАТЬ</span>
+            `;
+
+            srcCard.addEventListener('click', () => {
+                if (isLocked) return;
+                handleP3SrcClick(srcCard, item.src.id);
+            });
+
+            sourcesCont.appendChild(srcCard);
+        });
+
+        // Приемники: правильные + дистракторы
+        const targetPool = [...KARP_REDUCTIONS_BANK.map(k => k.tgt), ...DISTRACTOR_TARGETS];
+        for (let i = targetPool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [targetPool[i], targetPool[j]] = [targetPool[j], targetPool[i]];
+        }
+
+        targetPool.forEach(tgt => {
+            const tgtCard = document.createElement('div');
+            tgtCard.className = 'p3-node-target btn btn-outline-warning rounded-0 text-start p-3 font-monospace d-flex justify-content-between align-items-center';
+            tgtCard.dataset.tgtId = tgt.id;
+            tgtCard.innerHTML = `
+                <div>
+                    <div class="fw-bold fs-6">${tgt.title}</div>
+                    <div class="text-secondary small">${tgt.desc}</div>
+                </div>
+                <span class="badge border border-secondary text-secondary bg-dark rounded-0 p3-tgt-status">СВОБОДЕН</span>
+            `;
+
+            tgtCard.addEventListener('click', () => {
+                if (isLocked) return;
+                handleP3TgtClick(tgtCard, tgt.id);
+            });
+
+            targetsCont.appendChild(tgtCard);
+        });
+    }
+
+    function handleP3SrcClick(srcEl, srcId) {
+        document.querySelectorAll('.p3-node-source').forEach(el => el.classList.remove('border-warning', 'text-warning'));
+
+        if (p3SelectedSrc === srcId) {
+            p3SelectedSrc = null;
+            return;
+        }
+
+        p3SelectedSrc = srcId;
+        srcEl.classList.add('border-warning', 'text-warning');
+    }
+
+    function handleP3TgtClick(tgtEl, tgtId) {
+        if (!p3SelectedSrc) return;
+
+        // Если приемник уже занят другим источником, удаляем ту связь
+        for (const [sId, tId] of Object.entries(p3Connections)) {
+            if (tId === tgtId) {
+                delete p3Connections[sId];
+                updateSrcStatus(sId, null);
+            }
+        }
+
+        p3Connections[p3SelectedSrc] = tgtId;
+        updateSrcStatus(p3SelectedSrc, tgtId);
+        updateTgtStatuses();
+
+        // Снимаем выделение
+        document.querySelectorAll('.p3-node-source').forEach(el => el.classList.remove('border-warning', 'text-warning'));
+        p3SelectedSrc = null;
+    }
+
+    function updateSrcStatus(srcId, tgtId) {
+        const srcEl = document.querySelector(`.p3-node-source[data-src-id="${srcId}"]`);
+        if (!srcEl) return;
+        const statusBadge = srcEl.querySelector('.p3-src-status');
+        if (tgtId) {
+            statusBadge.textContent = 'СВЯЗАН →';
+            statusBadge.className = 'badge bg-success text-dark rounded-0 p3-src-status';
+        } else {
+            statusBadge.textContent = 'ВЫБРАТЬ';
+            statusBadge.className = 'badge border border-success text-success bg-dark rounded-0 p3-src-status';
+        }
+    }
+
+    function updateTgtStatuses() {
+        document.querySelectorAll('.p3-node-target').forEach(tgtEl => {
+            const tgtId = tgtEl.dataset.tgtId;
+            const statusBadge = tgtEl.querySelector('.p3-tgt-status');
+            const isConnected = Object.values(p3Connections).includes(tgtId);
+            if (isConnected) {
+                statusBadge.textContent = 'ПОДКЛЮЧЕН';
+                statusBadge.className = 'badge bg-warning text-dark rounded-0 p3-tgt-status';
+            } else {
+                statusBadge.textContent = 'СВОБОДЕН';
+                statusBadge.className = 'badge border border-secondary text-secondary bg-dark rounded-0 p3-tgt-status';
+            }
+        });
+    }
+
+    document.getElementById('p3-reset-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        p3Connections = {};
+        p3SelectedSrc = null;
+        document.querySelectorAll('.p3-node-source').forEach(srcEl => {
+            srcEl.classList.remove('border-warning', 'text-warning');
+            const statusBadge = srcEl.querySelector('.p3-src-status');
+            statusBadge.textContent = 'ВЫБРАТЬ';
+            statusBadge.className = 'badge border border-success text-success bg-dark rounded-0 p3-src-status';
+        });
+        updateTgtStatuses();
+    });
+
+    document.getElementById('p3-verify-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+
+        // Должны быть соединены все 4 источника
+        if (Object.keys(p3Connections).length < KARP_REDUCTIONS_BANK.length) {
+            triggerErrorReset('Соедините все задачи-источники с соответствующими целевыми задачами!');
+            return;
+        }
+
+        // Проверяем корректность связей
+        let isCorrect = true;
+        KARP_REDUCTIONS_BANK.forEach(item => {
+            if (p3Connections[item.src.id] !== item.tgt.id) {
+                isCorrect = false;
+            }
+        });
+
+        if (isCorrect) {
+            completeLevel();
+        } else {
+            triggerErrorReset('В цепи полиномиальных сведений обнаружена ошибка редукции!', () => initPhase3());
+        }
+    });
+
+    document.getElementById('btn-restart-level')?.addEventListener('click', () => {
+        window.location.reload();
+    });
+
+    // Старт
+    initPhase1();
+})();
+</script>
