@@ -16,6 +16,7 @@
  */
 
 import { expect } from '@playwright/test';
+import { DifficultyBenchmarker, calculateCCS, GRADE_CORRIDORS } from './difficulty-benchmarker.js';
 
 export const LearnerPersona = {
   NOVICE: 'novice',
@@ -37,9 +38,15 @@ export class StudentSimulator {
     this.consoleErrors = [];
     this.unhandledExceptions = [];
 
-    if (options.catchConsoleErrors !== false) {
+    if (this.page && options.catchConsoleErrors !== false) {
       this.attachErrorListeners();
     }
+
+    this.benchmarker = options.benchmarker || new DifficultyBenchmarker({
+      courseSlug: options.courseSlug,
+      lessonId: options.lessonId,
+      levelNumber: options.levelNumber
+    });
   }
 
   /**
@@ -308,4 +315,49 @@ export class StudentSimulator {
     const text = await locator.innerText();
     return text.trim().replace(/\s+/g, ' ');
   }
+
+  /**
+   * Benchmarks a phase's cognitive difficulty (CCS 1-10) and records telemetry.
+   * 
+   * @param {number} phaseNumber
+   * @param {Object} data
+   */
+  recordPhaseDifficulty(phaseNumber, data) {
+    return this.benchmarker.recordPhase(phaseNumber, data);
+  }
+
+  /**
+   * Audits clickable element hitboxes to detect Pixel Hunting (< minSize px).
+   * 
+   * @param {import('@playwright/test').Locator[]} locators
+   * @param {number} [minSize=36]
+   */
+  async auditHitboxes(locators, minSize = 36) {
+    return await this.benchmarker.auditHitboxes(locators, minSize);
+  }
+
+  /**
+   * Asserts difficulty compliance according to docs/difficulty-curve.md:
+   * - Sawtooth 2-1-2 profile (for Level 2)
+   * - Grade & Track Corridor
+   * - Absence of Fake Difficulty anti-patterns
+   * 
+   * @param {Object} [options]
+   */
+  assertDifficultyCompliance(options = {}) {
+    if (options.noFakeDifficulty !== false) {
+      this.benchmarker.assertNoFakeDifficulty();
+    }
+    if (options.sawtooth !== false && this.benchmarker.phases.length === 5) {
+      this.benchmarker.assertSawtoothProfile();
+    }
+    if (options.corridor !== false) {
+      this.benchmarker.assertGradeCorridor();
+    }
+    if (options.renderReport !== false) {
+      this.benchmarker.renderReport();
+    }
+  }
 }
+
+export { DifficultyBenchmarker, calculateCCS, GRADE_CORRIDORS };
