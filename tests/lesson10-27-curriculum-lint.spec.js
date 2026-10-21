@@ -4,6 +4,7 @@ import path from 'path';
 
 test.describe('Curriculum & Architecture Linting Suite (10th Grade Advanced - Lesson 27: Discretization & Signals)', () => {
   const lessonPath = path.join(process.cwd(), 'src/content/lessons/10-класс_углубленный/27');
+  const tasksPath = path.join(process.cwd(), 'src/pages/tasks/10-класс_углубленный/27');
 
   test('Theory file exists and contains essential educational sections from Polyakov 10th grade (advanced)', async () => {
     const theoryFile = path.join(lessonPath, 'theory.md');
@@ -45,5 +46,42 @@ test.describe('Curriculum & Architecture Linting Suite (10th Grade Advanced - Le
 
     // Check that clean HTML/Unicode notation is used instead
     expect(content).toMatch(/<sub.*>|<sup.*>/);
+  });
+
+  test('Level 1 adheres to architectural and game design requirements', async () => {
+    const level1File = path.join(tasksPath, 'level1.astro');
+    expect(fs.existsSync(level1File)).toBe(true);
+
+    const code = fs.readFileSync(level1File, 'utf-8');
+
+    // TaskLayout component usage
+    expect(code).toContain('import TaskLayout');
+    expect(code).toContain('<TaskLayout level={1}');
+
+    // Telemetry events
+    expect(code).toContain('TELEMETRY_EVENT');
+    expect(code).toContain('level_complete');
+    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('Урок 27');
+
+    // 3 phases
+    expect(code).toContain('id="phase1"');
+    expect(code).toContain('id="phase2"');
+    expect(code).toContain('id="phase3"');
+    expect(code).toContain('Шаг 1 из 3');
+    expect(code).toContain('Шаг 2 из 3');
+    expect(code).toContain('Шаг 3 из 3');
+
+    // Zero-Style Policy (no <style> tags)
+    expect(code.includes('<style>')).toBe(false);
+    expect(code.includes('<style ')).toBe(false);
+
+    // Zero Multiple Choice Policy
+    expect(code.includes('type="radio"')).toBe(false);
+    expect(code.includes('<select')).toBe(false);
+
+    // Container Responsiveness
+    expect(code).toContain('container-fluid');
+    expect(code.includes('class="container"')).toBe(false);
   });
 });
