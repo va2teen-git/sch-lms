@@ -1,0 +1,833 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / «Финальный босс»): 7 класс, Урок 8 - Контрольная работа: Сервисы интернет-коммуникаций. Сетевой этикет. Стратегии безопасного поведения в Интернете
+// Архетип 9: «Active Firewall Interceptor / Магистральный щит коммуникаций»
+// Декларативный стек: Vue 3
+// 10 процедурных волн под таймером (6.5 сек -> 3.5 сек), тотальный хардкор-сброс на шаг 1 при любой ошибке.
+---
+
+<TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
+<div id="app" class="container-fluid min-vh-100 p-2 p-md-3 bg-black text-danger font-monospace" v-cloak>
+
+    <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ МИССИИ) -->
+    <div v-if="!started && !completed" class="text-center py-4 py-md-5">
+        <div class="d-inline-block border border-danger p-3 p-md-4 bg-dark rounded-0 mb-4 text-start shadow-lg" style="max-width: 840px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                <h1 class="h3 text-danger mb-0 fw-bold">🛡️ FIREWALL INTERCEPTOR // АРХЕТИП 9</h1>
+                <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-2">ФИНАЛЬНЫЙ БОСС</span>
+            </div>
+            
+            <p class="text-light fs-5 mb-3">
+                На пограничный сетевой шлюз школы обрушился поток входящих коммуникационных запросов (веб-сессии, электронные письма, мессенджеры, переводы данных).
+                Вам поручено отразить <span class="text-danger fw-bold">10 нарастающих волн коммуникационного трафика</span> 
+                до переполнения буфера брандмауэра.
+            </p>
+
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
+                <div class="fw-bold text-danger mb-2 text-uppercase">[ПРОТОКОЛ ХАРДКОР-РЕАГИРОВАНИЯ]:</div>
+                <ul class="mb-0 ps-3">
+                    <li class="mb-1">• <span class="text-warning fw-bold">Динамический таймер такта:</span> От <span class="text-danger fw-bold">6.5 секунд</span> на 1-й волне до <span class="text-danger fw-bold">3.5 секунд</span> на 10-й волне!</li>
+                    <li class="mb-1">• <span class="text-warning fw-bold">Тотальный сброс (Full Wipeout):</span> Любая ошибка классификации, пропуск фишинга, ложная блокировка или тайм-аут вызывают аварийную тревогу и <span class="text-danger fw-bold">ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</span> с новой процедурной генерацией!</li>
+                    <li class="mb-1">• <span class="text-warning fw-bold">Два рубежа фильтрации:</span> <span class="text-success fw-bold">[ALLOW: Пропустить]</span> для легитимного защищенного трафика и <span class="text-danger fw-bold">[DROP: Блокировать]</span> для фишинга, опасных вложений, перехвата паролей и утечек ПДн.</li>
+                </ul>
+            </div>
+
+            <div class="text-secondary small mb-4">
+                Управление: кликами по кнопкам шлюза или горячими клавишами:
+                <kbd class="bg-dark text-success border border-success">1</kbd> / <kbd class="bg-dark text-success border border-success">A</kbd> / <kbd class="bg-dark text-success border border-success">←</kbd> (ALLOW), 
+                <kbd class="bg-dark text-danger border border-danger">0</kbd> / <kbd class="bg-dark text-danger border border-danger">D</kbd> / <kbd class="bg-dark text-danger border border-danger">→</kbd> (DROP).
+            </div>
+
+            <div class="text-center pt-2">
+                <button @click="startGame" id="btn-start" class="btn btn-outline-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    АКТИВИРОВАТЬ ЩИТ БРАНДМАУЭРА [ENTER]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ЭКРАН ПОБЕДЫ -->
+    <div v-else-if="completed" id="success-screen" class="text-center py-4 py-md-5">
+        <div class="d-inline-block border border-success p-4 p-md-5 bg-dark rounded-0 shadow-lg" style="max-width: 800px;">
+            <div class="text-success display-2 mb-3">🛡️ СИСТЕМА ЗАЩИЩЕНА 🛡️</div>
+            <h1 class="display-6 text-success fw-bold mb-3">ПЕРИМЕТР БЕЗОПАСНОСТИ УСПЕШНО ОТРАЗИЛ АТАКУ</h1>
+            <p class="fs-5 text-light mb-4">
+                Все 10 волн коммуникационного трафика успешно нейтрализованы! Фишинговые атаки, вредоносные вложения, спуфинг заголовков и утечки персональных данных заблокированы. Легитимные школьные службы функционируют без сбоев.
+            </p>
+            <div class="d-inline-block p-4 border border-success bg-black text-start small mx-auto mb-4" style="min-width: 360px;">
+                <div class="mb-1 text-light">СТАТУС: <span class="text-success fw-bold">АРКАДНЫЙ БОСС УРОВНЯ 3 ПОВЕРЖЕН</span></div>
+                <div class="mb-1 text-light">ОТРАЖЕНО ВОЛН: <span class="text-success fw-bold">10 / 10</span></div>
+                <div class="mb-1 text-light">ЗАТРАЧЕНО ВРЕМЕНИ: <span class="text-warning fw-bold"><span v-text="totalTimeSpent"></span> СЕК</span></div>
+                <div class="text-light">СБРОСОВ ХАРДКОРА: <span class="text-warning fw-bold"><span v-text="attempts"></span></span></div>
+            </div>
+            <div>
+                <button @click="startGame" id="btn-replay" class="btn btn-outline-success btn-lg rounded-0 fw-bold px-5 py-3 shadow">
+                    ПОВТОРИТЬ МИССИЮ [ENTER]
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ИГРОВОЙ ЭКРАН (ОТРАЖЕНИЕ ВОЛН БРАНДМАУЭРА) -->
+    <div v-else class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+
+            <!-- Шапка волны и таймера -->
+            <div class="card bg-dark border-danger rounded-0 mb-3 p-3 shadow">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-secondary small fw-bold">СЕТЕВОЙ ЭКРАН // ШЛЮЗ ШКОЛЫ:</span>
+                            <span id="phase-counter" class="text-danger fw-bold fs-5">ВОЛНА <span v-text="currentWaveIndex + 1"></span> ИЗ 10</span>
+                        </div>
+                        <div class="progress bg-black border border-secondary rounded-0" style="height: 12px;">
+                            <div class="progress-bar bg-danger" :style="{ width: progressPercent + '%' }"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-3 mt-md-0 text-md-end">
+                        <div class="text-secondary small fw-bold mb-1">ТАЙМЕР РЕАКЦИИ БУФЕРА:</div>
+                        <div class="d-flex align-items-center justify-content-md-end gap-2">
+                            <span id="timer-display" :class="timeLeft <= 2.0 ? 'text-danger fw-bold' : 'text-warning fw-bold'" class="fs-4">
+                                <span v-text="formattedTime"></span> сек
+                            </span>
+                            <div class="progress bg-black border border-secondary rounded-0 d-inline-block" style="width: 140px; height: 12px;">
+                                <div class="progress-bar" :class="timeLeft <= 2.0 ? 'bg-danger' : 'bg-warning'" :style="{ width: (timeLeft / waveTimeLimit * 100) + '%' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сирена тревоги при сбросе -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black border-danger rounded-0 text-center py-3 mb-3 shadow" role="alert">
+                <h4 class="fw-bold mb-1">[СИСТЕМНАЯ СИРЕНА // АВАРИЙНЫЙ СБРОС]</h4>
+                <div class="text-light fs-5" v-text="alarmMessage"></div>
+                <div class="text-warning small mt-2">ТОТАЛЬНЫЙ СБРОС НА ВОЛНУ 1... ПЕРЕЗАГРУЗКА ПАКЕТНОГО ФИЛЬТРА...</div>
+            </div>
+
+            <!-- Карточка входящего пакета (Firewall Target Packet) -->
+            <div v-if="currentWave" id="target-packet-card" :data-target="currentWave.target" class="card bg-dark border-danger rounded-0 p-3 p-md-4 mb-3 shadow">
+                <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3 gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-1">
+                            PACKET #<span v-text="currentWave.id"></span>
+                        </span>
+                        <span class="badge bg-black border border-secondary text-info rounded-0 px-2 py-1">
+                            <span v-text="currentWave.protocol"></span>:<span v-text="currentWave.port"></span>
+                        </span>
+                    </div>
+                    <span class="text-secondary small">
+                        СЛУЖБА: <span class="text-warning fw-bold" v-text="currentWave.service"></span>
+                    </span>
+                    <span class="badge bg-black border border-danger text-danger rounded-0 px-2 py-1">
+                        ШЛЮЗ: <span v-text="currentWave.direction"></span>
+                    </span>
+                </div>
+
+                <!-- Блок технических характеристик пакета (Data Source) -->
+                <div class="row g-2 mb-3 text-start small">
+                    <div class="col-md-6">
+                        <div class="bg-black border border-secondary p-2">
+                            <span class="text-secondary">УЗЕЛ / ИСТОЧНИК: </span>
+                            <span class="text-light fw-bold font-monospace" v-text="currentWave.source"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bg-black border border-secondary p-2">
+                            <span class="text-secondary">НАЗНАЧЕНИЕ / СЕРВЕР: </span>
+                            <span class="text-light fw-bold font-monospace" v-text="currentWave.destination"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bg-black border border-secondary p-2">
+                            <span class="text-secondary">КАНАЛ / ШИФРОВАНИЕ: </span>
+                            <span :class="currentWave.encryptionClass" class="fw-bold" v-text="currentWave.encryption"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bg-black border border-secondary p-2">
+                            <span class="text-secondary">СИСТЕМНЫЙ СТАТУС: </span>
+                            <span :class="currentWave.flagsClass" class="fw-bold" v-text="currentWave.flags"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Инспектируемое содержимое пакета (Payload Preview) -->
+                <div class="text-secondary small mb-1 fw-bold">СОДЕРЖИМОЕ ПАКЕТА (DATA PAYLOAD):</div>
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3 text-start">
+                    <pre class="m-0 text-light font-monospace" style="white-space: pre-wrap; word-break: break-all; font-size: 0.95rem;" v-text="currentWave.details"></pre>
+                </div>
+
+                <div class="text-secondary small mb-3">
+                    АНАЛИЗАТОР УГРОЗ: <span class="text-warning" v-text="currentWave.hint"></span>
+                </div>
+
+                <!-- Клавиши экстренного реагирования шлюза (ALLOW / DROP) -->
+                <div class="row g-3">
+                    <!-- Кнопка 1: ПРОПУСТИТЬ (ALLOW) -->
+                    <div class="col-md-6">
+                        <button @click="submitAction('allow')" 
+                                id="btn-action-allow"
+                                data-action="allow"
+                                :disabled="alarmActive"
+                                class="btn btn-outline-success w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center shadow"
+                                style="min-height: 58px;">
+                            <span class="fs-4">✓ ПРОПУСТИТЬ [ALLOW]</span>
+                            <span class="small text-secondary mt-1">Легитимный трафик • [ 1 ] / [ A ] / [ ← ]</span>
+                        </button>
+                    </div>
+
+                    <!-- Кнопка 2: БЛОКИРОВАТЬ (DROP) -->
+                    <div class="col-md-6">
+                        <button @click="submitAction('drop')" 
+                                id="btn-action-drop"
+                                data-action="drop"
+                                :disabled="alarmActive"
+                                class="btn btn-outline-danger w-100 py-3 rounded-0 fw-bold d-flex flex-column align-items-center justify-content-center shadow"
+                                style="min-height: 58px;">
+                            <span class="fs-4">✗ БЛОКИРОВАТЬ [DROP]</span>
+                            <span class="small text-secondary mt-1">Угроза / Sinkhole • [ 0 ] / [ D ] / [ → ]</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Информационная полоса статуса -->
+            <div class="d-flex justify-content-between text-secondary small px-1">
+                <span>ШЛЮЗ: ACTIVE_FIREWALL_v7.8</span>
+                <span>РЕЖИМ: ХАРДКОР (ТОТАЛЬНЫЙ СБРОС)</span>
+                <span>СБРОСОВ ХАРДКОРА: <span class="text-warning fw-bold" v-text="attempts"></span></span>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+    (function() {
+        const missionName = '7 класс :: Урок 8 :: Контрольная работа: Сервисы интернет-коммуникаций. Сетевой этикет. Стратегии безопасного поведения в Интернете (Уровень 3)';
+        const sessionStartTime = Date.now();
+        let attempts = 0;
+
+        function sendTelemetry(actionType, success = false) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: actionType,
+                status: actionType === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(sessionStartTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        // Старт сессии
+        sendTelemetry('in_progress', false);
+
+        // Синтезатор звуковых сигналов (Web Audio API)
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtxClass) audioCtx = new AudioCtxClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playSound(type) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                const now = ctx.currentTime;
+
+                if (type === 'success') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.15); // A5
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'alarm') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.35);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'victory') {
+                    const freqs = [523.25, 659.25, 783.99, 1046.50];
+                    freqs.forEach((f, idx) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(f, now + idx * 0.1);
+                        g.gain.setValueAtTime(0.15, now + idx * 0.1);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.3);
+                        o.start(now + idx * 0.1);
+                        o.stop(now + idx * 0.1 + 0.3);
+                    });
+                }
+            } catch (e) {
+                // Audio failure ignored gracefully
+            }
+        }
+
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const started = ref(false);
+                const completed = ref(false);
+                const alarmActive = ref(false);
+                const alarmMessage = ref('');
+                const currentWaveIndex = ref(0);
+                const waveTimeLimit = ref(6.5);
+                const timeLeft = ref(6.5);
+                const totalTimeSpent = ref(0);
+                const waves = ref([]);
+                let timerInterval = null;
+
+                const formattedTime = computed(() => {
+                    return Math.max(0, timeLeft.value).toFixed(1);
+                });
+
+                const progressPercent = computed(() => {
+                    return Math.round(((currentWaveIndex.value) / 10) * 100);
+                });
+
+                const currentWave = computed(() => {
+                    return waves.value[currentWaveIndex.value] || null;
+                });
+
+                // Генератор банка волн для 7 класса (Урок 8)
+                function createWave(waveNum) {
+                    const idNum = Math.floor(Math.random() * 899) + 100;
+                    const packetId = `SEC-708-${idNum}`;
+
+                    // Наборы вариантов для каждой из 10 волн
+                    const wavePresets = {
+                        1: [
+                            {
+                                service: 'Веб-доступ к образовательному порталу',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'WAN ➔ ШКОЛА',
+                                source: '178.208.83.42 (Минпросвещения РФ)',
+                                destination: 'Кабинет информатики (ПК-04)',
+                                encryption: 'TLS 1.3 (Сертификат Минцифры РФ валиден)',
+                                encryptionClass: 'text-success',
+                                flags: 'Проверенный национальный образовательный узел',
+                                flagsClass: 'text-success',
+                                details: 'GET https://resh.edu.ru/subject/lesson/informatics/7/ HTTP/2.0\nHost: resh.edu.ru\nAccept: text/html,application/xhtml+xml',
+                                hint: 'Официальный портал РЭШ по защищенному протоколу HTTPS (порт 443).',
+                                target: 'allow',
+                                errorExplanation: 'Официальные образовательные порталы с проверенным сертификатом HTTPS (порт 443) являются доверенными и должны пропускаться.'
+                            },
+                            {
+                                service: 'Приманка на выигрыш / Фишинговый сбор карт',
+                                protocol: 'HTTP',
+                                port: 80,
+                                direction: 'WAN ➔ ШКОЛА',
+                                source: '91.240.118.15 (Анонимный хостинг)',
+                                destination: 'Планшет школьника',
+                                encryption: 'НЕТ (Открытый незашифрованный канал HTTP)',
+                                encryptionClass: 'text-danger',
+                                flags: 'Подозрительный домен-однодневка, призыв ввести CVC',
+                                flagsClass: 'text-danger',
+                                details: 'POST http://gosuslugi-bonus-2026.net/claim HTTP/1.1\nHost: gosuslugi-bonus-2026.net\nBody: card_num=220220334455&cvc=789&pin=1122',
+                                hint: 'Поддельный сайт Госуслуг в незащищенном HTTP (порт 80) требует данные банковской карты.',
+                                target: 'drop',
+                                errorExplanation: 'Фишинговые сайты-подделки в открытом канале HTTP, выманивающие платежные реквизиты, подлежат немедленной блокировке!'
+                            }
+                        ],
+                        2: [
+                            {
+                                service: 'Электронная почта от учителя',
+                                protocol: 'SMTPS',
+                                port: 465,
+                                direction: 'WAN ➔ ПОЧТА ШКОЛЫ',
+                                source: 'petrova_teacher@school42.ru',
+                                destination: 'student_7a@school42.ru',
+                                encryption: 'SSL/TLS Encrypted (Школьный почтовый сервер)',
+                                encryptionClass: 'text-success',
+                                flags: 'SPF: PASS | DKIM: PASS | Заголовок From подтвержден',
+                                flagsClass: 'text-success',
+                                details: 'Subject: Домашнее задание по информатике на вторник\nAttachment: zadanie_7a.pdf (MIME: application/pdf, 185 Кб)\nBody: Здравствуйте, ребята! В приложении тест к следующему уроку.',
+                                hint: 'Письмо учителя с корректного домена школы с безопасным PDF-файлом.',
+                                target: 'allow',
+                                errorExplanation: 'Письма от подтвержденных школьных адресов с вложением формата .pdf безопасны и должны пропускаться.'
+                            },
+                            {
+                                service: 'Вредоносный исполняемый спам под видом обновления',
+                                protocol: 'SMTP',
+                                port: 25,
+                                direction: 'WAN ➔ ПОЧТА ШКОЛЫ',
+                                source: 'support-mailbox@portal-security-update.com',
+                                destination: 'student_7a@school42.ru',
+                                encryption: 'НЕТ (Нешифрованный транзитный релей)',
+                                encryptionClass: 'text-danger',
+                                flags: 'SPF: FAIL | Вложение содержит исполняемый файл .exe',
+                                flagsClass: 'text-danger',
+                                details: 'Subject: ВНИМАНИЕ: Ваш почтовый ящик переполнен! Срочно обновите\nAttachment: mailbox_patch.exe (MIME: application/x-msdownload, 420 Кб)\nBody: Запустите прикрепленный файл для увеличения квоты.',
+                                hint: 'Запугивание блокировкой и прикрепленный исполняемый файл .exe.',
+                                target: 'drop',
+                                errorExplanation: 'Категорически запрещено пропускать почту с исполняемыми вложениями .exe, особенно с требованием срочного запуска!'
+                            }
+                        ],
+                        3: [
+                            {
+                                service: 'Защищенное чтение почты учеником (IMAPS)',
+                                protocol: 'IMAPS',
+                                port: 993,
+                                direction: 'ШКОЛА ➔ ПОЧТОВЫЙ ХОСТ',
+                                source: 'Почтовый клиент ученика (192.168.1.45)',
+                                destination: 'mail.school-obr.ru:993',
+                                encryption: 'TLS Encrypted Tunnel (Порт IMAPS 993)',
+                                encryptionClass: 'text-success',
+                                flags: 'Соответствие стандартам протоколов RFC',
+                                flagsClass: 'text-success',
+                                details: 'A001 LOGIN student_7a **********\nA002 SELECT INBOX\nTLS Session: TLS_AES_256_GCM_SHA384 Valid',
+                                hint: 'Штатное соединение по защищенному протоколу IMAPS (порт 993).',
+                                target: 'allow',
+                                errorExplanation: 'Стандартный защищенный порт IMAPS (993) для получения почты является легитимным.'
+                            },
+                            {
+                                service: 'Аномалия маршрутизации: спам на веб-порт',
+                                protocol: 'SMTP',
+                                port: 80,
+                                direction: 'WAN ➔ ШКОЛЬНЫЙ СЕРВЕР',
+                                source: '185.220.101.5 (Анонимный прокси-узел)',
+                                destination: 'Веб-сервер школы (порт 80)',
+                                encryption: 'НЕТ',
+                                encryptionClass: 'text-danger',
+                                flags: 'Несоответствие протокола и порта (SMTP-трафик на порту 80)',
+                                flagsClass: 'text-danger',
+                                details: 'HELO botnet-sender.org\nMAIL FROM:<spam@botnet.org>\nRCPT TO:<all@school.ru>\n(Попытка обойти почтовый фильтр через порт веб-сервера 80)',
+                                hint: 'Почтовый протокол SMTP направлен на порт веб-сервера 80.',
+                                target: 'drop',
+                                errorExplanation: 'Трафик с несовпадением заявленного протокола и порта (SMTP на порт 80) является аномалией и должен блокироваться.'
+                            }
+                        ],
+                        4: [
+                            {
+                                service: 'Защищенный VPN-туннель из публичной сети Wi-Fi',
+                                protocol: 'OpenVPN',
+                                port: 1194,
+                                direction: 'ПУБЛИЧНЫЙ WI-FI ➔ СЕРВЕР',
+                                source: 'Ноутбук ученика в городском парке',
+                                destination: 'vpn.school.ru:1194',
+                                encryption: 'AES-256-GCM (Криптостойкий зашифрованный туннель)',
+                                encryptionClass: 'text-success',
+                                flags: 'Сквозное шифрование предотвращает перехват в открытой сети',
+                                flagsClass: 'text-success',
+                                details: 'PUSH_REPLY,dhcp-option DNS 192.168.1.1,redirect-gateway def1\nВесь трафик зашифрован и защищен от сниффинга третьими лицами',
+                                hint: 'Использование криптостойкого VPN-туннеля для защиты в открытом городском Wi-Fi.',
+                                target: 'allow',
+                                errorExplanation: 'VPN-туннель в открытых Wi-Fi сетях является рекомендованной стратегией безопасной работы и должен пропускаться.'
+                            },
+                            {
+                                service: 'Передача пароля открытым текстом в открытом Wi-Fi',
+                                protocol: 'HTTP',
+                                port: 80,
+                                direction: 'ОТКРЫТАЯ СЕТЬ ➔ ИНТЕРНЕТ',
+                                source: 'Смартфон в незащищенной сети Free_Cafe_WiFi',
+                                destination: 'dnevnik-login-portal.ru:80',
+                                encryption: 'ОТСУТСТВУЕТ (Трафик виден всем устройствам в радиусе 50м)',
+                                encryptionClass: 'text-danger',
+                                flags: 'Критическая утечка учетных данных (сниффинг паролей)',
+                                flagsClass: 'text-danger',
+                                details: 'POST /auth HTTP/1.1\nHost: dnevnik-login-portal.ru\nBody: user=misha_ivanov&pass=MySuperPass2026\n(Пароль передается в открытом незашифрованном виде!)',
+                                hint: 'Передача пароля в открытом виде по HTTP в общественной сети Wi-Fi.',
+                                target: 'drop',
+                                errorExplanation: 'Передача паролей по незащищенному протоколу HTTP (порт 80) в открытых сетях грозит их мгновенным перехватом и должна пресекаться!'
+                            }
+                        ],
+                        5: [
+                            {
+                                service: 'Официальная рассылка предметной олимпиады',
+                                protocol: 'SMTPS',
+                                port: 465,
+                                direction: 'WAN ➔ ПОЧТА ШКОЛЫ',
+                                source: 'info@olimpiada.ru',
+                                destination: 'school_informatics@school.ru',
+                                encryption: 'TLS Valid',
+                                encryptionClass: 'text-success',
+                                flags: 'From == Reply-To | SPF: PASS | DKIM: PASS',
+                                flagsClass: 'text-success',
+                                details: 'From: info@olimpiada.ru\nReply-To: info@olimpiada.ru\nSubject: Приглашение на муниципальный этап олимпиады\nBody: https://olimpiada.ru/reg/7-class',
+                                hint: 'Заголовки From и Reply-To совпадают, цифровые подписи SPF/DKIM подтверждены.',
+                                target: 'allow',
+                                errorExplanation: 'Официальные письма олимпиад с совпадающими заголовками и подтвержденной SPF-подписью легитимны.'
+                            },
+                            {
+                                service: 'Спуфинг отправителя письма (From != Reply-To)',
+                                protocol: 'SMTP',
+                                port: 25,
+                                direction: 'WAN ➔ ПОЧТА УЧИТЕЛЯ',
+                                source: 'директор@school-7.ru (ПОДДЕЛЬНЫЙ From)',
+                                destination: 'uchitel@school-7.ru',
+                                encryption: 'НЕТ',
+                                encryptionClass: 'text-danger',
+                                flags: 'Подмена заголовков: From: school-7.ru, но Reply-To: evil_hacker@temp.org',
+                                flagsClass: 'text-danger',
+                                details: 'From: director@school-7.ru\nReply-To: evil_hacker@temp-mail.org\nSubject: СРОЧНО переведите деньги на карту для закупки парт\n(Ответ на письмо уйдет анонимному мошеннику на сторонний сервер!)',
+                                hint: 'Злоумышленник подделал заголовок From директора, но поле Reply-To ведет на почту взломщика.',
+                                target: 'drop',
+                                errorExplanation: 'Несоответствие заголовков From и Reply-To — классический признак спуфинга и социальной инженерии, требующий блокировки.'
+                            }
+                        ],
+                        6: [
+                            {
+                                service: 'Сообщение в школьном чате с соблюдением нетикета',
+                                protocol: 'WebRTC',
+                                port: 3478,
+                                direction: 'ШКОЛЬНАЯ СЕТЬ ➔ КЛАССНЫЙ ЧАТ',
+                                source: 'Ученик 7 «Б» класса (Антон)',
+                                destination: 'Чат «7Б Информатика»',
+                                encryption: 'DTLS / SRTP Encrypted',
+                                encryptionClass: 'text-success',
+                                flags: 'Соблюдение сетевого этикета (вежливое обращение)',
+                                flagsClass: 'text-success',
+                                details: '«Добрый вечер! Подскажите, пожалуйста, какой номер практической работы задан по теме интернет-сервисов? Заранее спасибо!»',
+                                hint: 'Корректный деловой тон, нормальный регистр букв, уважительное общение.',
+                                target: 'allow',
+                                errorExplanation: 'Вежливые сообщения учеников в рамках учебной тематики полностью соответствуют правилам нетикета.'
+                            },
+                            {
+                                service: 'Кибербуллинг и доксинг (слив персональных данных)',
+                                protocol: 'HTTP',
+                                port: 80,
+                                direction: 'WAN ➔ ШКОЛЬНЫЙ ФОРУМ',
+                                source: '109.252.34.88 (Анонимный IP)',
+                                destination: 'Форум учащихся 7 классов',
+                                encryption: 'НЕТ',
+                                encryptionClass: 'text-danger',
+                                flags: 'Оскорбления, CAPS LOCK, незаконное распространение телефона (152-ФЗ)',
+                                flagsClass: 'text-danger',
+                                details: '«ТЫ ТУПОЙ И МЫ ТЕБЯ НАЙДЕМ ВОТ ЕГО ТЕЛЕФОН +7-999-555-44-33 И ЕГО АДРЕС УЛ. ЛЕСНАЯ 15 КВ 7 СПАМЬТЕ ЕМУ ВЕСЬ ДЕНЬ!!!»',
+                                hint: 'Агрессивный буллинг, сплошной Caps Lock и слив личного номера телефона (нарушение 152-ФЗ).',
+                                target: 'drop',
+                                errorExplanation: 'Кибербуллинг и несанкционированное распространение персональных данных учащихся (доксинг) грубо нарушают закон 152-ФЗ и блокируются.'
+                            }
+                        ],
+                        7: [
+                            {
+                                service: 'Учебный материал из облачного диска (Яндекс Диск)',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'ОБЛАКО ➔ КАБИНЕТ ИНФОРМАТИКИ',
+                                source: 'disk.yandex.ru (Проверенное облачное хранилище)',
+                                destination: 'Рабочее место ученика',
+                                encryption: 'TLS 1.3 Valid',
+                                encryptionClass: 'text-success',
+                                flags: 'MIME: application/vnd.ms-powerpoint (Файл проверен антивирусом)',
+                                flagsClass: 'text-success',
+                                details: 'GET https://downloader.disk.yandex.ru/disk/prezentaciya_urok8.pptx\nContent-Type: application/vnd.openxmlformats-officedocument.presentationml\nАнтивирусный статус: CLEAN (Угроз не обнаружено)',
+                                hint: 'Файл презентации .pptx из официального облачного сервиса.',
+                                target: 'allow',
+                                errorExplanation: 'Учебные презентации и документы из проверенных облачных хранилищ безопасны.'
+                            },
+                            {
+                                service: 'Маскировка вредоносного файла под фото (двойное расширение)',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'WAN ➔ МЕССЕНДЖЕР УЧЕНИКА',
+                                source: 'Неизвестный профиль «Подарки_ВК»',
+                                destination: 'Клиент школьного мессенджера',
+                                encryption: 'TLS Valid',
+                                encryptionClass: 'text-danger',
+                                flags: 'Двойное расширение файла: foto_klassa.jpg.exe (Исполняемый троян)',
+                                flagsClass: 'text-danger',
+                                details: 'File Transfer: foto_klassa.jpg.exe\nMagic Bytes: MZ (Windows PE Executable)\nИстинный формат: Исполняемая программа, маскирующаяся значком картинки!',
+                                hint: 'Опасный файл с двойным расширением .jpg.exe от незнакомца.',
+                                target: 'drop',
+                                errorExplanation: 'Файлы с двойным расширением (например .jpg.exe) являются вредоносными троянами и должны блокироваться шлюзом!'
+                            }
+                        ],
+                        8: [
+                            {
+                                service: 'Официальный информационный пост школы',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'ШКОЛА ➔ ВНЕШНИЙ МИР',
+                                source: 'Пресс-центр школы №42',
+                                destination: 'Официальное сообщество школы в VK',
+                                encryption: 'TLS 1.3 Valid',
+                                encryptionClass: 'text-success',
+                                flags: 'Соблюдение 152-ФЗ: отсутствие избыточных персональных данных',
+                                flagsClass: 'text-success',
+                                details: '«Поздравляем учеников 7 классов с успешной сдачей нормативов ГТО! Гордимся спортивными достижениями нашей команды!»\n(Личные телефоны и домашние адреса не публикуются)',
+                                hint: 'Позитивный цифровой след школы без нарушения закона о персональных данных.',
+                                target: 'allow',
+                                errorExplanation: 'Публикации без раскрытия чувствительных персональных данных (адресов, паспортов, телефонов) соответствуют нормам.'
+                            },
+                            {
+                                service: 'Опасный овершеринг (Oversharing) в открытом профиле',
+                                protocol: 'HTTP',
+                                port: 80,
+                                direction: 'ШКОЛЬНИК ➔ ОТКРЫТАЯ СЕТЬ',
+                                source: 'Аккаунт ученика в открытом доступе',
+                                destination: 'Публичная страница в соцсети',
+                                encryption: 'НЕТ',
+                                encryptionClass: 'text-danger',
+                                flags: 'Критический овершеринг: домашний адрес + информация об отсутствии родителей',
+                                flagsClass: 'text-danger',
+                                details: '«Родители уехали на море до конца месяца! Я один дома по адресу: ул. Победы, д. 8, кв. 22! Приходите все в гости, ключи под ковриком!»',
+                                hint: 'Публикация домашнего адреса и факта отсутствия взрослых создает угрозу ограбления.',
+                                target: 'drop',
+                                errorExplanation: 'Публикация в сети информации об отсутствии родителей вместе с домашним адресом (овершеринг) опасна для жизни и имущества.'
+                            }
+                        ],
+                        9: [
+                            {
+                                service: 'Электронный дневник школьника (Официальный домен)',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'БРАУЗЕР ➔ ДНЕВНИК',
+                                source: 'Рабочее место ученика',
+                                destination: 'dnevnik.ru:443',
+                                encryption: 'TLS 1.3 (Официальный сертификат выдан dnevnik.ru)',
+                                encryptionClass: 'text-success',
+                                flags: 'Подлинный домен верхнего уровня .ru',
+                                flagsClass: 'text-success',
+                                details: 'GET https://dnevnik.ru/marks/class-7a HTTP/2.0\nHost: dnevnik.ru\nCertificate CN: *.dnevnik.ru (Доверенный центр)',
+                                hint: 'Официальный и проверенный домен дневника с валидным сертификатом.',
+                                target: 'allow',
+                                errorExplanation: 'Официальный портал электронного дневника (dnevnik.ru) по HTTPS с валидным сертификатом является доверенным ресурсом.'
+                            },
+                            {
+                                service: 'Поддомен-ловушка (Subdomain Trap Phishing)',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'БРАУЗЕР ➔ ФИШИНГОВЫЙ СЕРВЕР',
+                                source: 'Рабочее место ученика',
+                                destination: 'dnevnik.ru.login-verify-account.com:443',
+                                encryption: 'TLS (Сертификат выдан на login-verify-account.com!)',
+                                encryptionClass: 'text-danger',
+                                flags: 'Ловушка поддомена: настоящий домен — login-verify-account.com, а не dnevnik.ru!',
+                                flagsClass: 'text-danger',
+                                details: 'Host: dnevnik.ru.login-verify-account.com\nURI: /auth/login.php?stolen_creds\n(Злоумышленник создал поддомен "dnevnik.ru" на собственном мошенническом домене)',
+                                hint: 'Внимание на правую часть адреса: настоящий домен — login-verify-account.com, это фишинг!',
+                                target: 'drop',
+                                errorExplanation: 'Поддомены-ловушки маскируют чужой сайт под известный бренд (настоящий домен пишется перед последней косой чертой).'
+                            }
+                        ],
+                        10: [
+                            {
+                                service: 'Двухфакторная аутентификация (2FA) через доверенный сервис',
+                                protocol: 'HTTPS',
+                                port: 443,
+                                direction: 'ШКОЛЬНИК ➔ ЕСИА ГОСУСЛУГИ',
+                                source: 'Приложение «Госуслуги» на смартфоне',
+                                destination: 'auth.gosuslugi.ru:443',
+                                encryption: 'TLS 1.3 / ГОСТ Шифрование',
+                                encryptionClass: 'text-success',
+                                flags: 'Двухфакторная защита (2FA) надежно защищает учетную запись',
+                                flagsClass: 'text-success',
+                                details: 'POST https://auth.gosuslugi.ru/idp/r/push-verify\nCode-Type: TOTP Single-Use 6-digit\nDevice-Fingerprint: MATCH (Доверенное устройство подтверждено)',
+                                hint: 'Штатная двухфакторная аутентификация с одноразовым кодом на доверенном устройстве.',
+                                target: 'allow',
+                                errorExplanation: 'Двухфакторная аутентификация (2FA) — золотой стандарт безопасности цифрового профиля, трафик должен быть пропущен.'
+                            },
+                            {
+                                service: 'Выманивание кода подтверждения третьими лицами (Скам 2FA)',
+                                protocol: 'HTTP',
+                                port: 80,
+                                direction: 'ЗЛОУМЫШЛЕННИК ➔ ТЕЛЕФОН ШКОЛЬНИКА',
+                                source: 'Fake-SMS Gateway (+7-900-000-00-00)',
+                                destination: 'Личный чат школьника',
+                                encryption: 'НЕТ',
+                                encryptionClass: 'text-danger',
+                                flags: 'Попытка перехвата одноразового кода 2FA: строго запрещено передавать код!',
+                                flagsClass: 'text-danger',
+                                details: '«Служба безопасности: Срочно продиктуйте код из СМС оператору или введите его на сайте http://kod-otmena-bank.ru, иначе счет будет заморожен!»',
+                                hint: 'Мошенники выманивают код двухфакторной аутентификации под видом отмены блокировки.',
+                                target: 'drop',
+                                errorExplanation: 'Никогда и никому нельзя сообщать одноразовые коды из СМС или пуш-уведомлений — это ключ к краже аккаунта!'
+                            }
+                        ]
+                    };
+
+                    const options = wavePresets[waveNum] || wavePresets[1];
+                    const selected = options[Math.floor(Math.random() * options.length)];
+                    return {
+                        id: packetId,
+                        ...selected
+                    };
+                }
+
+                function initAllWaves() {
+                    const list = [];
+                    for (let w = 1; w <= 10; w++) {
+                        list.push(createWave(w));
+                    }
+                    waves.value = list;
+                }
+
+                function startWave(index) {
+                    currentWaveIndex.value = index;
+
+                    // Динамический таймер такта для 7 класса (от 6.5 до 3.5 сек):
+                    // Волны 1-3: 6.5 сек
+                    // Волны 4-6: 5.5 сек
+                    // Волны 7-9: 4.5 сек
+                    // Волна 10: 3.5 сек
+                    let limit = 6.5;
+                    if (index >= 9) limit = 3.5;
+                    else if (index >= 6) limit = 4.5;
+                    else if (index >= 3) limit = 5.5;
+
+                    waveTimeLimit.value = limit;
+                    timeLeft.value = limit;
+
+                    clearInterval(timerInterval);
+                    timerInterval = setInterval(() => {
+                        timeLeft.value -= 0.1;
+                        if (timeLeft.value <= 0) {
+                            clearInterval(timerInterval);
+                            triggerHardcoreFail('ТАЙМ-АУТ ШЛЮЗА: Время реакции истекло! Буфер брандмауэра переполнен необработанным трафиком.');
+                        }
+                    }, 100);
+                }
+
+                function submitAction(action) {
+                    if (!started.value || completed.value || alarmActive.value) return;
+
+                    clearInterval(timerInterval);
+                    const expected = currentWave.value.target;
+
+                    if (action === expected) {
+                        // Успешный перехват
+                        playSound('success');
+                        if (currentWaveIndex.value < 9) {
+                            startWave(currentWaveIndex.value + 1);
+                        } else {
+                            // Финальная победа
+                            finishGame();
+                        }
+                    } else {
+                        // Ошибка аудитора
+                        const actionName = action === 'allow' ? '«ПРОПУСТИТЬ [ALLOW]»' : '«БЛОКИРОВАТЬ [DROP]»';
+                        const expectedName = expected === 'allow' ? '«ПРОПУСТИТЬ [ALLOW]»' : '«БЛОКИРОВАТЬ [DROP]»';
+                        const reason = `ОШИБКА АУДИТА: Вы выбрали ${actionName}, а требовалось ${expectedName}. ${currentWave.value.errorExplanation || ''}`;
+                        triggerHardcoreFail(reason);
+                    }
+                }
+
+                function triggerHardcoreFail(reason) {
+                    clearInterval(timerInterval);
+                    attempts++;
+                    sendTelemetry('hardcore_reset', false);
+                    playSound('alarm');
+
+                    alarmMessage.value = reason;
+                    alarmActive.value = true;
+
+                    // Через 2.2 секунды сброс на Волну 1 с новой процедурной генерацией!
+                    setTimeout(() => {
+                        alarmActive.value = false;
+                        initAllWaves();
+                        startWave(0);
+                    }, 2200);
+                }
+
+                function startGame() {
+                    attempts = 0;
+                    completed.value = false;
+                    alarmActive.value = false;
+                    started.value = true;
+                    initAllWaves();
+                    sendTelemetry('in_progress', false);
+                    startWave(0);
+                }
+
+                function finishGame() {
+                    clearInterval(timerInterval);
+                    completed.value = true;
+                    totalTimeSpent.value = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
+                    sendTelemetry('level_complete', true);
+                    playSound('victory');
+                }
+
+                function handleKeyDown(e) {
+                    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+                    if (!started.value || completed.value) {
+                        if (e.key === 'Enter') {
+                            startGame();
+                        }
+                        return;
+                    }
+
+                    if (started.value && !completed.value && !alarmActive.value) {
+                        if (e.key === '1' || e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft' || e.key === 'z' || e.key === 'Z') {
+                            submitAction('allow');
+                        } else if (e.key === '0' || e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight' || e.key === 'x' || e.key === 'X') {
+                            submitAction('drop');
+                        }
+                    }
+                }
+
+                // Экспорт состояния для автотестов Playwright и симулятора персон
+                window.__DEV_LEVEL3_STATE__ = {
+                    get started() { return started.value; },
+                    get completed() { return completed.value; },
+                    get currentWaveIndex() { return currentWaveIndex.value; },
+                    get currentWave() { return currentWave.value; },
+                    get waves() { return waves.value; },
+                    get attempts() { return attempts; },
+                    startGame,
+                    submitAction,
+                    solveCurrentWave() {
+                        if (currentWave.value) {
+                            submitAction(currentWave.value.target);
+                        }
+                    }
+                };
+
+                onMounted(() => {
+                    window.addEventListener('keydown', handleKeyDown);
+                });
+
+                onUnmounted(() => {
+                    clearInterval(timerInterval);
+                    window.removeEventListener('keydown', handleKeyDown);
+                });
+
+                return {
+                    started,
+                    completed,
+                    alarmActive,
+                    alarmMessage,
+                    waves,
+                    currentWaveIndex,
+                    currentWave,
+                    progressPercent,
+                    waveTimeLimit,
+                    timeLeft,
+                    formattedTime,
+                    totalTimeSpent,
+                    attempts,
+                    startGame,
+                    submitAction
+                };
+            }
+        }).mount('#app');
+    })();
+</script>
+</TaskLayout>
