@@ -149,10 +149,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
                         <label for="p5-input" class="form-label text-light small mb-2">
-                            Введите ответ в формате <strong>БАЛЛ:КЛАВИША</strong> (например: <code>2:CTRL+J</code> или <code>0:CTRL+F10</code>):
+                            Введите ответ в формате <strong>БАЛЛ:КЛАВИША</strong> (например: <code>2:Ctrl+J</code> или <code>2:J</code>, также принимается <code>0:Ctrl+F10</code> или <code>0:F10</code>):
                         </label>
                         <div class="input-group w-100" style="max-width: 580px;">
-                            <input type="text" id="p5-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 2:CTRL+J" autocomplete="off" data-expected="">
+                            <input type="text" id="p5-input" class="form-control bg-dark text-warning border-warning rounded-0 fs-5" placeholder="Например: 2:Ctrl+J или 2:J" autocomplete="off" data-expected="">
                             <button id="p5-btn" class="btn btn-outline-warning rounded-0 px-4 fw-bold">ЗАВЕРШИТЬ АНАЛИЗ</button>
                         </div>
                     </div>
@@ -254,7 +254,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             probEl.innerHTML = `
                 Абзац документа состоит ровно из <strong class="text-warning">${cfg.lines} строк</strong>.
                 Текст набран кеглем <strong class="text-info">${cfg.fontPt} пт</strong> с междустрочным интервалом <strong class="text-success">${cfg.lh}</strong>.<br>
-                Вычислите суммарную вертикальную высоту этого текстового блока <strong>в типографских пунктах (пт)</strong> (подсказка: это составляет <code>${cfg.totalInch} дюйма</code> при соотношении <code>1 дюйм = 72 пт</code>).
+                Вычислите суммарную вертикальную высоту этого текстового блока <strong>в типографских пунктах (пт)</strong>.
             `;
         }
         if (inp) {
@@ -289,15 +289,20 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     function initPhase2() {
         const scenarios = [
-            { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 20, cols: 5 }, // (210-40)/5 = 34
-            { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 15, cols: 3 }, // (210-45)/3 = 55
-            { orient: 'книжной', pageW: 210, leftMm: 25, rightMm: 15, cols: 4 }, // (210-40)/4 = 42.5 -> let's keep integer!
+            { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 20, cols: 5 }, // 170 / 5 = 34
             { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 20, cols: 4 }, // 160 / 4 = 40
+            { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 20, cols: 2 }, // 160 / 2 = 80
+            { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 15, cols: 3 }, // 165 / 3 = 55
+            { orient: 'книжной', pageW: 210, leftMm: 30, rightMm: 15, cols: 5 }, // 165 / 5 = 33
+            { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 10, cols: 4 }, // 180 / 4 = 45
+            { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 10, cols: 5 }, // 180 / 5 = 36
             { orient: 'книжной', pageW: 210, leftMm: 20, rightMm: 10, cols: 6 }, // 180 / 6 = 30
-            { orient: 'альбомной', pageW: 297, leftMm: 27, rightMm: 20, cols: 5 }, // 250 / 5 = 50
-            { orient: 'альбомной', pageW: 297, leftMm: 22, rightMm: 15, cols: 4 }, // 260 / 4 = 65
-            { orient: 'альбомной', pageW: 297, leftMm: 17, rightMm: 10, cols: 3 }  // 270 / 3 = 90
-        ].filter(s => (s.pageW - s.leftMm - s.rightMm) % s.cols === 0);
+            { orient: 'книжной', pageW: 210, leftMm: 15, rightMm: 15, cols: 3 }, // 180 / 3 = 60
+            { orient: 'книжной', pageW: 210, leftMm: 15, rightMm: 15, cols: 4 }, // 180 / 4 = 45
+            { orient: 'книжной', pageW: 210, leftMm: 15, rightMm: 15, cols: 5 }, // 180 / 5 = 36
+            { orient: 'книжной', pageW: 210, leftMm: 15, rightMm: 15, cols: 6 }, // 180 / 6 = 30
+            { orient: 'книжной', pageW: 210, leftMm: 25, rightMm: 15, cols: 5 }  // 170 / 5 = 34
+        ];
 
         const sc = scenarios[Math.floor(Math.random() * scenarios.length)];
         p2Expected = (sc.pageW - sc.leftMm - sc.rightMm) / sc.cols;
@@ -306,9 +311,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const inp = document.getElementById('p2-input');
         if (probEl) {
             probEl.innerHTML = `
-                Документ сверстан на листе формата <strong>А4 (210 × 297 мм)</strong> в <strong class="text-warning">${sc.orient} ориентации</strong> (ширина листа = <code>${sc.pageW} мм</code>).<br>
-                Установлены поля страницы: левое поле — <strong class="text-info">${sc.leftMm} мм</strong>, правое поле — <strong class="text-info">${sc.rightMm} мм</strong>.<br>
-                На всю доступную рабочую ширину полосы набора вставлена таблица, состоящая из <strong class="text-success">${sc.cols} равных по ширине столбцов</strong>. Чему равна ширина одного столбца таблицы (в мм)?
+                Документ сверстан на листе формата <strong>А4 (ширина 210 мм)</strong> в <strong class="text-warning">${sc.orient} ориентации</strong>.<br>
+                Установлены поля страницы: левое — <strong class="text-info">${sc.leftMm} мм</strong>, правое — <strong class="text-info">${sc.rightMm} мм</strong>.<br>
+                На всю доступную ширину полосы набора вставлена таблица из <strong class="text-success">${sc.cols} равных столбцов</strong>. Чему равна ширина одного столбца таблицы в миллиметрах?
             `;
         }
         if (inp) {
@@ -344,20 +349,20 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function initPhase3() {
         const tasks = [
             {
-                initial: 'ПРОТОКОЛ-СЕТЬ-БАЗА',
+                initial: 'ДОКУМЕНТ-ТЕКСТ-АБЗАЦ',
                 steps: [
-                    '1. Выделили слово «ПРОТОКОЛ» и нажали Ctrl+C (Копировать).',
-                    '2. Выделили фрагмент «-СЕТЬ» и нажали клавишу Delete (Удалить).',
-                    '3. Поставили курсор в самый конец строки (после слова «БАЗА»), ввели дефис «-» и нажали Ctrl+V (Вставить).',
-                    '4. Выделили первое слово «ПРОТОКОЛ-» в начале строки и нажали клавишу Delete.'
+                    '1. Выделили слово «ДОКУМЕНТ» и нажали Ctrl+C (Копировать).',
+                    '2. Выделили фрагмент «-ТЕКСТ» и нажали клавишу Delete (Удалить).',
+                    '3. Поставили курсор в самый конец строки (после слова «АБЗАЦ»), ввели дефис «-» и нажали Ctrl+V (Вставить).',
+                    '4. Выделили фрагмент «ДОКУМЕНТ-» в начале строки и нажали клавишу Delete.'
                 ],
-                result: 'БАЗА-ПРОТОКОЛ'
+                result: 'АБЗАЦ-ДОКУМЕНТ'
             },
             {
                 initial: 'КЕГЛЬ-ШРИФТ-АБЗАЦ',
                 steps: [
                     '1. Выделили фрагмент «-ШРИФТ» и нажали Ctrl+X (Вырезать).',
-                    '2. Выделили слово «КЕГЛЬ-» в начале строки и нажали клавишу Delete (Удалить).',
+                    '2. Выделили фрагмент «КЕГЛЬ-» в начале строки и нажали клавишу Delete (Удалить).',
                     '3. Поставили курсор в конец строки (после слова «АБЗАЦ») и дважды подряд нажали Ctrl+V (Вставить).',
                     '4. Никаких других действий не выполняли.'
                 ],
@@ -379,9 +384,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     '1. Выделили фрагмент «ТАБЛИЦА-» и нажали Ctrl+X (Вырезать).',
                     '2. Выделили фрагмент «-ЯЧЕЙКА» и нажали клавишу Delete (Удалить).',
                     '3. Поставили курсор в самое начало строки (перед словом «СТРОКА») и нажали Ctrl+V (Вставить).',
-                    '4. Поставили курсор в самый конец строки, ввели дефис «-» и написали слово «КОД».'
+                    '4. Поставили курсор в самый конец строки, ввели дефис «-» и написали слово «ЛИСТ».'
                 ],
-                result: 'ТАБЛИЦА-СТРОКА-КОД'
+                result: 'ТАБЛИЦА-СТРОКА-ЛИСТ'
             },
             {
                 initial: 'КУРСИВ-ЖИРНЫЙ-СТИЛЬ',
@@ -416,7 +421,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     function checkPhase3() {
         const inp = document.getElementById('p3-input');
-        const val = (inp?.value || '').trim().toUpperCase();
+        const val = (inp?.value || '').trim().toUpperCase().replace(/[—–]/g, '-');
         if (val === p3Expected.toUpperCase()) {
             logAction('phase3_complete', { answer: val });
             document.getElementById('phase3')?.classList.add('d-none');
@@ -454,7 +459,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 hint: 'Проверьте: 1) имитация красной строки пробелами (···), 2) пустой абзац (¶ в пустой строке), 3) пробел перед точкой (·.).'
             },
             {
-                html: `Текстовый·редактор·"Блокнот"·работает·с·файлами·.txt.¶<br>Формат·А4·-·210·×·297°мм.↵<br>Поля·листа··равны·20°мм.¶`,
+                html: `Текстовый·редактор·"Блокнот"·работает·с·документами.¶<br>Формат·А4·-·210·×·297°мм.↵<br>Поля·листа··равны·20°мм.¶`,
                 paras: 2,
                 errors: 3,
                 hint: 'Проверьте: 1) прямые кавычки ("Блокнот") вместо «Блокнот», 2) дефис вместо тире (·-·), 3) двойной пробел (··). Разрыв строки ↵ входит во 2-й абзац!'
@@ -476,7 +481,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const inp = document.getElementById('p4-input');
 
         if (dumpEl) dumpEl.innerHTML = d.html;
-        if (qEl) qEl.textContent = 'Подсчитайте: 1) Общее число абзацев (включая пустые, если есть маркер ¶) и 2) Число типографских ошибок («костылей») в этом дампе.';
+        if (qEl) {
+            qEl.innerHTML = `
+                Подсчитайте: <strong>1) Общее число абзацев</strong> (по маркерам ¶, включая пустые строки) и <strong>2) Число типографских ошибок («костылей»)</strong>.<br>
+                <span class="text-secondary" style="font-size: 0.8rem;">
+                    К ошибкам набора относятся: отступ пробелами в начале строки, пустая строка с ¶, двойной пробел (··), дефис с пробелами вместо тире (·-·), пробел перед знаком препинания (·, или ·; или ·.), прямые кавычки ("...") вместо «ёлочек».
+                </span>
+            `;
+        }
         if (inp) {
             inp.value = '';
             inp.setAttribute('data-expected', `${p4ExpectedParas} ${p4ExpectedErrors}`);
@@ -570,16 +582,32 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     function checkPhase5() {
         const inp = document.getElementById('p5-input');
-        const raw = (inp?.value || '').trim().toUpperCase().replace(/\s+/g, '');
-        const expected = `${p5ExpectedScore}:${p5ExpectedShortcut}`;
+        const raw = (inp?.value || '').trim().toUpperCase();
 
-        if (raw === expected) {
+        const m = raw.match(/^([012])[\s:;,-]+(.+)$/);
+        if (!m) {
+            triggerError('Неверный формат! Введите балл (0, 1 или 2) и клавишу, например: 2:J или 2:Ctrl+J.', initPhase5);
+            return;
+        }
+
+        const inputScore = parseInt(m[1], 10);
+        let inputKey = m[2].replace(/\s+/g, '').replace(/CTRL[+\-_]?/, '');
+
+        // Normalize Russian QWERTY layout equivalents
+        if (inputKey === 'О') inputKey = 'J';
+        if (inputKey === 'У') inputKey = 'E';
+        if (inputKey === 'И') inputKey = 'B';
+        if (inputKey === 'А10') inputKey = 'F10';
+
+        const targetKey = p5ExpectedShortcut.replace('CTRL+', '');
+
+        if (inputScore === p5ExpectedScore && inputKey === targetKey) {
             logAction('phase5_complete', { answer: raw });
             document.getElementById('phase5')?.classList.add('d-none');
             document.getElementById('success-screen')?.classList.remove('d-none');
             sendTelemetry('level_complete', 'completed', true);
         } else {
-            triggerError(`Неверно! Проверьте балл по критериям ОГЭ (0, 1 или 2) и комбинацию клавиш (формат БАЛЛ:CTRL+КЛАВИША).`, initPhase5);
+            triggerError(`Неверно! Проверьте балл по критериям ОГЭ (0, 1 или 2) и комбинацию клавиш (например: ${p5ExpectedScore}:${p5ExpectedShortcut} или ${p5ExpectedScore}:${targetKey}).`, initPhase5);
         }
     }
 
