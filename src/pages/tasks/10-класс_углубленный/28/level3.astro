@@ -1,0 +1,501 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center">
+            <div class="display-4 text-danger font-monospace mb-3">⚠️ CYBER MATRIX: FANOPROTOCOL BREACH ⚠️</div>
+            <h2 class="text-light font-monospace mb-3">АРКАДНЫЙ ВЗЛОМ МАТРИЦЫ ПРЕФИКСНЫХ КОДОВ (УРОВЕНЬ 3)</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                Защитный контур шины данных активировал протокол смены кодовых таблиц. 
+                Вам предстоит преодолеть <span class="text-danger fw-bold">10 нарастающих волн взлома</span> в интерактивной бинарно-кодовой матрице,
+                извлекая точные цепочки префиксных токенов по правилу чередования строк и столбцов.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start font-monospace small" style="max-width: 680px;">
+                <div class="text-danger fw-bold mb-2">[БОЕВОЙ РЕГЛАМЕНТ АРКАДЫ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning">Чередование Строка ↔ Столбец:</span> Первый клик разрешен только в активной строке (подсвечена красной рамкой). Выбранная ячейка фиксирует столбец для следующего клика, а клик в столбце активирует строку!</div>
+                <div class="text-light mb-1">• <span class="text-warning">Сбор целевой цепочки:</span> Соберите целевые префиксные токены в буфер памяти в точном порядке без постороннего шума.</div>
+                <div class="text-light mb-1">• <span class="text-warning">Лимит буфера и динамический таймер:</span> Буфер вмещает 4–6 ячеек. Таймер ужесточается от 14 сек на 1 волне до 6.5 сек на финальной 10 волне!</div>
+                <div class="text-light">• <span class="text-danger fw-bold">РЕЖИМ ХАРДКОРА (Total Reset):</span> Любая ошибка, переполнение буфера или истечение таймера вызывают полный сброс на <span class="text-danger fw-bold">Волну 1</span>!</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace fw-bold px-5 py-3 shadow">
+                    НАЧАТЬ ПРОТОКОЛ ВЗЛОМА (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой процесс -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-3 p-md-4">
+            
+            <!-- Хедер со статусом и таймером -->
+            <div class="d-flex justify-content-between align-items-center mb-2 font-monospace">
+                <div>
+                    <span class="text-secondary small d-block">РУБЕЖ ВЗЛОМА:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-4">ВОЛНА <span v-text="currentPhase"></span> ИЗ 10</span>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ВОЛНЫ:</span>
+                    <span id="timer-display" class="fw-bold fs-4" :class="phaseTimeLeft <= 3.5 ? 'text-danger' : 'text-warning'">
+                        <span v-text="formattedTime"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Полоса локального таймера -->
+            <div class="progress mb-3 bg-dark border border-secondary rounded-0" style="height: 10px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.5 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="{ width: ((phaseTimeLeft / maxPhaseTime) * 100) + '%' }">
+                </div>
+            </div>
+
+            <!-- Информационная панель текущей цели -->
+            <div class="card bg-dark border-danger rounded-0 p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+                    <span class="badge bg-danger text-black rounded-0 font-monospace fw-bold px-3 py-1" v-text="currentWaveInfo.badge"></span>
+                    <span class="text-secondary small font-monospace">
+                        Направление хода: <span class="text-warning fw-bold" v-text="activeDirection === 'row' ? 'ПО ГОРИЗОНТАЛИ (СТРОКА)' : 'ПО ВЕРТИКАЛИ (СТОЛБЕЦ)'"></span>
+                    </span>
+                </div>
+                <h5 class="text-light font-monospace mb-1" v-text="currentWaveInfo.title"></h5>
+                <p class="text-secondary small mb-3" v-text="currentWaveInfo.desc"></p>
+
+                <!-- Зона: Целевая цепочка и Буфер игрока -->
+                <div class="row g-3">
+                    <!-- Целевая цепочка -->
+                    <div class="col-12 col-md-6">
+                        <div class="card bg-black border-secondary rounded-0 p-2 h-100">
+                            <span class="text-secondary small d-block mb-1">ТРЕБУЕМАЯ ПРЕФИКСНАЯ ЦЕПОЧКА (TARGET):</span>
+                            <div class="d-flex flex-wrap gap-2">
+                                <div v-for="(token, idx) in targetSequence" :key="'tgt-' + idx"
+                                     class="p-2 border border-danger bg-dark text-danger fw-bold text-center font-monospace"
+                                     style="min-width: 48px;">
+                                    <span v-text="token"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Буфер игрока -->
+                    <div class="col-12 col-md-6">
+                        <div class="card bg-black border-secondary rounded-0 p-2 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-secondary small">БУФЕР ПАМЯТИ:</span>
+                                <span class="text-secondary small"><span v-text="playerBuffer.length"></span> / <span v-text="maxBufferSize"></span></span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <div v-for="bIdx in maxBufferSize" :key="'buf-' + bIdx"
+                                     class="p-2 border text-center font-monospace"
+                                     :class="playerBuffer[bIdx - 1] ? 'border-warning bg-dark text-warning fw-bold' : 'border-secondary bg-black text-secondary'"
+                                     style="min-width: 48px;">
+                                    <span v-text="playerBuffer[bIdx - 1] || '__'"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Игровая Киберматрица (Сетка) -->
+            <div class="card bg-black border-secondary rounded-0 p-2 p-md-3 mb-3 d-flex align-items-center justify-content-center">
+                <div class="text-secondary small mb-2 text-center w-100">
+                    МАТРИЦА ПРЕФИКСНЫХ ТОКЕНОВ (FANOPROTOCOL MATRIX):
+                </div>
+
+                <div class="matrix-grid d-flex flex-column gap-2 user-select-none w-100 align-items-center overflow-x-auto">
+                    <div v-for="(row, r) in matrix" :key="'r-' + r"
+                         class="d-flex gap-2 p-1"
+                         :class="{ 'border border-danger bg-dark bg-opacity-25': activeDirection === 'row' && activeLineIndex === r }">
+                        
+                        <button v-for="(cell, c) in row" :key="'c-' + r + '-' + c"
+                                @click="selectCell(r, c)"
+                                :disabled="!isCellSelectable(r, c)"
+                                class="btn rounded-0 font-monospace p-1 p-sm-2 fw-bold text-center transition-all d-flex align-items-center justify-content-center"
+                                :class="getCellClass(r, c)"
+                                style="min-width: 48px; min-height: 48px; font-size: 1rem;">
+                            <span v-if="!cell.used" v-text="cell.val"></span>
+                            <span v-else class="text-secondary">--</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-secondary small text-center">
+                Подсказка: Выбирайте токены только из активной линии (подсвечена красной рамкой).
+            </div>
+
+        </div>
+
+        <!-- Экран сбоя (Hardcore Reset) -->
+        <div v-else-if="gameState === 'failed'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center">
+            <h1 id="fail-title" class="display-3 text-danger font-monospace fw-bold mb-3">⚠️ ВЗЛОМ СОРВАН // PROTOCOL WIPE ⚠️</h1>
+            <h3 class="text-light font-monospace mb-3">Сработала защита от коллизий префиксного кода</h3>
+            <p class="text-secondary fs-5 mb-4" v-text="failMessage"></p>
+            <div class="badge bg-danger text-black p-3 font-monospace fs-6 rounded-0 mb-4">
+                ХАРДКОР-СБРОС: Полный откат на Волну 1. Сгенерированы новые бинарные матрицы!
+            </div>
+            <div>
+                <button @click="startGame" class="btn btn-danger btn-lg rounded-0 font-monospace px-5 py-3">
+                    ПЕРЕЗАПУСТИТЬ ВЗЛОМ (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран триумфальной победы -->
+        <div v-else-if="gameState === 'success'" class="card bg-black border-success rounded-0 p-4 p-md-5 text-center">
+            <div id="success-title" class="display-3 text-success font-monospace mb-3">★ ПРЕФИКСНЫЙ ПРОТОКОЛ ПОЛНОСТЬЮ ВЗЛОМАН ★</div>
+            <h2 class="text-light font-monospace mb-3">КОНТУР ДВОИЧНОГО ДЕКОДИРОВАНИЯ ПОД ПОЛНЫМ КОНТРОЛЕМ</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                Вы победоносно прошли все 10 волн киберматрицы в режиме экстремального временного прессинга. 
+                Деревья Хаффмана, префиксные цепочки прямого условия Фано и бинарные пакеты декодированы без единой ошибки на одном дыхании!
+            </p>
+            <div class="badge border border-success text-success bg-dark p-3 font-monospace fs-6 rounded-0">
+                Урок 28 завершен на 100%! Получен секретный ретро-доступ.
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+    const { createApp } = Vue;
+    const MISSION_NAME = 'Урок 28 :: Двоичное кодирование. Равномерные и неравномерные коды (Уровень 3)';
+    const TOKEN_POOL = ['0', '1', '00', '01', '10', '11', '100', '101', '110', '111'];
+
+    // 10 нарастающих волн
+    const WAVE_CONFIGS = [
+        {
+            badge: 'ВОЛНА 1: ВХОД В РИТМ',
+            title: 'Базовый префиксный контур (2 токена)',
+            desc: 'Извлеките 2 базовых префиксных токена в матрице 4x4 за 14 секунд.',
+            targetLen: 2,
+            size: 4,
+            maxBuf: 4,
+            time: 14.0
+        },
+        {
+            badge: 'ВОЛНА 2: РАВНОМЕРНЫЕ ТЕТРАДЫ',
+            title: 'Фиксированные 2-битные слова',
+            desc: 'Синхронизируйте 2 равномерных кодовых слова фиксированной длины L=2.',
+            targetLen: 2,
+            size: 4,
+            maxBuf: 4,
+            time: 13.0
+        },
+        {
+            badge: 'ВОЛНА 3: ДЕРЕВО ИЗ 3 ВЕТВЕЙ',
+            title: 'Префиксная цепочка Хаффмана',
+            desc: 'Соберите 3 кодовых слова переменной длины в матрице 4x4.',
+            targetLen: 3,
+            size: 4,
+            maxBuf: 5,
+            time: 12.0
+        },
+        {
+            badge: 'ВОЛНА 4: РАСШИРЕНИЕ СЕТКИ (5x5)',
+            title: 'Коммутация префиксных путей',
+            desc: 'Сетка расширена до 5x5. Извлеките 3 токена за 11 секунд.',
+            targetLen: 3,
+            size: 5,
+            maxBuf: 5,
+            time: 11.0
+        },
+        {
+            badge: 'ВОЛНА 5: ПРЯМОЕ УСЛОВИЕ ФАНО',
+            title: 'Мгновенное декодирование потока',
+            desc: 'Соберите 3 токена без коллизий префиксов за 10 секунд.',
+            targetLen: 3,
+            size: 5,
+            maxBuf: 5,
+            time: 10.0
+        },
+        {
+            badge: 'ВОЛНА 6: НЕРАВЕНСТВО КРАФТА',
+            title: 'Контроль насыщенности бинарного дерева',
+            desc: 'Преодолейте зашумленную матрицу 5x5: соберите 3 токена за 9 секунд.',
+            targetLen: 3,
+            size: 5,
+            maxBuf: 5,
+            time: 9.0
+        },
+        {
+            badge: 'ВОЛНА 7: ПЕРЕКРЕСТНЫЙ СИНТЕЗ (4 токена)',
+            title: 'Сложный многошаговый маршрут',
+            desc: 'Извлеките цепочку из 4 токенов в буфер из 6 слотов за 8.5 секунд.',
+            targetLen: 4,
+            size: 5,
+            maxBuf: 6,
+            time: 8.5
+        },
+        {
+            badge: 'ВОЛНА 8: ОБМАНЧИВАЯ ПЕРЕДЫШКА',
+            title: 'Ложная передышка контура',
+            desc: 'Временной лимит слегка ослаблен (9 сек), но структура требует быстрого внимания.',
+            targetLen: 3,
+            size: 5,
+            maxBuf: 6,
+            time: 9.0
+        },
+        {
+            badge: 'ВОЛНА 9: ГИПЕР-МАТРИЦА (6x6)',
+            title: 'Шестиуровневый кодовый узел',
+            desc: 'Предельная концентрация: соберите 4 токена в сетке 6x6 за 7.5 секунд.',
+            targetLen: 4,
+            size: 6,
+            maxBuf: 6,
+            time: 7.5
+        },
+        {
+            badge: 'ВОЛНА 10: ФИНАЛЬНЫЙ БОСС — СУПЕР-ХАФФМАН',
+            title: 'Кульминационный прорыв матрицы Фано',
+            desc: 'Финальный рубеж: соберите 4 токена в сетке 6x6 за 6.5 секунд для полной победы!',
+            targetLen: 4,
+            size: 6,
+            maxBuf: 6,
+            time: 6.5
+        }
+    ];
+
+    // Синтезатор звуков Web Audio API
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) audioCtx = new AudioContext();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    function playSound(freq, type = 'sine', duration = 0.12, gainLevel = 0.08) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(gainLevel, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch(e) {}
+    }
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro',
+                currentPhase: 1,
+                totalPhases: 10,
+                phaseTimeLeft: 14.0,
+                maxPhaseTime: 14.0,
+                timerInterval: null,
+                matrix: [],
+                gridSize: 4,
+                activeDirection: 'row',
+                activeLineIndex: 0,
+                targetSequence: [],
+                playerBuffer: [],
+                maxBufferSize: 4,
+                failMessage: '',
+                startTime: null,
+                attemptsCount: 0
+            };
+        },
+
+        computed: {
+            currentWaveInfo() {
+                return WAVE_CONFIGS[this.currentPhase - 1] || WAVE_CONFIGS[0];
+            },
+            formattedTime() {
+                return Math.max(0, this.phaseTimeLeft).toFixed(1);
+            }
+        },
+
+        methods: {
+            startGame() {
+                this.startTime = Date.now();
+                this.currentPhase = 1;
+                this.gameState = 'playing';
+
+                this.sendTelemetry('in_progress', false, 'in_progress');
+                this.loadWave(1);
+            },
+
+            sendTelemetry(actionType, successStatus, statusStr) {
+                const payload = {
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: MISSION_NAME,
+                    action_type: actionType,
+                    status: statusStr,
+                    start_time: new Date(this.startTime || Date.now()).toISOString(),
+                    time_spent_sec: Math.max(1, Math.round((Date.now() - (this.startTime || Date.now())) / 1000)),
+                    attempts_count: this.attemptsCount,
+                    success: successStatus
+                };
+                try {
+                    window.parent.postMessage(payload, '*');
+                } catch(e) {
+                    console.error('Telemetry postMessage error:', e);
+                }
+            },
+
+            loadWave(phase) {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+
+                const cfg = WAVE_CONFIGS[phase - 1];
+                this.gridSize = cfg.size;
+                this.maxBufferSize = cfg.maxBuf;
+                this.maxPhaseTime = cfg.time;
+                this.phaseTimeLeft = cfg.time;
+                this.playerBuffer = [];
+                this.activeDirection = 'row';
+                this.activeLineIndex = 0;
+
+                // Процедурная генерация целевой последовательности
+                const target = [];
+                for (let i = 0; i < cfg.targetLen; i++) {
+                    target.push(TOKEN_POOL[Math.floor(Math.random() * TOKEN_POOL.length)]);
+                }
+                this.targetSequence = target;
+
+                // Создаем пустую сетку
+                const grid = [];
+                for (let r = 0; r < cfg.size; r++) {
+                    const row = [];
+                    for (let c = 0; c < cfg.size; c++) {
+                        row.push({
+                            r, c,
+                            val: TOKEN_POOL[Math.floor(Math.random() * TOKEN_POOL.length)],
+                            used: false
+                        });
+                    }
+                    grid.push(row);
+                }
+
+                // Гарантируем 100% проходимый путь решения из строки 0:
+                let curR = 0;
+                let curC = Math.floor(Math.random() * cfg.size);
+                grid[curR][curC].val = target[0];
+
+                let nextDir = 'col';
+                for (let i = 1; i < target.length; i++) {
+                    if (nextDir === 'col') {
+                        let nextR = Math.floor(Math.random() * cfg.size);
+                        while (nextR === curR) {
+                            nextR = Math.floor(Math.random() * cfg.size);
+                        }
+                        curR = nextR;
+                        grid[curR][curC].val = target[i];
+                        nextDir = 'row';
+                    } else {
+                        let nextC = Math.floor(Math.random() * cfg.size);
+                        while (nextC === curC) {
+                            nextC = Math.floor(Math.random() * cfg.size);
+                        }
+                        curC = nextC;
+                        grid[curR][curC].val = target[i];
+                        nextDir = 'col';
+                    }
+                }
+
+                this.matrix = grid;
+
+                // Запуск таймера тиков
+                this.timerInterval = setInterval(() => {
+                    this.phaseTimeLeft -= 0.1;
+                    if (this.phaseTimeLeft <= 0) {
+                        clearInterval(this.timerInterval);
+                        this.handleFailure('Время на анализ матрицы истекло! Контур заблокирован.');
+                    }
+                }, 100);
+            },
+
+            isCellSelectable(r, c) {
+                if (this.matrix[r][c].used) return false;
+                if (this.activeDirection === 'row' && r === this.activeLineIndex) return true;
+                if (this.activeDirection === 'col' && c === this.activeLineIndex) return true;
+                return false;
+            },
+
+            getCellClass(r, c) {
+                const cell = this.matrix[r][c];
+                if (cell.used) return 'btn-outline-secondary opacity-25';
+                if (this.isCellSelectable(r, c)) {
+                    return 'btn-outline-danger text-light border-danger';
+                }
+                return 'btn-outline-secondary text-secondary opacity-50';
+            },
+
+            selectCell(r, c) {
+                if (!this.isCellSelectable(r, c)) return;
+
+                const cell = this.matrix[r][c];
+                cell.used = true;
+                this.playerBuffer.push(cell.val);
+                playSound(520, 'sine', 0.08);
+
+                // Переключение направления
+                if (this.activeDirection === 'row') {
+                    this.activeDirection = 'col';
+                    this.activeLineIndex = c;
+                } else {
+                    this.activeDirection = 'row';
+                    this.activeLineIndex = r;
+                }
+
+                // Проверка совпадения с целевой цепочкой
+                this.checkBuffer();
+            },
+
+            checkBuffer() {
+                // Ищем targetSequence внутри playerBuffer
+                const bufStr = this.playerBuffer.join(',');
+                const tgtStr = this.targetSequence.join(',');
+
+                if (bufStr.includes(tgtStr)) {
+                    // Волна пройдена!
+                    playSound(880, 'triangle', 0.2);
+                    if (this.currentPhase >= this.totalPhases) {
+                        // Полная победа!
+                        clearInterval(this.timerInterval);
+                        this.gameState = 'success';
+                        this.sendTelemetry('level_complete', true, 'completed');
+                    } else {
+                        this.currentPhase++;
+                        this.loadWave(this.currentPhase);
+                    }
+                    return;
+                }
+
+                // Если буфер заполнен, но цель не достигнута -> сбой!
+                if (this.playerBuffer.length >= this.maxBufferSize) {
+                    this.handleFailure('Буфер памяти переполнен! Не удалось собрать целевую последовательность.');
+                }
+            },
+
+            handleFailure(msg) {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.attemptsCount++;
+                this.failMessage = msg;
+                this.gameState = 'failed';
+                playSound(150, 'sawtooth', 0.4, 0.2);
+
+                this.sendTelemetry('hardcore_reset', false, 'in_progress');
+            }
+        }
+    }).mount('#app');
+</script>
