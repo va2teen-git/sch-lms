@@ -437,7 +437,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 const seq = currentWave.value.targetSequence;
                 const buf = memoryBuffer.value;
                 if (index >= seq.length) return false;
-                return buf.includes(seq[index]);
+
+                // Подсветка прогресса совпадения префикса целевой цепочки в хвосте буфера
+                for (let len = seq.length; len >= 1; len--) {
+                    if (buf.length >= len) {
+                        let match = true;
+                        for (let k = 0; k < len; k++) {
+                            if (buf[buf.length - len + k] !== seq[k]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            return index < len;
+                        }
+                    }
+                }
+                return false;
             }
 
             function checkBufferStatus() {
@@ -445,10 +461,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 const seq = wave.targetSequence;
                 const buf = memoryBuffer.value;
 
-                // Проверяем, содержит ли буфер все токены целевой цепочки
-                const isFullyCollected = seq.every(token => buf.includes(token));
+                // Проверяем точное вхождение подмассива целевой цепочки внутри буфера игрока
+                let foundMatch = false;
+                if (buf.length >= seq.length) {
+                    for (let i = 0; i <= buf.length - seq.length; i++) {
+                        let match = true;
+                        for (let j = 0; j < seq.length; j++) {
+                            if (buf[i + j] !== seq[j]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            foundMatch = true;
+                            break;
+                        }
+                    }
+                }
 
-                if (isFullyCollected) {
+                if (foundMatch) {
                     onWaveSuccess();
                     return;
                 }
@@ -519,7 +550,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 if (timerInterval) clearInterval(timerInterval);
                 const stepMs = 100;
                 timerInterval = setInterval(() => {
-                    waveTimeLeft.value -= 0.1;
+                    waveTimeLeft.value = Math.max(0, Math.round((waveTimeLeft.value - 0.1) * 10) / 10);
                     if (waveTimeLeft.value <= 0.05) {
                         waveTimeLeft.value = 0;
                         triggerHardcoreReset('Превышено время раунда (Time-out)!');
