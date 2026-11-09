@@ -1,0 +1,659 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 text-success mb-0">Тренажер: Решето Эратосфена (Уровень 1)</h2>
+                <div class="text-secondary small">Урок 27 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Манипуляция мышью // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса и таймер -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Сито вычеркивания составных чисел</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ОШИБКА АЛГОРИТМА]</strong> <span id="feedback-text">Неверно вычеркнуты числа!</span> 
+                            Регенерация фазы...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: Интерактивная числовая матрица     -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <div class="bg-black p-3 border border-secondary mb-3">
+                        <div class="text-light mb-2">
+                            Текущее простое число: <strong id="p1-prime-val" class="text-warning fs-5">p = 3</strong>.
+                            Диапазон таблицы: от <span class="text-info">2</span> до <span id="p1-max-val" class="text-info">30</span>.
+                        </div>
+                        <div class="text-secondary small">
+                            ИНСТРУКЦИЯ: Выделите кликом мышью <strong>ВСЕ составные числа</strong>, которые вычёркиваются на данном шаге.
+                            <br>
+                            Помните о правиле оптимизации: вычёркивание начинается строго с <code class="text-warning">p²</code> (меньшие кратные уже вычеркнуты другими простыми делителями), а само простое число <code class="text-warning">p</code> вычёркивать запрещено!
+                        </div>
+                    </div>
+
+                    <!-- Числовая сетка -->
+                    <div id="p1-grid" class="d-flex flex-wrap gap-2 mb-3 justify-content-center">
+                        <!-- Генерируется динамически через JS -->
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-secondary small">
+                            Вычеркнуто элементов: <span id="p1-selected-count" class="text-success fw-bold">0</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button id="p1-reset-btn" class="btn btn-outline-secondary rounded-0 px-3">
+                                СБРОСИТЬ ВЫБОР
+                            </button>
+                            <button id="p1-submit-btn" class="btn btn-success rounded-0 px-4 fw-bold">
+                                ПОДТВЕРДИТЬ ВЫЧЁРКИВАНИЕ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: Слот-пазл алгоритма (Slot & Snap)  -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Соберите оптимальный алгоритмический каркас решета Эратосфена для диапазона от <code>2</code> до <code>N</code>.
+                        Перетащите блоки из палитры в соответствующие слоты (или кликните блок, затем целевой слот).
+                    </p>
+
+                    <!-- Целевые слоты -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-2">1. ИНИЦИАЛИЗАЦИЯ ТАБЛИЦЫ РЕШЕТА</div>
+                                <div id="slot-0" class="slot-box border border-dashed border-success p-3 text-center rounded-0 d-flex align-items-center justify-content-center" style="min-height: 48px;" data-slot="0">
+                                    <span class="text-secondary small placeholder-text">[Перетащите токен инициализации]</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-2">2. УСЛОВИЕ ВНЕШНЕГО ЦИКЛА ПОИСКА ДЕЛИТЕЛЕЙ</div>
+                                <div id="slot-1" class="slot-box border border-dashed border-success p-3 text-center rounded-0 d-flex align-items-center justify-content-center" style="min-height: 48px;" data-slot="1">
+                                    <span class="text-secondary small placeholder-text">[Перетащите границу внешнего цикла]</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-2">3. ВНУТРЕННИЙ ЦИКЛ ВЫЧЁРКИВАНИЯ КРАТНЫХ</div>
+                                <div id="slot-2" class="slot-box border border-dashed border-success p-3 text-center rounded-0 d-flex align-items-center justify-content-center" style="min-height: 48px;" data-slot="2">
+                                    <span class="text-secondary small placeholder-text">[Перетащите параметры шага и старта]</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-2">4. ТЕОРЕТИЧЕСКАЯ ВРЕМЕННАЯ СЛОЖНОСТЬ</div>
+                                <div id="slot-3" class="slot-box border border-dashed border-success p-3 text-center rounded-0 d-flex align-items-center justify-content-center" style="min-height: 48px;" data-slot="3">
+                                    <span class="text-secondary small placeholder-text">[Перетащите асимптотическую оценку]</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Палитра токенов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПАЛИТРА АЛГОРИТМИЧЕСКИХ ТОКЕНОВ (содержит дистракторы):</div>
+                        <div id="p2-tokens-palette" class="d-flex flex-wrap gap-2">
+                            <!-- Генерируется динамически через JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-submit-btn" class="btn btn-success rounded-0 px-4 fw-bold">
+                            ПРОВЕРИТЬ КОНСТРУКЦИЮ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: Сортировка по контейнерам (Buckets)-->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-3">
+                        Распределите числа по контейнерам в зависимости от того, на каком этапе решета они вычёркиваются, либо являются простыми.
+                        <br>
+                        <span class="text-secondary small">Кликните на карточку числа в пуле, затем кликните на целевую корзину для перемещения.</span>
+                    </p>
+
+                    <!-- Пул доступных карточек -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ЧИСЛА ДЛЯ КЛАССИФИКАЦИИ:</div>
+                        <div id="p3-pool" class="d-flex flex-wrap gap-2 align-items-center" style="min-height: 48px;">
+                            <!-- Карточки чисел -->
+                        </div>
+                    </div>
+
+                    <!-- 3 Целевые корзины -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-4">
+                            <div id="bucket-2" class="bucket-card card bg-black border border-primary rounded-0 p-3 h-100" data-bucket="p2">
+                                <div class="text-primary fw-bold mb-1">КОРЗИНА 1: КРАТНЫЕ p = 2</div>
+                                <div class="text-secondary small mb-2">Вычёркиваются чётные числа (начиная с 2² = 4)</div>
+                                <div class="bucket-items d-flex flex-wrap gap-2 p-2 border border-secondary rounded-0 bg-dark" style="min-height: 48px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div id="bucket-3" class="bucket-card card bg-black border border-warning rounded-0 p-3 h-100" data-bucket="p3">
+                                <div class="text-warning fw-bold mb-1">КОРЗИНА 2: КРАТНЫЕ p = 3</div>
+                                <div class="text-secondary small mb-2">Впервые вычёркиваются тройкой (начиная с 3² = 9)</div>
+                                <div class="bucket-items d-flex flex-wrap gap-2 p-2 border border-secondary rounded-0 bg-dark" style="min-height: 48px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div id="bucket-prime" class="bucket-card card bg-black border border-success rounded-0 p-3 h-100" data-bucket="prime">
+                                <div class="text-success fw-bold mb-1">КОРЗИНА 3: ПРОСТЫЕ ЧИСЛА</div>
+                                <div class="text-secondary small mb-2">Остаются невычеркнутыми в решете</div>
+                                <div class="bucket-items d-flex flex-wrap gap-2 p-2 border border-secondary rounded-0 bg-dark" style="min-height: 48px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-submit-btn" class="btn btn-success rounded-0 px-4 fw-bold">
+                            ПРОВЕРИТЬ РАСПРЕДЕЛЕНИЕ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФИНАЛЬНЫЙ ЭКРАН ПОБЕДЫ                     -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="text-center py-5 d-none">
+                    <div class="display-1 text-success mb-3">✓</div>
+                    <h3 class="text-success mb-2">УРОВЕНЬ 1 УСПЕШНО ПРОЙДЕН!</h3>
+                    <p class="text-secondary mb-4">
+                        Вы успешно освоили фундаментальные принципы вычёркивания составных чисел по алгоритму Эратосфена.
+                    </p>
+                    <div class="d-inline-flex border border-success p-3 bg-black gap-4 text-start rounded-0 mb-4">
+                        <div>
+                            <div class="text-secondary small">Затраченное время:</div>
+                            <div id="final-time" class="text-info fw-bold fs-5">00:00</div>
+                        </div>
+                        <div class="border-start border-secondary ps-4">
+                            <div class="text-secondary small">Количество ошибок:</div>
+                            <div id="final-attempts" class="text-warning fw-bold fs-5">0</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Таймер
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 1)',
+            action_type: 'level_fail',
+            status: 'failed',
+            attempts_count: attemptsCount
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1800);
+    }
+
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 1)',
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Интерактивная числовая сетка
+    // =========================================================================
+    let p1CurrentPrime = 3;
+    let p1MaxNum = 30;
+    let p1SelectedNumbers = new Set();
+
+    function initPhase1() {
+        const primesPool = [2, 3, 5];
+        p1CurrentPrime = primesPool[Math.floor(Math.random() * primesPool.length)];
+        p1MaxNum = 30;
+        p1SelectedNumbers.clear();
+
+        document.getElementById('p1-prime-val').textContent = `p = ${p1CurrentPrime}`;
+        document.getElementById('p1-max-val').textContent = String(p1MaxNum);
+        document.getElementById('p1-selected-count').textContent = '0';
+
+        const grid = document.getElementById('p1-grid');
+        grid.innerHTML = '';
+
+        for (let i = 2; i <= p1MaxNum; i++) {
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'btn btn-outline-light rounded-0 fw-bold fs-5 p-2 grid-num-btn';
+            cell.style.width = '48px';
+            cell.style.height = '48px';
+            cell.dataset.num = String(i);
+            cell.textContent = String(i);
+
+            cell.addEventListener('click', () => {
+                if (isLocked) return;
+                const num = parseInt(cell.dataset.num, 10);
+                if (p1SelectedNumbers.has(num)) {
+                    p1SelectedNumbers.delete(num);
+                    cell.classList.remove('btn-danger', 'text-white');
+                    cell.classList.add('btn-outline-light');
+                } else {
+                    p1SelectedNumbers.add(num);
+                    cell.classList.remove('btn-outline-light');
+                    cell.classList.add('btn-danger', 'text-white');
+                }
+                document.getElementById('p1-selected-count').textContent = String(p1SelectedNumbers.size);
+            });
+
+            grid.appendChild(cell);
+        }
+    }
+
+    document.getElementById('p1-reset-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        p1SelectedNumbers.clear();
+        document.querySelectorAll('.grid-num-btn').forEach(btn => {
+            btn.classList.remove('btn-danger', 'text-white');
+            btn.classList.add('btn-outline-light');
+        });
+        document.getElementById('p1-selected-count').textContent = '0';
+    });
+
+    document.getElementById('p1-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+
+        // Вычисляем эталонные числа, вычеркиваемые на шаге p, начиная с p²
+        const expected = new Set();
+        const start = p1CurrentPrime * p1CurrentPrime;
+        for (let k = start; k <= p1MaxNum; k += p1CurrentPrime) {
+            expected.add(k);
+        }
+
+        // Проверяем множества
+        let isMatch = (expected.size === p1SelectedNumbers.size);
+        if (isMatch) {
+            for (let num of expected) {
+                if (!p1SelectedNumbers.has(num)) {
+                    isMatch = false;
+                    break;
+                }
+            }
+        }
+
+        if (!isMatch) {
+            let errorMsg = 'Неверно вычеркнуты составные числа!';
+            if (p1SelectedNumbers.has(p1CurrentPrime)) {
+                errorMsg = `Ошибка: число p = ${p1CurrentPrime} является простым, его нельзя вычёркивать!`;
+            } else {
+                for (let num of p1SelectedNumbers) {
+                    if (num < p1CurrentPrime * p1CurrentPrime) {
+                        errorMsg = `Ошибка: вычеркивание для p = ${p1CurrentPrime} начинается с p² = ${p1CurrentPrime * p1CurrentPrime}! Число ${num} уже обработано ранее.`;
+                        break;
+                    }
+                    if (num % p1CurrentPrime !== 0) {
+                        errorMsg = `Ошибка: число ${num} не кратно ${p1CurrentPrime}!`;
+                        break;
+                    }
+                }
+            }
+            triggerErrorReset(errorMsg, () => {
+                initPhase1();
+            });
+            return;
+        }
+
+        // Успех Фазы 1 -> переход на Фазу 2
+        currentPhase = 2;
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+        document.getElementById('phase-title').textContent = 'Слот-пазл алгоритмического каркаса';
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.remove('d-none');
+        initPhase2();
+    });
+
+    // =========================================================================
+    // ФАЗА 2: Слот-пазл (Slot & Snap)
+    // =========================================================================
+    const P2_TOKENS = [
+        { id: 't_init', slot: 0, text: 'is_prime = [True] * (N + 1); is_prime[0] = is_prime[1] = False' },
+        { id: 't_outer', slot: 1, text: 'Внешний цикл: от p = 2 пока p * p <= N' },
+        { id: 't_inner', slot: 2, text: 'Внутренний цикл: от k = p * p до N с шагом p' },
+        { id: 't_comp', slot: 3, text: 'Временная сложность: O(N · log(log N))' },
+        // Дистракторы
+        { id: 'd_outer_half', slot: -1, text: 'Внешний цикл: от p = 2 до N // 2' },
+        { id: 'd_inner_2p', slot: -1, text: 'Внутренний цикл: от k = 2 * p до N с шагом 1' },
+        { id: 'd_comp_sq', slot: -1, text: 'Временная сложность: O(N · √N)' }
+    ];
+
+    let p2SelectedToken = null;
+    let p2SlotsState = [null, null, null, null];
+
+    function initPhase2() {
+        p2SlotsState = [null, null, null, null];
+        p2SelectedToken = null;
+
+        // Очистка слотов
+        for (let i = 0; i < 4; i++) {
+            const slotEl = document.getElementById(`slot-${i}`);
+            slotEl.innerHTML = '<span class="text-secondary small placeholder-text">[Перетащите токен]</span>';
+            slotEl.classList.remove('border-warning', 'bg-dark');
+            slotEl.classList.add('border-success');
+        }
+
+        // Перемешивание токенов
+        const palette = document.getElementById('p2-tokens-palette');
+        palette.innerHTML = '';
+        const shuffled = [...P2_TOKENS].sort(() => Math.random() - 0.5);
+
+        shuffled.forEach(t => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-outline-info rounded-0 p-2 text-start token-btn';
+            btn.style.fontSize = '0.85rem';
+            btn.dataset.tokenId = t.id;
+            btn.textContent = t.text;
+
+            btn.addEventListener('click', () => {
+                if (isLocked) return;
+                document.querySelectorAll('.token-btn').forEach(b => b.classList.remove('active', 'border-warning'));
+                if (p2SelectedToken === t.id) {
+                    p2SelectedToken = null;
+                } else {
+                    p2SelectedToken = t.id;
+                    btn.classList.add('active', 'border-warning');
+                }
+            });
+
+            palette.appendChild(btn);
+        });
+
+        // Слушатели кликов по слотам
+        for (let i = 0; i < 4; i++) {
+            const slotEl = document.getElementById(`slot-${i}`);
+            slotEl.onclick = () => {
+                if (isLocked) return;
+                if (!p2SelectedToken) return;
+
+                const tokenObj = P2_TOKENS.find(t => t.id === p2SelectedToken);
+                p2SlotsState[i] = tokenObj;
+
+                slotEl.innerHTML = `<span class="text-warning fw-bold small">${tokenObj.text}</span>`;
+                slotEl.classList.add('bg-dark');
+
+                // Сброс выбора
+                p2SelectedToken = null;
+                document.querySelectorAll('.token-btn').forEach(b => b.classList.remove('active', 'border-warning'));
+            };
+        }
+    }
+
+    document.getElementById('p2-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+
+        // Проверяем заполнение всех 4 слотов
+        for (let i = 0; i < 4; i++) {
+            if (!p2SlotsState[i]) {
+                triggerErrorReset('Заполните все 4 слота алгоритмического каркаса!');
+                return;
+            }
+        }
+
+        // Проверяем правильность
+        let allCorrect = true;
+        for (let i = 0; i < 4; i++) {
+            if (p2SlotsState[i].slot !== i) {
+                allCorrect = false;
+                break;
+            }
+        }
+
+        if (!allCorrect) {
+            triggerErrorReset('Неверная конфигурация слотов решета! Обратите внимание на границы циклов и оптимизации.', () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        // Успех Фазы 2 -> переход на Фазу 3
+        currentPhase = 3;
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+        document.getElementById('phase-title').textContent = 'Сортировка чисел по корзинам вычёркивания';
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.remove('d-none');
+        initPhase3();
+    });
+
+    // =========================================================================
+    // ФАЗА 3: Сортировка по контейнерам (Buckets)
+    // =========================================================================
+    const P3_BANK = [
+        { num: 4, bucket: 'p2' },
+        { num: 6, bucket: 'p2' },
+        { num: 8, bucket: 'p2' },
+        { num: 10, bucket: 'p2' },
+        { num: 12, bucket: 'p2' },
+        { num: 14, bucket: 'p2' },
+        { num: 16, bucket: 'p2' },
+        { num: 9, bucket: 'p3' },   // 3 * 3 = 9
+        { num: 15, bucket: 'p3' },  // 3 * 5 = 15
+        { num: 21, bucket: 'p3' },  // 3 * 7 = 21
+        { num: 27, bucket: 'p3' },  // 3 * 9 = 27
+        { num: 33, bucket: 'p3' },  // 3 * 11 = 33
+        { num: 2, bucket: 'prime' },
+        { num: 3, bucket: 'prime' },
+        { num: 5, bucket: 'prime' },
+        { num: 7, bucket: 'prime' },
+        { num: 11, bucket: 'prime' },
+        { num: 13, bucket: 'prime' },
+        { num: 17, bucket: 'prime' },
+        { num: 19, bucket: 'prime' },
+        { num: 23, bucket: 'prime' },
+        { num: 29, bucket: 'prime' },
+        { num: 31, bucket: 'prime' }
+    ];
+
+    let p3ActiveCard = null;
+    let p3Placed = {}; // { num: bucketId }
+
+    function initPhase3() {
+        p3ActiveCard = null;
+        p3Placed = {};
+
+        // Выбираем 9 карточек: 3 из p2, 3 из p3, 3 из prime
+        const p2s = P3_BANK.filter(x => x.bucket === 'p2').sort(() => Math.random() - 0.5).slice(0, 3);
+        const p3s = P3_BANK.filter(x => x.bucket === 'p3').sort(() => Math.random() - 0.5).slice(0, 3);
+        const primes = P3_BANK.filter(x => x.bucket === 'prime').sort(() => Math.random() - 0.5).slice(0, 3);
+
+        const currentCards = [...p2s, ...p3s, ...primes].sort(() => Math.random() - 0.5);
+
+        // Очистка корзин
+        document.querySelectorAll('.bucket-items').forEach(b => b.innerHTML = '');
+
+        const pool = document.getElementById('p3-pool');
+        pool.innerHTML = '';
+
+        currentCards.forEach(c => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'btn btn-outline-light rounded-0 px-3 py-2 fw-bold fs-5 p3-card';
+            card.dataset.num = String(c.num);
+            card.dataset.expectedBucket = c.bucket;
+            card.textContent = String(c.num);
+
+            card.addEventListener('click', () => {
+                if (isLocked) return;
+                document.querySelectorAll('.p3-card').forEach(cd => cd.classList.remove('border-warning', 'text-warning'));
+                if (p3ActiveCard === card) {
+                    p3ActiveCard = null;
+                } else {
+                    p3ActiveCard = card;
+                    card.classList.add('border-warning', 'text-warning');
+                }
+            });
+
+            pool.appendChild(card);
+        });
+
+        // Слушатели корзин
+        document.querySelectorAll('.bucket-card').forEach(bucketEl => {
+            bucketEl.onclick = () => {
+                if (isLocked) return;
+                if (!p3ActiveCard) return;
+
+                const bucketId = bucketEl.dataset.bucket;
+                const itemsContainer = bucketEl.querySelector('.bucket-items');
+
+                // Перемещаем карточку в корзину
+                p3Placed[p3ActiveCard.dataset.num] = bucketId;
+                itemsContainer.appendChild(p3ActiveCard);
+
+                p3ActiveCard.classList.remove('border-warning', 'text-warning');
+                p3ActiveCard.classList.add('btn-secondary');
+                p3ActiveCard = null;
+            };
+        });
+    }
+
+    document.getElementById('p3-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+
+        const poolCards = document.querySelectorAll('#p3-pool .p3-card');
+        if (poolCards.length > 0) {
+            triggerErrorReset('Распределите все числа из пула по корзинам!');
+            return;
+        }
+
+        // Проверяем корректность
+        let allCorrect = true;
+        let errorHint = 'Ошибка классификации!';
+
+        const cards = document.querySelectorAll('.bucket-items .p3-card');
+        cards.forEach(c => {
+            const num = c.dataset.num;
+            const expected = c.dataset.expectedBucket;
+            const actual = p3Placed[num];
+
+            if (actual !== expected) {
+                allCorrect = false;
+                if (expected === 'p2' && actual === 'p3') {
+                    errorHint = `Число ${num} делится на 3, но вычёркивается УЖЕ на шаге p = 2!`;
+                } else if (expected === 'prime') {
+                    errorHint = `Число ${num} — простое! Оно не должно быть в корзине составных.`;
+                } else {
+                    errorHint = `Число ${num} помещено не в ту корзину!`;
+                }
+            }
+        });
+
+        if (!allCorrect) {
+            triggerErrorReset(errorHint, () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        // Успех всего Уровня 1!
+        completeLevel();
+    });
+
+    // Запуск
+    startTimer();
+    initPhase1();
+})();
+</script>
+
+
