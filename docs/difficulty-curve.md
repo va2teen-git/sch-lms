@@ -275,5 +275,9 @@ test('Level 2 - Cognitive Difficulty Calibration & Sawtooth Profile Audit', asyn
 npm run test:difficulty
 
 # Проверка калибровки сложности конкретного урока
+# 10 класс (Урок 27 — Дискретизация)
 npx playwright test tests/lesson27-grade10-student-personas.spec.js -g "Cognitive Difficulty"
+
+# 11 класс углубленный (Урок 27 — Решето Эратосфена)
+npx playwright test tests/lesson27-grade11-student-personas.spec.js -g "Cognitive Difficulty"
 ```
