@@ -574,7 +574,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             card.dataset.expectedBucket = c.bucket;
             card.textContent = String(c.num);
 
-            card.addEventListener('click', () => {
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
                 if (isLocked) return;
                 document.querySelectorAll('.p3-card').forEach(cd => cd.classList.remove('border-warning', 'text-warning'));
                 if (p3ActiveCard === card) {
@@ -587,6 +588,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             pool.appendChild(card);
         });
+
+        // Слушатель пула (возврат карточки из корзины в пул)
+        pool.onclick = () => {
+            if (isLocked) return;
+            if (!p3ActiveCard) return;
+
+            pool.appendChild(p3ActiveCard);
+            delete p3Placed[p3ActiveCard.dataset.num];
+
+            p3ActiveCard.classList.remove('border-warning', 'text-warning', 'btn-secondary');
+            p3ActiveCard.classList.add('btn-outline-light');
+            p3ActiveCard = null;
+        };
 
         // Слушатели корзин
         document.querySelectorAll('.bucket-card').forEach(bucketEl => {
@@ -601,7 +615,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 p3Placed[p3ActiveCard.dataset.num] = bucketId;
                 itemsContainer.appendChild(p3ActiveCard);
 
-                p3ActiveCard.classList.remove('border-warning', 'text-warning');
+                p3ActiveCard.classList.remove('border-warning', 'text-warning', 'btn-outline-light');
                 p3ActiveCard.classList.add('btn-secondary');
                 p3ActiveCard = null;
             };
