@@ -1,0 +1,598 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 text-warning mb-0">Тренажер: Решето Эратосфена (Уровень 2)</h2>
+                <div class="text-secondary small">Урок 27 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">
+                Аналитический ввод // Anti-Paste Guard
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса и таймер -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет вычеркиваний</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ОШИБКА РАСЧЕТА]</strong> <span id="feedback-text">Неверное значение!</span> 
+                            Регенерация параметров...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: Прямой расчет вычеркиваний         -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">УСЛОВИЕ ЗАДАЧИ:</div>
+                        <div class="text-light mb-2">
+                            В классическом оптимизированном алгоритме решета Эратосфена для числового диапазона от <code>2</code> до <strong id="p1-n-val" class="text-info">85</strong> выполняется вычеркивание составных чисел.
+                            <br><br>
+                            Сколько составных чисел будет вычеркнуто внутренним циклом алгоритма для простого числа <strong id="p1-p-val" class="text-warning">p = 7</strong> с учётом оптимизации старта с <code>p²</code>?
+                        </div>
+                        <div class="text-secondary small">
+                            (Напоминание: внутренний цикл начинает вычеркивание строго с индекса <code>p²</code> с шагом <code>p</code> вплоть до границы диапазона <code>N</code> включительно).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p1-input" class="form-label text-warning small">ВВЕДИТЕ РАССЧИТАННОЕ ЧИСЛО ОПЕРАЦИЙ ВЫЧЕРКИВАНИЯ:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 6" autocomplete="off">
+                            <button id="p1-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: Многошаговый расчет (Впервые)      -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">УСЛОВИЕ ЗАДАЧИ (АНАЛИЗ КОЛЛИЗИЙ ДЕЛИТЕЛЕЙ):</div>
+                        <div class="text-light mb-2">
+                            Анализируется просеивание диапазона чисел от <code>2</code> до <strong id="p2-n-val" class="text-info">70</strong>.
+                            <br><br>
+                            Сколько составных чисел в этом диапазоне будут вычеркнуты <strong>ВПЕРВЫЕ</strong> именно простым числом <strong id="p2-p-val" class="text-warning">p = 5</strong>?
+                        </div>
+                        <div class="text-secondary small">
+                            (Пояснение: число вычеркивается пятеркой впервые, если оно кратно 5, лежит в диапазоне от <code>5² = 25</code> до <code>N</code> и НЕ делится на предшествующие простые числа 2 и 3).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p2-input" class="form-label text-warning small">КОЛИЧЕСТВО ЧИСЕЛ, ВПЕРВЫЕ ВЫЧЕРКИВАЕМЫХ ДЕЛИТЕЛЕМ:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 4" autocomplete="off">
+                            <button id="p2-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: Обратная задача (Пик 1)            -->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">ОБРАТНАЯ ЗАДАЧА (REVERSE PROBLEM):</div>
+                        <div class="text-light mb-2">
+                            В оптимизированном решете Эратосфена для диапазона <code>[2; N]</code> внешний цикл поиска делителей завершил свою работу на простом числе <strong id="p3-p-val" class="text-warning">p = 7</strong> (то есть для числа 7 вычеркивание ещё выполнялось, а следующее простое число 11 уже не проверялось внешним циклом, так как <code>11² > N</code>).
+                            <br><br>
+                            Каково <strong>максимально возможное натуральное число N</strong>, при котором выполняется это условие останова?
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p3-input" class="form-label text-warning small">МАКСИМАЛЬНАЯ ВЕРХНЯЯ ГРАНИЦА ДИАПАЗОНА (N):</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 120" autocomplete="off">
+                            <button id="p3-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 4: Долина консолидации (Память)       -->
+                <!-- ========================================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">КОНЦЕПТУАЛЬНЫЙ АНАЛИЗ ЕМКОСТИ ПАМЯТИ:</div>
+                        <div class="text-light mb-2">
+                            Для просеивания чисел в диапазоне от <code>0</code> до <strong id="p4-n-val" class="text-info">1000</strong> в C++ используется битовый массив <code>std::vector&lt;bool&gt;</code> размера <code>N + 1</code>, где каждый элемент занимает ровно <strong>1 бит</strong>.
+                            <br><br>
+                            Каков минимальный объем оперативной памяти в <strong>байтах</strong> (с округлением вверх до целого байта), необходимый для хранения этого массива?
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p4-input" class="form-label text-warning small">ОБЪЕМ ПАМЯТИ В БАЙТАХ:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 126" autocomplete="off">
+                            <button id="p4-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 5: Кульминация (Сегментированное решето)-->
+                <!-- ========================================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">КУЛЬМИНАЦИОННЫЙ СИНТЕЗ (СЕГМЕНТИРОВАННОЕ РЕШЕТО):</div>
+                        <div class="text-light mb-2">
+                            Для числового отрезка <code>[<span id="p5-l-val" class="text-info">135</span>; <span id="p5-r-val" class="text-info">180</span>]</code> выполняется сегментированное решето Эратосфена с помощью базового простого делителя <strong id="p5-p-val" class="text-warning">p = 11</strong>.
+                            <br><br>
+                            Найдите:
+                            <br>1) <strong>СТАРТ</strong>: наименьшее число отрезка, с которого начнётся вычеркивание для делителя <code>p</code> (по формуле <code>start = max(p², ⌈L/p⌉ · p)</code>);
+                            <br>2) <strong>КОЛИЧЕСТВО</strong>: сколько всего чисел в отрезке <code>[L; R]</code> будет вычеркнуто числом <code>p</code>.
+                        </div>
+                        <div class="text-secondary small">
+                            Ответ введите в формате <code>СТАРТ:КОЛИЧЕСТВО</code> (например, <code>143:4</code>).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p5-input" class="form-label text-warning small">ВВЕДИТЕ СТАРТ И КОЛИЧЕСТВО ВЫЧЕРКИВАНИЙ:</label>
+                        <div class="input-group">
+                            <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 143:4" autocomplete="off">
+                            <button id="p5-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФИНАЛЬНЫЙ ЭКРАН ПОБЕДЫ                     -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="text-center py-5 d-none">
+                    <div class="display-1 text-warning mb-3">✓</div>
+                    <h3 class="text-warning mb-2">УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН!</h3>
+                    <p class="text-secondary mb-4">
+                        Вы продемонстрировали глубокое аналитическое владение математическим аппаратом и оптимизациями решета Эратосфена.
+                    </p>
+                    <div class="d-inline-flex border border-warning p-3 bg-black gap-4 text-start rounded-0 mb-4">
+                        <div>
+                            <div class="text-secondary small">Затраченное время:</div>
+                            <div id="final-time" class="text-info fw-bold fs-5">00:00</div>
+                        </div>
+                        <div class="border-start border-secondary ps-4">
+                            <div class="text-secondary small">Количество ошибок:</div>
+                            <div id="final-attempts" class="text-warning fw-bold fs-5">0</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 2)',
+            action_type: 'hardcore_reset'
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 2000);
+    }
+
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        for (let i = 1; i <= 5; i++) {
+            const p = document.getElementById(`phase${i}`);
+            if (p) p.classList.add('d-none');
+        }
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 2)',
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Прямой расчет
+    // =========================================================================
+    let p1P = 7;
+    let p1N = 85;
+    let p1Expected = 6;
+
+    const P1_CONFIGS = [
+        { p: 5, n: 62 }, // 25, 30, 35, 40, 45, 50, 55, 60 -> 8
+        { p: 7, n: 85 }, // 49, 56, 63, 70, 77, 84 -> 6
+        { p: 7, n: 70 }, // 49, 56, 63, 70 -> 4
+        { p: 11, n: 160 }, // 121, 132, 143, 154 -> 4
+        { p: 5, n: 45 }  // 25, 30, 35, 40, 45 -> 5
+    ];
+
+    function initPhase1() {
+        const cfg = P1_CONFIGS[Math.floor(Math.random() * P1_CONFIGS.length)];
+        p1P = cfg.p;
+        p1N = cfg.n;
+        p1Expected = Math.floor((p1N - p1P * p1P) / p1P) + 1;
+
+        document.getElementById('p1-p-val').textContent = `p = ${p1P}`;
+        document.getElementById('p1-n-val').textContent = String(p1N);
+
+        const inp = document.getElementById('p1-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase1() {
+        if (isLocked) return;
+        const inp = document.getElementById('p1-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите числовой ответ!');
+            return;
+        }
+
+        if (val !== p1Expected) {
+            triggerErrorReset(`Неверный расчет! Для p = ${p1P} старт с ${p1P * p1P}, шаг ${p1P} до ${p1N}.`, () => {
+                initPhase1();
+            });
+            return;
+        }
+
+        // Переход на Фазу 2
+        currentPhase = 2;
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+        document.getElementById('phase-title').textContent = 'Многошаговый расчет коллизий делителей';
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.remove('d-none');
+        initPhase2();
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Анализ коллизий делителей
+    // =========================================================================
+    let p2P = 5;
+    let p2N = 70;
+    let p2Expected = 4;
+
+    const P2_CONFIGS = [
+        { p: 5, n: 70 },  // 25, 35, 55, 65 -> 4
+        { p: 5, n: 60 },  // 25, 35, 55 -> 3
+        { p: 5, n: 85 },  // 25, 35, 55, 65, 85 -> 5
+        { p: 5, n: 100 }  // 25, 35, 55, 65, 85, 95 -> 6
+    ];
+
+    function initPhase2() {
+        const cfg = P2_CONFIGS[Math.floor(Math.random() * P2_CONFIGS.length)];
+        p2P = cfg.p;
+        p2N = cfg.n;
+
+        // Вычисляем эталон
+        let count = 0;
+        for (let k = p2P * p2P; k <= p2N; k += p2P) {
+            if (k % 2 !== 0 && k % 3 !== 0) {
+                count++;
+            }
+        }
+        p2Expected = count;
+
+        document.getElementById('p2-p-val').textContent = `p = ${p2P}`;
+        document.getElementById('p2-n-val').textContent = String(p2N);
+
+        const inp = document.getElementById('p2-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase2() {
+        if (isLocked) return;
+        const inp = document.getElementById('p2-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите целое число!');
+            return;
+        }
+
+        if (val !== p2Expected) {
+            triggerErrorReset(`Неверно! Помните, что чётные числа уже вычеркнуты двойкой, а кратные 3 — тройкой.`, () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        // Переход на Фазу 3
+        currentPhase = 3;
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+        document.getElementById('phase-title').textContent = 'Обратная задача останова внешнего цикла';
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.remove('d-none');
+        initPhase3();
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Обратная задача
+    // =========================================================================
+    let p3P = 7;
+    let p3Expected = 120;
+
+    const P3_CONFIGS = [
+        { p: 5, nextP: 7, expected: 48 },    // 7² - 1 = 48
+        { p: 7, nextP: 11, expected: 120 },  // 11² - 1 = 120
+        { p: 11, nextP: 13, expected: 168 }, // 13² - 1 = 168
+        { p: 13, nextP: 17, expected: 288 }  // 17² - 1 = 288
+    ];
+
+    function initPhase3() {
+        const cfg = P3_CONFIGS[Math.floor(Math.random() * P3_CONFIGS.length)];
+        p3P = cfg.p;
+        p3Expected = cfg.expected;
+
+        document.getElementById('p3-p-val').textContent = `p = ${p3P}`;
+
+        const inp = document.getElementById('p3-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase3() {
+        if (isLocked) return;
+        const inp = document.getElementById('p3-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите числовой ответ!');
+            return;
+        }
+
+        if (val !== p3Expected) {
+            triggerErrorReset(`Неверно! Чтобы следующее простое число p_next не проверялось, должно выполняться p_next² > N.`, () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        // Переход на Фазу 4
+        currentPhase = 4;
+        document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+        document.getElementById('phase-title').textContent = 'Концептуальный анализ емкости памяти';
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('phase4').classList.remove('d-none');
+        initPhase4();
+    }
+
+    // =========================================================================
+    // ФАЗА 4: Емкость памяти (Долина разгрузки)
+    // =========================================================================
+    let p4N = 1000;
+    let p4Expected = 126;
+
+    const P4_CONFIGS = [
+        { n: 1000 }, // 1001 бит -> ceil(1001/8) = 126 байт
+        { n: 2048 }, // 2049 бит -> ceil(2049/8) = 257 байт
+        { n: 4096 }, // 4097 бит -> ceil(4097/8) = 513 байт
+        { n: 8192 }  // 8193 бит -> ceil(8193/8) = 1025 байт
+    ];
+
+    function initPhase4() {
+        const cfg = P4_CONFIGS[Math.floor(Math.random() * P4_CONFIGS.length)];
+        p4N = cfg.n;
+        p4Expected = Math.ceil((p4N + 1) / 8);
+
+        document.getElementById('p4-n-val').textContent = String(p4N);
+
+        const inp = document.getElementById('p4-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase4() {
+        if (isLocked) return;
+        const inp = document.getElementById('p4-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите числовой объем памяти в байтах!');
+            return;
+        }
+
+        if (val !== p4Expected) {
+            triggerErrorReset(`Неверно! Таблица содержит N + 1 бит (индексы от 0 до N). Переведите биты в байты с округлением вверх.`, () => {
+                initPhase4();
+            });
+            return;
+        }
+
+        // Переход на Фазу 5
+        currentPhase = 5;
+        document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+        document.getElementById('phase-title').textContent = 'Кульминационный синтез: сегментированное решето';
+        document.getElementById('phase4').classList.add('d-none');
+        document.getElementById('phase5').classList.remove('d-none');
+        initPhase5();
+    }
+
+    // =========================================================================
+    // ФАЗА 5: Кульминация (Сегментированное решето)
+    // =========================================================================
+    let p5L = 135;
+    let p5R = 180;
+    let p5P = 11;
+    let p5ExpectedStart = 143;
+    let p5ExpectedCount = 4;
+
+    const P5_CONFIGS = [
+        { l: 135, r: 180, p: 11 }, // start = max(121, 143) = 143. 143, 154, 165, 176 -> 4
+        { l: 160, r: 210, p: 13 }, // start = max(169, 169) = 169. 169, 182, 195, 208 -> 4
+        { l: 100, r: 150, p: 7 },  // start = max(49, 105) = 105. 105, 112, 119, 126, 133, 140, 147 -> 7
+        { l: 200, r: 260, p: 17 }  // start = max(289, 204) = 289 -> 289 > 260 -> 0!
+    ];
+
+    function initPhase5() {
+        // Выбираем конфиг, где start <= r
+        const validConfigs = P5_CONFIGS.filter(c => Math.max(c.p * c.p, Math.ceil(c.l / c.p) * c.p) <= c.r);
+        const cfg = validConfigs[Math.floor(Math.random() * validConfigs.length)];
+
+        p5L = cfg.l;
+        p5R = cfg.r;
+        p5P = cfg.p;
+
+        p5ExpectedStart = Math.max(p5P * p5P, Math.ceil(p5L / p5P) * p5P);
+        let cnt = 0;
+        for (let k = p5ExpectedStart; k <= p5R; k += p5P) {
+            cnt++;
+        }
+        p5ExpectedCount = cnt;
+
+        document.getElementById('p5-l-val').textContent = String(p5L);
+        document.getElementById('p5-r-val').textContent = String(p5R);
+        document.getElementById('p5-p-val').textContent = `p = ${p5P}`;
+
+        const inp = document.getElementById('p5-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase5() {
+        if (isLocked) return;
+        const inp = document.getElementById('p5-input');
+        const raw = inp.value.trim().replace(/\s+/g, '').replace(',', ':');
+        const parts = raw.split(':');
+
+        if (parts.length !== 2) {
+            triggerErrorReset('Введите ответ в формате СТАРТ:КОЛИЧЕСТВО (например, 143:4)!');
+            return;
+        }
+
+        const startVal = parseInt(parts[0], 10);
+        const countVal = parseInt(parts[1], 10);
+
+        if (isNaN(startVal) || isNaN(countVal)) {
+            triggerErrorReset('Значения должны быть целыми числами!');
+            return;
+        }
+
+        if (startVal !== p5ExpectedStart || countVal !== p5ExpectedCount) {
+            triggerErrorReset(`Неверно! start = max(p², ⌈L/p⌉ · p). Проверьте формулу и подсчитайте число кратных в отрезке.`, () => {
+                initPhase5();
+            });
+            return;
+        }
+
+        // Победа всего Уровня 2!
+        completeLevel();
+    }
+
+    // Слушатели кнопок и Enter
+    document.getElementById('p1-submit-btn').addEventListener('click', verifyPhase1);
+    document.getElementById('p1-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase1();
+    });
+
+    document.getElementById('p2-submit-btn').addEventListener('click', verifyPhase2);
+    document.getElementById('p2-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase2();
+    });
+
+    document.getElementById('p3-submit-btn').addEventListener('click', verifyPhase3);
+    document.getElementById('p3-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase3();
+    });
+
+    document.getElementById('p4-submit-btn').addEventListener('click', verifyPhase4);
+    document.getElementById('p4-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase4();
+    });
+
+    document.getElementById('p5-submit-btn').addEventListener('click', verifyPhase5);
+    document.getElementById('p5-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase5();
+    });
+
+    // Запуск
+    startTimer();
+    initPhase1();
+})();
+</script>
