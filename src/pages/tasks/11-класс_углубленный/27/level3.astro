@@ -1,0 +1,583 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="vue-app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 text-danger mb-0">Тренажер: Решето Эратосфена (Уровень 3 // Хардкор)</h2>
+                <div class="text-secondary small">Урок 27 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-2">
+                Архетип 1: Cyber Matrix // Hardcore Reset
+            </span>
+        </div>
+
+        <div class="card bg-dark border-danger rounded-0 shadow" :class="{ 'shake-anim': isErrorGlitch }">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Экран Инструктажа (Intro) -->
+                <div v-if="gameState === 'intro'" class="text-center py-4">
+                    <div class="display-3 text-danger mb-3">⚡</div>
+                    <h3 class="text-danger mb-3">КИБЕР-МАТРИЦА: СИТО ЧИСЛОВОГО ВЗЛОМА</h3>
+                    <p class="text-light lead mx-auto" style="max-width: 720px;">
+                        Вам предстоит преодолеть <strong>8 волн</strong> динамического аркадного взлома криптографического ядра.
+                        <br><br>
+                        Каждая волна требует сбора целевой цепочки простых чисел или характеристик решета в буфер памяти.
+                        Выбор ячеек строго подчинен протоколу: 
+                        <strong class="text-warning">горизонтальный ход в активной строке фиксирует столбец</strong>, 
+                        а следующий <strong class="text-info">вертикальный ход фиксирует строку</strong>.
+                    </p>
+
+                    <div class="alert alert-danger bg-black border-danger rounded-0 text-start mx-auto mb-4" style="max-width: 650px;">
+                        <div class="fw-bold mb-1">⚠️ РЕГЛАМЕНТ ХАРДКОРА (ZERO-TOLERANCE):</div>
+                        <ul class="mb-0 small ps-3">
+                            <li>Таймер раунда ограничен и ужесточается с каждой волной!</li>
+                            <li>Любая ошибка (неверный токен, клик мимо направляющей, тайм-аут) сбрасывает весь прогресс на <strong>Волну 1</strong>!</li>
+                            <li>Поддерживается клавиша <kbd class="bg-dark text-warning border border-secondary">Пробел</kbd> для быстрого старта и подтверждения.</li>
+                        </ul>
+                    </div>
+
+                    <button @click="startGame" class="btn btn-danger btn-lg rounded-0 px-5 fw-bold shadow">
+                        ИНИЦИИРОВАТЬ ЗАБЕГ [ПРОБЕЛ]
+                    </button>
+                </div>
+
+                <!-- Игровой процесс (Playing) -->
+                <div v-else-if="gameState === 'playing'">
+                    <!-- Верхняя панель: индикатор волны, таймер и буфер -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                        <div>
+                            <span class="badge bg-danger text-white rounded-0 fs-6 me-2">Волна {{ currentWaveIndex + 1 }} из 8</span>
+                            <span class="text-light fw-bold fs-6">{{ currentWave.title }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-secondary small">
+                                Ошибки: <span class="text-warning fw-bold">{{ attemptsCount }}</span>
+                            </div>
+                            <!-- Анимированный прогресс-бар таймера -->
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-secondary small">TTL:</span>
+                                <div class="progress bg-black border border-secondary rounded-0" style="width: 140px; height: 16px;">
+                                    <div class="progress-bar bg-danger transition-all" role="progressbar"
+                                         :style="{ width: (waveTimeLeft / currentWave.timeLimit * 100) + '%' }">
+                                    </div>
+                                </div>
+                                <span class="text-danger fw-bold fs-6" style="min-width: 45px;">{{ waveTimeLeft.toFixed(1) }}s</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Системный баннер ошибки -->
+                    <div v-if="errorMessage" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-3 py-2" role="alert">
+                        <strong>[КРИТИЧЕСКИЙ СБОЙ МАТРИЦЫ]</strong> {{ errorMessage }} Полный откат на Волну 1...
+                    </div>
+
+                    <!-- Панель целей и буфера памяти -->
+                    <div class="row g-3 mb-3">
+                        <!-- Целевая последовательность -->
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                                <div class="text-secondary small fw-bold mb-2">ЦЕЛЕВОЙ ПРОТОКОЛ ВЗЛОМА:</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <span v-for="(token, idx) in currentWave.targetSequence" :key="idx"
+                                          class="badge border rounded-0 p-2 fs-6 font-monospace"
+                                          :class="isTargetMatched(idx) ? 'bg-success border-success text-dark' : 'border-danger text-light bg-dark'">
+                                        {{ token }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Буфер памяти игрока -->
+                        <div class="col-12 col-md-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-secondary small fw-bold">БУФЕР ПАМЯТИ:</span>
+                                    <span class="text-secondary small">{{ memoryBuffer.length }} / {{ currentWave.bufferSize }}</span>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <div v-for="slotIdx in currentWave.bufferSize" :key="slotIdx"
+                                         class="border border-secondary p-2 text-center rounded-0 flex-fill d-flex align-items-center justify-content-center font-monospace fw-bold"
+                                         :class="memoryBuffer[slotIdx - 1] ? 'bg-dark text-warning border-warning' : 'bg-black text-secondary'"
+                                         style="min-height: 44px; min-width: 0; word-break: break-all; font-size: 0.85rem;">
+                                        {{ memoryBuffer[slotIdx - 1] || '---' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Интерактивная матрица Direct Manipulation -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3 text-center">
+                        <div class="text-secondary small mb-2 d-flex justify-content-between align-items-center">
+                            <span>НАПРАВЛЯЮЩАЯ ШИНА: 
+                                <strong :class="currentDirection === 'horizontal' ? 'text-warning' : 'text-info'">
+                                    {{ currentDirection === 'horizontal' ? '► СТРОКА (ГОРИЗОНТАЛЬ)' : '▼ СТОЛБЕЦ (ВЕРТИКАЛЬ)' }}
+                                </strong>
+                            </span>
+                            <span class="small text-secondary">Кликайте ячейки строго на активной направляющей</span>
+                        </div>
+
+                        <!-- Сетка матрицы -->
+                        <div class="d-flex flex-column gap-2 mx-auto" style="max-width: 580px;">
+                            <div v-for="(row, rIdx) in matrix" :key="rIdx" class="d-flex gap-2">
+                                <button v-for="(cell, cIdx) in row" :key="cIdx"
+                                        type="button"
+                                        @click="onCellClick(rIdx, cIdx)"
+                                        :disabled="!isCellClickable(rIdx, cIdx) || cell.used || isLocked"
+                                        class="btn rounded-0 flex-fill p-2 text-center font-monospace fw-bold transition-all d-flex flex-column justify-content-center align-items-center"
+                                        :class="getCellClass(rIdx, cIdx)"
+                                        style="min-width: 0; min-height: 48px; overflow: hidden; word-break: break-word;">
+                                    <span class="fs-6 lh-1">{{ cell.token }}</span>
+                                    <span v-if="cell.sub" class="text-secondary text-truncate" style="font-size: 0.65rem;">{{ cell.sub }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Подсказка управления -->
+                    <div class="d-flex justify-content-between align-items-center text-secondary small">
+                        <span>Нажмите <kbd class="bg-black text-light border border-secondary">Space</kbd> для форсажа при сборе последовательности.</span>
+                        <button @click="forceCompleteWave" class="btn btn-outline-danger btn-sm rounded-0">
+                            ФОРСАЖ СБОРА [SPACE]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Экран триумфа (Victory) -->
+                <div v-else-if="gameState === 'victory'" class="text-center py-5">
+                    <div class="display-1 text-danger mb-3">★</div>
+                    <h3 class="text-danger mb-2">ХАРДКОР-РЕЖИМ УСПЕШНО ПРОЙДЕН!</h3>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 600px;">
+                        Вы преодолели все 8 волн матричного взлома решета Эратосфена без единой фатальной ошибки, доказав безупречную моторную реакцию и математическое мастерство.
+                    </p>
+                    <div class="d-inline-flex border border-danger p-3 bg-black gap-4 text-start rounded-0 mb-4">
+                        <div>
+                            <div class="text-secondary small">Общее время забега:</div>
+                            <div class="text-info fw-bold fs-5">{{ formatTime(totalElapsedSec) }}</div>
+                        </div>
+                        <div class="border-start border-secondary ps-4">
+                            <div class="text-secondary small">Ошибок до победы:</div>
+                            <div class="text-warning fw-bold fs-5">{{ attemptsCount }}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <button @click="startGame" class="btn btn-outline-danger rounded-0 px-4">
+                            ПОВТОРИТЬ ЗАБЕГ
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<!-- Подключение Vue 3 локально -->
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+(() => {
+    if (!window.Vue) {
+        console.error('Vue 3 not loaded from /static/vue.global.js');
+        return;
+    }
+
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const gameState = ref('intro'); // 'intro', 'playing', 'victory'
+            const currentWaveIndex = ref(0);
+            const attemptsCount = ref(0);
+            const startTime = ref(Date.now());
+            const totalElapsedSec = ref(0);
+            const isLocked = ref(false);
+            const isErrorGlitch = ref(false);
+            const errorMessage = ref('');
+
+            // Навигация матрицы
+            const currentDirection = ref('horizontal'); // 'horizontal' (строка) или 'vertical' (столбец)
+            const activeRow = ref(0);
+            const activeCol = ref(0);
+            const memoryBuffer = ref([]);
+            const matrix = ref([]);
+
+            // Таймер
+            const waveTimeLeft = ref(12.0);
+            let timerInterval = null;
+
+            // =================================================================
+            // БАНК ИЗ 8 ВОЛН (АРХЕТИП 1: КИБЕР-МАТРИЦА РЕШЕТА ЭРАТОСФЕНА)
+            // =================================================================
+            const waves = [
+                {
+                    title: 'Волна 1: Базовый триумвират простых чисел',
+                    timeLimit: 12.0,
+                    bufferSize: 4,
+                    targetSequence: ['2', '3', '5'],
+                    pool: [
+                        { token: '2', sub: 'Простое' },
+                        { token: '3', sub: 'Простое' },
+                        { token: '5', sub: 'Простое' },
+                        { token: '4', sub: '2² (кратное)' },
+                        { token: '6', sub: 'Составное' },
+                        { token: '1', sub: 'Не простое' }
+                    ]
+                },
+                {
+                    title: 'Волна 2: Нечётные простые делители',
+                    timeLimit: 11.0,
+                    bufferSize: 4,
+                    targetSequence: ['3', '5', '7'],
+                    pool: [
+                        { token: '3', sub: 'Простое' },
+                        { token: '5', sub: 'Простое' },
+                        { token: '7', sub: 'Простое' },
+                        { token: '9', sub: '3² (кратное)' },
+                        { token: '15', sub: 'Составное' },
+                        { token: '21', sub: 'Составное' }
+                    ]
+                },
+                {
+                    title: 'Волна 3: Оптимизация старта вычеркивания (p²)',
+                    timeLimit: 10.0,
+                    bufferSize: 4,
+                    targetSequence: ['2² = 4', '3² = 9', '5² = 25'],
+                    pool: [
+                        { token: '2² = 4', sub: 'Старт p=2' },
+                        { token: '3² = 9', sub: 'Старт p=3' },
+                        { token: '5² = 25', sub: 'Старт p=5' },
+                        { token: '2p = 6', sub: 'Дистрактор' },
+                        { token: '2p = 10', sub: 'Дистрактор' },
+                        { token: 'p+1', sub: 'Ловушка' }
+                    ]
+                },
+                {
+                    title: 'Волна 4: Просеивание нечётных кратных тройки',
+                    timeLimit: 9.5,
+                    bufferSize: 4,
+                    targetSequence: ['9', '15', '21'],
+                    pool: [
+                        { token: '9', sub: '3 × 3' },
+                        { token: '15', sub: '3 × 5' },
+                        { token: '21', sub: '3 × 7' },
+                        { token: '6', sub: 'Вычеркнуто p=2' },
+                        { token: '12', sub: 'Вычеркнуто p=2' },
+                        { token: '18', sub: 'Вычеркнуто p=2' }
+                    ]
+                },
+                {
+                    title: 'Волна 5: Простые числа второго десятка',
+                    timeLimit: 9.0,
+                    bufferSize: 5,
+                    targetSequence: ['11', '13', '17', '19'],
+                    pool: [
+                        { token: '11', sub: 'Простое' },
+                        { token: '13', sub: 'Простое' },
+                        { token: '17', sub: 'Простое' },
+                        { token: '19', sub: 'Простое' },
+                        { token: '15', sub: 'Составное' },
+                        { token: '21', sub: 'Составное' }
+                    ]
+                },
+                {
+                    title: 'Волна 6: Первые вычеркивания делителем p = 7',
+                    timeLimit: 8.5,
+                    bufferSize: 5,
+                    targetSequence: ['49', '77', '91', '119'],
+                    pool: [
+                        { token: '49', sub: '7 × 7' },
+                        { token: '77', sub: '7 × 11' },
+                        { token: '91', sub: '7 × 13' },
+                        { token: '119', sub: '7 × 17' },
+                        { token: '35', sub: 'Вычеркнуто p=5' },
+                        { token: '42', sub: 'Вычеркнуто p=2' }
+                    ]
+                },
+                {
+                    title: 'Волна 7: Инварианты алгоритмической сложности',
+                    timeLimit: 8.5,
+                    bufferSize: 4,
+                    targetSequence: ['ОТ p²', 'ДО √N', 'O(N log log N)'],
+                    pool: [
+                        { token: 'ОТ p²', sub: 'Внутренний старт' },
+                        { token: 'ДО √N', sub: 'Внешний предел' },
+                        { token: 'O(N log log N)', sub: 'Мертенс' },
+                        { token: 'ОТ 2p', sub: 'Дистрактор' },
+                        { token: 'ДО N/2', sub: 'Дистрактор' },
+                        { token: 'O(N²)', sub: 'Ловушка' }
+                    ]
+                },
+                {
+                    title: 'Волна 8: Кульминационный штурм (простые третьего десятка)',
+                    timeLimit: 7.5,
+                    bufferSize: 5,
+                    targetSequence: ['23', '29', '31', '37'],
+                    pool: [
+                        { token: '23', sub: 'Простое' },
+                        { token: '29', sub: 'Простое' },
+                        { token: '31', sub: 'Простое' },
+                        { token: '37', sub: 'Простое' },
+                        { token: '25', sub: '5 × 5' },
+                        { token: '27', sub: '3 × 9' },
+                        { token: '33', sub: '3 × 11' },
+                        { token: '35', sub: '5 × 7' }
+                    ]
+                }
+            ];
+
+            const currentWave = computed(() => waves[currentWaveIndex.value]);
+
+            function formatTime(totalSec) {
+                const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const secs = String(totalSec % 60).padStart(2, '0');
+                return `${mins}:${secs}`;
+            }
+
+            function generateMatrix() {
+                const wave = currentWave.value;
+                const pool = wave.pool;
+                const seq = wave.targetSequence;
+                const size = 4; // 4x4 сетка
+                const newMatrix = [];
+
+                // Заполняем сетку случайными элементами из пула
+                for (let r = 0; r < size; r++) {
+                    const row = [];
+                    for (let c = 0; c < size; c++) {
+                        const item = pool[Math.floor(Math.random() * pool.length)];
+                        row.push({
+                            token: item.token,
+                            sub: item.sub || '',
+                            used: false
+                        });
+                    }
+                    newMatrix.push(row);
+                }
+
+                // Гарантируем проходимость (Монте-Карло / Детерминированный маршрут)
+                // Размещаем целевую цепочку по валидному перекрестному маршруту:
+                // Start: row 0, col C0 -> move V to col C0, row R1 -> move H to row R1, col C1, etc.
+                let curR = 0;
+                let curC = Math.floor(Math.random() * size);
+                newMatrix[curR][curC] = { token: seq[0], sub: '', used: false };
+
+                let dir = 'horizontal';
+                for (let i = 1; i < seq.length; i++) {
+                    if (dir === 'horizontal') {
+                        // Меняем строку в том же столбце curC
+                        let nextR = (curR + 1 + Math.floor(Math.random() * (size - 1))) % size;
+                        curR = nextR;
+                        dir = 'vertical';
+                    } else {
+                        // Меняем столбец в той же строке curR
+                        let nextC = (curC + 1 + Math.floor(Math.random() * (size - 1))) % size;
+                        curC = nextC;
+                        dir = 'horizontal';
+                    }
+                    newMatrix[curR][curC] = { token: seq[i], sub: '', used: false };
+                }
+
+                matrix.value = newMatrix;
+                currentDirection.value = 'horizontal';
+                activeRow.value = 0;
+                activeCol.value = 0;
+            }
+
+            function isCellClickable(r, c) {
+                if (matrix.value[r] && matrix.value[r][c] && matrix.value[r][c].used) {
+                    return false;
+                }
+                if (currentDirection.value === 'horizontal') {
+                    return r === activeRow.value;
+                } else {
+                    return c === activeCol.value;
+                }
+            }
+
+            function getCellClass(r, c) {
+                const cell = matrix.value[r][c];
+                if (cell.used) {
+                    return 'btn-secondary text-muted opacity-50';
+                }
+                if (isCellClickable(r, c)) {
+                    if (currentDirection.value === 'horizontal') {
+                        return 'btn-outline-warning border-2 shadow-sm';
+                    } else {
+                        return 'btn-outline-info border-2 shadow-sm';
+                    }
+                }
+                return 'btn-outline-secondary opacity-75';
+            }
+
+            function onCellClick(r, c) {
+                if (isLocked.value || !isCellClickable(r, c)) return;
+
+                const cell = matrix.value[r][c];
+                cell.used = true;
+                memoryBuffer.value.push(cell.token);
+
+                // Переключение направления
+                if (currentDirection.value === 'horizontal') {
+                    activeCol.value = c;
+                    currentDirection.value = 'vertical';
+                } else {
+                    activeRow.value = r;
+                    currentDirection.value = 'horizontal';
+                }
+
+                checkBufferStatus();
+            }
+
+            function isTargetMatched(index) {
+                const seq = currentWave.value.targetSequence;
+                const buf = memoryBuffer.value;
+                if (index >= seq.length) return false;
+                return buf.includes(seq[index]);
+            }
+
+            function checkBufferStatus() {
+                const wave = currentWave.value;
+                const seq = wave.targetSequence;
+                const buf = memoryBuffer.value;
+
+                // Проверяем, содержит ли буфер все токены целевой цепочки
+                const isFullyCollected = seq.every(token => buf.includes(token));
+
+                if (isFullyCollected) {
+                    onWaveSuccess();
+                    return;
+                }
+
+                // Если буфер полон, но цепочка не собрана -> ХАРДКОР-ВАЙП
+                if (buf.length >= wave.bufferSize) {
+                    triggerHardcoreReset('Переполнение буфера без сбора целевого протокола!');
+                }
+            }
+
+            function onWaveSuccess() {
+                if (timerInterval) clearInterval(timerInterval);
+                isLocked.value = true;
+
+                if (currentWaveIndex.value + 1 >= waves.length) {
+                    // Победа в хардкоре!
+                    totalElapsedSec.value = Math.floor((Date.now() - startTime.value) / 1000);
+                    gameState.value = 'victory';
+
+                    window.parent.postMessage({
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 3)',
+                        action_type: 'level_complete',
+                        status: 'completed',
+                        success: true,
+                        attempts_count: attemptsCount.value,
+                        time_spent_sec: totalElapsedSec.value
+                    }, '*');
+                } else {
+                    currentWaveIndex.value++;
+                    setTimeout(() => {
+                        startWave();
+                    }, 500);
+                }
+            }
+
+            function forceCompleteWave() {
+                checkBufferStatus();
+            }
+
+            function triggerHardcoreReset(reason) {
+                if (timerInterval) clearInterval(timerInterval);
+                isLocked.value = true;
+                isErrorGlitch.value = true;
+                attemptsCount.value++;
+                errorMessage.value = reason;
+
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 3)',
+                    action_type: 'hardcore_reset'
+                }, '*');
+
+                setTimeout(() => {
+                    isErrorGlitch.value = false;
+                    errorMessage.value = '';
+                    currentWaveIndex.value = 0; // Полный сброс на Волну 1!
+                    startWave();
+                }, 2000);
+            }
+
+            function startWave() {
+                isLocked.value = false;
+                memoryBuffer.value = [];
+                waveTimeLeft.value = currentWave.value.timeLimit;
+                generateMatrix();
+
+                if (timerInterval) clearInterval(timerInterval);
+                const stepMs = 100;
+                timerInterval = setInterval(() => {
+                    waveTimeLeft.value -= 0.1;
+                    if (waveTimeLeft.value <= 0.05) {
+                        waveTimeLeft.value = 0;
+                        triggerHardcoreReset('Превышено время раунда (Time-out)!');
+                    }
+                }, stepMs);
+            }
+
+            function startGame() {
+                gameState.value = 'playing';
+                currentWaveIndex.value = 0;
+                attemptsCount.value = 0;
+                startTime.value = Date.now();
+                startWave();
+            }
+
+            function handleKeyDown(e) {
+                if (e.code === 'Space') {
+                    if (gameState.value === 'intro') {
+                        e.preventDefault();
+                        startGame();
+                    } else if (gameState.value === 'playing') {
+                        e.preventDefault();
+                        forceCompleteWave();
+                    }
+                }
+            }
+
+            onMounted(() => {
+                window.addEventListener('keydown', handleKeyDown);
+            });
+
+            onUnmounted(() => {
+                window.removeEventListener('keydown', handleKeyDown);
+                if (timerInterval) clearInterval(timerInterval);
+            });
+
+            return {
+                gameState,
+                currentWaveIndex,
+                currentWave,
+                attemptsCount,
+                totalElapsedSec,
+                isLocked,
+                isErrorGlitch,
+                errorMessage,
+                currentDirection,
+                memoryBuffer,
+                matrix,
+                waveTimeLeft,
+                formatTime,
+                isCellClickable,
+                getCellClass,
+                onCellClick,
+                isTargetMatched,
+                forceCompleteWave,
+                startGame
+            };
+        }
+    }).mount('#vue-app');
+})();
+</script>
