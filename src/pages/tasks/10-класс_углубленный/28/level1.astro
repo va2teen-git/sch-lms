@@ -676,63 +676,88 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const streamContainer = document.getElementById('p3-stream-container');
         streamContainer.innerHTML = '';
 
-        for (let i = 0; i < p3BitStream.length; i++) {
-            // Сам бит
-            const bitEl = document.createElement('span');
-            bitEl.className = 'badge bg-black border border-light text-light font-monospace fs-5 px-3 py-2 rounded-0 select-none';
-            bitEl.textContent = p3BitStream[i];
-            streamContainer.appendChild(bitEl);
-
-            // Разделитель между битами (если это не последний бит)
-            if (i < p3BitStream.length - 1) {
-                const cutBtn = document.createElement('button');
-                const isCut = p3Cuts.has(i);
-                cutBtn.type = 'button';
-                cutBtn.className = isCut 
-                    ? 'btn btn-danger btn-sm rounded-0 px-2 py-1 mx-1 fw-bold fs-6 border-light' 
-                    : 'btn btn-outline-secondary btn-sm rounded-0 px-1 py-1 mx-1 text-secondary opacity-50';
-                cutBtn.style.minWidth = '32px';
-                cutBtn.textContent = isCut ? '✂' : '|';
-                cutBtn.title = isCut ? 'Удалить разрез' : 'Сделать разрез';
-
-                cutBtn.addEventListener('click', () => {
-                    if (p3Cuts.has(i)) {
-                        p3Cuts.delete(i);
-                    } else {
-                        p3Cuts.add(i);
-                    }
-                    renderStream();
-                    updateP3Decoding();
-                });
-
-                streamContainer.appendChild(cutBtn);
-            }
-        }
-
-        updateP3Decoding();
-    }
-
-    function updateP3Decoding() {
-        // Разделяем битовую цепочку по позициям в p3Cuts
         const cutIndices = Array.from(p3Cuts).sort((a, b) => a - b);
-        const segments = [];
         let prev = 0;
+
+        const segmentRanges = [];
         cutIndices.forEach(idx => {
-            segments.push(p3BitStream.slice(prev, idx + 1));
+            segmentRanges.push({ start: prev, end: idx });
             prev = idx + 1;
         });
-        segments.push(p3BitStream.slice(prev));
+        segmentRanges.push({ start: prev, end: p3BitStream.length - 1 });
 
         let decodedWord = '';
         let allValid = true;
 
-        segments.forEach(seg => {
-            const match = P3_DICTIONARY.find(x => x.code === seg);
-            if (match) {
-                decodedWord += match.char;
-            } else {
-                decodedWord += '?';
-                allValid = false;
+        segmentRanges.forEach((seg, sIdx) => {
+            const segBits = p3BitStream.slice(seg.start, seg.end + 1);
+            const match = P3_DICTIONARY.find(x => x.code === segBits);
+            const isValid = !!match;
+            if (isValid) decodedWord += match.char;
+            else { decodedWord += '?'; allValid = false; }
+
+            // Контейнер сегмента
+            const segCard = document.createElement('div');
+            segCard.className = `d-inline-flex flex-column align-items-center p-2 rounded-0 border ${
+                isValid ? 'border-success bg-black' : 'border-secondary bg-dark'
+            }`;
+
+            // Бейдж декодированного символа
+            const badge = document.createElement('span');
+            badge.className = `badge rounded-0 mb-1 font-monospace ${
+                isValid ? 'bg-success text-dark fw-bold' : 'bg-dark border border-secondary text-secondary'
+            }`;
+            badge.style.fontSize = '0.85rem';
+            badge.textContent = isValid ? match.char : `? (${segBits.length} б)`;
+            segCard.appendChild(badge);
+
+            // Строка битов внутри сегмента
+            const bitsRow = document.createElement('div');
+            bitsRow.className = 'd-flex align-items-center gap-1';
+
+            for (let i = seg.start; i <= seg.end; i++) {
+                const bitEl = document.createElement('span');
+                bitEl.className = `badge font-monospace fs-5 px-2 py-1 rounded-0 select-none ${
+                    isValid ? 'bg-dark border border-success text-success' : 'bg-black border border-light text-light'
+                }`;
+                bitEl.textContent = p3BitStream[i];
+                bitsRow.appendChild(bitEl);
+
+                // Кнопка разреза между соседними битами
+                if (i < seg.end) {
+                    const cutBtn = document.createElement('button');
+                    cutBtn.type = 'button';
+                    cutBtn.className = 'btn btn-outline-secondary btn-sm rounded-0 p-0 text-secondary opacity-50 font-monospace';
+                    cutBtn.style.width = '24px';
+                    cutBtn.style.height = '32px';
+                    cutBtn.textContent = '|';
+                    cutBtn.title = 'Разрезать здесь';
+                    const cutAt = i;
+                    cutBtn.addEventListener('click', () => {
+                        p3Cuts.add(cutAt);
+                        renderStream();
+                    });
+                    bitsRow.appendChild(cutBtn);
+                }
+            }
+
+            segCard.appendChild(bitsRow);
+            streamContainer.appendChild(segCard);
+
+            // Кнопка удаления разреза (склейка)
+            if (sIdx < segmentRanges.length - 1) {
+                const stitchBtn = document.createElement('button');
+                stitchBtn.type = 'button';
+                stitchBtn.className = 'btn btn-danger btn-sm rounded-0 px-2 py-1 fw-bold fs-6 border-light align-self-center';
+                stitchBtn.style.minWidth = '32px';
+                stitchBtn.textContent = '✂';
+                stitchBtn.title = 'Удалить разрез';
+                const removeCutAt = seg.end;
+                stitchBtn.addEventListener('click', () => {
+                    p3Cuts.delete(removeCutAt);
+                    renderStream();
+                });
+                streamContainer.appendChild(stitchBtn);
             }
         });
 
