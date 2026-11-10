@@ -1,0 +1,559 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / «Финальный босс»): 7 класс, Урок 9 - Информация и данные
+// Архетип: «Data Stream Analyzer // Селектор информационных потоков»
+// Декларативный стек: Vue 3
+// 10 процедурных волн под таймером (6.5 с -> 3.5 с), тотальный хардкор-сброс на шаг 1 при любой ошибке.
+---
+
+<TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
+<div id="app" class="container-fluid min-vh-100 p-2 p-md-3 bg-black text-danger font-monospace" v-cloak>
+
+    <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ МИССИИ) -->
+    <div v-if="!started && !completed" class="text-center py-4 py-md-5">
+        <div class="d-inline-block border border-danger p-3 p-md-4 bg-dark rounded-0 mb-4 text-start shadow-lg" style="max-width: 840px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                <h1 class="h3 text-danger mb-0 fw-bold">📡 DATA STREAM ANALYZER // СЕЛЕКТОР ПОТОКОВ</h1>
+                <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-2">ФИНАЛЬНЫЙ БОСС</span>
+            </div>
+            
+            <p class="text-light fs-5 mb-3">
+                На пограничный шлюз школьного дата-центра обрушился непрерывный поток пакетов телеметрии.
+                Вам поручено в режиме реального времени отфильтровать <span class="text-danger fw-bold">10 нарастающих волн данных</span>:
+                отделить полноценную достоверную информацию от информационного шума, неполных сводок и сырых данных без контекста.
+            </p>
+
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
+                <div class="fw-bold text-danger mb-2 text-uppercase">[ПРОТОКОЛ ХАРДКОР-РЕАГИРОВАНИЯ]:</div>
+                <ul class="mb-0 ps-3">
+                    <li class="mb-1">• <span class="text-warning fw-bold">Динамический таймер такта:</span> От <span class="text-danger fw-bold">6.5 секунд</span> на 1-й волне до <span class="text-danger fw-bold">3.5 секунд</span> на 10-й волне!</li>
+                    <li class="mb-1">• <span class="text-warning fw-bold">Тотальный сброс (Full Wipeout):</span> Любая ошибка классификации, пропуск шума, ложная отбраковка или тайм-аут вызывают аварийную тревогу и <span class="text-danger fw-bold">ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</span> с новой процедурной генерацией!</li>
+                    <li class="mb-1">• <span class="text-warning fw-bold">Два рубежа фильтрации:</span> <span class="text-success fw-bold">[ACCEPT: Принять в базу]</span> для достоверной и полной информации с контекстом; <span class="text-danger fw-bold">[DROP: Отклонить / Шум]</span> для шума, сырых чисел без контекста, искажений и устаревших сведений.</li>
+                </ul>
+            </div>
+
+            <div class="text-secondary small mb-4">
+                Управление: кликами по крупным кнопкам шлюза или горячими клавишами:
+                <kbd class="bg-dark text-success border border-success">1</kbd> / <kbd class="bg-dark text-success border border-success">A</kbd> / <kbd class="bg-dark text-success border border-success">←</kbd> (ACCEPT: Принять), 
+                <kbd class="bg-dark text-danger border border-danger">0</kbd> / <kbd class="bg-dark text-danger border border-danger">D</kbd> / <kbd class="bg-dark text-danger border border-danger">→</kbd> (DROP: Отклонить).
+            </div>
+
+            <button id="start-game-btn" class="btn btn-danger btn-lg rounded-0 w-100 fw-bold font-monospace py-3 text-uppercase shadow tracking-wider" @click="startGame">
+                ▶ АКТИВИРОВАТЬ СЕЛЕКТОР ПОТОКОВ (СТАРТ)
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. ИГРОВОЙ ЭКРАН (АРКАДНАЯ СЕССИЯ) -->
+    <div v-if="started && !completed" class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+
+            <!-- ВЕРХНИЙ ХУД ПАНЕЛИ -->
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom border-danger pb-2 mb-3 gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fs-4">📡</span>
+                    <div>
+                        <div class="h5 text-danger mb-0 fw-bold">СЕЛЕКТОР ПОТОКОВ ДАННЫХ // STREAM ANALYZER</div>
+                        <div class="small text-secondary">РЕЖИМ: ХАРДКОР (ОШИБКА = СБРОС НА ШАГ 1)</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-black border border-danger text-danger rounded-0 px-3 py-2 fs-6">
+                        ВОЛНА {{ currentWaveIndex + 1 }} / 10
+                    </span>
+                    <span class="badge bg-danger text-black rounded-0 px-3 py-2 fs-6 fw-bold">
+                        ТАЙМЕР: {{ timeLeft.toFixed(1) }}s
+                    </span>
+                </div>
+            </div>
+
+            <!-- ИНДИКАТОР ТАЙМЕРА (ПРОГРЕСС-БАР) -->
+            <div class="progress rounded-0 bg-dark border border-danger mb-3" style="height: 12px;">
+                <div 
+                    class="progress-bar progress-bar-striped progress-bar-animated" 
+                    :class="timerBarClass" 
+                    role="progressbar" 
+                    :style="{ width: (timeLeft / waveTimeLimit * 100) + '%' }"
+                ></div>
+            </div>
+
+            <!-- АВАРИЙНЫЙ ОВЕРЛЕЙ ХАРДКОР-СБРОСА -->
+            <div v-if="alarmActive" class="alert alert-danger bg-black border-2 border-danger text-danger rounded-0 p-3 mb-3 text-center">
+                <div class="fs-4 fw-bold mb-1">🚨 СБОЙ ФИЛЬТРАЦИИ // ХАРДКОР-СБРОС НА ВОЛНУ 1!</div>
+                <div class="small text-light font-monospace">{{ alarmMessage }}</div>
+                <div class="text-secondary small mt-2">Перегенерация входящего потока данных...</div>
+            </div>
+
+            <!-- ЦЕНТРАЛЬНЫЙ ТЕРМИНАЛ ПАКЕТА ДАННЫХ -->
+            <div class="card bg-black border-2 border-danger rounded-0 p-3 p-md-4 mb-4 shadow-lg">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-dark text-warning border border-warning rounded-0">
+                            ИСТОЧНИК: {{ currentWave.source }}
+                        </span>
+                        <span class="badge bg-dark text-secondary border border-secondary rounded-0">
+                            ПАКЕТ ID: #{{ currentWave.packetId }}
+                        </span>
+                    </div>
+                    <span class="badge bg-danger text-black rounded-0 font-monospace">
+                        СКОРОСТЬ: {{ currentWave.speed }} Мбит/с
+                    </span>
+                </div>
+
+                <!-- Содержимое пакета -->
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-4">
+                        <div class="p-3 bg-dark border border-secondary text-center h-100">
+                            <span class="text-secondary small d-block mb-1">СЫРЫЕ ДАННЫЕ (Data Payload):</span>
+                            <div class="fs-4 text-warning fw-bold font-monospace text-break">
+                                {{ currentWave.rawPayload }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <div class="p-3 bg-dark border border-secondary h-100">
+                            <span class="text-secondary small d-block mb-1">СЛУЖЕБНЫЙ ЗАГОЛОВОК И МЕТАДАННЫЕ:</span>
+                            <div class="text-light small font-monospace mb-2">
+                                {{ currentWave.metadata }}
+                            </div>
+                            <div class="small p-2 border border-secondary bg-black" :class="currentWave.flagClass">
+                                <span class="fw-bold">ДИАГНОСТИКА СЕНСОРА:</span> {{ currentWave.sensorStatus }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вопрос оператору -->
+                <div class="text-center p-2 bg-dark border border-danger mb-3">
+                    <span class="text-light small text-uppercase">
+                        Является ли данный пакет <strong>полноценной, достоверной и актуальной информацией</strong> с понятным контекстом?
+                    </span>
+                </div>
+
+                <!-- КНОПКИ РЕАГИРОВАНИЯ (DIRECT MANIPULATION) -->
+                <div class="row g-3">
+                    <div class="col-6">
+                        <button 
+                            id="btn-accept"
+                            class="btn btn-outline-success btn-lg w-100 rounded-0 py-3 fw-bold font-monospace d-flex flex-column align-items-center justify-content-center border-2 shadow"
+                            :disabled="alarmActive"
+                            @click="submitAction('ACCEPT')"
+                        >
+                            <span class="fs-4 mb-1">✅ ACCEPT (ПРИНЯТЬ)</span>
+                            <span class="small font-monospace text-uppercase" style="font-size: 0.75rem;">
+                                Достоверная информация с контекстом [1 / A / ←]
+                            </span>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button 
+                            id="btn-drop"
+                            class="btn btn-outline-danger btn-lg w-100 rounded-0 py-3 fw-bold font-monospace d-flex flex-column align-items-center justify-content-center border-2 shadow"
+                            :disabled="alarmActive"
+                            @click="submitAction('DROP')"
+                        >
+                            <span class="fs-4 mb-1">🚫 DROP (ОТКЛОНИТЬ)</span>
+                            <span class="small font-monospace text-uppercase" style="font-size: 0.75rem;">
+                                Шум / Сырые данные / Ложные показания [0 / D / →]
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- НИЖНЯЯ ПАНЕЛЬ СТАТИСТИКИ -->
+            <div class="d-flex justify-content-between align-items-center text-secondary small border-top border-danger pt-2">
+                <span>ПРОЙДЕНО ВОЛН: {{ currentWaveIndex }} / 10</span>
+                <span>ХАРДКОР-СТАТУС: БЕЗУПРЕЧНО</span>
+                <span>ПОПЫТОК ЗАБЕГА: {{ attemptsCount }}</span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 3. ЭКРАН ТРИУМФА (ПОБЕДА НА ХАРДКОРЕ) -->
+    <div v-if="completed" class="text-center py-5">
+        <div class="d-inline-block border-2 border-success p-4 p-md-5 bg-dark rounded-0 shadow-lg text-start" style="max-width: 800px;">
+            <div class="text-center mb-4 fs-1">🏆</div>
+            <h2 class="h2 text-success fw-bold text-center mb-2 font-monospace text-uppercase">ФИНАЛЬНЫЙ БОСС ПОВЕРЖЕН!</h2>
+            <div class="text-center text-warning font-monospace small mb-4">[РЕЖИМ ХАРДКОР: 10 ИЗ 10 ВОЛН ПРОЙДЕНЫ БЕЗ ЕДИНОЙ ОШИБКИ]</div>
+
+            <p class="text-light mb-3">
+                Поздравляем! Вы продемонстрировали эталонную скорость реакции и глубокое понимание различий между сырыми данными, информационным шумом и достоверной контекстной информацией.
+            </p>
+
+            <div class="alert alert-success bg-black border border-success rounded-0 mb-4 font-monospace small text-light">
+                <div class="fw-bold text-success mb-2">РЕЗУЛЬТАТЫ СЕССИИ ТЕЛЕМЕТРИИ:</div>
+                <div>• Успешных волн фильтрации: 10 / 10 (100%)</div>
+                <div>• Финальный лимит реакции: 3.5 секунды на пакет</div>
+                <div>• Зафиксирован статус: <span class="text-success fw-bold">LEVEL_COMPLETE // HARDCORE_VICTORY</span></div>
+            </div>
+
+            <div class="text-center">
+                <span class="badge bg-success text-dark px-4 py-2 fs-6 rounded-0 font-monospace text-uppercase fw-bold">
+                    СЕКРЕТНЫЙ РЕТРО-АРХИВ 1989 ГОДА РАЗБЛОКИРОВАН
+                </span>
+            </div>
+        </div>
+    </div>
+
+</div>
+</TaskLayout>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+(function() {
+    const missionName = 'Урок 9 :: Информация и данные (Уровень 3)';
+    const startTime = new Date();
+    let globalAttempts = 0;
+
+    function sendTelemetry(actionType, success = false) {
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: success ? 'completed' : 'in_progress',
+            start_time: startTime.toISOString(),
+            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
+            attempts_count: globalAttempts,
+            success: success
+        }, '*');
+    }
+
+    sendTelemetry('in_progress', false);
+
+    // Синтезатор звуковых сигналов (Web Audio API)
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtxClass) audioCtx = new AudioCtxClass();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    function playSound(type) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            const now = ctx.currentTime;
+
+            if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.15); // A5
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'alarm') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.35);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else if (type === 'victory') {
+                const freqs = [523.25, 659.25, 783.99, 1046.50];
+                freqs.forEach((f, idx) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.type = 'triangle';
+                    o.frequency.setValueAtTime(f, now + idx * 0.1);
+                    g.gain.setValueAtTime(0.15, now + idx * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.3);
+                    o.start(now + idx * 0.1);
+                    o.stop(now + idx * 0.1 + 0.3);
+                });
+            }
+        } catch (e) {}
+    }
+
+    // БАНК ПАКЕТОВ ТЕЛЕМЕТРИИ
+    const VALID_PACKETS = [
+        {
+            source: 'Метеостанция "Север-1"',
+            rawPayload: 'T: +18.4 °C | H: 62% | P: 755 мм рт. ст.',
+            metadata: 'Канал: LoRaWAN | Контекст: Атмосферные параметры | Временная метка: Синхронизирована (UTC)',
+            sensorStatus: 'Калибровка пройдена. Данные достоверны, полны и актуальны.',
+            flagClass: 'text-success',
+            expected: 'ACCEPT',
+            failReason: 'Ошибка: Это достоверная и полная информация с понятным контекстом. Ее следовало принять (ACCEPT)!'
+        },
+        {
+            source: 'Серверная стойка #4',
+            rawPayload: 'CPU: 42.0 °C | Fan: 2400 RPM | Vcore: 1.20 В',
+            metadata: 'Канал: IPMI/SNMP | Контекст: Телеметрия охлаждения серверов | Статус: Норма',
+            sensorStatus: 'Сенсоры активны. Значения в пределах допустимого теплопакета.',
+            flagClass: 'text-success',
+            expected: 'ACCEPT',
+            failReason: 'Ошибка: Данные обладают контекстом и отражают штатный режим работы. Следовало принять (ACCEPT)!'
+        },
+        {
+            source: 'Спутниковый трекер GPS/ГЛОНАСС',
+            rawPayload: '55.7558° N, 37.6173° E | Alt: 156 м | Sats: 14',
+            metadata: 'Канал: NMEA-0183 | Контекст: Навигационные координаты объекта | Погрешность: 1.5 м',
+            sensorStatus: 'Фиксация 3D-позиции подтверждена созвездием спутников.',
+            flagClass: 'text-success',
+            expected: 'ACCEPT',
+            failReason: 'Ошибка: Полные и точные координаты с ясным контекстом. Следовало нажать ACCEPT!'
+        },
+        {
+            source: 'Медицинский монитор интенсивной терапии',
+            rawPayload: 'Пульс: 74 уд/мин | SpO2: 98% | АД: 120/80 мм',
+            metadata: 'Канал: Bluetooth LE Medical | Контекст: Показатели жизнедеятельности пациента',
+            sensorStatus: 'Датчик пульсоксиметра закреплен надежно, артефакты отсутствуют.',
+            flagClass: 'text-success',
+            expected: 'ACCEPT',
+            failReason: 'Ошибка: Жизненно важные объективные показатели с полным контекстом. Следовало нажать ACCEPT!'
+        },
+        {
+            source: 'Энергоучет (АСКУЭ)',
+            rawPayload: 'U: 228.5 В | I: 14.2 А | Freq: 50.0 Гц',
+            metadata: 'Канал: RS-485 Modbus | Контекст: Параметры трехфазного ввода здания',
+            sensorStatus: 'Частота и напряжение строго соответствуют ГОСТу.',
+            flagClass: 'text-success',
+            expected: 'ACCEPT',
+            failReason: 'Ошибка: Параметры электросети достоверны и полны. Следовало нажать ACCEPT!'
+        },
+        {
+            source: 'Магистральный маршрутизатор BGP',
+            rawPayload: 'Port 10G-Optic: 9420 Мбит/с | PacketLoss: 0.00%',
+            metadata: 'Канал: Fiber Optic SFP+ | Контекст: Загрузка опорного оптоволоконного канала',
+            sensorStatus: 'Канал чист, оптический сигнал в норме (-12 dBm).',
+            flagClass: 'text-success',
+            expected: 'ACCEPT',
+            failReason: 'Ошибка: Сетевая телеметрия с ясными единицами измерения. Следовало нажать ACCEPT!'
+        }
+    ];
+
+    const INVALID_PACKETS = [
+        {
+            source: 'Датчик криокамеры #2',
+            rawPayload: 'Температура: -350.0 °C',
+            metadata: 'Канал: 1-Wire | Контекст: Контроль сверхнизких температур',
+            sensorStatus: 'КРИТИЧЕСКАЯ АНОМАЛИЯ: Значение ниже абсолютного нуля (-273.15 °C)! Пробой кабеля.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Нарушено свойство ДОСТОВЕРНОСТИ (температура ниже абсолютного нуля невозможна). Следовало отклонить (DROP)!'
+        },
+        {
+            source: 'Аварийный регистратор цеха',
+            rawPayload: '"ВНИМАНИЕ: ПРОИЗОШЕЛ СБОЙ ОБОРУДОВАНИЯ!"',
+            metadata: 'Канал: Сирена / SMS | Контекст: Аварийное оповещение',
+            sensorStatus: 'НЕПОЛНЫЕ ДАННЫЕ: Цех не указан, станок не назван, характер аварии неизвестен.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Нарушено свойство ПОЛНОТЫ. Невозможно понять, где авария. Следовало нажать DROP!'
+        },
+        {
+            source: 'Метеорологический архив',
+            rawPayload: 'Штормовое предупреждение: ураган 32 м/с!',
+            metadata: 'Канал: RSS | Временная метка: 12 октября 2017 года (архив)',
+            sensorStatus: 'УСТАРЕВШИЕ ДАННЫЕ: Событие произошло много лет назад.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Нарушено свойство АКТУАЛЬНОСТИ. Устаревшая сводка пятилетней давности бесполезна. Следовало нажать DROP!'
+        },
+        {
+            source: 'Сырой поток АЦП микроконтроллера',
+            rawPayload: '0x3F, 1024, 77, 0, 255',
+            metadata: 'Канал: SPI Raw Data | Контекст: ОТСУТСТВУЕТ (сырые бинарные байты)',
+            sensorStatus: 'ОТСУТСТВУЕТ КОНТЕКСТ: Неизвестно, что это — напряжение, пиксели или вес.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Это СЫРЫЕ ДАННЫЕ без контекста и единиц измерения. Они не являются информацией. Следовало нажать DROP!'
+        },
+        {
+            source: 'Приемник радиотелескопа',
+            rawPayload: 'Белый шум: ~ ~ ~ ~ ~ (RMS: 0.002 мкВ)',
+            metadata: 'Канал: RF Antenna 1.4 ГГц | Контекст: Поиск полезного сигнала',
+            sensorStatus: 'ЭЛЕКТРОМАГНИТНЫЙ ШУМ: Полезный модулированный сигнал отсутствует.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Это паразитный ИНФОРМАЦИОННЫЙ ШУМ, не несущий полезных сведений. Следовало нажать DROP!'
+        },
+        {
+            source: 'Пользовательский отзыв',
+            rawPayload: '"Погода сегодня просто отвратительная, мне холодно!"',
+            metadata: 'Канал: Чат поддержки | Контекст: Оценка микроклимата',
+            sensorStatus: 'СУБЪЕКТИВНАЯ ОЦЕНКА: Отсутствуют объективные показания термометра.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Нарушено свойство ОБЪЕКТИВНОСТИ. Личные эмоции субъективны. Следовало нажать DROP!'
+        },
+        {
+            source: 'Служебный терминал диспетчера',
+            rawPayload: 'Инструкция: %#@!&*§¶ (кодовая таблица повреждена)',
+            metadata: 'Канал: UART COM-1 | Контекст: Регламент аварийного пуска',
+            sensorStatus: 'НЕПОНЯТНАЯ ИНФОРМАЦИЯ: Повреждена таблица символов, текст нечитаем.',
+            flagClass: 'text-danger',
+            expected: 'DROP',
+            failReason: 'Ошибка: Нарушено свойство ПОНЯТНОСТИ (символы повреждены). Следовало нажать DROP!'
+        }
+    ];
+
+    function generateWaves() {
+        const waves = [];
+        // Нарастающее сжатие таймера с 6.5s до 3.5s
+        const times = [6.5, 6.2, 5.9, 5.6, 5.3, 5.0, 4.6, 4.2, 3.8, 3.5];
+
+        for (let i = 0; i < 10; i++) {
+            // Чередование или случайный выбор валидных / невалидных
+            const isAccept = Math.random() < 0.5;
+            const pool = isAccept ? VALID_PACKETS : INVALID_PACKETS;
+            const template = pool[Math.floor(Math.random() * pool.length)];
+
+            waves.push({
+                packetId: Math.floor(1000 + Math.random() * 9000),
+                speed: (50 + i * 25),
+                timeLimit: times[i],
+                ...template
+            });
+        }
+        return waves;
+    }
+
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const started = ref(false);
+            const completed = ref(false);
+            const alarmActive = ref(false);
+            const alarmMessage = ref('');
+            const currentWaveIndex = ref(0);
+            const waveTimeLimit = ref(6.5);
+            const timeLeft = ref(6.5);
+            const attemptsCount = ref(1);
+
+            let waves = generateWaves();
+            let timerInterval = null;
+
+            const currentWave = computed(() => {
+                return waves[currentWaveIndex.value] || waves[0];
+            });
+
+            const timerBarClass = computed(() => {
+                const ratio = timeLeft.value / waveTimeLimit.value;
+                if (ratio > 0.5) return 'bg-success';
+                if (ratio > 0.25) return 'bg-warning text-dark';
+                return 'bg-danger';
+            });
+
+            function startTimer() {
+                clearInterval(timerInterval);
+                waveTimeLimit.value = currentWave.value.timeLimit;
+                timeLeft.value = currentWave.value.timeLimit;
+
+                const stepMs = 50;
+                timerInterval = setInterval(() => {
+                    if (alarmActive.value) return;
+                    timeLeft.value = Math.max(0, timeLeft.value - stepMs / 1000);
+                    if (timeLeft.value <= 0) {
+                        clearInterval(timerInterval);
+                        triggerHardcoreFail('ВРЕМЯ ИСТЕКЛО: Переполнение входного буфера шлюза! Не успели принять решение.');
+                    }
+                }, stepMs);
+            }
+
+            function submitAction(action) {
+                if (alarmActive.value || completed.value || !started.value) return;
+
+                if (action === currentWave.value.expected) {
+                    playSound('success');
+                    if (currentWaveIndex.value < 9) {
+                        currentWaveIndex.value++;
+                        startTimer();
+                    } else {
+                        finishGame();
+                    }
+                } else {
+                    triggerHardcoreFail(currentWave.value.failReason);
+                }
+            }
+
+            function triggerHardcoreFail(reason) {
+                playSound('alarm');
+                alarmActive.value = true;
+                alarmMessage.value = reason;
+                clearInterval(timerInterval);
+                globalAttempts++;
+                attemptsCount.value++;
+
+                sendTelemetry('hardcore_reset', false);
+
+                setTimeout(() => {
+                    alarmActive.value = false;
+                    currentWaveIndex.value = 0;
+                    waves = generateWaves();
+                    startTimer();
+                }, 2000);
+            }
+
+            function startGame() {
+                getAudioContext();
+                started.value = true;
+                currentWaveIndex.value = 0;
+                waves = generateWaves();
+                startTimer();
+            }
+
+            function finishGame() {
+                clearInterval(timerInterval);
+                completed.value = true;
+                playSound('victory');
+                sendTelemetry('level_complete', true);
+            }
+
+            function handleKeyDown(e) {
+                if (!started.value || completed.value || alarmActive.value) return;
+                const key = e.key.toLowerCase();
+
+                if (key === '1' || key === 'a' || key === 'ф' || key === 'arrowleft') {
+                    e.preventDefault();
+                    submitAction('ACCEPT');
+                } else if (key === '0' || key === 'd' || key === 'в' || key === 'arrowright') {
+                    e.preventDefault();
+                    submitAction('DROP');
+                }
+            }
+
+            onMounted(() => {
+                window.addEventListener('keydown', handleKeyDown);
+            });
+
+            onUnmounted(() => {
+                clearInterval(timerInterval);
+                window.removeEventListener('keydown', handleKeyDown);
+            });
+
+            return {
+                started,
+                completed,
+                alarmActive,
+                alarmMessage,
+                currentWaveIndex,
+                waveTimeLimit,
+                timeLeft,
+                attemptsCount,
+                currentWave,
+                timerBarClass,
+                startGame,
+                submitAction
+            };
+        }
+    }).mount('#app');
+})();
+</script>
