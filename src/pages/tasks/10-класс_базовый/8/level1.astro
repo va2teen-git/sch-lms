@@ -852,6 +852,49 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             };
         }
 
+        // Экспорт DEV-состояния для E2E-тестов и персон
+        window.__DEV_LEVEL1_STATE__ = {
+            getPhase: () => currentPhase,
+            getAttempts: () => attempts,
+            solvePhase1: () => {
+                const b2 = document.getElementById('bucket-2bit').querySelector('.bucket-slot');
+                const b3 = document.getElementById('bucket-3bit').querySelector('.bucket-slot');
+                const b4 = document.getElementById('bucket-4bit').querySelector('.bucket-slot');
+                document.querySelectorAll('#p1-cards-pool .card').forEach(c => {
+                    const cat = c.dataset.category;
+                    if (cat === '2bit') b2.appendChild(c);
+                    else if (cat === '3bit') b3.appendChild(c);
+                    else if (cat === '4bit') b4.appendChild(c);
+                });
+                updateBucketCounters();
+                checkP1Readiness();
+                document.getElementById('p1-submit-btn').click();
+            },
+            solvePhase2: () => {
+                document.querySelectorAll('#p2-tokens-pool .badge').forEach(token => {
+                    const val = token.dataset.val;
+                    if (val === p2Current.chA.power) placeTokenInSlot(token, document.getElementById('slot-p2-a-power'));
+                    else if (val === p2Current.chA.bits) placeTokenInSlot(token, document.getElementById('slot-p2-a-bits'));
+                    else if (val === p2Current.chB.power) placeTokenInSlot(token, document.getElementById('slot-p2-b-power'));
+                    else if (val === p2Current.chB.bits) placeTokenInSlot(token, document.getElementById('slot-p2-b-bits'));
+                });
+                checkP2Readiness();
+                document.getElementById('p2-submit-btn').click();
+            },
+            solvePhase3: () => {
+                document.querySelectorAll('#p3-tokens-pool .badge').forEach(token => {
+                    const val = token.dataset.val;
+                    if (val === p3Current.k) placeTokenInPipelineSlot(token, document.getElementById('slot-p3-k'));
+                    else if (val === p3Current.i) placeTokenInPipelineSlot(token, document.getElementById('slot-p3-i'));
+                    else if (val === p3Current.bits) placeTokenInPipelineSlot(token, document.getElementById('slot-p3-bits'));
+                    else if (val === p3Current.div) placeTokenInPipelineSlot(token, document.getElementById('slot-p3-div'));
+                    else if (val === p3Current.bytes) placeTokenInPipelineSlot(token, document.getElementById('slot-p3-bytes'));
+                });
+                checkP3Readiness();
+                document.getElementById('p3-submit-btn').click();
+            }
+        };
+
         // Старт с 1 фазы
         initPhase1();
     });

@@ -66,10 +66,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     </div>
                     <div class="d-flex align-items-center gap-3">
                         <span id="wave-counter-badge" class="badge bg-danger text-black rounded-0 fs-6 px-3 py-2 fw-bold">
-                            Волна {{ currentWave }} из {{ totalWaves }}
+                            Волна <span v-text="currentWave"></span> из <span v-text="totalWaves"></span>
                         </span>
                         <div class="text-secondary small">
-                            Сбоев: <span class="text-warning fw-bold">{{ attempts }}</span> | Время: <span class="text-light">{{ formatTime(sessionTime) }}</span>
+                            Сбоев: <span class="text-warning fw-bold" v-text="attempts"></span> | Время: <span class="text-light" v-text="formatTime(sessionTime)"></span>
                         </div>
                     </div>
                 </div>
@@ -79,7 +79,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="d-flex justify-content-between text-secondary small mb-1">
                         <span>ОКНО РАСЧЕТА ТАКТА:</span>
                         <span class="fw-bold" :class="timeLeft < 2.0 ? 'text-danger' : 'text-warning'">
-                            {{ timeLeft.toFixed(1) }} c / {{ currentWaveDuration.toFixed(1) }} c
+                            <span v-text="timeLeft.toFixed(1)"></span> c / <span v-text="currentWaveDuration.toFixed(1)"></span> c
                         </span>
                     </div>
                     <div class="progress rounded-0 bg-dark" style="height: 12px;">
@@ -93,7 +93,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 <!-- АВАРИЙНЫЙ АЛЕРТ ПРИ СБОЕ -->
                 <div v-if="showErrorAlert" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-3 py-2 text-center" role="alert">
-                    <div class="fw-bold fs-6">⚠️ [СИСТЕМНЫЙ СБОЙ] {{ errorMessage }}</div>
+                    <div class="fw-bold fs-6">⚠️ [СИСТЕМНЫЙ СБОЙ] <span v-text="errorMessage"></span></div>
                     <div class="small text-secondary">ТОТАЛЬНЫЙ СБРОС ПРОГРЕССА НА ВОЛНУ 1...</div>
                 </div>
 
@@ -101,21 +101,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <div class="card bg-black border border-danger rounded-0 p-3 p-md-4 mb-4 shadow-lg">
                     <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
                         <span class="badge border border-danger text-danger bg-dark rounded-0 px-2 py-1">
-                            ПАКЕТ ДАННЫХ #{{ currentWave.toString().padStart(2, '0') }}
+                            ПАКЕТ ДАННЫХ #<span v-text="currentWave.toString().padStart(2, '0')"></span>
                         </span>
-                        <span class="text-secondary small">КАТЕГОРИЯ: {{ currentPacket.category }}</span>
+                        <span class="text-secondary small">КАТЕГОРИЯ: <span v-text="currentPacket.category"></span></span>
                     </div>
 
-                    <h4 class="h5 text-light fw-bold mb-3">{{ currentPacket.title }}</h4>
+                    <h4 class="h5 text-light fw-bold mb-3" v-text="currentPacket.title"></h4>
 
                     <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
                         <div class="text-secondary small mb-1">ВХОДНЫЕ МЕТРИКИ И ПАРАМЕТРЫ СИСТЕМЫ:</div>
-                        <div class="text-warning fs-5 fw-bold mb-2">{{ currentPacket.condition }}</div>
-                        <div class="text-light small">{{ currentPacket.question }}</div>
+                        <div class="text-warning fs-5 fw-bold mb-2" v-text="currentPacket.condition"></div>
+                        <div class="text-light small" v-text="currentPacket.question"></div>
                     </div>
 
                     <div class="p-2 border border-secondary bg-black text-secondary small">
-                        <strong>Инженерная подсказка:</strong> {{ currentPacket.hint }}
+                        <strong>Инженерная подсказка:</strong> <span v-text="currentPacket.hint"></span>
                     </div>
                 </div>
 
@@ -167,8 +167,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <div class="card bg-black border border-success rounded-0 p-3 mb-4 font-monospace">
                     <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">ФИНАЛЬНЫЙ ТЕЛЕМЕТРИЧЕСКИЙ ОТЧЕТ:</div>
                     <div class="text-light mb-1">Пройдено волн: <span class="text-success fw-bold">10 из 10 (100% Flow)</span></div>
-                    <div class="text-light mb-1">Общее время сессии: <span class="text-warning fw-bold">{{ formatTime(sessionTime) }}</span></div>
-                    <div class="text-light mb-1">Количество аппаратных сбоев: <span class="text-warning fw-bold">{{ attempts }}</span></div>
+                    <div class="text-light mb-1">Общее время сессии: <span class="text-warning fw-bold" v-text="formatTime(sessionTime)"></span></div>
+                    <div class="text-light mb-1">Количество аппаратных сбоев: <span class="text-warning fw-bold" v-text="attempts"></span></div>
                     <div class="text-light">Итоговый статус: <span class="text-success fw-bold">HARDCORE_MASTER // ZERO_FAIL</span></div>
                 </div>
 
@@ -569,6 +569,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             restartGame() {
                 this.startGame();
             }
+        },
+        mounted() {
+            window.__DEV_LEVEL3_STATE__ = {
+                getCurrentWave: () => this.currentWave,
+                getAttempts: () => this.attempts,
+                getCurrentPacket: () => this.currentPacket,
+                solveCurrentWave: () => {
+                    this.handleGateChoice(this.currentPacket.isSufficient);
+                },
+                submitChoice: (choice) => {
+                    this.handleGateChoice(choice);
+                }
+            };
         },
         beforeUnmount() {
             if (this.waveTimerId) clearInterval(this.waveTimerId);
