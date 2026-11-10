@@ -50,7 +50,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                     <span class="badge bg-success text-dark rounded-0 count-badge">0 / 2</span>
                                 </div>
                                 <p class="text-secondary small mb-2">100% побитовая точность. PDF/A, TIFF, FLAC, SQL.GZ, PNG.</p>
-                                <div class="bucket-slots d-flex flex-column gap-2 min-vh-25">
+                                <div class="bucket-slots d-flex flex-column gap-2 border border-secondary border-dashed p-2" style="min-height: 120px;">
                                     <!-- Сюда падают карточки -->
                                 </div>
                             </div>
@@ -64,7 +64,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                     <span class="badge bg-warning text-dark rounded-0 count-badge">0 / 2</span>
                                 </div>
                                 <p class="text-secondary small mb-2">Компактное хранение, необратимое сжатие. JPEG, MP3, MP4, AAC.</p>
-                                <div class="bucket-slots d-flex flex-column gap-2 min-vh-25">
+                                <div class="bucket-slots d-flex flex-column gap-2 border border-secondary border-dashed p-2" style="min-height: 120px;">
                                     <!-- Сюда падают карточки -->
                                 </div>
                             </div>
@@ -384,6 +384,26 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         card.addEventListener('click', (e) => {
             e.stopPropagation();
+
+            // Если уже выбрана другая карточка, и кликаем по корзине (даже если попали на лежащую карточку)
+            if (selectedCardElement && selectedCardElement !== card && card.parentElement && card.parentElement.classList.contains('bucket-slots')) {
+                const targetSlotContainer = card.parentElement;
+                targetSlotContainer.appendChild(selectedCardElement);
+                selectedCardElement.classList.remove('border-warning', 'border-2');
+                selectedCardElement = null;
+                updatePhase1Counters();
+                return;
+            }
+
+            // Если карточка уже в корзине и ничего другого не выбрано - клик возвращает её в пул
+            if (card.parentElement && card.parentElement.classList.contains('bucket-slots')) {
+                document.getElementById('p1-cards-pool').appendChild(card);
+                card.classList.remove('border-warning', 'border-2');
+                if (selectedCardElement === card) selectedCardElement = null;
+                updatePhase1Counters();
+                return;
+            }
+
             if (selectedCardElement === card) {
                 card.classList.remove('border-warning', 'border-2');
                 selectedCardElement = null;
