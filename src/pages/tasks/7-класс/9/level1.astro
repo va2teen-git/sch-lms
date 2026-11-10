@@ -71,7 +71,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="col-12 col-md-4">
                         <div class="card bg-black border border-success rounded-0 p-3 h-100 p1-dropzone" data-bucket="visual">
                             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-2 mb-2">
-                                <span class="fw-bold text-success font-monospace">👁️ ЗРИТЕЛЬНЫЙ КАНАЛ</span>
+                                <span class="fw-bold text-success font-monospace p1-dropzone-header">👁️ ЗРИТЕЛЬНЫЙ КАНАЛ</span>
                                 <span class="badge bg-success text-dark rounded-0 p1-bucket-count">0 / 2</span>
                             </div>
                             <div class="text-secondary small mb-2" style="font-size: 0.75rem;">Глаза: цвет, форма, текст, световые импульсы (~80-90%)</div>
@@ -81,7 +81,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="col-12 col-md-4">
                         <div class="card bg-black border border-info rounded-0 p-3 h-100 p1-dropzone" data-bucket="auditory">
                             <div class="d-flex justify-content-between align-items-center border-bottom border-info pb-2 mb-2">
-                                <span class="fw-bold text-info font-monospace">👂 СЛУХОВОЙ КАНАЛ</span>
+                                <span class="fw-bold text-info font-monospace p1-dropzone-header">👂 СЛУХОВОЙ КАНАЛ</span>
                                 <span class="badge bg-info text-dark rounded-0 p1-bucket-count">0 / 2</span>
                             </div>
                             <div class="text-secondary small mb-2" style="font-size: 0.75rem;">Органы слуха: звуковые волны, речь, акустические сигналы (~9-10%)</div>
@@ -91,7 +91,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="col-12 col-md-4">
                         <div class="card bg-black border border-warning rounded-0 p-3 h-100 p1-dropzone" data-bucket="tactile">
                             <div class="d-flex justify-content-between align-items-center border-bottom border-warning pb-2 mb-2">
-                                <span class="fw-bold text-warning font-monospace">✋ ТАКТИЛЬНЫЙ КАНАЛ</span>
+                                <span class="fw-bold text-warning font-monospace p1-dropzone-header">✋ ТАКТИЛЬНЫЙ КАНАЛ</span>
                                 <span class="badge bg-warning text-dark rounded-0 p1-bucket-count">0 / 2</span>
                             </div>
                             <div class="text-secondary small mb-2" style="font-size: 0.75rem;">Кожа / рецепторы: температура, вибрация, текстура (~1-2%)</div>
@@ -315,17 +315,27 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         card.addEventListener('click', (e) => {
-            e.stopPropagation();
             const parentDropzone = card.closest('.p1-dropzone');
             if (parentDropzone) {
-                // Если кликнули на карточку внутри корзины — возвращаем ее в пул
+                if (p1SelectedCard) {
+                    parentDropzone.querySelector('.p1-slots').appendChild(p1SelectedCard);
+                    p1SelectedCard.classList.remove('border-warning');
+                    p1SelectedCard.classList.add('border-secondary');
+                    p1SelectedCard = null;
+                    updateP1UI();
+                    e.stopPropagation();
+                    return;
+                }
+                e.stopPropagation();
                 document.getElementById('p1-cards-pool').appendChild(card);
                 card.classList.remove('border-warning');
+                card.classList.add('border-secondary');
                 if (p1SelectedCard === card) p1SelectedCard = null;
                 updateP1UI();
                 return;
             }
 
+            e.stopPropagation();
             // Выбор карточки в пуле
             if (p1SelectedCard === card) {
                 card.classList.remove('border-warning');
@@ -550,6 +560,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             e.stopPropagation();
             const parentSlot = div.closest('.p2-slot');
             if (parentSlot) {
+                if (p2SelectedToken) {
+                    document.getElementById('p2-palette').appendChild(div);
+                    div.classList.remove('border-warning');
+                    div.classList.add('border-info');
+
+                    parentSlot.appendChild(p2SelectedToken);
+                    p2SelectedToken.classList.remove('border-warning');
+                    p2SelectedToken.classList.add('border-info');
+                    p2SelectedToken = null;
+                    updateP2UI();
+                    return;
+                }
                 // Возврат в палитру
                 document.getElementById('p2-palette').appendChild(div);
                 const ph = parentSlot.querySelector('.placeholder-text');
