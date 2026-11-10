@@ -1,0 +1,592 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / «Финальный босс»): 10 класс (базовый), Урок 8 - Подходы к измерению информации
+// Архетип: «Capacity & Bandwidth Gatekeeper // Диспетчер пропускной способности и емкости данных»
+// Стек: Vue 3
+// 10 процедурных волн с убывающим таймером (8.0 с -> 3.8 с), тотальный хардкор-сброс на шаг 1 при любой ошибке.
+---
+
+<TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
+    <div id="vue-app" class="container-fluid min-vh-100 p-2 p-md-3 bg-black text-danger font-monospace" v-cloak>
+        
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ МИССИИ) -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="text-center py-4 py-md-5">
+            <div class="d-inline-block border border-danger p-3 p-md-4 bg-dark rounded-0 mb-4 text-start shadow-lg" style="max-width: 860px;">
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3">
+                    <h1 class="h3 text-danger mb-0 fw-bold">⚡ BANDWIDTH GATEKEEPER // ДИСПЕТЧЕР ЕМКОСТИ</h1>
+                    <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-2">АРКАДНЫЙ БОСС</span>
+                </div>
+                
+                <p class="text-light fs-5 mb-3">
+                    На магистральный шлюз узла связи обрушился скоростной поток информационных пакетов, запросов на буферизацию и транзитных данных.
+                    Вам поручено в режиме реального времени провести <span class="text-danger fw-bold">10 скоростных волн верификации</span>:
+                    мгновенно определять, <strong>достаточна ли разрядность регистра, емкость буфера или пропускная способность канала</strong> для входящих данных.
+                </p>
+
+                <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
+                    <div class="fw-bold text-danger mb-2 text-uppercase">[ПРОТОКОЛ ХАРДКОР-РЕАГИРОВАНИЯ]:</div>
+                    <ul class="mb-0 ps-3">
+                        <li class="mb-1">• <span class="text-warning fw-bold">Динамический таймер такта:</span> От <span class="text-danger fw-bold">8.0 секунд</span> на 1-й волне до экстремальных <span class="text-danger fw-bold">3.8 секунд</span> на финальных волнах!</li>
+                        <li class="mb-1">• <span class="text-warning fw-bold">Тотальный сброс (Full Wipeout):</span> Любая ошибка расчета емкости, ложный допуск переполнения или тайм-аут вызывают аварийную сирену и <span class="text-danger fw-bold">ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</span> с новой процедурной генерацией!</li>
+                        <li class="mb-1">• <span class="text-warning fw-bold">Два шлюза управления:</span>
+                            <br><span class="text-success fw-bold">[ШЛЮЗ 1: SUFFICIENT]</span> — Емкость достаточна (2<sup>i</sup> ≥ N, размер ≤ буфер, время ≤ норматив).
+                            <br><span class="text-danger fw-bold">[ШЛЮЗ 2: OVERFLOW]</span> — Дефицит / Переполнение (2<sup>i</sup> &lt; N, файл больше памяти, тайм-аут канала).
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="text-secondary small mb-4">
+                    Управление: кликами по крупным кнопкам шлюзов или горячими клавишами:
+                    <kbd class="bg-dark text-success border border-success">1</kbd> / <kbd class="bg-dark text-success border border-success">A</kbd> / <kbd class="bg-dark text-success border border-success">←</kbd> (SUFFICIENT: Достаточно), 
+                    <kbd class="bg-dark text-danger border border-danger">2</kbd> / <kbd class="bg-dark text-danger border border-danger">D</kbd> / <kbd class="bg-dark text-danger border border-danger">→</kbd> (OVERFLOW: Переполнение).
+                </div>
+
+                <button id="start-btn" class="btn btn-danger btn-lg rounded-0 w-100 fw-bold font-monospace py-3 text-uppercase shadow tracking-wider" @click="startGame">
+                    ▶ АКТИВИРОВАТЬ ДИСПЕТЧЕР ШЛЮЗА (СТАРТ)
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (АРКАДНАЯ СЕССИЯ) -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'playing'" class="row justify-content-center">
+            <div class="col-12 col-xl-10">
+
+                <!-- ВЕРХНИЙ ХУД ПАНЕЛИ -->
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom border-danger pb-2 mb-3 gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="fs-4">⚡</span>
+                        <div>
+                            <div class="h5 text-danger mb-0 fw-bold">ДИСПЕТЧЕР ЕМКОСТИ И ПРОПУСКНОЙ СПОСОБНОСТИ</div>
+                            <div class="small text-secondary">РЕЖИМ: ХАРДКОР (ОШИБКА = СБРОС НА ВОЛНУ 1)</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="wave-counter-badge" class="badge bg-danger text-black rounded-0 fs-6 px-3 py-2 fw-bold">
+                            Волна <span v-text="currentWave"></span> из <span v-text="totalWaves"></span>
+                        </span>
+                        <div class="text-secondary small">
+                            Сбоев: <span class="text-warning fw-bold" v-text="attempts"></span> | Время: <span class="text-light" v-text="formatTime(sessionTime)"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ТАЙМЕР-БАР -->
+                <div class="card bg-black border border-secondary rounded-0 p-2 mb-3">
+                    <div class="d-flex justify-content-between text-secondary small mb-1">
+                        <span>ОКНО РАСЧЕТА ТАКТА:</span>
+                        <span class="fw-bold" :class="timeLeft < 2.0 ? 'text-danger' : 'text-warning'">
+                            <span v-text="timeLeft.toFixed(1)"></span> c / <span v-text="currentWaveDuration.toFixed(1)"></span> c
+                        </span>
+                    </div>
+                    <div class="progress rounded-0 bg-dark" style="height: 12px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             :class="timerBarClass"
+                             role="progressbar"
+                             :style="{ width: (timeLeft / currentWaveDuration * 100) + '%' }">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- АВАРИЙНЫЙ АЛЕРТ ПРИ СБОЕ -->
+                <div v-if="showErrorAlert" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-3 py-2 text-center" role="alert">
+                    <div class="fw-bold fs-6">⚠️ [СИСТЕМНЫЙ СБОЙ] <span v-text="errorMessage"></span></div>
+                    <div class="small text-secondary">ТОТАЛЬНЫЙ СБРОС ПРОГРЕССА НА ВОЛНУ 1...</div>
+                </div>
+
+                <!-- КАРТОЧКА ТЕКУЩЕГО ИНФОРМАЦИОННОГО ПАКЕТА -->
+                <div class="card bg-black border border-danger rounded-0 p-3 p-md-4 mb-4 shadow-lg">
+                    <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-3">
+                        <span class="badge border border-danger text-danger bg-dark rounded-0 px-2 py-1">
+                            ПАКЕТ ДАННЫХ #<span v-text="currentWave.toString().padStart(2, '0')"></span>
+                        </span>
+                        <span class="text-secondary small">КАТЕГОРИЯ: <span v-text="currentPacket.category"></span></span>
+                    </div>
+
+                    <h4 class="h5 text-light fw-bold mb-3" v-text="currentPacket.title"></h4>
+
+                    <div class="card bg-dark border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ВХОДНЫЕ МЕТРИКИ И ПАРАМЕТРЫ СИСТЕМЫ:</div>
+                        <div class="text-warning fs-5 fw-bold mb-2" v-text="currentPacket.condition"></div>
+                        <div class="text-light small" v-text="currentPacket.question"></div>
+                    </div>
+
+                    <div class="p-2 border border-secondary bg-black text-secondary small">
+                        <strong>Инженерная подсказка:</strong> <span v-text="currentPacket.hint"></span>
+                    </div>
+                </div>
+
+                <!-- ОРГАНЫ ПРЯМОГО УПРАВЛЕНИЯ (ШЛЮЗЫ РЕШЕНИЯ) -->
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <button id="gate-sufficient-btn"
+                                class="btn btn-outline-success bg-black border-success text-success rounded-0 w-100 py-3 py-md-4 d-flex flex-column align-items-center justify-content-center shadow"
+                                style="min-height: 100px;"
+                                @click="handleGateChoice(true)">
+                            <div class="fw-bold fs-4 mb-1">✓ SUFFICIENT [ДОСТАТОЧНО]</div>
+                            <div class="small text-secondary">
+                                Емкость покрывает данные (2<sup>i</sup> ≥ N, файл ≤ буфер, время ≤ лимит)
+                            </div>
+                            <div class="mt-2 text-success small border border-success px-2 py-0">Горячая клавиша: [1] или [←]</div>
+                        </button>
+                    </div>
+
+                    <div class="col-md-6">
+                        <button id="gate-overflow-btn"
+                                class="btn btn-outline-danger bg-black border-danger text-danger rounded-0 w-100 py-3 py-md-4 d-flex flex-column align-items-center justify-content-center shadow"
+                                style="min-height: 100px;"
+                                @click="handleGateChoice(false)">
+                            <div class="fw-bold fs-4 mb-1">✗ OVERFLOW [ДЕФИЦИТ]</div>
+                            <div class="small text-secondary">
+                                Нехватка разрядности или памяти (2<sup>i</sup> &lt; N, переполнение, срыв тайм-аута)
+                            </div>
+                            <div class="mt-2 text-danger small border border-danger px-2 py-0">Горячая клавиша: [2] или [→]</div>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'victory'" class="text-center py-5">
+            <div class="d-inline-block border border-success bg-dark p-4 p-md-5 rounded-0 shadow-lg text-start" style="max-width: 720px;">
+                <div class="text-center mb-4">
+                    <div class="display-3 text-success mb-2">★ ПОБЕДА ★</div>
+                    <h3 class="h3 text-success fw-bold">АТТЕСТАЦИЯ АРКАДЫ ЗАВЕРШЕНА // 10 ВОЛН</h3>
+                    <p class="text-light">
+                        Все 10 скоростных волн информационного шлюза отработаны безошибочно в условиях жесткого тайм-прессинга.
+                    </p>
+                </div>
+
+                <div class="card bg-black border border-success rounded-0 p-3 mb-4 font-monospace">
+                    <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">ФИНАЛЬНЫЙ ТЕЛЕМЕТРИЧЕСКИЙ ОТЧЕТ:</div>
+                    <div class="text-light mb-1">Пройдено волн: <span class="text-success fw-bold">10 из 10 (100% Flow)</span></div>
+                    <div class="text-light mb-1">Общее время сессии: <span class="text-warning fw-bold" v-text="formatTime(sessionTime)"></span></div>
+                    <div class="text-light mb-1">Количество аппаратных сбоев: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+                    <div class="text-light">Итоговый статус: <span class="text-success fw-bold">HARDCORE_MASTER // ZERO_FAIL</span></div>
+                </div>
+
+                <button id="restart-arcade-btn" class="btn btn-outline-success rounded-0 w-100 py-3 fw-bold font-monospace text-uppercase" @click="restartGame">
+                    ПРОЙТИ АРКАДУ ПОВТОРНО
+                </button>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+<script is:inline>
+    const { createApp } = Vue;
+
+    // Web Audio Синтезатор звуковых эффектов
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) audioCtx = new AudioContext();
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type, duration) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    }
+
+    function playSuccessChime() {
+        playTone(523.25, 'sine', 0.12);
+        setTimeout(() => playTone(659.25, 'sine', 0.12), 70);
+        setTimeout(() => playTone(783.99, 'sine', 0.18), 140);
+    }
+
+    function playErrorBuzzer() {
+        playTone(180, 'sawtooth', 0.25);
+        setTimeout(() => playTone(120, 'sawtooth', 0.35), 80);
+    }
+
+    function playAlarmSiren() {
+        playTone(440, 'triangle', 0.2);
+        setTimeout(() => playTone(880, 'triangle', 0.2), 120);
+        setTimeout(() => playTone(440, 'triangle', 0.2), 240);
+    }
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                currentWave: 1,
+                totalWaves: 10,
+                attempts: 0,
+                startTime: 0,
+                sessionTime: 0,
+                sessionTimerId: null,
+                
+                timeLeft: 8.0,
+                currentWaveDuration: 8.0,
+                waveTimerId: null,
+                
+                showErrorAlert: false,
+                errorMessage: '',
+                currentPacket: {}
+            };
+        },
+        computed: {
+            timerBarClass() {
+                if (this.timeLeft > this.currentWaveDuration * 0.5) return 'bg-success';
+                if (this.timeLeft > this.currentWaveDuration * 0.25) return 'bg-warning';
+                return 'bg-danger';
+            }
+        },
+        methods: {
+            formatTime(sec) {
+                const m = String(Math.floor(sec / 60)).padStart(2, '0');
+                const s = String(sec % 60).padStart(2, '0');
+                return `${m}:${s}`;
+            },
+
+            sendTelemetry(actionType, isSuccess) {
+                const spent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 8 :: Подходы к измерению информации (Уровень 3)',
+                    action_type: actionType,
+                    status: isSuccess ? 'completed' : 'in_progress',
+                    start_time: new Date(this.startTime).toISOString(),
+                    time_spent_sec: spent,
+                    attempts_count: this.attempts,
+                    success: isSuccess
+                }, '*');
+            },
+
+            startGame() {
+                this.startTime = Date.now();
+                this.sessionTime = 0;
+                this.attempts = 0;
+                this.currentWave = 1;
+                this.showErrorAlert = false;
+                this.gameState = 'playing';
+
+                this.sendTelemetry('in_progress', false);
+
+                if (this.sessionTimerId) clearInterval(this.sessionTimerId);
+                this.sessionTimerId = setInterval(() => {
+                    this.sessionTime = Math.floor((Date.now() - this.startTime) / 1000);
+                }, 1000);
+
+                window.addEventListener('keydown', this.handleKeyDown);
+                this.loadWave(1);
+            },
+
+            getWaveConfig(wave) {
+                // Длительность волны линейно сжимается от 8.0 с до 3.8 с
+                const duration = Math.max(3.8, 8.0 - (wave - 1) * 0.45);
+
+                // Банк процедурных сценариев по волнам
+                const waveBank = {
+                    1: [
+                        {
+                            category: 'Хартли // Базовые состояния',
+                            title: 'Регистр кодирования граней октаэдра',
+                            condition: 'Множество равновероятных состояний N = 8. Выделен регистр разрядностью i = 3 бита.',
+                            question: 'Достаточна ли разрядность 3 бита для кодирования всех 8 состояний?',
+                            hint: '2³ = 8. Число кодовых комбинаций в точности равно числу событий.',
+                            isSufficient: true
+                        },
+                        {
+                            category: 'Хартли // Базовые состояния',
+                            title: 'Регистр кодирования 4 сторон света',
+                            condition: 'Множество состояний N = 4 (С, Ю, З, В). Выделен регистр i = 2 бита.',
+                            question: 'Достаточна ли разрядность 2 бита для кодирования 4 направлений?',
+                            hint: '2² = 4. Разрядность точно покрывает 4 исхода.',
+                            isSufficient: true
+                        }
+                    ],
+                    2: [
+                        {
+                            category: 'Хартли // Дефицит разрядности',
+                            title: 'Регистр состояний перекрестка',
+                            condition: 'Светофор со стрелками имеет N = 10 уникальных сигналов. Буфер равен i = 3 бита.',
+                            question: 'Позволит ли 3-битный буфер закодировать все 10 сигналов светофора?',
+                            hint: '2³ = 8 комбинаций. 8 < 10! Возникает дефицит двух состояний.',
+                            isSufficient: false
+                        },
+                        {
+                            category: 'Хартли // Дефицит разрядности',
+                            title: 'Регистр десятичных цифр (0..9)',
+                            condition: 'Десятичный алфавит N = 10 цифр. Назначен регистр i = 3 бита.',
+                            question: 'Поместится ли десятичная цифра в 3 бита без потери состояний?',
+                            hint: '2³ = 8 < 10. Требуется минимум 4 бита (2⁴ = 16 ≥ 10).',
+                            isSufficient: false
+                        }
+                    ],
+                    3: [
+                        {
+                            category: 'Алфавитный подход // Телеграф',
+                            title: 'Канал телетайпного терминала',
+                            condition: 'Алфавит терминала содержит N = 60 символов. Выделен 6-битный канал.',
+                            question: 'Достаточна ли разрядность 6 бит для алфавита из 60 знаков?',
+                            hint: '2⁶ = 64 комбинации. 64 ≥ 60 — емкости достаточно.',
+                            isSufficient: true
+                        },
+                        {
+                            category: 'Алфавитный подход // Русский алфавит',
+                            title: 'Шина передачи букв (без буквы ё)',
+                            condition: 'Алфавит русского языка N = 32 буквы. Выделен регистр i = 5 бит.',
+                            question: 'Хватит ли 5 бит для однозначного кодирования 32 букв?',
+                            hint: '2⁵ = 32. Разрядность точно покрывает алфавит.',
+                            isSufficient: true
+                        }
+                    ],
+                    4: [
+                        {
+                            category: 'Единицы измерения // Буферы памяти',
+                            title: 'Сетевой буфер Ethernet-кадра',
+                            condition: 'Размер входящего блока 4096 байт. Емкость входного FIFO-буфера 4 Кбайт.',
+                            question: 'Поместится ли блок 4096 байт в буфер емкостью 4 Килобайта?',
+                            hint: '4 Кбайт = 4 × 1024 = 4096 байт. Объемы строго равны.',
+                            isSufficient: true
+                        },
+                        {
+                            category: 'Единицы измерения // Буферы памяти',
+                            title: 'Фрагмент лог-файла сервера',
+                            condition: 'Размер фрагмента 2048 байт. Емкость приемного кольца 2 Кбайт.',
+                            question: 'Уложится ли блок 2048 байт в лимит буфера 2 Кбайт?',
+                            hint: '2 Кбайт = 2048 байт. Блок полностью помещается в буфер.',
+                            isSufficient: true
+                        }
+                    ],
+                    5: [
+                        {
+                            category: 'Единицы измерения // Переполнение',
+                            title: 'Пакет сенсорного массива',
+                            condition: 'Объем пакета 10 000 бит. Буфер оперативной памяти чипа равен 1 Кбайт.',
+                            question: 'Поместится ли пакет 10 000 бит в буфер емкостью 1 Килобайт?',
+                            hint: '1 Кбайт = 1024 байта = 8192 бит. 10 000 бит > 8192 бит (переполнение буфера на 1808 бит)!',
+                            isSufficient: false
+                        },
+                        {
+                            category: 'Единицы измерения // Переполнение',
+                            title: 'Дамп микроконтроллера',
+                            condition: 'Дамп содержит 9000 бит. Внутренняя память EEPROM составляет 1 Кбайт.',
+                            question: 'Успешно ли запишется дамп 9000 бит в память 1 Кбайт без переполнения?',
+                            hint: '1 Кбайт = 8192 бит. 9000 > 8192 — переполнение памяти!',
+                            isSufficient: false
+                        }
+                    ],
+                    6: [
+                        {
+                            category: 'Объем текста // ASCII',
+                            title: 'Передача ASCII-документа',
+                            condition: 'Текст состоит из 500 символов однобайтной кодировки ASCII (1 символ = 1 байт = 8 бит). Выделен буфер 500 байт.',
+                            question: 'Поместится ли текст из 500 знаков ASCII в память объемом 500 байт?',
+                            hint: '500 символов × 1 байт = 500 байт. Емкость строго совпадает.',
+                            isSufficient: true
+                        },
+                        {
+                            category: 'Объем текста // ASCII',
+                            title: 'Командный скрипт терминала',
+                            condition: 'Скрипт содержит 256 символов в таблице ASCII (1 байт/символ). Объем выделенной зоны 256 байт.',
+                            question: 'Достаточна ли зона 256 байт для хранения скрипта из 256 символов?',
+                            hint: '256 × 1 байт = 256 байт. Данные помещаются в память.',
+                            isSufficient: true
+                        }
+                    ],
+                    7: [
+                        {
+                            category: 'Объем текста // Unicode коллизия',
+                            title: 'Многоязычный текст Unicode UTF-16',
+                            condition: 'Текст содержит 300 символов в 16-битной кодировке Unicode (2 байта на знак). Емкость транзитного шлюза 500 байт.',
+                            question: 'Уложится ли данный текст в транзитный шлюз 500 байт?',
+                            hint: '300 символов × 2 байта = 600 байт! 600 байт > 500 байт (переполнение на 100 байт).',
+                            isSufficient: false
+                        },
+                        {
+                            category: 'Объем текста // Unicode коллизия',
+                            title: 'Словарь символов UTF-16',
+                            condition: 'Словарь из 400 знаков в кодировке Unicode (2 байта на символ). Выделенный буфер равен 600 байт.',
+                            question: 'Хватит ли буфера 600 байт для размещения 400 знаков Unicode?',
+                            hint: '400 × 2 байта = 800 байт > 600 байт (дефицит 200 байт)!',
+                            isSufficient: false
+                        }
+                    ],
+                    8: [
+                        {
+                            category: 'Пропускная способность // Скорость канала',
+                            title: 'Синхронизация архива 1 Мбайт',
+                            condition: 'Файл размером 1 Мегабайт (Мбайт) передается по каналу со скоростью 8 Мбит/с. Норматив времени передачи SLA: 1.0 секунда.',
+                            question: 'Успеет ли файл передаться в пределах норматива 1.0 с?',
+                            hint: '1 Мбайт = 8 Мбит. При скорости 8 Мбит/с время t = 8 / 8 = 1.0 секунда. Норматив выполнен.',
+                            isSufficient: true
+                        },
+                        {
+                            category: 'Пропускная способность // Скорость канала',
+                            title: 'Бэкап конфигурации 2 Мбайт',
+                            condition: 'Файл размером 2 Мбайт передается по каналу 16 Мбит/с. Лимит ожидания: 1.0 секунда.',
+                            question: 'Уложится ли трансмиссия 2 Мбайт в лимит 1.0 с по каналу 16 Мбит/с?',
+                            hint: '2 Мбайт = 16 Мбит. 16 Мбит / 16 Мбит/с = 1.0 секунда. Успевает.',
+                            isSufficient: true
+                        }
+                    ],
+                    9: [
+                        {
+                            category: 'Пропускная способность // Тайм-аут',
+                            title: 'Спутниковый канал связи',
+                            condition: 'Файл объемом 2 Мбайт передается по радиоканалу со скоростью 4 Мбит/с. Жесткий тайм-аут контроллера: 2.0 секунды.',
+                            question: 'Успеет ли завершиться передача до наступления тайм-аута в 2.0 секунды?',
+                            hint: '2 Мбайт = 16 Мбит. Время передачи t = 16 / 4 = 4.0 секунды. 4.0 с > 2.0 с (срыв тайм-аута)!',
+                            isSufficient: false
+                        },
+                        {
+                            category: 'Пропускная способность // Тайм-аут',
+                            title: 'Модемная линия филиала',
+                            condition: 'Объем пакета 1 Мбайт. Скорость канала 2 Мбит/с. Максимальное окно задержки: 2.0 секунды.',
+                            question: 'Завершится ли отправка пакета за отведенные 2.0 секунды?',
+                            hint: '1 Мбайт = 8 Мбит. Время передачи t = 8 / 2 = 4.0 секунды > 2.0 с (срыв окна задержки)!',
+                            isSufficient: false
+                        }
+                    ],
+                    10: [
+                        {
+                            category: 'Финальный синтез // Идентификаторы БД',
+                            title: 'Индексация базы из 2048 записей',
+                            condition: 'Для 2048 записей выделены уникальные двоичные ключи минимальной длины. Буфер индекса равен 22 Кбит (22 000 бит).',
+                            question: 'Поместятся ли ключи всех 2048 записей в буфер 22 000 бит?',
+                            hint: '2048 = 2¹¹ => 11 бит на ключ. Общий объем = 2048 × 11 = 22 528 бит > 22 000 бит (переполнение буфера на 528 бит)!',
+                            isSufficient: false
+                        },
+                        {
+                            category: 'Финальный синтез // Идентификаторы БД',
+                            title: 'Индексация абонентов сети',
+                            condition: 'Для 1024 абонентов выделены уникальные двоичные ключи (1024 = 2¹⁰). Буфер равен 10 Кбит (10 000 бит).',
+                            question: 'Хватит ли буфера 10 000 бит для хранения ключей всех 1024 абонентов?',
+                            hint: '10 бит на ключ. Объем = 1024 × 10 = 10 240 бит > 10 000 бит (переполнение на 240 бит)!',
+                            isSufficient: false
+                        }
+                    ]
+                };
+
+                const variants = waveBank[wave] || waveBank[1];
+                const selected = variants[Math.floor(Math.random() * variants.length)];
+                return { duration, packet: selected };
+            },
+
+            loadWave(wave) {
+                if (this.waveTimerId) clearInterval(this.waveTimerId);
+
+                const cfg = this.getWaveConfig(wave);
+                this.currentWave = wave;
+                this.currentWaveDuration = cfg.duration;
+                this.timeLeft = cfg.duration;
+                this.currentPacket = cfg.packet;
+
+                const tickInterval = 50; // каждые 50 мс для плавной анимации
+                this.waveTimerId = setInterval(() => {
+                    this.timeLeft -= tickInterval / 1000;
+                    if (this.timeLeft <= 0) {
+                        this.timeLeft = 0;
+                        clearInterval(this.waveTimerId);
+                        this.triggerHardcoreReset('Время такта истекло! Шлюз заблокирован.');
+                    }
+                }, tickInterval);
+            },
+
+            handleGateChoice(choice) {
+                if (this.gameState !== 'playing') return;
+
+                if (choice === this.currentPacket.isSufficient) {
+                    // Верное решение
+                    playSuccessChime();
+                    if (this.currentWave < this.totalWaves) {
+                        this.loadWave(this.currentWave + 1);
+                    } else {
+                        this.finishGame();
+                    }
+                } else {
+                    // Ошибка
+                    playErrorBuzzer();
+                    const reason = this.currentPacket.isSufficient 
+                        ? 'Емкость была ДЕЙСТВИТЕЛЬНО достаточна! Ложная отбраковка.' 
+                        : 'Входящий объем превышал лимит! Допущен сбой переполнения.';
+                    this.triggerHardcoreReset(reason);
+                }
+            },
+
+            handleKeyDown(e) {
+                if (this.gameState !== 'playing') return;
+                const key = e.key.toLowerCase();
+                if (key === '1' || key === 'a' || key === 'arrowleft') {
+                    e.preventDefault();
+                    this.handleGateChoice(true);
+                } else if (key === '2' || key === 'd' || key === 'arrowright') {
+                    e.preventDefault();
+                    this.handleGateChoice(false);
+                }
+            },
+
+            triggerHardcoreReset(msg) {
+                if (this.waveTimerId) clearInterval(this.waveTimerId);
+                playAlarmSiren();
+
+                this.attempts++;
+                this.errorMessage = msg;
+                this.showErrorAlert = true;
+                this.sendTelemetry('hardcore_reset', false);
+
+                setTimeout(() => {
+                    this.showErrorAlert = false;
+                    this.loadWave(1);
+                }, 1600);
+            },
+
+            finishGame() {
+                if (this.waveTimerId) clearInterval(this.waveTimerId);
+                if (this.sessionTimerId) clearInterval(this.sessionTimerId);
+                window.removeEventListener('keydown', this.handleKeyDown);
+
+                this.gameState = 'victory';
+                this.sendTelemetry('level_complete', true);
+            },
+
+            restartGame() {
+                this.startGame();
+            }
+        },
+        mounted() {
+            window.__DEV_LEVEL3_STATE__ = {
+                getCurrentWave: () => this.currentWave,
+                getAttempts: () => this.attempts,
+                getCurrentPacket: () => this.currentPacket,
+                solveCurrentWave: () => {
+                    this.handleGateChoice(this.currentPacket.isSufficient);
+                },
+                submitChoice: (choice) => {
+                    this.handleGateChoice(choice);
+                }
+            };
+        },
+        beforeUnmount() {
+            if (this.waveTimerId) clearInterval(this.waveTimerId);
+            if (this.sessionTimerId) clearInterval(this.sessionTimerId);
+            window.removeEventListener('keydown', this.handleKeyDown);
+        }
+    }).mount('#vue-app');
+</script>
