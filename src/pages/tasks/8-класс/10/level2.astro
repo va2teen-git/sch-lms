@@ -1,0 +1,730 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический расчет таблиц истинности (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Аналитический ввод // Sawtooth 2-1-2</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Шапка прогресса и счетчика ошибок -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Расчет размерности таблицы истинности (Прямой расчет)</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки / Перекалибровки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Единый блок обратной связи при аналитическом сбое -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[АНАЛИТИЧЕСКИЙ СБОЙ] <span id="feedback-text">Неверный расчет!</span> Перекалибровка параметров текущей фазы...</span>
+                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: РАСЧЕТ РАЗМЕРНОСТИ ТАБЛИЦЫ (CCS = 4) ================= -->
+                <div id="phase1" class="phase-container">
+                    <div class="mb-3 text-light">
+                        <p class="mb-1">
+                            <span class="text-warning fw-bold">Директива задачи:</span> Рассчитайте информационную емкость таблицы истинности для заданного логического выражения.
+                        </p>
+                        <p class="text-secondary small mb-2">
+                            Используйте формулу мощности полного перебора булевых переменных N = 2<sup>n</sup>.
+                        </p>
+                        <div class="p-3 bg-black border border-secondary text-center mb-3">
+                            <div class="text-secondary small mb-1">Исследуемое логическое выражение:</div>
+                            <div id="p1-formula-display" class="text-warning fw-bold fs-5">F = (A ∧ ¬B) ∨ (C ∧ ¬D)</div>
+                        </div>
+                        <div class="p-3 bg-dark border border-secondary mb-3">
+                            <div id="p1-question-text" class="text-light fs-6">
+                                Сколько информационных строк (наборов входных переменных) содержит таблица истинности данного выражения?
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column align-items-center justify-content-center gap-3 my-4">
+                        <div class="w-100 d-flex flex-column align-items-center">
+                            <label for="p1-input" class="text-secondary small mb-1">Ваш расчетный ответ (целое число):</label>
+                            <input type="number" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 fs-4 text-center font-monospace" placeholder="Введите число..." style="max-width: 320px; min-height: 48px;" autocomplete="off">
+                        </div>
+                        <button id="p1-verify-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 py-2" style="min-height: 48px;">
+                            ПОДТВЕРДИТЬ РАСЧЕТ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: АНАЛИТИЧЕСКИЙ ВЕС ФУНКЦИИ (CCS = 6) ================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="mb-3 text-light">
+                        <p class="mb-1">
+                            <span class="text-warning fw-bold">Директива задачи:</span> Вычислите количество единиц в итоговом столбце таблицы истинности (аналитический вес функции).
+                        </p>
+                        <p class="text-secondary small mb-2">
+                            Проанализируйте логическую структуру функции для 3 переменных (8 возможных строк от 000 до 111).
+                        </p>
+                        <div class="p-3 bg-black border border-secondary text-center mb-3">
+                            <div class="text-secondary small mb-1">Исследуемая функция:</div>
+                            <div id="p2-formula-display" class="text-warning fw-bold fs-5">F = (A ∨ B) ∧ ¬C</div>
+                        </div>
+                        <div class="p-3 bg-dark border border-secondary mb-3">
+                            <div id="p2-question-text" class="text-light fs-6">
+                                Сколько раз в итоговом столбце полной таблицы истинности функции F встречается логическая единица [ 1 ]?
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column align-items-center justify-content-center gap-3 my-4">
+                        <div class="w-100 d-flex flex-column align-items-center">
+                            <label for="p2-input" class="text-secondary small mb-1">Количество строк со значением 1 (от 0 до 8):</label>
+                            <input type="number" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 fs-4 text-center font-monospace" placeholder="0..8" min="0" max="8" style="max-width: 320px; min-height: 48px;" autocomplete="off">
+                        </div>
+                        <button id="p2-verify-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 py-2" style="min-height: 48px;">
+                            ПОДТВЕРДИТЬ РАСЧЕТ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: ПИК 1 — ДЕШИФРОВКА СТОЛБЦОВ (CCS = 7-8) ================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="mb-3 text-light">
+                        <p class="mb-1">
+                            <span class="text-warning fw-bold">Директива задачи (Пик инверсии):</span> Восстановите соответствие переменных столбцам таблицы истинности.
+                        </p>
+                        <p class="text-secondary small mb-2">
+                            Дана функция и фрагмент таблицы из уникальных строк. Введите строкой из 3 букв (без пробелов) имена переменных, соответствующих Столбцу 1, Столбцу 2 и Столбцу 3 (например: <code>zyx</code>).
+                        </p>
+                        <div class="p-3 bg-black border border-secondary text-center mb-3">
+                            <div class="text-secondary small mb-1">Логическая функция:</div>
+                            <div id="p3-formula-display" class="text-warning fw-bold fs-5">F = (x ∧ ¬y) ∨ z</div>
+                        </div>
+                    </div>
+
+                    <!-- Таблица фрагмента -->
+                    <div class="table-responsive mb-4">
+                        <table class="table table-bordered border-secondary table-dark text-center align-middle mb-0 font-monospace">
+                            <thead>
+                                <tr class="bg-black text-warning">
+                                    <th style="width: 25%;">Столбец 1</th>
+                                    <th style="width: 25%;">Столбец 2</th>
+                                    <th style="width: 25%;">Столбец 3</th>
+                                    <th class="text-success" style="width: 25%;">F (Результат)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="p3-table-body">
+                                <!-- Строки таблицы генерируются процедурно -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex flex-column align-items-center justify-content-center gap-3 my-4">
+                        <div class="w-100 d-flex flex-column align-items-center">
+                            <label for="p3-input" class="text-secondary small mb-1">Порядок переменных слева направо (например: zyx):</label>
+                            <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 fs-4 text-center font-monospace" placeholder="например, zyx" maxlength="3" style="max-width: 320px; min-height: 48px;" autocomplete="off">
+                        </div>
+                        <button id="p3-verify-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 py-2" style="min-height: 48px;">
+                            ПРОВЕРИТЬ СООТВЕТСТВИЕ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ — КОНЦЕПТУАЛЬНЫЙ ИНВАРИАНТ (CCS = 5-6) ================= -->
+                <div id="phase4" class="phase-container d-none">
+                    <div class="mb-3 text-light">
+                        <p class="mb-1">
+                            <span class="text-warning fw-bold">Директива задачи (Долина консолидации):</span> Примените инвариантные свойства законов логики и инверсии без построения полной таблицы.
+                        </p>
+                        <p class="text-secondary small mb-2">
+                            Используйте фундаментальные свойства тавтологий, противоречий и симметрии инверсии.
+                        </p>
+                        <div class="p-3 bg-black border border-secondary text-center mb-3">
+                            <div class="text-secondary small mb-1">Инвариантное условие:</div>
+                            <div id="p4-condition-display" class="text-warning fw-bold fs-5">Таблица истинности функции F содержит 8 строк...</div>
+                        </div>
+                        <div class="p-3 bg-dark border border-secondary mb-3">
+                            <div id="p4-question-text" class="text-light fs-6">
+                                Сколько единиц содержит таблица истинности для инверсии ¬F?
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column align-items-center justify-content-center gap-3 my-4">
+                        <div class="w-100 d-flex flex-column align-items-center">
+                            <label for="p4-input" class="text-secondary small mb-1">Расчетное число:</label>
+                            <input type="number" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 fs-4 text-center font-monospace" placeholder="Введите число..." style="max-width: 320px; min-height: 48px;" autocomplete="off">
+                        </div>
+                        <button id="p4-verify-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 py-2" style="min-height: 48px;">
+                            ПОДТВЕРДИТЬ РЕШЕНИЕ →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 5: КУЛЬМИНАЦИОННЫЙ ПИК (CCS = 8-9) ================= -->
+                <div id="phase5" class="phase-container d-none">
+                    <div class="mb-3 text-light">
+                        <p class="mb-1">
+                            <span class="text-warning fw-bold">Директива задачи (Кульминация):</span> Анализ системы логических функций с граничным условием.
+                        </p>
+                        <p class="text-secondary small mb-2">
+                            Найдите количество комбинаций входных переменных, одновременно удовлетворяющих составному системному предикату.
+                        </p>
+                        <div class="p-3 bg-black border border-secondary text-center mb-3">
+                            <div class="text-secondary small mb-1">Система логических функций:</div>
+                            <div id="p5-formula-display" class="text-warning fw-bold fs-5">F₁ = A ∨ ¬B,  F₂ = B ∧ C</div>
+                        </div>
+                        <div class="p-3 bg-dark border border-secondary mb-3">
+                            <div id="p5-question-text" class="text-light fs-6">
+                                Сколько наборов переменных (A, B, C) удовлетворяют условию: F₁ = 1 И F₂ = 0?
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column align-items-center justify-content-center gap-3 my-4">
+                        <div class="w-100 d-flex flex-column align-items-center">
+                            <label for="p5-input" class="text-secondary small mb-1">Количество удовлетворяющих наборов (от 0 до 8):</label>
+                            <input type="number" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 fs-4 text-center font-monospace" placeholder="0..8" min="0" max="8" style="max-width: 320px; min-height: 48px;" autocomplete="off">
+                        </div>
+                        <button id="p5-verify-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 py-2" style="min-height: 48px;">
+                            ЗАВЕРШИТЬ УРОВЕНЬ 2 ✓
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ЭКРАН ТРИУМФА ================= -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="display-5 text-warning fw-bold mb-3">✓ УРОВЕНЬ 2 ВЫПОЛНЕН</div>
+                    <p class="fs-5 text-light mb-2">
+                        Аналитический расчет таблиц истинности успешно завершен.
+                    </p>
+                    <p class="text-secondary mb-4">
+                        Пройдена полная калибровка сложности Sawtooth 2-1-2: прямой расчет, вес функции, дешифровка столбцов, инварианты и системный синтез.
+                    </p>
+                    <div class="p-3 bg-black border border-warning d-inline-block text-start mb-4 font-monospace">
+                        <div class="text-warning mb-1">СВОДНЫЙ ОТЧЕТ ТЕЛЕМЕТРИИ:</div>
+                        <div class="text-light small">Статус: <span class="text-warning fw-bold">LEVEL_COMPLETE</span></div>
+                        <div class="text-light small">Зафиксировано попыток / перекалибровок: <span id="final-attempts" class="text-warning fw-bold">0</span></div>
+                        <div class="text-light small">Общее время сессии: <span id="final-time" class="text-info fw-bold">0</span> сек.</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+        const missionName = 'Урок 10 :: Таблицы истинности (Уровень 2)';
+        const startTime = Date.now();
+        let attempts = 0;
+        let isLocked = false;
+        let currentPhase = 1;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: success
+            }, '*');
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function setPhaseHeader(stepNum, title) {
+            document.getElementById('phase-badge').textContent = `Шаг ${stepNum} из 5`;
+            document.getElementById('phase-title').textContent = title;
+        }
+
+        function triggerErrorAndRegenerate(message, regenerateFn) {
+            if (isLocked) return;
+            isLocked = true;
+            attempts++;
+            document.getElementById('attempts-display').textContent = String(attempts);
+            sendTelemetry('hardcore_reset', false);
+
+            const fb = document.getElementById('feedback-box');
+            document.getElementById('feedback-text').textContent = message;
+            fb.classList.remove('d-none');
+
+            setTimeout(() => {
+                fb.classList.add('d-none');
+                isLocked = false;
+                regenerateFn();
+            }, 1300);
+        }
+
+        // =========================================================================
+        // ФАЗА 1: РАСЧЕТ РАЗМЕРНОСТИ ТАБЛИЦЫ (CCS = 4)
+        // =========================================================================
+        function initPhase1() {
+            const nVariants = [
+                {
+                    n: 3,
+                    formula: 'F = ¬(A ∧ B) ∨ (B ∧ ¬C)',
+                    varsList: 'A, B, C'
+                },
+                {
+                    n: 4,
+                    formula: 'F = (A ∧ ¬B) ∨ (C ∧ ¬D)',
+                    varsList: 'A, B, C, D'
+                },
+                {
+                    n: 5,
+                    formula: 'F = (A ∨ ¬B) ∧ (C ∨ D) ∧ ¬E',
+                    varsList: 'A, B, C, D, E'
+                },
+                {
+                    n: 6,
+                    formula: 'F = (A ∧ B ∧ ¬C) ∨ (D ∧ E ∧ ¬K)',
+                    varsList: 'A, B, C, D, E, K'
+                }
+            ];
+
+            const chosen = nVariants[rnd(0, nVariants.length - 1)];
+            const isHeaderIncluded = rnd(0, 1) === 1;
+
+            document.getElementById('p1-formula-display').textContent = chosen.formula;
+
+            let expectedVal = Math.pow(2, chosen.n);
+            let qText = '';
+
+            if (isHeaderIncluded) {
+                expectedVal += 1;
+                qText = `Сколько ВСЕГО строк (включая 1 строку заголовка с именами столбцов) будет содержать полная таблица истинности данного выражения с ${chosen.n} переменными (${chosen.varsList})?`;
+            } else {
+                qText = `Сколько информационных строк (наборов входных переменных) содержит таблица истинности данного выражения с ${chosen.n} переменными (${chosen.varsList})?`;
+            }
+
+            document.getElementById('p1-question-text').textContent = qText;
+            const input = document.getElementById('p1-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(expectedVal));
+            input.focus();
+        }
+
+        function checkPhase1() {
+            if (isLocked) return;
+            const input = document.getElementById('p1-input');
+            const userVal = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (userVal === expected && userVal !== '') {
+                document.getElementById('phase1').classList.add('d-none');
+                document.getElementById('phase2').classList.remove('d-none');
+                setPhaseHeader(2, 'Аналитический вес функции (Количество единиц в таблице)');
+                currentPhase = 2;
+                sendTelemetry('in_progress', false);
+                initPhase2();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверный расчет количества строк! Формула числа информационных строк N = 2ⁿ, где n — количество различных переменных.',
+                    initPhase1
+                );
+            }
+        }
+
+        document.getElementById('p1-verify-btn').addEventListener('click', checkPhase1);
+        document.getElementById('p1-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase1();
+        });
+
+        // =========================================================================
+        // ФАЗА 2: АНАЛИТИЧЕСКИЙ ВЕС ФУНКЦИИ (CCS = 6)
+        // =========================================================================
+        const p2Variants = [
+            {
+                formula: 'F = (A ∧ B) ∨ C',
+                // C=1 дает 4 набора; A=1,B=1,C=0 дает еще 1 набор -> итого 5
+                fn: (a, b, c) => ((a && b) || c) ? 1 : 0
+            },
+            {
+                formula: 'F = (A ∨ B) ∧ ¬C',
+                // C=0 (4 набора), из них A||B=1 в 3 наборах -> итого 3
+                fn: (a, b, c) => ((a || b) && !c) ? 1 : 0
+            },
+            {
+                formula: 'F = ¬A ∧ (B ∨ C)',
+                // A=0 (4 набора), из них B||C=1 в 3 наборах -> итого 3
+                fn: (a, b, c) => (!a && (b || c)) ? 1 : 0
+            },
+            {
+                formula: 'F = (A ∧ ¬B) ∨ (¬A ∧ B)',
+                // A != B (2 набора по A,B) * 2 по C -> итого 4
+                fn: (a, b, c) => ((a && !b) || (!a && b)) ? 1 : 0
+            },
+            {
+                formula: 'F = ¬(A ∨ B) ∨ (A ∧ C)',
+                // A=0,B=0 (2 набора: 000, 001); A=1,C=1 (2 набора: 101, 111) -> итого 4
+                fn: (a, b, c) => (!(a || b) || (a && c)) ? 1 : 0
+            },
+            {
+                formula: 'F = (A ∧ B) ∨ (B ∧ C)',
+                // B=1 обязательно (4 набора); A||C=1 -> 3 набора (011, 110, 111) -> итого 3
+                fn: (a, b, c) => ((a && b) || (b && c)) ? 1 : 0
+            },
+            {
+                formula: 'F = ¬(A ∧ B ∧ C)',
+                // Ложно только при 111 -> итого 7 единиц
+                fn: (a, b, c) => (!(a && b && c)) ? 1 : 0
+            },
+            {
+                formula: 'F = A ∧ ¬B ∧ ¬C',
+                // Истинно только при 100 -> итого 1 единица
+                fn: (a, b, c) => (a && !b && !c) ? 1 : 0
+            }
+        ];
+
+        function initPhase2() {
+            const chosen = p2Variants[rnd(0, p2Variants.length - 1)];
+            document.getElementById('p2-formula-display').textContent = chosen.formula;
+
+            let onesCount = 0;
+            for (let a = 0; a <= 1; a++) {
+                for (let b = 0; b <= 1; b++) {
+                    for (let c = 0; c <= 1; c++) {
+                        if (chosen.fn(a, b, c) === 1) onesCount++;
+                    }
+                }
+            }
+
+            const input = document.getElementById('p2-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(onesCount));
+            input.focus();
+        }
+
+        function checkPhase2() {
+            if (isLocked) return;
+            const input = document.getElementById('p2-input');
+            const userVal = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (userVal === expected && userVal !== '') {
+                document.getElementById('phase2').classList.add('d-none');
+                document.getElementById('phase3').classList.remove('d-none');
+                setPhaseHeader(3, 'Пик инверсии: Дешифровка перемешанных столбцов таблицы');
+                currentPhase = 3;
+                sendTelemetry('in_progress', false);
+                initPhase3();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверный подсчет единиц! Постройте 8 строк таблицы (000..111) и вычислите значение функции по действиям.',
+                    initPhase2
+                );
+            }
+        }
+
+        document.getElementById('p2-verify-btn').addEventListener('click', checkPhase2);
+        document.getElementById('p2-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase2();
+        });
+
+        // =========================================================================
+        // ФАЗА 3: ПИК 1 — ДЕШИФРОВКА СТОЛБЦОВ ТАБЛИЦЫ (CCS = 7-8)
+        // =========================================================================
+        const p3Scenarios = [
+            {
+                formula: 'F = (x ∧ ¬y) ∨ z',
+                fn: (x, y, z) => ((x && !y) || z) ? 1 : 0,
+                targetOrder: 'zyx',
+                columns: ['z', 'y', 'x'],
+                rows: [
+                    { x: 0, y: 1, z: 0 },
+                    { x: 1, y: 0, z: 0 },
+                    { x: 0, y: 0, z: 1 }
+                ]
+            },
+            {
+                formula: 'F = (¬x ∨ y) ∧ z',
+                fn: (x, y, z) => ((!x || y) && z) ? 1 : 0,
+                targetOrder: 'yxz',
+                columns: ['y', 'x', 'z'],
+                rows: [
+                    { x: 1, y: 0, z: 1 },
+                    { x: 0, y: 0, z: 1 },
+                    { x: 1, y: 0, z: 0 }
+                ]
+            },
+            {
+                formula: 'F = (x ∨ y) ∧ ¬z',
+                fn: (x, y, z) => ((x || y) && !z) ? 1 : 0,
+                targetOrder: 'zxy',
+                columns: ['z', 'x', 'y'],
+                rows: [
+                    { x: 1, y: 0, z: 0 },
+                    { x: 0, y: 1, z: 0 },
+                    { x: 1, y: 1, z: 1 }
+                ]
+            },
+            {
+                formula: 'F = ¬x ∧ (y ∨ ¬z)',
+                fn: (x, y, z) => (!x && (y || !z)) ? 1 : 0,
+                targetOrder: 'xzy',
+                columns: ['x', 'z', 'y'],
+                rows: [
+                    { x: 0, y: 1, z: 1 },
+                    { x: 1, y: 1, z: 0 },
+                    { x: 0, y: 0, z: 1 }
+                ]
+            },
+            {
+                formula: 'F = ¬(x ∧ y) ∧ z',
+                fn: (x, y, z) => (!(x && y) && z) ? 1 : 0,
+                targetOrder: 'yzx',
+                columns: ['y', 'z', 'x'],
+                rows: [
+                    { x: 1, y: 1, z: 1 },
+                    { x: 0, y: 1, z: 1 },
+                    { x: 1, y: 1, z: 0 }
+                ]
+            }
+        ];
+
+        function initPhase3() {
+            const chosen = p3Scenarios[rnd(0, p3Scenarios.length - 1)];
+            document.getElementById('p3-formula-display').textContent = chosen.formula;
+
+            const tbody = document.getElementById('p3-table-body');
+            tbody.innerHTML = '';
+
+            chosen.rows.forEach(r => {
+                const tr = document.createElement('tr');
+                const rowObj = { x: r.x, y: r.y, z: r.z };
+                const c0 = rowObj[chosen.columns[0]];
+                const c1 = rowObj[chosen.columns[1]];
+                const c2 = rowObj[chosen.columns[2]];
+                const res = chosen.fn(r.x, r.y, r.z);
+
+                tr.innerHTML = `
+                    <td class="bg-black text-light fw-bold">${c0}</td>
+                    <td class="bg-black text-light fw-bold">${c1}</td>
+                    <td class="bg-black text-light fw-bold">${c2}</td>
+                    <td class="bg-dark text-success fw-bold border border-success">${res}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const input = document.getElementById('p3-input');
+            input.value = '';
+            input.setAttribute('data-expected', chosen.targetOrder);
+            input.focus();
+        }
+
+        function checkPhase3() {
+            if (isLocked) return;
+            const input = document.getElementById('p3-input');
+            const userVal = input.value.trim().toLowerCase().replace(/[\s,;-]/g, '');
+            const expected = input.getAttribute('data-expected').toLowerCase();
+
+            if (userVal === expected && userVal !== '') {
+                document.getElementById('phase3').classList.add('d-none');
+                document.getElementById('phase4').classList.remove('d-none');
+                setPhaseHeader(4, 'Долина консолидации: Инварианты законов логики и инверсии');
+                currentPhase = 4;
+                sendTelemetry('in_progress', false);
+                initPhase4();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверное сопоставление столбцов! Проанализируйте строки таблицы, подставляя гипотезы распределения переменных.',
+                    initPhase3
+                );
+            }
+        }
+
+        document.getElementById('p3-verify-btn').addEventListener('click', checkPhase3);
+        document.getElementById('p3-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase3();
+        });
+
+        // =========================================================================
+        // ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ — КОНЦЕПТУАЛЬНЫЙ ИНВАРИАНТ (CCS = 5-6)
+        // =========================================================================
+        function initPhase4() {
+            const types = ['inversion', 'tautology', 'contradiction', 'double_neg'];
+            const chosenType = types[rnd(0, types.length - 1)];
+
+            let condText = '';
+            let qText = '';
+            let expectedVal = 0;
+
+            if (chosenType === 'inversion') {
+                const k = rnd(2, 6);
+                condText = `Таблица истинности логической функции F от 3 переменных содержит 8 строк. В ее итоговом столбце ровно ${k} единиц [ 1 ].`;
+                qText = `Сколько единиц [ 1 ] будет содержать итоговый столбец таблицы истинности для функции ¬F (инверсии функции F)?`;
+                expectedVal = 8 - k;
+            } else if (chosenType === 'tautology') {
+                const n = rnd(3, 5);
+                const totalRows = Math.pow(2, n);
+                condText = `Функция F от ${n} переменных тождественно истинна: F ≡ 1 (является тавтологией, законом логики). Ее таблица содержит ${totalRows} строк.`;
+                qText = `Сколько строк со значением [ 0 ] (ложь) содержит таблица истинности этой функции?`;
+                expectedVal = 0;
+            } else if (chosenType === 'contradiction') {
+                const n = rnd(3, 5);
+                const totalRows = Math.pow(2, n);
+                condText = `Функция F от ${n} переменных тождественно ложна: F ≡ 0 (является логическим противоречием). Ее таблица содержит ${totalRows} строк.`;
+                qText = `Сколько строк со значением [ 1 ] (истина) содержит полная таблица истинности этой функции?`;
+                expectedVal = 0;
+            } else {
+                const m = rnd(3, 12);
+                condText = `Таблица истинности функции F от 4 переменных содержит 16 строк, из которых ровно в ${m} строках результат равен 0.`;
+                qText = `Сколько нулей [ 0 ] содержит таблица истинности для функции двойного отрицания ¬(¬F)?`;
+                expectedVal = m;
+            }
+
+            document.getElementById('p4-condition-display').textContent = condText;
+            document.getElementById('p4-question-text').textContent = qText;
+
+            const input = document.getElementById('p4-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(expectedVal));
+            input.focus();
+        }
+
+        function checkPhase4() {
+            if (isLocked) return;
+            const input = document.getElementById('p4-input');
+            const userVal = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (userVal === expected && userVal !== '') {
+                document.getElementById('phase4').classList.add('d-none');
+                document.getElementById('phase5').classList.remove('d-none');
+                setPhaseHeader(5, 'Кульминационный пик: Анализ системы логических функций');
+                currentPhase = 5;
+                sendTelemetry('in_progress', false);
+                initPhase5();
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверный инвариантный расчет! Вспомните: тавтология истинна всегда, противоречие ложно всегда, а инверсия обращает все биты.',
+                    initPhase4
+                );
+            }
+        }
+
+        document.getElementById('p4-verify-btn').addEventListener('click', checkPhase4);
+        document.getElementById('p4-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase4();
+        });
+
+        // =========================================================================
+        // ФАЗА 5: КУЛЬМИНАЦИОННЫЙ ПИК (CCS = 8-9)
+        // =========================================================================
+        const p5Scenarios = [
+            {
+                formula: 'F₁ = A ∨ ¬B,   F₂ = B ∧ C',
+                question: 'Сколько наборов переменных (A, B, C) удовлетворяют условию: F₁ = 1 И F₂ = 0?',
+                evalFn: (a, b, c) => {
+                    const f1 = (a || !b) ? 1 : 0;
+                    const f2 = (b && c) ? 1 : 0;
+                    return (f1 === 1 && f2 === 0);
+                }
+            },
+            {
+                formula: 'F₁ = ¬A ∨ B,   F₂ = A ∧ ¬C',
+                question: 'Сколько наборов переменных (A, B, C) удовлетворяют условию: F₁ = 1 И F₂ = 0?',
+                evalFn: (a, b, c) => {
+                    const f1 = (!a || b) ? 1 : 0;
+                    const f2 = (a && !c) ? 1 : 0;
+                    return (f1 === 1 && f2 === 0);
+                }
+            },
+            {
+                formula: 'F = (A ∧ ¬B) ∨ (B ∧ ¬C)',
+                question: 'Сколько наборов (A, B, C) дают F = 1 при дополнительном условии, что A + B + C ≥ 2?',
+                evalFn: (a, b, c) => {
+                    const f = ((a && !b) || (b && !c)) ? 1 : 0;
+                    const boundary = (a + b + c >= 2);
+                    return (f === 1 && boundary);
+                }
+            },
+            {
+                formula: 'F = ¬(A ∧ B) ∧ (B ∨ C)',
+                question: 'Сколько наборов (A, B, C) дают F = 1 при условии, что переменная A = 0?',
+                evalFn: (a, b, c) => {
+                    const f = (!(a && b) && (b || c)) ? 1 : 0;
+                    return (f === 1 && a === 0);
+                }
+            },
+            {
+                formula: 'F₁ = A ∧ (B ∨ ¬C),   F₂ = ¬A ∧ B',
+                question: 'Сколько наборов переменных (A, B, C) удовлетворяют условию: F₁ = 1 ИЛИ F₂ = 1?',
+                evalFn: (a, b, c) => {
+                    const f1 = (a && (b || !c)) ? 1 : 0;
+                    const f2 = (!a && b) ? 1 : 0;
+                    return (f1 === 1 || f2 === 1);
+                }
+            }
+        ];
+
+        function initPhase5() {
+            const chosen = p5Scenarios[rnd(0, p5Scenarios.length - 1)];
+            document.getElementById('p5-formula-display').textContent = chosen.formula;
+            document.getElementById('p5-question-text').textContent = chosen.question;
+
+            let satisfyingCount = 0;
+            for (let a = 0; a <= 1; a++) {
+                for (let b = 0; b <= 1; b++) {
+                    for (let c = 0; c <= 1; c++) {
+                        if (chosen.evalFn(a, b, c)) satisfyingCount++;
+                    }
+                }
+            }
+
+            const input = document.getElementById('p5-input');
+            input.value = '';
+            input.setAttribute('data-expected', String(satisfyingCount));
+            input.focus();
+        }
+
+        function checkPhase5() {
+            if (isLocked) return;
+            const input = document.getElementById('p5-input');
+            const userVal = input.value.trim();
+            const expected = input.getAttribute('data-expected');
+
+            if (userVal === expected && userVal !== '') {
+                const finalTimeSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+                document.getElementById('final-attempts').textContent = String(attempts);
+                document.getElementById('final-time').textContent = String(finalTimeSec);
+
+                document.getElementById('phase5').classList.add('d-none');
+                document.getElementById('victory-screen').classList.remove('d-none');
+                document.getElementById('phase-badge').className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
+                document.getElementById('phase-badge').textContent = 'Успешно завершено';
+                document.getElementById('phase-title').textContent = 'Все 5 этапов аналитического тренажера пройдены!';
+
+                sendTelemetry('level_complete', true);
+            } else {
+                triggerErrorAndRegenerate(
+                    'Неверный подсчет совместных наборов! Проверьте истинность условий F₁ и F₂ для каждого из 8 возможных наборов.',
+                    initPhase5
+                );
+            }
+        }
+
+        document.getElementById('p5-verify-btn').addEventListener('click', checkPhase5);
+        document.getElementById('p5-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkPhase5();
+        });
+
+        // =========================================================================
+        // СТАРТ ТРЕНАЖЕРА
+        // =========================================================================
+        initPhase1();
+        sendTelemetry('in_progress', false);
+    </script>
+</TaskLayout>
