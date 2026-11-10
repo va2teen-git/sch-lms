@@ -1,0 +1,858 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Измерительные контуры информации (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляции мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация систем событий по формуле Хартли</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-light">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Описание задания -->
+                <p id="phase-desc" class="text-light mb-3">
+                    Используя мышь, <strong>распределите карточки систем событий по трем целевым накопителям</strong> в соответствии с количеством информации <code>i</code> (в битах), вычисленным по формуле Хартли <code>N = 2<sup>i</sup></code>. Внимание: в пуле может присутствовать посторонний дистрактор!
+                </p>
+
+                <!-- Окно системных уведомлений / ошибок -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[СБОЙ СИНТЕЗА] <span id="feedback-text">Ошибка распределения информационных объемов!</span> Генерация нового пакета...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: КЛАССИФИКАЦИЯ ХАРТЛИ (DRAG-TO-BIN) -->
+                <!-- ========================================== -->
+                <div id="phase1-container" class="phase-section">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">НЕРАСПРЕДЕЛЕННЫЕ КАРТОЧКИ (ПЕРЕТАЩИТЕ ИЛИ КЛИКНИТЕ ДЛЯ ВЫБОРА):</span>
+                            <button id="p1-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в пул
+                            </button>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-2 border border-secondary bg-dark" style="min-height: 80px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Бакет 1: i = 2 бита (N = 4) -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-success rounded-0 h-100 target-bucket" data-category="2bit" id="bucket-2bit">
+                                <div class="card-header bg-dark border-bottom border-success text-success d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">1. ЕМКОСТЬ: i = 2 бита</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Количество исходов: <code>N = 2<sup>2</sup> = 4</code> (четыре равновероятных состояния).</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-success bg-dark d-flex flex-column gap-2" style="min-height: 140px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 2: i = 3 бита (N = 8) -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-warning rounded-0 h-100 target-bucket" data-category="3bit" id="bucket-3bit">
+                                <div class="card-header bg-dark border-bottom border-warning text-warning d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">2. ЕМКОСТЬ: i = 3 бита</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Количество исходов: <code>N = 2<sup>3</sup> = 8</code> (восемь равновероятных состояний).</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-warning bg-dark d-flex flex-column gap-2" style="min-height: 140px;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бакет 3: i = 4 бита (N = 16) -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border-info rounded-0 h-100 target-bucket" data-category="4bit" id="bucket-4bit">
+                                <div class="card-header bg-dark border-bottom border-info text-info d-flex justify-content-between align-items-center py-2">
+                                    <span class="fw-bold">3. ЕМКОСТЬ: i = 4 бита</span>
+                                    <span class="badge border border-info text-info bg-black rounded-0 count-badge">0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column">
+                                    <p class="text-secondary small mb-2">Количество исходов: <code>N = 2<sup>4</sup> = 16</code> (шестнадцать равновероятных состояний).</p>
+                                    <div class="bucket-slot flex-grow-1 p-2 border border-info bg-dark d-flex flex-column gap-2" style="min-height: 140px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-submit-btn" class="btn btn-success rounded-0 px-4 fw-bold" disabled>
+                            Проверить распределение
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: СЛОТ-ПАЗЛ КОДИРОВАНИЯ АЛФАВИТОВ -->
+                <!-- ========================================== -->
+                <div id="phase2-container" class="phase-section d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ПАЛИТРА БИТОВЫХ ТОКЕНОВ (ПЕРЕТАЩИТЕ В ЦЕЛЕВЫЕ СЛОТЫ МОЩНОСТИ):</span>
+                            <button id="p2-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить токены
+                            </button>
+                        </div>
+                        <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2 p-2 border border-secondary bg-dark" style="min-height: 60px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Контур А -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border-success rounded-0 p-3 h-100">
+                                <div class="text-success fw-bold mb-1" id="p2-channel-a-name">Канал А: Спектральный сенсор</div>
+                                <div class="text-secondary small mb-3" id="p2-channel-a-desc">Мощность множества состояний: N = 26 градаций</div>
+                                
+                                <div class="bg-dark p-3 border border-secondary mb-2">
+                                    <div class="text-light small mb-2">Ближайшая покрывающая степень двойки <code>2<sup>i</sup> ≥ N</code>:</div>
+                                    <div class="slot-target p-2 border border-dashed border-success text-center text-success" data-slot="p2-a-power" id="slot-p2-a-power" style="min-height: 48px;">
+                                        [Поместите токен степени 2<sup>i</sup>]
+                                    </div>
+                                </div>
+
+                                <div class="bg-dark p-3 border border-secondary">
+                                    <div class="text-light small mb-2">Минимальная разрядность кода <code>i</code>:</div>
+                                    <div class="slot-target p-2 border border-dashed border-success text-center text-success" data-slot="p2-a-bits" id="slot-p2-a-bits" style="min-height: 48px;">
+                                        [Поместите токен битности i]
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Контур Б -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border-warning rounded-0 p-3 h-100">
+                                <div class="text-warning fw-bold mb-1" id="p2-channel-b-name">Канал Б: Телеграфный терминал</div>
+                                <div class="text-secondary small mb-3" id="p2-channel-b-desc">Мощность множества состояний: N = 58 символов</div>
+                                
+                                <div class="bg-dark p-3 border border-secondary mb-2">
+                                    <div class="text-light small mb-2">Ближайшая покрывающая степень двойки <code>2<sup>i</sup> ≥ N</code>:</div>
+                                    <div class="slot-target p-2 border border-dashed border-warning text-center text-warning" data-slot="p2-b-power" id="slot-p2-b-power" style="min-height: 48px;">
+                                        [Поместите токен степени 2<sup>i</sup>]
+                                    </div>
+                                </div>
+
+                                <div class="bg-dark p-3 border border-secondary">
+                                    <div class="text-light small mb-2">Минимальная разрядность кода <code>i</code>:</div>
+                                    <div class="slot-target p-2 border border-dashed border-warning text-center text-warning" data-slot="p2-b-bits" id="slot-p2-b-bits" style="min-height: 48px;">
+                                        [Поместите токен битности i]
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-submit-btn" class="btn btn-success rounded-0 px-4 fw-bold" disabled>
+                            Зафиксировать разрядность каналов
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: КОНВЕЙЕР ОБЪЕМА ДАННЫХ I = K × i -->
+                <!-- ========================================== -->
+                <div id="phase3-container" class="phase-section d-none">
+                    <div class="card bg-black border-info rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-info fw-bold" id="p3-scenario-title">Синтез информационного пакета</span>
+                            <span class="badge border border-info text-info bg-dark rounded-0" id="p3-scenario-badge">Кодировка ASCII</span>
+                        </div>
+                        <p class="text-light small mb-0" id="p3-scenario-text">
+                            Текстовый лог содержит ровно <strong>256 символов</strong> (включая пробелы и знаки пунктуации). Символы закодированы в алфавите мощностью <strong>16 символов</strong> (hex-код). Рассчитайте и сконструируйте полный конвейер вычисления объема <code>I = K × i</code> и перевода в байты.
+                        </p>
+                    </div>
+
+                    <!-- Палитра конвейера -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">ПАЛИТРА ПАРАМЕТРОВ (ПЕРЕТАЩИТЕ В СЛОТЫ КОНВЕЙЕРА, ИЗБЕГАЯ ДИСТРАКТОРОВ):</span>
+                            <button id="p3-reset-pool-btn" class="btn btn-sm btn-outline-secondary rounded-0 text-secondary">
+                                Сбросить в палитру
+                            </button>
+                        </div>
+                        <div id="p3-tokens-pool" class="d-flex flex-wrap gap-2 p-2 border border-secondary bg-dark" style="min-height: 60px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Архитектура конвейера вычисления -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-4">
+                        <div class="text-secondary small mb-3">АРХИТЕКТУРА ИЗМЕРИТЕЛЬНОГО КОНВЕЙЕРА:</div>
+                        <div class="d-flex flex-wrap align-items-center justify-content-center gap-2 text-light fs-5 py-3">
+                            <div class="text-center">
+                                <div class="small text-secondary mb-1">Длина K (знаков)</div>
+                                <div class="slot-target border border-dashed border-success p-2 text-center text-success bg-dark" data-slot="p3-k" id="slot-p3-k" style="min-width: 130px; min-height: 48px;">
+                                    [Слот K]
+                                </div>
+                            </div>
+
+                            <span class="fw-bold text-success">×</span>
+
+                            <div class="text-center">
+                                <div class="small text-secondary mb-1">Вес символа i (бит)</div>
+                                <div class="slot-target border border-dashed border-success p-2 text-center text-success bg-dark" data-slot="p3-i" id="slot-p3-i" style="min-width: 130px; min-height: 48px;">
+                                    [Слот i]
+                                </div>
+                            </div>
+
+                            <span class="fw-bold text-success">=</span>
+
+                            <div class="text-center">
+                                <div class="small text-secondary mb-1">Общий объем (бит)</div>
+                                <div class="slot-target border border-dashed border-info p-2 text-center text-info bg-dark" data-slot="p3-bits" id="slot-p3-bits" style="min-width: 140px; min-height: 48px;">
+                                    [Слот бит]
+                                </div>
+                            </div>
+
+                            <span class="fw-bold text-secondary">÷</span>
+
+                            <div class="text-center">
+                                <div class="small text-secondary mb-1">Делитель байта</div>
+                                <div class="slot-target border border-dashed border-secondary p-2 text-center text-light bg-dark" data-slot="p3-div" id="slot-p3-div" style="min-width: 110px; min-height: 48px;">
+                                    [Слот : 8]
+                                </div>
+                            </div>
+
+                            <span class="fw-bold text-success">=</span>
+
+                            <div class="text-center">
+                                <div class="small text-secondary mb-1">Итог (байты)</div>
+                                <div class="slot-target border border-dashed border-warning p-2 text-center text-warning bg-dark" data-slot="p3-bytes" id="slot-p3-bytes" style="min-width: 130px; min-height: 48px;">
+                                    [Слот байт]
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-submit-btn" class="btn btn-success rounded-0 px-4 fw-bold" disabled>
+                            Проверить конвейер расчета
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="mb-4">
+                        <span class="display-3 text-success">✓</span>
+                        <h3 class="h3 text-success mt-2">АТТЕСТАЦИЯ УРОВНЯ 1 УСПЕШНО ПРОЙДЕНА!</h3>
+                        <p class="text-light">
+                            Все измерительные контуры информации (Хартли, мощность алфавита, объем в байтах) откалиброваны корректно.
+                        </p>
+                    </div>
+                    <div class="card bg-black border-success d-inline-block p-4 mb-4 text-start font-monospace">
+                        <div class="text-secondary small mb-1">РЕЗУЛЬТАТЫ ПРОХОЖДЕНИЯ:</div>
+                        <div class="text-light">Затраченное время: <span id="final-time" class="text-success fw-bold">00:00</span></div>
+                        <div class="text-light">Использовано попыток: <span id="final-attempts" class="text-warning fw-bold">1</span></div>
+                        <div class="text-light">Статус телеметрии: <span class="text-success fw-bold">LEVEL_COMPLETE // 100% MASTERY</span></div>
+                    </div>
+                    <div>
+                        <button id="restart-level-btn" class="btn btn-outline-success rounded-0 px-4">
+                            Пройти уровень повторно
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+        const startTime = Date.now();
+        let attempts = 0;
+        let currentPhase = 1;
+        let selectedItem = null;
+
+        // Таймер
+        const timerDisplay = document.getElementById('timer-display');
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
+        }, 1000);
+
+        // Телеметрия
+        function sendTelemetry(actionType, isSuccess) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 8 :: Подходы к измерению информации (Уровень 1)',
+                action_type: actionType,
+                status: isSuccess ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: isSuccess
+            }, '*');
+        }
+
+        sendTelemetry('in_progress', false);
+
+        // Уведомление об ошибке
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+        const attemptsDisplay = document.getElementById('attempts-display');
+
+        function triggerError(msg, callback) {
+            attempts++;
+            if (attemptsDisplay) attemptsDisplay.textContent = attempts;
+            if (feedbackText) feedbackText.textContent = msg;
+            if (feedbackBox) feedbackBox.classList.remove('d-none');
+            sendTelemetry('hardcore_reset', false);
+
+            setTimeout(() => {
+                if (feedbackBox) feedbackBox.classList.add('d-none');
+                if (callback) callback();
+            }, 1200);
+        }
+
+        // ==========================================
+        // УНИВЕРСАЛЬНЫЙ СЛУШАТЕЛЬ DRAG & CLICK
+        // ==========================================
+        function makeCardDraggableAndClickable(el, getParentPool) {
+            el.setAttribute('draggable', 'true');
+
+            el.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', el.id);
+                el.classList.add('opacity-50');
+            });
+
+            el.addEventListener('dragend', () => {
+                el.classList.remove('opacity-50');
+            });
+
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedItem === el) {
+                    el.classList.remove('border-warning', 'border-2');
+                    selectedItem = null;
+                } else {
+                    if (selectedItem) {
+                        selectedItem.classList.remove('border-warning', 'border-2');
+                    }
+                    selectedItem = el;
+                    el.classList.add('border-warning', 'border-2');
+                }
+            });
+        }
+
+        // ==========================================
+        // ЛОГИКА ФАЗЫ 1: КЛАССИФИКАЦИЯ (DRAG-TO-BIN)
+        // ==========================================
+        const P1_GENERATOR = {
+            cardSets: [
+                [
+                    { id: 'c1', text: 'Стороны горизонта (С, Ю, З, В)', category: '2bit' },
+                    { id: 'c2', text: 'Времена года (Зима, Весна, Лето, Осень)', category: '2bit' },
+                    { id: 'c3', text: 'Игральный кубик-октаэдр (8 граней)', category: '3bit' },
+                    { id: 'c4', text: 'Восьмеричный разряд (цифры 0..7)', category: '3bit' },
+                    { id: 'c5', text: 'Шестнадцатеричный разряд (0..F)', category: '4bit' },
+                    { id: 'c6', text: 'Порты 16-портового свитча (1..16)', category: '4bit' },
+                    { id: 'c_dist', text: 'Подбрасывание монеты (орел / решка)', category: 'distractor' }
+                ],
+                [
+                    { id: 'c1', text: 'Базовые нуклеотиды ДНК (A, C, G, T)', category: '2bit' },
+                    { id: 'c2', text: 'Квадранты координатной плоскости (I..IV)', category: '2bit' },
+                    { id: 'c3', text: 'Двоичное слово из 3 разрядов (000..111)', category: '3bit' },
+                    { id: 'c4', text: 'Светофор со стрелками (8 комбинаций)', category: '3bit' },
+                    { id: 'c5', text: 'Цветовая палитра EGA (16 цветов)', category: '4bit' },
+                    { id: 'c6', text: 'Ниббл / полубайт (16 состояний)', category: '4bit' },
+                    { id: 'c_dist', text: 'Колода игральных карт (32 листа)', category: 'distractor' }
+                ]
+            ],
+            generate() {
+                const set = this.cardSets[Math.floor(Math.random() * this.cardSets.length)];
+                return set.slice().sort(() => Math.random() - 0.5);
+            }
+        };
+
+        let p1CurrentCards = [];
+
+        function initPhase1() {
+            const pool = document.getElementById('p1-cards-pool');
+            pool.innerHTML = '';
+            document.querySelectorAll('.target-bucket .bucket-slot').forEach(b => b.innerHTML = '');
+            updateBucketCounters();
+            selectedItem = null;
+
+            p1CurrentCards = P1_GENERATOR.generate();
+
+            p1CurrentCards.forEach(c => {
+                const card = document.createElement('div');
+                card.id = `p1-card-${c.id}`;
+                card.className = 'card bg-black border border-secondary text-light p-2 cursor-pointer user-select-none small';
+                card.dataset.category = c.category;
+                card.dataset.cardId = c.id;
+                card.innerHTML = `<span class="fw-bold">${c.text}</span>`;
+                makeCardDraggableAndClickable(card, pool);
+                pool.appendChild(card);
+            });
+
+            checkP1Readiness();
+        }
+
+        // Бакеты Phase 1
+        document.querySelectorAll('.target-bucket').forEach(bucket => {
+            const slot = bucket.querySelector('.bucket-slot');
+
+            bucket.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                bucket.classList.add('border-white');
+            });
+
+            bucket.addEventListener('dragleave', () => {
+                bucket.classList.remove('border-white');
+            });
+
+            bucket.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bucket.classList.remove('border-white');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const card = document.getElementById(cardId);
+                if (card) {
+                    slot.appendChild(card);
+                    if (selectedItem === card) {
+                        card.classList.remove('border-warning', 'border-2');
+                        selectedItem = null;
+                    }
+                    updateBucketCounters();
+                    checkP1Readiness();
+                }
+            });
+
+            bucket.addEventListener('click', () => {
+                if (selectedItem && selectedItem.parentElement !== slot) {
+                    slot.appendChild(selectedItem);
+                    selectedItem.classList.remove('border-warning', 'border-2');
+                    selectedItem = null;
+                    updateBucketCounters();
+                    checkP1Readiness();
+                }
+            });
+        });
+
+        // Сброс в пул P1
+        document.getElementById('p1-reset-pool-btn').onclick = () => {
+            const pool = document.getElementById('p1-cards-pool');
+            document.querySelectorAll('.target-bucket .bucket-slot div').forEach(card => {
+                pool.appendChild(card);
+            });
+            updateBucketCounters();
+            checkP1Readiness();
+        };
+
+        function updateBucketCounters() {
+            document.querySelectorAll('.target-bucket').forEach(bucket => {
+                const count = bucket.querySelectorAll('.bucket-slot div').length;
+                bucket.querySelector('.count-badge').textContent = count;
+            });
+        }
+
+        function checkP1Readiness() {
+            const totalInBuckets = document.querySelectorAll('.target-bucket .bucket-slot div').length;
+            const submitBtn = document.getElementById('p1-submit-btn');
+            // В бакетах должно быть ровно 6 карточек (1 дистрактор остается в пуле)
+            submitBtn.disabled = (totalInBuckets < 6);
+        }
+
+        document.getElementById('p1-submit-btn').onclick = () => {
+            let hasError = false;
+
+            document.querySelectorAll('.target-bucket').forEach(bucket => {
+                const targetCat = bucket.dataset.category;
+                const cards = bucket.querySelectorAll('.bucket-slot div');
+                cards.forEach(card => {
+                    if (card.dataset.category !== targetCat) {
+                        hasError = true;
+                    }
+                });
+            });
+
+            // Проверяем, что в бакетах нет дистрактора
+            const distInBucket = document.querySelector('.target-bucket .bucket-slot div[data-category="distractor"]');
+            if (distInBucket) hasError = true;
+
+            if (hasError) {
+                triggerError('Неверное сопоставление системы исходов и битовой емкости! Дистрактор должен оставаться в пуле.', () => {
+                    initPhase1();
+                });
+            } else {
+                goToPhase2();
+            }
+        };
+
+        // ==========================================
+        // ЛОГИКА ФАЗЫ 2: СЛОТ-ПАЗЛ (SLOT & SNAP)
+        // ==========================================
+        const P2_CONFIGS = [
+            {
+                chA: { name: 'Канал А: Спектральный сенсор', desc: 'Мощность множества состояний: N = 26 градаций', power: '2⁵ = 32', bits: '5 бит' },
+                chB: { name: 'Канал Б: Телеграфный терминал', desc: 'Мощность множества состояний: N = 58 символов', power: '2⁶ = 64', bits: '6 бит' },
+                tokens: [
+                    { id: 't1', text: '2⁵ = 32', type: 'power', val: '2⁵ = 32' },
+                    { id: 't2', text: '5 бит', type: 'bits', val: '5 бит' },
+                    { id: 't3', text: '2⁶ = 64', type: 'power', val: '2⁶ = 64' },
+                    { id: 't4', text: '6 бит', type: 'bits', val: '6 бит' },
+                    { id: 't_dist1', text: '2⁴ = 16', type: 'power', val: '2⁴ = 16' },
+                    { id: 't_dist2', text: '4 бита', type: 'bits', val: '4 бита' }
+                ]
+            },
+            {
+                chA: { name: 'Канал А: Медицинский томограф', desc: 'Мощность дискретной шкалы: N = 70 срезов', power: '2⁷ = 128', bits: '7 бит' },
+                chB: { name: 'Канал Б: Матрица микролинз', desc: 'Мощность матрицы состояний: N = 12 пикселей', power: '2⁴ = 16', bits: '4 бита' },
+                tokens: [
+                    { id: 't1', text: '2⁷ = 128', type: 'power', val: '2⁷ = 128' },
+                    { id: 't2', text: '7 бит', type: 'bits', val: '7 бит' },
+                    { id: 't3', text: '2⁴ = 16', type: 'power', val: '2⁴ = 16' },
+                    { id: 't4', text: '4 бита', type: 'bits', val: '4 бита' },
+                    { id: 't_dist1', text: '2⁶ = 64', type: 'power', val: '2⁶ = 64' },
+                    { id: 't_dist2', text: '8 бит', type: 'bits', val: '8 бит' }
+                ]
+            }
+        ];
+
+        let p2Current = null;
+
+        function initPhase2() {
+            p2Current = P2_CONFIGS[Math.floor(Math.random() * P2_CONFIGS.length)];
+
+            document.getElementById('p2-channel-a-name').textContent = p2Current.chA.name;
+            document.getElementById('p2-channel-a-desc').textContent = p2Current.chA.desc;
+            document.getElementById('p2-channel-b-name').textContent = p2Current.chB.name;
+            document.getElementById('p2-channel-b-desc').textContent = p2Current.chB.desc;
+
+            const pool = document.getElementById('p2-tokens-pool');
+            pool.innerHTML = '';
+            selectedItem = null;
+
+            document.querySelectorAll('#phase2-container .slot-target').forEach(slot => {
+                slot.innerHTML = slot.dataset.slot.includes('power') ? '[Поместите токен 2<sup>i</sup>]' : '[Поместите токен i бит]';
+                slot.classList.remove('bg-black', 'border-solid');
+            });
+
+            const shuffledTokens = p2Current.tokens.slice().sort(() => Math.random() - 0.5);
+            shuffledTokens.forEach(t => {
+                const token = document.createElement('div');
+                token.id = `p2-token-${t.id}`;
+                token.className = 'badge border border-info bg-black text-info p-2 fs-6 cursor-pointer user-select-none';
+                token.textContent = t.text;
+                token.dataset.val = t.val;
+                token.dataset.type = t.type;
+                makeCardDraggableAndClickable(token, pool);
+                pool.appendChild(token);
+            });
+
+            checkP2Readiness();
+        }
+
+        // Слоты Phase 2
+        document.querySelectorAll('#phase2-container .slot-target').forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('border-white');
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('border-white');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('border-white');
+                const tokenId = e.dataTransfer.getData('text/plain');
+                const token = document.getElementById(tokenId);
+                if (token) {
+                    placeTokenInSlot(token, slot);
+                }
+            });
+
+            slot.addEventListener('click', () => {
+                if (selectedItem) {
+                    placeTokenInSlot(selectedItem, slot);
+                }
+            });
+        });
+
+        function placeTokenInSlot(token, slot) {
+            // Если в слоте уже есть токен, возвращаем его в пул
+            if (slot.querySelector('div, span.badge')) {
+                const old = slot.querySelector('div, span.badge');
+                document.getElementById('p2-tokens-pool').appendChild(old);
+            }
+            slot.innerHTML = '';
+            slot.appendChild(token);
+            if (selectedItem === token) {
+                token.classList.remove('border-warning', 'border-2');
+                selectedItem = null;
+            }
+            checkP2Readiness();
+        }
+
+        document.getElementById('p2-reset-pool-btn').onclick = () => {
+            initPhase2();
+        };
+
+        function checkP2Readiness() {
+            const slots = document.querySelectorAll('#phase2-container .slot-target');
+            let filledCount = 0;
+            slots.forEach(s => {
+                if (s.querySelector('.badge')) filledCount++;
+            });
+            document.getElementById('p2-submit-btn').disabled = (filledCount < 4);
+        }
+
+        document.getElementById('p2-submit-btn').onclick = () => {
+            const slotAPower = document.getElementById('slot-p2-a-power').querySelector('.badge');
+            const slotABits = document.getElementById('slot-p2-a-bits').querySelector('.badge');
+            const slotBPower = document.getElementById('slot-p2-b-power').querySelector('.badge');
+            const slotBBits = document.getElementById('slot-p2-b-bits').querySelector('.badge');
+
+            const okA = (slotAPower && slotAPower.dataset.val === p2Current.chA.power) &&
+                        (slotABits && slotABits.dataset.val === p2Current.chA.bits);
+            const okB = (slotBPower && slotBPower.dataset.val === p2Current.chB.power) &&
+                        (slotBBits && slotBBits.dataset.val === p2Current.chB.bits);
+
+            if (okA && okB) {
+                goToPhase3();
+            } else {
+                triggerError('Ошибка разрядности: помните, что 2^i должно быть НЕ МЕНЬШЕ N (округление вверх)!', () => {
+                    initPhase2();
+                });
+            }
+        };
+
+        // ==========================================
+        // ЛОГИКА ФАЗЫ 3: КОНВЕЙЕР I = K × i
+        // ==========================================
+        const P3_CONFIGS = [
+            {
+                title: 'Пакет сенсорного телеметрического лога',
+                badge: 'Шестнадцатеричный код (N = 16)',
+                desc: 'Текстовый лог содержит ровно 256 символов (включая пробелы и знаки пунктуации). Символы закодированы в алфавите мощностью 16 символов. Рассчитайте и сконструируйте полный конвейер вычисления объема I = K × i и перевода в байты.',
+                k: '256 знаков',
+                i: '4 бита',
+                bits: '1024 бит',
+                div: '÷ 8',
+                bytes: '128 байт',
+                tokens: [
+                    { id: 'pk', text: '256 знаков', val: '256 знаков' },
+                    { id: 'pi', text: '4 бита', val: '4 бита' },
+                    { id: 'pbits', text: '1024 бит', val: '1024 бит' },
+                    { id: 'pdiv', text: '÷ 8', val: '÷ 8' },
+                    { id: 'pbytes', text: '128 байт', val: '128 байт' },
+                    { id: 'd1', text: '8 бит', val: '8 бит' },
+                    { id: 'd2', text: '2048 бит', val: '2048 бит' },
+                    { id: 'd3', text: '÷ 1024', val: '÷ 1024' },
+                    { id: 'd4', text: '256 байт', val: '256 байт' }
+                ]
+            },
+            {
+                title: 'Блок сетевой конфигурации маршрутизатора',
+                badge: 'Однобайтная кодировка (N = 256)',
+                desc: 'Сетевой конфигурационный файл содержит 512 символов алфавита ASCII (N = 256 символов). Сконструируйте конвейер вычисления объема данных в битах и итогового размера в байтах.',
+                k: '512 знаков',
+                i: '8 бит',
+                bits: '4096 бит',
+                div: '÷ 8',
+                bytes: '512 байт',
+                tokens: [
+                    { id: 'pk', text: '512 знаков', val: '512 знаков' },
+                    { id: 'pi', text: '8 бит', val: '8 бит' },
+                    { id: 'pbits', text: '4096 бит', val: '4096 бит' },
+                    { id: 'pdiv', text: '÷ 8', val: '÷ 8' },
+                    { id: 'pbytes', text: '512 байт', val: '512 байт' },
+                    { id: 'd1', text: '16 бит', val: '16 бит' },
+                    { id: 'd2', text: '8192 бит', val: '8192 бит' },
+                    { id: 'd3', text: '÷ 1024', val: '÷ 1024' },
+                    { id: 'd4', text: '64 байта', val: '64 байта' }
+                ]
+            }
+        ];
+
+        let p3Current = null;
+
+        function initPhase3() {
+            p3Current = P3_CONFIGS[Math.floor(Math.random() * P3_CONFIGS.length)];
+
+            document.getElementById('p3-scenario-title').textContent = p3Current.title;
+            document.getElementById('p3-scenario-badge').textContent = p3Current.badge;
+            document.getElementById('p3-scenario-text').textContent = p3Current.desc;
+
+            const pool = document.getElementById('p3-tokens-pool');
+            pool.innerHTML = '';
+            selectedItem = null;
+
+            document.querySelectorAll('#phase3-container .slot-target').forEach(slot => {
+                const sType = slot.dataset.slot;
+                slot.innerHTML = `[${sType}]`;
+            });
+
+            const shuffled = p3Current.tokens.slice().sort(() => Math.random() - 0.5);
+            shuffled.forEach(t => {
+                const token = document.createElement('div');
+                token.id = `p3-token-${t.id}`;
+                token.className = 'badge border border-success bg-black text-light p-2 fs-6 cursor-pointer user-select-none';
+                token.textContent = t.text;
+                token.dataset.val = t.val;
+                makeCardDraggableAndClickable(token, pool);
+                pool.appendChild(token);
+            });
+
+            checkP3Readiness();
+        }
+
+        // Слоты Phase 3
+        document.querySelectorAll('#phase3-container .slot-target').forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('border-white');
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('border-white');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('border-white');
+                const tokenId = e.dataTransfer.getData('text/plain');
+                const token = document.getElementById(tokenId);
+                if (token) {
+                    placeTokenInPipelineSlot(token, slot);
+                }
+            });
+
+            slot.addEventListener('click', () => {
+                if (selectedItem) {
+                    placeTokenInPipelineSlot(selectedItem, slot);
+                }
+            });
+        });
+
+        function placeTokenInPipelineSlot(token, slot) {
+            if (slot.querySelector('.badge')) {
+                const old = slot.querySelector('.badge');
+                document.getElementById('p3-tokens-pool').appendChild(old);
+            }
+            slot.innerHTML = '';
+            slot.appendChild(token);
+            if (selectedItem === token) {
+                token.classList.remove('border-warning', 'border-2');
+                selectedItem = null;
+            }
+            checkP3Readiness();
+        }
+
+        document.getElementById('p3-reset-pool-btn').onclick = () => {
+            initPhase3();
+        };
+
+        function checkP3Readiness() {
+            const slots = document.querySelectorAll('#phase3-container .slot-target');
+            let filledCount = 0;
+            slots.forEach(s => {
+                if (s.querySelector('.badge')) filledCount++;
+            });
+            document.getElementById('p3-submit-btn').disabled = (filledCount < 5);
+        }
+
+        document.getElementById('p3-submit-btn').onclick = () => {
+            const slotK = document.getElementById('slot-p3-k').querySelector('.badge');
+            const slotI = document.getElementById('slot-p3-i').querySelector('.badge');
+            const slotBits = document.getElementById('slot-p3-bits').querySelector('.badge');
+            const slotDiv = document.getElementById('slot-p3-div').querySelector('.badge');
+            const slotBytes = document.getElementById('slot-p3-bytes').querySelector('.badge');
+
+            const ok = (slotK && slotK.dataset.val === p3Current.k) &&
+                       (slotI && slotI.dataset.val === p3Current.i) &&
+                       (slotBits && slotBits.dataset.val === p3Current.bits) &&
+                       (slotDiv && slotDiv.dataset.val === p3Current.div) &&
+                       (slotBytes && slotBytes.dataset.val === p3Current.bytes);
+
+            if (ok) {
+                finishLevel();
+            } else {
+                triggerError('Сбой конвейера: проверьте соотношение бит/байт (1 байт = 8 бит) и информационный вес символа!', () => {
+                    initPhase3();
+                });
+            }
+        };
+
+        // ==========================================
+        // ПЕРЕХОДЫ МЕЖДУ ФАЗАМИ
+        // ==========================================
+        function goToPhase2() {
+            currentPhase = 2;
+            document.getElementById('phase1-container').classList.add('d-none');
+            document.getElementById('phase2-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Слот-пазл покрывающей разрядности алфавитов';
+            document.getElementById('phase-desc').innerHTML = 'Перетащите соответствующие токены покрывающей степени двойки <code>2<sup>i</sup> ≥ N</code> и минимальной разрядности <code>i</code> в гнезда измерительных контуров. Помните: 2 лишних токена являются дистракторами!';
+            initPhase2();
+        }
+
+        function goToPhase3() {
+            currentPhase = 3;
+            document.getElementById('phase2-container').classList.add('d-none');
+            document.getElementById('phase3-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Конструирование измерительного конвейера I = K × i';
+            document.getElementById('phase-desc').innerHTML = 'Соберите непрерывный расчетный конвейер из параметров сообщения: перетащите блоки длины сообщения <code>K</code>, веса символа <code>i</code>, промежуточного объема в битах и итогового размера в байтах в целевые слоты.';
+            initPhase3();
+        }
+
+        function finishLevel() {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
+            const s = String(timeSpent % 60).padStart(2, '0');
+
+            document.getElementById('phase3-container').classList.add('d-none');
+            document.getElementById('phase-badge').classList.replace('bg-success', 'bg-info');
+            document.getElementById('phase-badge').textContent = 'Пройдено';
+            document.getElementById('phase-title').textContent = 'Аттестация Уровня 1 завершена';
+            document.getElementById('phase-desc').classList.add('d-none');
+
+            document.getElementById('victory-screen').classList.remove('d-none');
+            document.getElementById('final-time').textContent = `${m}:${s}`;
+            document.getElementById('final-attempts').textContent = attempts + 1;
+
+            sendTelemetry('level_complete', true);
+
+            document.getElementById('restart-level-btn').onclick = () => {
+                location.reload();
+            };
+        }
+
+        // Старт с 1 фазы
+        initPhase1();
+    });
+</script>
