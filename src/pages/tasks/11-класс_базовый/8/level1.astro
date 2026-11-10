@@ -1,0 +1,909 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container my-4 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Организация личного архива информации (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Шапка и индикаторы текущей фазы -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Сортировка по бакетам: Форматы файлов и алгоритмы сжатия</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках / калибровке -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА АРХИВАЦИИ] <span id="feedback-text">Неверное распределение объектов!</span> Перекалибровка параметров...</span>
+                        <span class="spinner-border spinner-border-sm text-danger" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: СОРТИРОВКА ПО БАКЕТАМ ================= -->
+                <div id="phase-1-container">
+                    <p class="text-light mb-2">
+                        Служба электронного архива принимает цифровые материалы. Распределите файлы по двум целевым хранилищам в зависимости от допустимости потерь при компрессии:
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        <span class="text-info fw-bold">[ПРАВИЛО]:</span> Для юридических документов, баз данных и мастер-сканов необходимо сжатие <strong>БЕЗ ПОТЕРЬ (Lossless)</strong>. Для оперативных промо-материалов и веб-медиа допускается сжатие <strong>С ПОТЕРЯМИ (Lossy)</strong>.
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Корзина Lossless -->
+                        <div class="col-md-6">
+                            <div id="bucket-lossless" class="bucket-zone card bg-black border border-success rounded-0 p-3 h-100" data-bucket-type="lossless">
+                                <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-2 mb-2">
+                                    <h5 class="text-success small fw-bold mb-0">АРХИВ ДОЛГОСРОЧНОГО ХРАНЕНИЯ (БЕЗ ПОТЕРЬ / LOSSLESS)</h5>
+                                    <span class="badge bg-success text-dark rounded-0 count-badge">0 / 2</span>
+                                </div>
+                                <p class="text-secondary small mb-2">100% побитовая точность. PDF/A, TIFF, FLAC, SQL.GZ, PNG.</p>
+                                <div class="bucket-slots d-flex flex-column gap-2 min-vh-25">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Корзина Lossy -->
+                        <div class="col-md-6">
+                            <div id="bucket-lossy" class="bucket-zone card bg-black border border-warning rounded-0 p-3 h-100" data-bucket-type="lossy">
+                                <div class="d-flex justify-content-between align-items-center border-bottom border-warning pb-2 mb-2">
+                                    <h5 class="text-warning small fw-bold mb-0">МУЛЬТИМЕДИЙНЫЙ КЭШ (С ПОТЕРЯМИ / LOSSY)</h5>
+                                    <span class="badge bg-warning text-dark rounded-0 count-badge">0 / 2</span>
+                                </div>
+                                <p class="text-secondary small mb-2">Компактное хранение, необратимое сжатие. JPEG, MP3, MP4, AAC.</p>
+                                <div class="bucket-slots d-flex flex-column gap-2 min-vh-25">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Пул карточек для сортировки -->
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-info small fw-bold">ВХОДЯЩИЙ ПОТОК ОБЪЕКТОВ ДЛЯ АРХИВАЦИИ:</span>
+                            <span class="text-secondary small">Перетащите мышью или кликните по объекту, затем по корзине</span>
+                        </div>
+                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2">
+                            <!-- Процедурно генерируемые карточки -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold" disabled>
+                            ПРОВЕРИТЬ РАСПРЕДЕЛЕНИЕ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: ТОПОЛОГИЯ 3-2-1-1-0 ================= -->
+                <div id="phase-2-container" class="d-none">
+                    <p class="text-light mb-2">
+                        Сконструируйте отказоустойчивую топологию резервного копирования личного архива по регламенту <strong>«3-2-1-1-0»</strong>.
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        Установите соответствующие физические накопители и хранилища в 4 целевых слота архитектуры. Исключите общий режим отказа (Common Mode Failure)!
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Слот 1 -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-1">УЗЕЛ 1: РАБОЧИЙ ОРИГИНАЛ (БЫСТРЫЙ ДОСТУП)</div>
+                                <div class="text-secondary small mb-2">Основная рабочая станция для повседневной работы с документами.</div>
+                                <div class="slot-target border border-dashed border-success p-3 text-center min-h-60 d-flex align-items-center justify-content-center" data-slot="original">
+                                    <span class="placeholder-text text-muted small">[Перетащите токен накопителя]</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Слот 2 -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-1">УЗЕЛ 2: ЛОКАЛЬНЫЙ ДУБЛИКАТ (ИНОЙ ФИЗИЧЕСКИЙ НОСИТЕЛЬ)</div>
+                                <div class="text-secondary small mb-2">Резервное хранилище в локальной сети (исключение одинаковых носителей).</div>
+                                <div class="slot-target border border-dashed border-success p-3 text-center min-h-60 d-flex align-items-center justify-content-center" data-slot="local_backup">
+                                    <span class="placeholder-text text-muted small">[Перетащите токен накопителя]</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Слот 3 -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-1">УЗЕЛ 3: УДАЛЕННЫЙ АРХИВ (OFFSITE REPOSITORY)</div>
+                                <div class="text-secondary small mb-2">Географически удаленное хранилище, защищенное от техногенных катастроф.</div>
+                                <div class="slot-target border border-dashed border-success p-3 text-center min-h-60 d-flex align-items-center justify-content-center" data-slot="offsite">
+                                    <span class="placeholder-text text-muted small">[Перетащите токен накопителя]</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Слот 4 -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <div class="text-info small fw-bold mb-1">УЗЕЛ 4: ХОЛОДНЫЙ ИЗОЛИРОВАННЫЙ АРХИВ (AIR-GAP / WORM)</div>
+                                <div class="text-secondary small mb-2">Физически отключенный от сети носитель для защиты от вирусов-вымогателей.</div>
+                                <div class="slot-target border border-dashed border-success p-3 text-center min-h-60 d-flex align-items-center justify-content-center" data-slot="airgap">
+                                    <span class="placeholder-text text-muted small">[Перетащите токен накопителя]</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Пул токенов устройств -->
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-info small fw-bold">ПУЛ ДОСТУПНЫХ УСТРОЙСТВ И СЕРВИСОВ:</span>
+                            <span class="text-secondary small">Кликните токен, затем кликните слот (или перетащите)</span>
+                        </div>
+                        <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2">
+                            <!-- Токены оборудования -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold" disabled>
+                            ПРОВЕРИТЬ ТОПОЛОГИЮ ХРАНИЛИЩА
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: РЕГЛАМЕНТ АРХИВАЦИИ И ЭЦП ================= -->
+                <div id="phase-3-container" class="d-none">
+                    <p class="text-light mb-2">
+                        Откалибруйте параметры корпоративной политики архивации и юридической значимости документов.
+                    </p>
+                    <p class="text-secondary small mb-3">
+                        Установите ползунки и тумблеры органов прямого управления в соответствии со стандартами ГОСТ, ФЗ-63 и ISO.
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Калибратор 1: Слайдер RPO -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-info small fw-bold">1. ЦЕЛЕВАЯ ТОЧКА ВОССТАНОВЛЕНИЯ (RPO БАЗЫ):</span>
+                                    <span id="val-rpo" class="badge bg-secondary rounded-0 fs-6">12 ч</span>
+                                </div>
+                                <p class="text-secondary small mb-2">
+                                    Максимально допустимый интервал потери данных для критических транзакций: <strong>1 час</strong>.
+                                </p>
+                                <input type="range" class="form-range" id="slider-rpo" min="1" max="24" step="1" value="12">
+                                <div class="d-flex justify-content-between text-secondary small">
+                                    <span>1 час</span>
+                                    <span>6 ч</span>
+                                    <span>12 ч</span>
+                                    <span>24 ч</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Калибратор 2: Слайдер глубины версионности -->
+                        <div class="col-md-6">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-info small fw-bold">2. ГЛУБИНА ВЕРСИОННОСТИ (SNAPSHOT RETENTION):</span>
+                                    <span id="val-retention" class="badge bg-secondary rounded-0 fs-6">7 дней</span>
+                                </div>
+                                <p class="text-secondary small mb-2">
+                                    Хранение версий в облаке против отложенных атак программ-вымогателей: <strong>не менее 30 дней</strong>.
+                                </p>
+                                <input type="range" class="form-range" id="slider-retention" min="5" max="90" step="5" value="7">
+                                <div class="d-flex justify-content-between text-secondary small">
+                                    <span>5 дн</span>
+                                    <span>30 дн</span>
+                                    <span>60 дн</span>
+                                    <span>90 дн</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Тумблер 1: Формат документов -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <span class="text-info small fw-bold mb-2">3. ФОРМАТ ДОКУМЕНТОВ АРХИВА:</span>
+                                <p class="text-secondary small mb-3">Стандарт ISO 19005 (внедренные шрифты, отсутствие внешних ссылок).</p>
+                                <button id="toggle-format-btn" type="button" class="btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold" data-state="docx">
+                                    <span class="status-label">.DOCX (Формат текстового процессора)</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Тумблер 2: Вид электронной подписи -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <span class="text-info small fw-bold mb-2">4. ЮРИДИЧЕСКАЯ ПОДПИСЬ (ФЗ-63):</span>
+                                <p class="text-secondary small mb-3">Для договоров с государственными органами без доп. соглашений.</p>
+                                <button id="toggle-sig-btn" type="button" class="btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold" data-state="pep">
+                                    <span class="status-label">ПЭП (Простая подпись / SMS-код)</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Тумблер 3: Алгоритм хеширования -->
+                        <div class="col-md-4">
+                            <div class="card bg-black border border-secondary rounded-0 p-3 h-100">
+                                <span class="text-info small fw-bold mb-2">5. КОНТРОЛЬ ЦЕЛОСТНОСТИ:</span>
+                                <p class="text-secondary small mb-3">Современный криптостойкий стандарт вычисления контрольных сумм.</p>
+                                <button id="toggle-hash-btn" type="button" class="btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold" data-state="md5">
+                                    <span class="status-label">MD5 (128 бит / Риск коллизий)</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Панель статуса валидации -->
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-2 text-center small">
+                            <div class="col-sm" id="ind-rpo"><span class="badge bg-danger rounded-0 w-100">RPO: Не откалибровано</span></div>
+                            <div class="col-sm" id="ind-retention"><span class="badge bg-danger rounded-0 w-100">Версионность: Не откалибровано</span></div>
+                            <div class="col-sm" id="ind-format"><span class="badge bg-danger rounded-0 w-100">Формат: Неверно</span></div>
+                            <div class="col-sm" id="ind-sig"><span class="badge bg-danger rounded-0 w-100">Подпись: Неверно</span></div>
+                            <div class="col-sm" id="ind-hash"><span class="badge bg-danger rounded-0 w-100">Хеш: Неверно</span></div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold">
+                            УТВЕРДИТЬ РЕГЛАМЕНТ АРХИВАЦИИ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФИНАЛЬНЫЙ ЭКРАН УСПЕХА ================= -->
+                <div id="final-screen" class="d-none text-center py-5">
+                    <div class="mb-3">
+                        <span class="badge bg-success text-dark rounded-0 fs-5 px-4 py-2">✓ АРХИВНАЯ ИНФРАСТРУКТУРА РАЗВЕРНУТА</span>
+                    </div>
+                    <h3 class="text-light mb-3">Практическая работа Уровня 1 успешно завершена!</h3>
+                    <p class="text-secondary mb-4">
+                        Вы успешно классифицировали форматы хранения, сконструировали отказоустойчивую топологию «3-2-1-1-0» и утвердили нормативный регламент архивации.
+                    </p>
+                    <div class="border border-success bg-black p-3 d-inline-block text-start mb-4">
+                        <div class="text-success small fw-bold">ОТЧЕТ ТЕЛЕМЕТРИИ О ВЫПОЛНЕНИИ:</div>
+                        <div class="text-light small">Событие: <code>level_complete</code></div>
+                        <div class="text-light small">Статус: <code>SUCCESS</code></div>
+                        <div class="text-light small">Зафиксировано попыток: <span id="final-attempts" class="text-warning">0</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const startTime = Date.now();
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let selectedCardElement = null;
+    let selectedTokenElement = null;
+
+    const missionName = 'Урок 8 :: Организация личного архива информации (Уровень 1)';
+
+    function sendTelemetry(actionType, status, success) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success
+        }, '*');
+    }
+
+    function showFeedback(message) {
+        const box = document.getElementById('feedback-box');
+        const text = document.getElementById('feedback-text');
+        text.textContent = message;
+        box.classList.remove('d-none');
+        setTimeout(() => {
+            box.classList.add('d-none');
+        }, 2200);
+    }
+
+    // =========================================================================
+    // ФАЗА 1: СОРТИРОВКА ПО БАКЕТАМ
+    // =========================================================================
+
+    const allPhase1Files = [
+        // Lossless (4 файла)
+        { id: 'f_tiff', type: 'lossless', name: '2026_Договор_СканПечати.tiff', desc: 'Архивный скан многостраничного договора с факсимиле (Group 4)', ext: 'TIFF' },
+        { id: 'f_pdfa', type: 'lossless', name: '2026_УставКомпании_Финал.pdf', desc: 'Архивный документ стандарта PDF/A с внедренными шрифтами', ext: 'PDF/A' },
+        { id: 'f_flac', type: 'lossless', name: 'ЗаписьИнтервью_Мастер.flac', desc: 'Оригинальная звукозапись судебного заседания без сжатия спектра', ext: 'FLAC' },
+        { id: 'f_sql', type: 'lossless', name: 'КадроваяБаза_Бэкап.sql.gz', desc: 'Дамп базы данных сотрудников предприятия, сжатый gzip', ext: 'SQL.GZ' },
+
+        // Lossy (4 файла)
+        { id: 'f_jpeg', type: 'lossy', name: 'ПревьюСайта_Баннер.jpg', desc: 'Изображение для публикации в социальной сети (сжатие с квантованием)', ext: 'JPEG' },
+        { id: 'f_mp3', type: 'lossy', name: 'ПодкастНовости_Выпуск14.mp3', desc: 'Сжатая аудиозапись для стримингового мобильного вещания (128 kbps)', ext: 'MP3' },
+        { id: 'f_mp4', type: 'lossy', name: 'ВидеоРепортаж_Черновик.mp4', desc: 'Видеоролик с межкадровой компрессией H.264 для оперативного предпросмотра', ext: 'MP4' },
+        { id: 'f_aac', type: 'lossy', name: 'ЗвуковаяДорожка_Стрим.aac', desc: 'Потоковый аудиофайл для интернет-радиостанции с психоакустическим сжатием', ext: 'AAC' }
+    ];
+
+    let currentPhase1Files = [];
+
+    function setupPhase1() {
+        const pool = document.getElementById('p1-cards-pool');
+        pool.innerHTML = '';
+        selectedCardElement = null;
+
+        // Очистить корзины
+        document.querySelectorAll('.bucket-slots').forEach(b => b.innerHTML = '');
+        updatePhase1Counters();
+
+        document.getElementById('p1-verify-btn').disabled = true;
+
+        // Выбираем 2 lossless и 2 lossy
+        const losslessSamples = allPhase1Files.filter(f => f.type === 'lossless').sort(() => 0.5 - Math.random()).slice(0, 2);
+        const lossySamples = allPhase1Files.filter(f => f.type === 'lossy').sort(() => 0.5 - Math.random()).slice(0, 2);
+        currentPhase1Files = [...losslessSamples, ...lossySamples].sort(() => 0.5 - Math.random());
+
+        currentPhase1Files.forEach(file => {
+            const card = createPhase1Card(file);
+            pool.appendChild(card);
+        });
+
+        setupDragAndDropPhase1();
+    }
+
+    function createPhase1Card(file) {
+        const card = document.createElement('div');
+        card.className = 'phase1-card card bg-dark border border-light rounded-0 p-2 text-light cursor-grab user-select-none font-monospace small';
+        card.style.cursor = 'grab';
+        card.style.minWidth = '220px';
+        card.draggable = true;
+        card.dataset.id = file.id;
+        card.dataset.expectedType = file.type;
+
+        card.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="badge border border-info text-info bg-black rounded-0 small">${file.ext}</span>
+                <span class="text-secondary small">⋮⋮ перетащить</span>
+            </div>
+            <div class="fw-bold text-light text-truncate mb-1">${file.name}</div>
+            <div class="text-secondary small">${file.desc}</div>
+        `;
+
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (selectedCardElement === card) {
+                card.classList.remove('border-warning', 'border-2');
+                selectedCardElement = null;
+                return;
+            }
+            if (selectedCardElement) {
+                selectedCardElement.classList.remove('border-warning', 'border-2');
+            }
+            selectedCardElement = card;
+            card.classList.add('border-warning', 'border-2');
+        });
+
+        return card;
+    }
+
+    function setupDragAndDropPhase1() {
+        const pool = document.getElementById('p1-cards-pool');
+        const buckets = document.querySelectorAll('.bucket-zone');
+
+        // Клик по корзине для перемещения выбранной карточки
+        buckets.forEach(bucket => {
+            bucket.addEventListener('click', () => {
+                if (!selectedCardElement) return;
+                const slotContainer = bucket.querySelector('.bucket-slots');
+                slotContainer.appendChild(selectedCardElement);
+                selectedCardElement.classList.remove('border-warning', 'border-2');
+                selectedCardElement = null;
+                updatePhase1Counters();
+            });
+
+            bucket.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                bucket.classList.add('border-white');
+            });
+
+            bucket.addEventListener('dragleave', () => {
+                bucket.classList.remove('border-white');
+            });
+
+            bucket.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bucket.classList.remove('border-white');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const card = document.querySelector(`.phase1-card[data-id="${cardId}"]`);
+                if (card) {
+                    const slotContainer = bucket.querySelector('.bucket-slots');
+                    slotContainer.appendChild(card);
+                    if (selectedCardElement === card) {
+                        card.classList.remove('border-warning', 'border-2');
+                        selectedCardElement = null;
+                    }
+                    updatePhase1Counters();
+                }
+            });
+        });
+
+        // Пул карточек
+        pool.addEventListener('click', () => {
+            if (!selectedCardElement) return;
+            pool.appendChild(selectedCardElement);
+            selectedCardElement.classList.remove('border-warning', 'border-2');
+            selectedCardElement = null;
+            updatePhase1Counters();
+        });
+
+        pool.addEventListener('dragover', (e) => e.preventDefault());
+        pool.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const cardId = e.dataTransfer.getData('text/plain');
+            const card = document.querySelector(`.phase1-card[data-id="${cardId}"]`);
+            if (card) {
+                pool.appendChild(card);
+                if (selectedCardElement === card) {
+                    card.classList.remove('border-warning', 'border-2');
+                    selectedCardElement = null;
+                }
+                updatePhase1Counters();
+            }
+        });
+
+        // Слушатель перетаскивания для всех карточек
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList && e.target.classList.contains('phase1-card')) {
+                e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            }
+        });
+    }
+
+    function updatePhase1Counters() {
+        const bLossless = document.getElementById('bucket-lossless');
+        const bLossy = document.getElementById('bucket-lossy');
+        const countLossless = bLossless.querySelectorAll('.phase1-card').length;
+        const countLossy = bLossy.querySelectorAll('.phase1-card').length;
+
+        bLossless.querySelector('.count-badge').textContent = `${countLossless} / 2`;
+        bLossy.querySelector('.count-badge').textContent = `${countLossy} / 2`;
+
+        const totalPlaced = countLossless + countLossy;
+        document.getElementById('p1-verify-btn').disabled = (totalPlaced !== 4);
+    }
+
+    document.getElementById('p1-verify-btn').addEventListener('click', () => {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+
+        const bLossless = document.getElementById('bucket-lossless');
+        const bLossy = document.getElementById('bucket-lossy');
+
+        const losslessCards = Array.from(bLossless.querySelectorAll('.phase1-card'));
+        const lossyCards = Array.from(bLossy.querySelectorAll('.phase1-card'));
+
+        const allLosslessCorrect = losslessCards.every(c => c.dataset.expectedType === 'lossless');
+        const allLossyCorrect = lossyCards.every(c => c.dataset.expectedType === 'lossy');
+
+        if (allLosslessCorrect && allLossyCorrect && losslessCards.length === 2 && lossyCards.length === 2) {
+            // Успех Фазы 1
+            sendTelemetry('in_progress', 'phase1_complete', true);
+            currentPhase = 2;
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Топология архива 3-2-1-1-0: Размещение накопителей';
+            document.getElementById('phase-1-container').classList.add('d-none');
+            document.getElementById('phase-2-container').classList.remove('d-none');
+            setupPhase2();
+        } else {
+            // Ошибка Фазы 1
+            sendTelemetry('hardcore_reset', 'phase1_error', false);
+            showFeedback('Неверное распределение форматов! Файлы долгосрочного хранения требуют Lossless-сжатия.');
+            setTimeout(() => {
+                setupPhase1();
+            }, 1200);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: ТОПОЛОГИЯ 3-2-1-1-0 (Slot & Snap токенами)
+    // =========================================================================
+
+    const phase2Devices = [
+        // 4 правильных устройства
+        { id: 'dev_nvme', slot: 'original', name: 'Внутренний NVMe SSD (M.2 PCI-e)', desc: 'Основной рабочий диск ноутбука для оперативных документов', color: 'border-info text-info' },
+        { id: 'dev_nas', slot: 'local_backup', name: 'Сетевой NAS (RAID 1) в локальной сети', desc: 'Автономный сетевой сервер на магнитных дисках в офисе', color: 'border-success text-success' },
+        { id: 'dev_s3', slot: 'offsite', name: 'Облачное объектное хранилище S3 (ЦОД Москва)', desc: 'Геораспределенный удаленный архив с защитой от катастроф', color: 'border-primary text-primary' },
+        { id: 'dev_lto', slot: 'airgap', name: 'Картридж LTO / Внешний HDD в сейфе', desc: 'Физически изолированный накопитель (Air-Gap / Offline)', color: 'border-warning text-warning' },
+
+        // 4 дистрактора
+        { id: 'dist_partition', slot: 'none', name: 'Раздел D: на том же внутреннем NVMe SSD', desc: 'Тот же физический диск: отказ накопителя уничтожит обе копии', color: 'border-secondary text-secondary' },
+        { id: 'dist_sync', slot: 'none', name: 'Папка автосинхронизации без версий', desc: 'Ransomware за секунды зашифрует и локальные, и облачные файлы', color: 'border-secondary text-secondary' },
+        { id: 'dist_flash', slot: 'none', name: 'Постоянно подключенная USB-флешка', desc: 'Доступна по шине USB: подвержена заражению червями и шифрованию', color: 'border-secondary text-secondary' },
+        { id: 'dist_temp', slot: 'none', name: 'Временный каталог %TEMP% на системном диске', desc: 'Очищается при перезагрузке, не является надежным архивом', color: 'border-secondary text-secondary' }
+    ];
+
+    function setupPhase2() {
+        const pool = document.getElementById('p2-tokens-pool');
+        pool.innerHTML = '';
+        selectedTokenElement = null;
+
+        // Очистить слоты
+        document.querySelectorAll('.slot-target').forEach(slot => {
+            slot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+            slot.removeAttribute('data-placed-id');
+        });
+
+        document.getElementById('p2-verify-btn').disabled = true;
+
+        // Перемешать все 8 токенов
+        const shuffled = [...phase2Devices].sort(() => 0.5 - Math.random());
+        shuffled.forEach(dev => {
+            const token = createDeviceToken(dev);
+            pool.appendChild(token);
+        });
+
+        setupDragAndDropPhase2();
+    }
+
+    function createDeviceToken(dev) {
+        const token = document.createElement('div');
+        token.className = `device-token p-2 bg-black border ${dev.color} rounded-0 cursor-grab user-select-none small font-monospace`;
+        token.style.cursor = 'grab';
+        token.draggable = true;
+        token.dataset.id = dev.id;
+        token.dataset.expectedSlot = dev.slot;
+
+        token.innerHTML = `
+            <div class="fw-bold">${dev.name}</div>
+            <div class="text-secondary small">${dev.desc}</div>
+        `;
+
+        token.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (selectedTokenElement === token) {
+                token.classList.remove('border-white', 'border-2');
+                selectedTokenElement = null;
+                return;
+            }
+            if (selectedTokenElement) {
+                selectedTokenElement.classList.remove('border-white', 'border-2');
+            }
+            selectedTokenElement = token;
+            token.classList.add('border-white', 'border-2');
+        });
+
+        return token;
+    }
+
+    function setupDragAndDropPhase2() {
+        const slots = document.querySelectorAll('.slot-target');
+        const pool = document.getElementById('p2-tokens-pool');
+
+        slots.forEach(slot => {
+            slot.addEventListener('click', () => {
+                if (!selectedTokenElement) return;
+
+                // Если в слоте уже лежит токен — вернуть его в пул
+                const existing = slot.querySelector('.device-token');
+                if (existing) {
+                    pool.appendChild(existing);
+                }
+
+                slot.innerHTML = '';
+                slot.appendChild(selectedTokenElement);
+                slot.dataset.placedId = selectedTokenElement.dataset.id;
+                selectedTokenElement.classList.remove('border-white', 'border-2');
+                selectedTokenElement = null;
+                checkPhase2Completion();
+            });
+
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('border-warning');
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('border-warning');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('border-warning');
+                const tokenId = e.dataTransfer.getData('text/plain');
+                const token = document.querySelector(`.device-token[data-id="${tokenId}"]`);
+                if (token) {
+                    const existing = slot.querySelector('.device-token');
+                    if (existing) {
+                        pool.appendChild(existing);
+                    }
+                    slot.innerHTML = '';
+                    slot.appendChild(token);
+                    slot.dataset.placedId = token.dataset.id;
+                    if (selectedTokenElement === token) {
+                        token.classList.remove('border-white', 'border-2');
+                        selectedTokenElement = null;
+                    }
+                    checkPhase2Completion();
+                }
+            });
+        });
+
+        // Пул
+        pool.addEventListener('click', () => {
+            if (!selectedTokenElement) return;
+            pool.appendChild(selectedTokenElement);
+            selectedTokenElement.classList.remove('border-white', 'border-2');
+            selectedTokenElement = null;
+            checkPhase2Completion();
+        });
+
+        pool.addEventListener('dragover', (e) => e.preventDefault());
+        pool.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const tokenId = e.dataTransfer.getData('text/plain');
+            const token = document.querySelector(`.device-token[data-id="${tokenId}"]`);
+            if (token) {
+                pool.appendChild(token);
+                if (selectedTokenElement === token) {
+                    token.classList.remove('border-white', 'border-2');
+                    selectedTokenElement = null;
+                }
+                checkPhase2Completion();
+            }
+        });
+
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList && e.target.classList.contains('device-token')) {
+                e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            }
+        });
+    }
+
+    function checkPhase2Completion() {
+        const slots = document.querySelectorAll('.slot-target');
+        let filledCount = 0;
+        slots.forEach(s => {
+            if (s.querySelector('.device-token')) filledCount++;
+        });
+        document.getElementById('p2-verify-btn').disabled = (filledCount !== 4);
+    }
+
+    document.getElementById('p2-verify-btn').addEventListener('click', () => {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+
+        const slots = document.querySelectorAll('.slot-target');
+        let allCorrect = true;
+
+        slots.forEach(slot => {
+            const token = slot.querySelector('.device-token');
+            const targetSlotName = slot.dataset.slot;
+            if (!token || token.dataset.expectedSlot !== targetSlotName) {
+                allCorrect = false;
+            }
+        });
+
+        if (allCorrect) {
+            // Успех Фазы 2
+            sendTelemetry('in_progress', 'phase2_complete', true);
+            currentPhase = 3;
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Регламент архивации и ЭЦП: Калибровка параметров';
+            document.getElementById('phase-2-container').classList.add('d-none');
+            document.getElementById('phase-3-container').classList.remove('d-none');
+            setupPhase3();
+        } else {
+            // Ошибка Фазы 2
+            sendTelemetry('hardcore_reset', 'phase2_error', false);
+            showFeedback('Ошибка топологии! Использованы дистракторы или нарушено правило 3-2-1-1-0.');
+            setTimeout(() => {
+                setupPhase2();
+            }, 1200);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: КАЛИБРАТОР РЕГЛАМЕНТА АРХИВАЦИИ И ЭЦП
+    // =========================================================================
+
+    function setupPhase3() {
+        const sRpo = document.getElementById('slider-rpo');
+        const sRetention = document.getElementById('slider-retention');
+
+        // Неверные стартовые позиции
+        sRpo.value = 12;
+        sRetention.value = 10;
+
+        document.getElementById('val-rpo').textContent = `${sRpo.value} ч`;
+        document.getElementById('val-retention').textContent = `${sRetention.value} дн`;
+
+        const btnFormat = document.getElementById('toggle-format-btn');
+        btnFormat.dataset.state = 'docx';
+        btnFormat.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+        btnFormat.querySelector('.status-label').textContent = '.DOCX (Формат текстового процессора)';
+
+        const btnSig = document.getElementById('toggle-sig-btn');
+        btnSig.dataset.state = 'pep';
+        btnSig.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+        btnSig.querySelector('.status-label').textContent = 'ПЭП (Простая подпись / SMS-код)';
+
+        const btnHash = document.getElementById('toggle-hash-btn');
+        btnHash.dataset.state = 'md5';
+        btnHash.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+        btnHash.querySelector('.status-label').textContent = 'MD5 (128 бит / Риск коллизий)';
+
+        updatePhase3Indicators();
+    }
+
+    document.getElementById('slider-rpo').addEventListener('input', (e) => {
+        document.getElementById('val-rpo').textContent = `${e.target.value} ч`;
+        updatePhase3Indicators();
+    });
+
+    document.getElementById('slider-retention').addEventListener('input', (e) => {
+        document.getElementById('val-retention').textContent = `${e.target.value} дн`;
+        updatePhase3Indicators();
+    });
+
+    // Тумблер формата
+    document.getElementById('toggle-format-btn').addEventListener('click', function() {
+        if (this.dataset.state === 'docx') {
+            this.dataset.state = 'pdfa';
+            this.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'PDF/A (ISO 19005, WORM, архивный)';
+        } else {
+            this.dataset.state = 'docx';
+            this.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = '.DOCX (Формат текстового процессора)';
+        }
+        updatePhase3Indicators();
+    });
+
+    // Тумблер ЭЦП
+    document.getElementById('toggle-sig-btn').addEventListener('click', function() {
+        if (this.dataset.state === 'pep') {
+            this.dataset.state = 'nep';
+            this.className = 'btn btn-outline-warning rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'НЭП (Неквалифицированная подпись)';
+        } else if (this.dataset.state === 'nep') {
+            this.dataset.state = 'kep';
+            this.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'КЭП (Квалифицированная / ГОСТ / Полная сила)';
+        } else {
+            this.dataset.state = 'pep';
+            this.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'ПЭП (Простая подпись / SMS-код)';
+        }
+        updatePhase3Indicators();
+    });
+
+    // Тумблер хеша
+    document.getElementById('toggle-hash-btn').addEventListener('click', function() {
+        if (this.dataset.state === 'md5') {
+            this.dataset.state = 'sha256';
+            this.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'SHA-256 (256 бит / Криптостойкий)';
+        } else {
+            this.dataset.state = 'md5';
+            this.className = 'btn btn-outline-danger rounded-0 text-start py-2 px-3 fw-bold';
+            this.querySelector('.status-label').textContent = 'MD5 (128 бит / Риск коллизий)';
+        }
+        updatePhase3Indicators();
+    });
+
+    function updatePhase3Indicators() {
+        const rpoVal = parseInt(document.getElementById('slider-rpo').value);
+        const retentionVal = parseInt(document.getElementById('slider-retention').value);
+        const formatState = document.getElementById('toggle-format-btn').dataset.state;
+        const sigState = document.getElementById('toggle-sig-btn').dataset.state;
+        const hashState = document.getElementById('toggle-hash-btn').dataset.state;
+
+        // Валидация
+        setIndicator('ind-rpo', rpoVal === 1, 'RPO: 1 час [ОК]', `RPO: ${rpoVal} ч (Слишком велик)`);
+        setIndicator('ind-retention', retentionVal >= 30, `Версионность: ${retentionVal} дн [ОК]`, `Версионность: ${retentionVal} дн (< 30 дн)`);
+        setIndicator('ind-format', formatState === 'pdfa', 'Формат: PDF/A [ОК]', 'Формат: Не архивный');
+        setIndicator('ind-sig', sigState === 'kep', 'Подпись: КЭП [ОК]', 'Подпись: Не квалифицированная');
+        setIndicator('ind-hash', hashState === 'sha256', 'Хеш: SHA-256 [ОК]', 'Хеш: Не криптостойкий');
+    }
+
+    function setIndicator(elId, isValid, okText, badText) {
+        const el = document.getElementById(elId);
+        if (isValid) {
+            el.innerHTML = `<span class="badge bg-success text-dark rounded-0 w-100">${okText}</span>`;
+        } else {
+            el.innerHTML = `<span class="badge bg-danger rounded-0 w-100">${badText}</span>`;
+        }
+    }
+
+    document.getElementById('p3-verify-btn').addEventListener('click', () => {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+
+        const rpoVal = parseInt(document.getElementById('slider-rpo').value);
+        const retentionVal = parseInt(document.getElementById('slider-retention').value);
+        const formatState = document.getElementById('toggle-format-btn').dataset.state;
+        const sigState = document.getElementById('toggle-sig-btn').dataset.state;
+        const hashState = document.getElementById('toggle-hash-btn').dataset.state;
+
+        const isOk = (rpoVal === 1) && (retentionVal >= 30) && (formatState === 'pdfa') && (sigState === 'kep') && (hashState === 'sha256');
+
+        if (isOk) {
+            // Финал Уровня 1!
+            sendTelemetry('level_complete', 'passed', true);
+            document.getElementById('phase-3-container').classList.add('d-none');
+            document.getElementById('final-screen').classList.remove('d-none');
+            document.getElementById('final-attempts').textContent = attemptsCount;
+        } else {
+            sendTelemetry('hardcore_reset', 'phase3_error', false);
+            showFeedback('Регламент не соответствует требованиям надежности! Проверьте индикаторы.');
+        }
+    });
+
+    // Экспорт состояния для E2E и персон
+    window.__DEV_LEVEL1_STATE__ = {
+        getPhase: () => currentPhase,
+        getAttempts: () => attemptsCount,
+        solvePhase1: () => {
+            const bLossless = document.getElementById('bucket-lossless').querySelector('.bucket-slots');
+            const bLossy = document.getElementById('bucket-lossy').querySelector('.bucket-slots');
+            document.querySelectorAll('.phase1-card').forEach(c => {
+                if (c.dataset.expectedType === 'lossless') bLossless.appendChild(c);
+                else bLossy.appendChild(c);
+            });
+            updatePhase1Counters();
+            document.getElementById('p1-verify-btn').click();
+        },
+        solvePhase2: () => {
+            const pool = document.getElementById('p2-tokens-pool');
+            document.querySelectorAll('.slot-target').forEach(slot => {
+                const targetSlot = slot.dataset.slot;
+                const matchToken = pool.querySelector(`.device-token[data-expected-slot="${targetSlot}"]`);
+                if (matchToken) {
+                    slot.innerHTML = '';
+                    slot.appendChild(matchToken);
+                    slot.dataset.placedId = matchToken.dataset.id;
+                }
+            });
+            checkPhase2Completion();
+            document.getElementById('p2-verify-btn').click();
+        },
+        solvePhase3: () => {
+            document.getElementById('slider-rpo').value = 1;
+            document.getElementById('slider-retention').value = 35;
+            const btnF = document.getElementById('toggle-format-btn');
+            btnF.dataset.state = 'pdfa';
+            btnF.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            btnF.querySelector('.status-label').textContent = 'PDF/A (ISO 19005, WORM, архивный)';
+
+            const btnS = document.getElementById('toggle-sig-btn');
+            btnS.dataset.state = 'kep';
+            btnS.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            btnS.querySelector('.status-label').textContent = 'КЭП (Квалифицированная / ГОСТ / Полная сила)';
+
+            const btnH = document.getElementById('toggle-hash-btn');
+            btnH.dataset.state = 'sha256';
+            btnH.className = 'btn btn-outline-success rounded-0 text-start py-2 px-3 fw-bold';
+            btnH.querySelector('.status-label').textContent = 'SHA-256 (256 бит / Криптостойкий)';
+
+            updatePhase3Indicators();
+            document.getElementById('p3-verify-btn').click();
+        }
+    };
+
+    // Старт
+    setupPhase1();
+})();
+</script>
