@@ -36,7 +36,7 @@ test.describe('Grade 11 Basic Lesson 8: Student Persona Simulations', () => {
     await expect(page.locator('#final-screen')).toBeVisible();
   });
 
-  test('Persona: CARELESS on Level 2 — enters spaces and wrong number, receives error, then enters correct calculation', async ({ page }) => {
+  test('Persona: CARELESS on Level 2 — enters spaces and wrong number, receives error, then enters dirty inputs with spaces and recovers', async ({ page }) => {
     await page.goto('/tasks/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D0%B1%D0%B0%D0%B7%D0%BE%D0%B2%D1%8B%D0%B9/8/level2');
 
     // Careless puts 0 and 0
@@ -46,10 +46,25 @@ test.describe('Grade 11 Basic Lesson 8: Student Persona Simulations', () => {
 
     await expect(page.locator('#error-feedback')).toBeVisible();
 
-    // Careless recovers and calculates properly
+    // Careless waits and enters correct values with extra whitespace and formatting
     await page.waitForTimeout(1400);
+
+    // Get expected values
+    const orig = parseInt(await page.locator('#p1-orig-size').textContent());
+    const comp = parseInt(await page.locator('#p1-comp-size').textContent());
+    const expectedK = Math.round(orig / comp);
+    const expectedPct = Math.round(((orig - comp) / orig) * 100);
+
+    // Fill with dirty spaces (Careless pattern)
+    await page.locator('#p1-input-k').fill(`  ${expectedK}  `);
+    await page.locator('#p1-input-percent').fill(`  ${expectedPct}  `);
+    await page.locator('#p1-btn').click();
+
+    // Advances to phase 2
+    await expect(page.locator('#phase2')).toBeVisible();
+
+    // Finishes remaining phases cleanly
     await page.evaluate(() => {
-      window.__DEV_LEVEL2_STATE__.solvePhase1();
       window.__DEV_LEVEL2_STATE__.solvePhase2();
       window.__DEV_LEVEL2_STATE__.solvePhase3();
       window.__DEV_LEVEL2_STATE__.solvePhase4();

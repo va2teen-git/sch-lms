@@ -12,7 +12,7 @@ test.describe('Grade 11 Basic Lesson 8: Personal Archive Management Level 2', ()
     const selects = await page.locator('select').count();
     expect(selects).toBe(0);
 
-    const textInputs = await page.locator('input[type="number"]').count();
+    const textInputs = await page.locator('input[inputmode="numeric"]').count();
     expect(textInputs).toBeGreaterThanOrEqual(2);
   });
 
