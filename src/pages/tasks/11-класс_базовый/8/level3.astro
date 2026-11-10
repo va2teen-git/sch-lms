@@ -1,0 +1,546 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="vue-app" class="container my-4 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-danger mb-0">Тренажер: Диспетчер архивных потоков и верификация (Уровень 3 / Аркада)</h2>
+            <span class="badge border border-danger text-danger bg-black rounded-0 px-3 py-2">Архетип: Storage Pipeline Dispatcher // Хардкор-сброс</span>
+        </div>
+
+        <!-- Контейнер игры -->
+        <div class="card bg-black border border-danger rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Экран Введения / Инструктажа -->
+                <div v-if="gameState === 'intro'" class="text-center py-4">
+                    <div class="mb-3">
+                        <span class="badge bg-danger text-black rounded-0 fs-5 px-4 py-2">СИСТЕМА ЭКСТРЕННОЙ АРХИВАЦИИ [ACTIVE]</span>
+                    </div>
+                    <h3 class="text-light mb-3">Аркадное испытание: Диспетчер целостности архива</h3>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 650px;">
+                        Вам предстоит отработать <strong>10 скоростных волн</strong> входящего потока цифровых данных.
+                        Для каждого блока необходимо мгновенно определить целевой шлюз:
+                        <br><strong class="text-success">[1] WORM Vault</strong> — Долгосрочные документы без потерь (PDF/A, TIFF, FLAC, SQL.GZ) с валидным хешем SHA-256.
+                        <br><strong class="text-warning">[2] Media Cache</strong> — Мультимедиа с потерями (JPEG, MP3, MP4) для оперативного веб-доступа.
+                        <br><strong class="text-danger">[3] Quarantine</strong> — Блоки с нарушенной контрольной суммой (Bit Rot) или неархивные форматы (.docx).
+                    </p>
+                    <div class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-inline-block text-start mb-4 py-2 px-3 small">
+                        <strong>ВНИМАНИЕ! ХАРДКОР-РЕЖИМ:</strong> Любая ошибка, неверный шлюз или истечение таймера вызывают системную сирену и <strong>ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</strong> с перегенерацией всех волн!
+                    </div>
+                    <div>
+                        <button id="start-btn" @click="startGame" class="btn btn-danger rounded-0 px-5 py-3 fw-bold fs-5 text-black">
+                            ЗАПУСТИТЬ ШЛЮЗ АРХИВАЦИИ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Игровой экран -->
+                <div v-if="gameState === 'playing'">
+                    <!-- Шапка со счетчиками и таймером -->
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <div>
+                            <span class="badge bg-danger text-black rounded-0 fs-6 me-2">
+                                Волна <span v-text="currentWave"></span> из <span v-text="totalWaves"></span>
+                            </span>
+                            <span class="text-light fw-bold fs-6">
+                                Конвейер верификации и диспетчеризации
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-secondary small">
+                                Попытки: <span class="text-warning fw-bold" v-text="attempts"></span>
+                            </span>
+                            <span class="badge border border-danger text-danger bg-black rounded-0 fs-6">
+                                Время: <span v-text="phaseTimeLeft.toFixed(1)"></span> с
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Индикатор таймера -->
+                    <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 10px;">
+                        <div class="progress-bar bg-danger" role="progressbar" :style="{ width: timerPercentage + '%' }"></div>
+                    </div>
+
+                    <!-- Тревожный бокс (Аварийная сирена) -->
+                    <div id="alarm-box" v-if="alarmActive" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-3 py-3 text-center" role="alert">
+                        <div class="d-flex align-items-center justify-content-center gap-3">
+                            <span class="spinner-grow spinner-grow-sm text-danger"></span>
+                            <span class="fw-bold fs-5">[ТРЕВОГА АРХИВА] <span v-text="alarmMessage"></span> СБРОС НА ВОЛНУ 1!</span>
+                            <span class="spinner-grow spinner-grow-sm text-danger"></span>
+                        </div>
+                    </div>
+
+                    <!-- Карточка текущего объекта данных -->
+                    <div class="card bg-dark border border-danger rounded-0 p-4 mb-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <span class="badge border border-info text-info bg-black rounded-0 me-2" v-text="currentWaveData.category"></span>
+                                <span class="badge border border-secondary text-secondary bg-black rounded-0" v-text="currentWaveData.ext"></span>
+                            </div>
+                            <span class="text-secondary small">ID блока: <code class="text-warning" v-text="currentWaveData.id"></code></span>
+                        </div>
+
+                        <h4 class="text-light fw-bold mb-2 font-monospace" v-text="currentWaveData.filename"></h4>
+                        <p class="text-secondary small mb-3" v-text="currentWaveData.description"></p>
+
+                        <!-- Таблица параметров верификации блока -->
+                        <div class="table-responsive">
+                            <table class="table table-dark table-bordered border-secondary small font-monospace mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-secondary" style="width: 220px;">Объем исходных данных:</td>
+                                        <td class="text-info fw-bold" v-text="currentWaveData.size"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-secondary">Формат сжатия:</td>
+                                        <td :class="currentWaveData.isLossless ? 'text-success' : 'text-warning'" v-text="currentWaveData.compressionType"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-secondary">Контрольная сумма SHA-256:</td>
+                                        <td>
+                                            <div class="text-secondary text-break mb-1" v-text="currentWaveData.hash"></div>
+                                            <span v-if="currentWaveData.isHashValid" class="badge bg-success text-black rounded-0">✓ ЦЕЛОСТНОСТЬ ПОДТВЕРЖДЕНА (64 hex)</span>
+                                            <span v-else class="badge bg-danger text-black rounded-0">✕ ОБНАРУЖЕНА ОШИБКА SHA-256 (BIT ROT)</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-secondary">Юридический статус:</td>
+                                        <td class="text-light" v-text="currentWaveData.legalStatus"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Органы прямого управления (3 Шлюза) -->
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <button id="gate-worm-btn" @click="handleAction('worm')" class="btn btn-outline-success rounded-0 p-3 w-100 text-start h-100 border-2" :disabled="isActionBlocked">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fs-4 fw-bold text-success">[1]</span>
+                                    <span class="badge border border-success text-success bg-black rounded-0">WORM VAULT</span>
+                                </div>
+                                <div class="fw-bold text-light mb-1">Долгосрочный Архив</div>
+                                <div class="text-secondary small">Сжатие без потерь (Lossless), PDF/A, TIFF, валидный хеш SHA-256.</div>
+                            </button>
+                        </div>
+
+                        <div class="col-md-4">
+                            <button id="gate-media-btn" @click="handleAction('media')" class="btn btn-outline-warning rounded-0 p-3 w-100 text-start h-100 border-2" :disabled="isActionBlocked">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fs-4 fw-bold text-warning">[2]</span>
+                                    <span class="badge border border-warning text-warning bg-black rounded-0">MEDIA CACHE</span>
+                                </div>
+                                <div class="fw-bold text-light mb-1">Мультимедиа Кэш</div>
+                                <div class="text-secondary small">Сжатие с потерями (Lossy), промо-материалы, JPEG, MP3, MP4.</div>
+                            </button>
+                        </div>
+
+                        <div class="col-md-4">
+                            <button id="gate-quarantine-btn" @click="handleAction('quarantine')" class="btn btn-outline-danger rounded-0 p-3 w-100 text-start h-100 border-2" :disabled="isActionBlocked">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fs-4 fw-bold text-danger">[3]</span>
+                                    <span class="badge border border-danger text-danger bg-black rounded-0">QUARANTINE</span>
+                                </div>
+                                <div class="fw-bold text-light mb-1">Изоляция в Карантин</div>
+                                <div class="text-secondary small">Поврежден хеш, Bit Rot, неархивный формат .docx или риск искажения.</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="text-center text-secondary small mt-3">
+                        Горячие клавиши на клавиатуре: <strong>[1]</strong>, <strong>[2]</strong>, <strong>[3]</strong>
+                    </div>
+                </div>
+
+                <!-- Экран Победы -->
+                <div v-if="gameState === 'victory'" class="text-center py-5">
+                    <div class="mb-3">
+                        <span class="badge bg-success text-black rounded-0 fs-4 px-4 py-2">✓ ВСЕ 10 ВОЛН АРХИВА УСПЕШНО ОТРАБОТАНЫ</span>
+                    </div>
+                    <h2 class="text-light mb-3">АРКАДНЫЙ БОСС УРОВНЯ 3 ПОВЕРЖЕН!</h2>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 600px;">
+                        Вы безупречно отфильтровали все 10 скоростных потоков данных, своевременно выявили поврежденные тома с деградацией бит и направили архивные материалы в долгосрочное хранилище WORM.
+                    </p>
+                    <div class="border border-success bg-black p-3 d-inline-block text-start mb-4">
+                        <div class="text-success small fw-bold">ФИНАЛЬНЫЙ СТАТУС ТЕЛЕМЕТРИИ:</div>
+                        <div class="text-light small">Миссия: <code>Урок 8 (Уровень 3 / Аркада)</code></div>
+                        <div class="text-light small">Статус: <code>PASSED / SUCCESS</code></div>
+                        <div class="text-light small">Общее время: <code v-text="formattedFinalTime"></code></div>
+                        <div class="text-light small">Попыток сброса: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+(function() {
+    const { createApp } = Vue;
+
+    // Синтезатор звуков Web Audio API
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) audioCtx = new AudioContext();
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type, duration) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    }
+
+    function playSuccessSound() {
+        playTone(880, 'sine', 0.15);
+        setTimeout(() => playTone(1320, 'sine', 0.2), 80);
+    }
+
+    function playErrorSound() {
+        playTone(180, 'sawtooth', 0.35);
+        setTimeout(() => playTone(120, 'sawtooth', 0.4), 100);
+    }
+
+    function playAlarmSiren() {
+        playTone(440, 'triangle', 0.25);
+        setTimeout(() => playTone(880, 'triangle', 0.25), 150);
+        setTimeout(() => playTone(440, 'triangle', 0.25), 300);
+    }
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                currentWave: 1,
+                totalWaves: 10,
+                attempts: 0,
+                startTime: Date.now(),
+                phaseTimeLeft: 12.0,
+                maxPhaseTime: 12.0,
+                timerInterval: null,
+                alarmActive: false,
+                alarmMessage: '',
+                isActionBlocked: false,
+
+                // Банк шаблонов волн (10 сценариев)
+                wavesPool: [
+                    {
+                        id: 'BLK-01',
+                        filename: '2026-11-10_Договор_Аренды_Филиал.tiff',
+                        category: 'Юридический архив',
+                        ext: 'TIFF (Group 4)',
+                        description: 'Многостраничный нотариальный скан с подписями и гербовой печатью.',
+                        size: '84 МБ',
+                        isLossless: true,
+                        compressionType: 'Сжатие без потерь (Lossless / CCITT)',
+                        isHashValid: true,
+                        legalStatus: 'Имеет юридическую силу (подлежит WORM-хранению)',
+                        correctAction: 'worm'
+                    },
+                    {
+                        id: 'BLK-02',
+                        filename: 'promo_release_teaser_4k.mp4',
+                        category: 'Медиа-отдел',
+                        ext: 'MP4 (H.264 / AAC)',
+                        description: 'Рекламный видеоролик для публикации в социальных сетях и на сайте.',
+                        size: '420 МБ',
+                        isLossless: false,
+                        compressionType: 'Сжатие с потерями (Lossy)',
+                        isHashValid: true,
+                        legalStatus: 'Маркетинговые материалы (не требует постоянного WORM)',
+                        correctAction: 'media'
+                    },
+                    {
+                        id: 'BLK-03',
+                        filename: 'buhgalteria_db_dump.sql.gz',
+                        category: 'Бухгалтерия и аудит',
+                        ext: 'SQL.GZ',
+                        description: 'Резервная копия базы проводок за октябрь. Контрольная сумма не совпадает с логом!',
+                        size: '1.2 ГБ',
+                        isLossless: true,
+                        compressionType: 'Сжатие без потерь (Lossless GZIP)',
+                        isHashValid: false, // Bit-rot!
+                        legalStatus: 'КРИТИЧЕСКОЕ ПОВРЕЖДЕНИЕ: Нарушена целостность блока!',
+                        correctAction: 'quarantine'
+                    },
+                    {
+                        id: 'BLK-04',
+                        filename: '2026-11-09_Устав_Правления_v2.0.pdf',
+                        category: 'Корпоративное право',
+                        ext: 'PDF/A-1b',
+                        description: 'Архивный устав общества со встроенными шрифтами и запретом скриптов.',
+                        size: '18 МБ',
+                        isLossless: true,
+                        compressionType: 'Архивный стандарт ISO 19005 (PDF/A)',
+                        isHashValid: true,
+                        legalStatus: 'Подтверждена КЭП генерального директора',
+                        correctAction: 'worm'
+                    },
+                    {
+                        id: 'BLK-05',
+                        filename: 'banner_header_autumn.jpg',
+                        category: 'Веб-дизайн',
+                        ext: 'JPEG',
+                        description: 'Растровое промо-изображение с дискретным косинусным преобразованием.',
+                        size: '4.8 МБ',
+                        isLossless: false,
+                        compressionType: 'Сжатие с потерями (Lossy JPEG)',
+                        isHashValid: true,
+                        legalStatus: 'Публичный контент',
+                        correctAction: 'media'
+                    },
+                    {
+                        id: 'BLK-06',
+                        filename: 'arbitrage_court_speech_master.flac',
+                        category: 'Судебный архив',
+                        ext: 'FLAC',
+                        description: 'Официальная аудиозапись прений сторон в арбитражном суде.',
+                        size: '680 МБ',
+                        isLossless: true,
+                        compressionType: 'Сжатие звука без потерь (Free Lossless Audio Codec)',
+                        isHashValid: true,
+                        legalStatus: 'Протокольная запись судебного производства',
+                        correctAction: 'worm'
+                    },
+                    {
+                        id: 'BLK-07',
+                        filename: 'project_contract_final_draft.docx',
+                        category: 'Канцелярия',
+                        ext: '.DOCX',
+                        description: 'Файл текстового процессора без встроенных шрифтов. Запрещен для архивации!',
+                        size: '3.2 МБ',
+                        isLossless: true,
+                        compressionType: 'ZIP-контейнер XML (Зависимость от версий Word)',
+                        isHashValid: true,
+                        legalStatus: 'ОТКЛОНЕНО: Не соответствует стандарту PDF/A!',
+                        correctAction: 'quarantine'
+                    },
+                    {
+                        id: 'BLK-08',
+                        filename: 'tech_podcast_broadcast_ep12.mp3',
+                        category: 'Радиовещание',
+                        ext: 'MP3 (128 kbps)',
+                        description: 'Аудиодорожка передачи с психоакустическим сжатием частот.',
+                        size: '56 МБ',
+                        isLossless: false,
+                        compressionType: 'Сжатие с потерями (Lossy MP3)',
+                        isHashValid: true,
+                        legalStatus: 'Стриминговый контент',
+                        correctAction: 'media'
+                    },
+                    {
+                        id: 'BLK-09',
+                        filename: 'personnel_archive_tom_4.tiff',
+                        category: 'Кадровый архив',
+                        ext: 'TIFF (LZW)',
+                        description: 'Скан личных карточек уволенных сотрудников. Несовпадение контрольной суммы SHA-256!',
+                        size: '310 МБ',
+                        isLossless: true,
+                        compressionType: 'Сжатие без потерь (Lossless LZW)',
+                        isHashValid: false, // Bit-rot!
+                        legalStatus: 'ОШИБКА ХЕША: Обнаружена деградация бит на диске!',
+                        correctAction: 'quarantine'
+                    },
+                    {
+                        id: 'BLK-10',
+                        filename: '2026-11-10_Годовой_Финансовый_Баланс.pdf',
+                        category: 'Финансовый департамент',
+                        ext: 'PDF/A-2u',
+                        description: 'Итоговый годовой отчет с квалифицированной электронной подписью (КЭП).',
+                        size: '24 МБ',
+                        isLossless: true,
+                        compressionType: 'Архивный стандарт PDF/A (Внедренные шрифты)',
+                        isHashValid: true,
+                        legalStatus: 'Полный юридический аналог бумажного баланса с печатью',
+                        correctAction: 'worm'
+                    }
+                ],
+
+                activeWaves: [],
+                currentWaveData: {}
+            };
+        },
+
+        computed: {
+            timerPercentage() {
+                return Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
+            },
+            formattedFinalTime() {
+                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
+                return `${m}:${s}`;
+            }
+        },
+
+        mounted() {
+            window.addEventListener('keydown', this.handleKeydown);
+
+            // Экспорт глобального объекта состояния для тестов
+            window.__DEV_LEVEL3_STATE__ = {
+                getCurrentWaveIndex: () => this.currentWave,
+                getCurrentWave: () => this.currentWaveData,
+                getAttempts: () => this.attempts,
+                solveCurrentWave: () => {
+                    if (this.currentWaveData && this.currentWaveData.correctAction) {
+                        this.handleAction(this.currentWaveData.correctAction);
+                    }
+                },
+                submitAction: (action) => {
+                    this.handleAction(action);
+                }
+            };
+        },
+
+        beforeUnmount() {
+            window.removeEventListener('keydown', this.handleKeydown);
+            this.stopTimer();
+        },
+
+        methods: {
+            sendTelemetry(actionType, status, success) {
+                const timeSpent = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 8 :: Организация личного архива информации (Уровень 3)',
+                    action_type: actionType,
+                    status: status,
+                    start_time: new Date(this.startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: this.attempts,
+                    success: success
+                }, '*');
+            },
+
+            genRandomSha256(isValid) {
+                const h = '0123456789abcdef';
+                let s = '';
+                for (let i = 0; i < 64; i++) s += h[Math.floor(Math.random() * h.length)];
+                return s;
+            },
+
+            generateWaves() {
+                // Создаем глубокую копию пула волн и генерируем динамические хеши
+                this.activeWaves = this.wavesPool.map(w => {
+                    const waveCopy = { ...w };
+                    waveCopy.hash = this.genRandomSha256(waveCopy.isHashValid);
+                    return waveCopy;
+                });
+            },
+
+            startGame() {
+                this.startTime = Date.now();
+                this.currentWave = 1;
+                this.generateWaves();
+                this.loadWave(1);
+                this.gameState = 'playing';
+                this.sendTelemetry('in_progress', 'started', true);
+            },
+
+            loadWave(waveNum) {
+                this.currentWave = waveNum;
+                this.currentWaveData = this.activeWaves[waveNum - 1];
+
+                // Динамическое сокращение времени таймера от 12.0 с до 5.5 с
+                // Волна 1: 12.0 с, Волна 10: 5.5 с
+                this.maxPhaseTime = Math.max(5.5, 12.0 - (waveNum - 1) * 0.7);
+                this.phaseTimeLeft = this.maxPhaseTime;
+                this.isActionBlocked = false;
+
+                this.startTimer();
+            },
+
+            startTimer() {
+                this.stopTimer();
+                const tickInterval = 100;
+                this.timerInterval = setInterval(() => {
+                    this.phaseTimeLeft -= tickInterval / 1000;
+                    if (this.phaseTimeLeft <= 0) {
+                        this.phaseTimeLeft = 0;
+                        this.stopTimer();
+                        this.triggerHardcoreReset('Время ожидания истекло! Переполнение буфера шлюза.');
+                    }
+                }, tickInterval);
+            },
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            },
+
+            handleAction(action) {
+                if (this.gameState !== 'playing' || this.isActionBlocked) return;
+
+                if (action === this.currentWaveData.correctAction) {
+                    // Успех текущей волны
+                    playSuccessSound();
+                    this.stopTimer();
+                    this.isActionBlocked = true;
+
+                    if (this.currentWave >= this.totalWaves) {
+                        // Победа в Уровне 3!
+                        this.gameState = 'victory';
+                        this.sendTelemetry('level_complete', 'passed', true);
+                    } else {
+                        this.sendTelemetry('in_progress', `wave_${this.currentWave}_complete`, true);
+                        setTimeout(() => {
+                            this.loadWave(this.currentWave + 1);
+                        }, 250);
+                    }
+                } else {
+                    // Ошибка действия
+                    this.triggerHardcoreReset(`Неверная маршрутизация блока! Выбран не тот шлюз.`);
+                }
+            },
+
+            triggerHardcoreReset(reason) {
+                this.stopTimer();
+                this.isActionBlocked = true;
+                this.attempts++;
+                playErrorSound();
+                playAlarmSiren();
+
+                this.sendTelemetry('hardcore_reset', 'failed', false);
+                this.alarmMessage = reason;
+                this.alarmActive = true;
+
+                setTimeout(() => {
+                    this.alarmActive = false;
+                    this.generateWaves();
+                    this.loadWave(1);
+                }, 1600);
+            },
+
+            handleKeydown(e) {
+                if (this.gameState !== 'playing' || this.isActionBlocked) return;
+                if (e.key === '1') this.handleAction('worm');
+                else if (e.key === '2') this.handleAction('media');
+                else if (e.key === '3') this.handleAction('quarantine');
+            }
+        }
+    }).mount('#vue-app');
+})();
+</script>
