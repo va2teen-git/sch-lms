@@ -40,7 +40,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <p class="text-light mb-2" id="p1-prompt-label">Введите информационный объем сообщения (в битах):</p>
                     <div class="input-group mb-3" style="max-width: 420px;">
-                        <input type="text" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Только число" autocomplete="off">
+                        <input type="text" inputmode="numeric" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Только число" autocomplete="off">
                         <button id="p1-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
                     </div>
                     <div id="p1-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
@@ -65,7 +65,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <p class="text-light mb-2">Рассчитайте информационный объем документа (в Килобайтах, Кбайт):</p>
                     <div class="input-group mb-3" style="max-width: 420px;">
-                        <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Объем в Кбайт" autocomplete="off">
+                        <input type="text" inputmode="numeric" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Объем в Кбайт" autocomplete="off">
                         <button id="p2-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
                     </div>
                     <div id="p2-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
@@ -90,7 +90,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <p class="text-light mb-2">Вычислите максимально возможную мощность алфавита N (число символов в алфавите):</p>
                     <div class="input-group mb-3" style="max-width: 420px;">
-                        <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Мощность алфавита N" autocomplete="off">
+                        <input type="text" inputmode="numeric" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Мощность алфавита N" autocomplete="off">
                         <button id="p3-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
                     </div>
                     <div id="p3-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
@@ -113,7 +113,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <p class="text-light mb-2">Укажите минимальную длину индивидуального ключа (в целых битах):</p>
                     <div class="input-group mb-3" style="max-width: 420px;">
-                        <input type="text" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Число бит" autocomplete="off">
+                        <input type="text" inputmode="numeric" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Число бит" autocomplete="off">
                         <button id="p4-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
                     </div>
                     <div id="p4-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
@@ -139,7 +139,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <p class="text-light mb-2">Сколько секунд (с) займет полная передача документа?</p>
                     <div class="input-group mb-3" style="max-width: 420px;">
-                        <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Время в секундах" autocomplete="off">
+                        <input type="text" inputmode="numeric" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Время в секундах" autocomplete="off">
                         <button id="p5-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
                     </div>
                     <div id="p5-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
@@ -212,14 +212,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         function normalizeInput(val) {
             if (!val) return '';
             let s = String(val).trim().replace(',', '.');
-            // Удаляем возможные текстовые суффиксы (байт, бит, с, сек, кб)
-            s = s.replace(/(бит|байт|секунд|сек|с|кбайт|кб|мб)$/i, '').trim();
+            // Удаляем возможные текстовые суффиксы и пробелы
+            s = s.replace(/(бит[а-я]*|байт[а-я]*|секунд[а-я]*|сек|с|кбайт[а-я]*|кб|мб|гб)$/i, '').trim();
+            s = s.replace(/\s+/g, '');
             return s;
         }
 
         const attemptsDisplay = document.getElementById('attempts-display');
+        let isProcessing = false;
 
         function triggerPhaseError(feedbackEl, callback) {
+            if (isProcessing) return;
+            isProcessing = true;
             attempts++;
             if (attemptsDisplay) attemptsDisplay.textContent = attempts;
             if (feedbackEl) feedbackEl.classList.remove('d-none');
@@ -228,6 +232,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             setTimeout(() => {
                 if (feedbackEl) feedbackEl.classList.add('d-none');
                 if (callback) callback();
+                isProcessing = false;
             }, 1400);
         }
 
