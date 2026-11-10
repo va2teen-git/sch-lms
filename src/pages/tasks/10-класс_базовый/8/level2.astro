@@ -1,0 +1,470 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container my-4 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический расчет информационного объема (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет информационного объема сообщения (I = K × i)</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-light">00:00</span>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: ПРЯМОЙ РАСЧЕТ I = K × i (CCS = 4) -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light">
+                        Телеметрический датчик передал статусное сообщение длиной в <span id="p1-chars-desc" class="text-warning fw-bold"></span> знаков.
+                        Текст составлен из символов алфавита мощностью <span id="p1-power-desc" class="text-warning fw-bold"></span> знаков с равномерным посимвольным кодированием.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ТЕКУЩИЕ ПАРАМЕТРЫ ПЕРЕДАЧИ:</div>
+                        <div class="text-light">Количество символов в сообщении (K): <span id="p1-k-val" class="text-warning fw-bold"></span></div>
+                        <div class="text-light">Мощность используемого алфавита (N): <span id="p1-n-val" class="text-warning fw-bold"></span></div>
+                        <div class="text-secondary small mt-1">Формулы: N = 2<sup>i</sup> (вес одного символа i), I = K × i (общий объем).</div>
+                    </div>
+
+                    <p class="text-light mb-2" id="p1-prompt-label">Введите информационный объем сообщения (в битах):</p>
+                    <div class="input-group mb-3" style="max-width: 420px;">
+                        <input type="text" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Только число" autocomplete="off">
+                        <button id="p1-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p1-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Проверьте степень двойки для N и формулу I = K × i! Генерация новой задачи...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: МНОГОШАГОВЫЙ РАСЧЕТ В КБАЙТАХ (CCS = 6) -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light">
+                        Для подготовки электронного отчета оператор сформировал многостраничный документ в стандартной однобайтной кодировке Windows-1251 (мощность алфавита N = 256 символов, 1 символ = 1 байт).
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">СТРУКТУРА ТЕКСТОВОГО ДОКУМЕНТА:</div>
+                        <div class="text-light">Количество страниц: <span id="p2-pages-val" class="text-warning fw-bold"></span></div>
+                        <div class="text-light">Строк на каждой странице: <span id="p2-lines-val" class="text-warning fw-bold"></span></div>
+                        <div class="text-light">Символов в одной строке: <span id="p2-cols-val" class="text-warning fw-bold"></span></div>
+                        <div class="text-secondary small mt-1">Правило: 1 Килобайт = 1024 байта = 2<sup>10</sup> байт.</div>
+                    </div>
+
+                    <p class="text-light mb-2">Рассчитайте информационный объем документа (в Килобайтах, Кбайт):</p>
+                    <div class="input-group mb-3" style="max-width: 420px;">
+                        <input type="text" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Объем в Кбайт" autocomplete="off">
+                        <button id="p2-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p2-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Пересчитайте общее количество символов K и разделите на 1024! Генерация...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: ПИК 1 / ОБРАТНАЯ ЗАДАЧА НА МОЩНОСТЬ (CCS = 7-8) -->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light">
+                        <span class="badge bg-danger text-light rounded-0 me-1">РЕВЕРС-АНАЛИЗ</span>
+                        Архивный дамп неизвестного протокола перехвачен сетевым сниффером. Известен точный объем дампа в Килобайтах и общее число символов.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">МЕТРИКИ ПЕРЕХВАЧЕННОГО ФАЙЛА:</div>
+                        <div class="text-light">Информационный объем файла: <span id="p3-size-val" class="text-warning fw-bold"></span> Кбайт</div>
+                        <div class="text-light">Общее число символов в сообщении (K): <span id="p3-chars-val" class="text-warning fw-bold"></span> знаков</div>
+                        <div class="text-secondary small mt-1">Все знаки закодированы одинаковым минимально достаточным числом бит i.</div>
+                    </div>
+
+                    <p class="text-light mb-2">Вычислите максимально возможную мощность алфавита N (число символов в алфавите):</p>
+                    <div class="input-group mb-3" style="max-width: 420px;">
+                        <input type="text" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Мощность алфавита N" autocomplete="off">
+                        <button id="p3-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p3-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Переведите Кбайты в биты: I_бит = (Размер_КБ × 1024 × 8), затем i = I_бит / K и N = 2^i!
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ / ХАРТЛИ ДЛЯ N (CCS = 5-6) -->
+                <!-- ========================================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <p class="text-light">
+                        Для распределения прав доступа к серверному кластеру каждому из <span id="p4-users-desc" class="text-warning fw-bold"></span> сотрудников назначен персональный двоичный идентификационный ключ минимальной фиксированной разрядности.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">КОНФИГУРАЦИЯ СКУД:</div>
+                        <div class="text-light">Число регистрируемых субъектов: <span id="p4-subjects-val" class="text-warning fw-bold"></span> человек</div>
+                        <div class="text-secondary small mt-1">Требование: все идентификаторы имеют одинаковую длину в целых битах <em>k</em>, удовлетворяющую условию 2<sup>k</sup> ≥ N.</div>
+                    </div>
+
+                    <p class="text-light mb-2">Укажите минимальную длину индивидуального ключа (в целых битах):</p>
+                    <div class="input-group mb-3" style="max-width: 420px;">
+                        <input type="text" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Число бит" autocomplete="off">
+                        <button id="p4-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p4-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Помните: 2^(k-1) &lt; N &le; 2^k. Длина в битах округляется строго вверх!
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 5: КУЛЬМИНАЦИЯ / UNICODE И СКОРОСТЬ КАНАЛА (CCS = 8-9) -->
+                <!-- ========================================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <p class="text-light">
+                        <span class="badge bg-danger text-light rounded-0 me-1">ФИНАЛЬНЫЙ СИНТЕЗ</span>
+                        Текстовый массив, набранный в 16-битной кодировке Unicode (UTF-16, вес одного символа <strong>2 байта = 16 бит</strong>), отправляется по удаленному спутниковому каналу связи.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТРЫ ТРАНСМИССИИ:</div>
+                        <div class="text-light">Объем документа: <span id="p5-pages-val" class="text-warning fw-bold"></span> страниц, по <span id="p5-lines-val" class="text-warning fw-bold"></span> строк, в каждой по <span id="p5-cols-val" class="text-warning fw-bold"></span> символов</div>
+                        <div class="text-light">Кодировка: <strong>Unicode UTF-16</strong> (2 байта на знак)</div>
+                        <div class="text-light">Пропускная способность канала (v): <span id="p5-speed-val" class="text-warning fw-bold"></span> бит/с</div>
+                        <div class="text-secondary small mt-1">Формулы: I = K × 16 бит, Время передачи t = I / v (секунд).</div>
+                    </div>
+
+                    <p class="text-light mb-2">Сколько секунд (с) займет полная передача документа?</p>
+                    <div class="input-group mb-3" style="max-width: 420px;">
+                        <input type="text" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Время в секундах" autocomplete="off">
+                        <button id="p5-btn" class="btn btn-warning rounded-0 text-dark fw-bold px-4">Ввод ↵</button>
+                    </div>
+                    <div id="p5-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Учтите: вес символа Unicode равен 16 бит (2 байта)! Объем в битах делим на скорость в бит/с.
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="mb-4">
+                        <span class="display-3 text-warning">✓</span>
+                        <h3 class="h3 text-warning mt-2">АТТЕСТАЦИЯ УРОВНЯ 2 УСПЕШНО ЗАВЕРШЕНА!</h3>
+                        <p class="text-light">
+                            Все аналитические расчеты (формула Хартли, алфавитный объем, реверс-энтропия, Unicode и скорость каналов) выполнены безупречно.
+                        </p>
+                    </div>
+                    <div class="card bg-black border-warning d-inline-block p-4 mb-4 text-start font-monospace">
+                        <div class="text-secondary small mb-1">РЕЗУЛЬТАТЫ ПРОХОЖДЕНИЯ:</div>
+                        <div class="text-light">Затраченное время: <span id="final-time" class="text-warning fw-bold">00:00</span></div>
+                        <div class="text-light">Использовано попыток: <span id="final-attempts" class="text-warning fw-bold">1</span></div>
+                        <div class="text-light">Статус телеметрии: <span class="text-warning fw-bold">LEVEL_COMPLETE // ANALYTICAL MASTERY</span></div>
+                    </div>
+                    <div>
+                        <button id="restart-level-btn" class="btn btn-outline-warning rounded-0 px-4">
+                            Пройти уровень повторно
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+        const startTime = Date.now();
+        let attempts = 0;
+        let currentPhase = 1;
+
+        // Таймер
+        const timerDisplay = document.getElementById('timer-display');
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
+        }, 1000);
+
+        // Телеметрия
+        function sendTelemetry(actionType, isSuccess) {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: 'Урок 8 :: Подходы к измерению информации (Уровень 2)',
+                action_type: actionType,
+                status: isSuccess ? 'completed' : 'in_progress',
+                start_time: new Date(startTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: attempts,
+                success: isSuccess
+            }, '*');
+        }
+
+        sendTelemetry('in_progress', false);
+
+        // Нормализация числового ввода
+        function normalizeInput(val) {
+            if (!val) return '';
+            let s = String(val).trim().replace(',', '.');
+            // Удаляем возможные текстовые суффиксы (байт, бит, с, сек, кб)
+            s = s.replace(/(бит|байт|секунд|сек|с|кбайт|кб|мб)$/i, '').trim();
+            return s;
+        }
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+
+        function triggerPhaseError(feedbackEl, callback) {
+            attempts++;
+            if (attemptsDisplay) attemptsDisplay.textContent = attempts;
+            if (feedbackEl) feedbackEl.classList.remove('d-none');
+            sendTelemetry('hardcore_reset', false);
+
+            setTimeout(() => {
+                if (feedbackEl) feedbackEl.classList.add('d-none');
+                if (callback) callback();
+            }, 1400);
+        }
+
+        // ==========================================
+        // ГЕНЕРАТОРЫ ФАЗ (Sawtooth 2-1-2)
+        // ==========================================
+
+        // --- Фаза 1: Прямой расчет I = K × i (CCS = 4) ---
+        const P1_VARIANTS = [
+            { k: 120, n: 64, i: 6, ans: 720 },
+            { k: 150, n: 32, i: 5, ans: 750 },
+            { k: 200, n: 16, i: 4, ans: 800 },
+            { k: 80, n: 128, i: 7, ans: 560 }
+        ];
+        let p1Current = null;
+
+        function initP1() {
+            p1Current = P1_VARIANTS[Math.floor(Math.random() * P1_VARIANTS.length)];
+            document.getElementById('p1-chars-desc').textContent = `${p1Current.k}`;
+            document.getElementById('p1-power-desc').textContent = `${p1Current.n}`;
+            document.getElementById('p1-k-val').textContent = `${p1Current.k}`;
+            document.getElementById('p1-n-val').textContent = `${p1Current.n}`;
+            const inp = document.getElementById('p1-input');
+            inp.value = '';
+            inp.focus();
+        }
+
+        document.getElementById('p1-btn').onclick = checkP1;
+        document.getElementById('p1-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkP1();
+        });
+
+        function checkP1() {
+            const val = normalizeInput(document.getElementById('p1-input').value);
+            if (Number(val) === p1Current.ans) {
+                goToP2();
+            } else {
+                triggerPhaseError(document.getElementById('p1-feedback'), initP1);
+            }
+        }
+
+        // --- Фаза 2: Многошаговый расчет в Кбайтах (CCS = 6) ---
+        const P2_VARIANTS = [
+            { pages: 4, lines: 32, cols: 64, ans: 8 },      // 4*32*64 = 8192 байт = 8 КБ
+            { pages: 8, lines: 32, cols: 64, ans: 16 },     // 8*32*64 = 16384 байт = 16 КБ
+            { pages: 2, lines: 64, cols: 64, ans: 8 },      // 2*64*64 = 8192 байт = 8 КБ
+            { pages: 16, lines: 16, cols: 64, ans: 16 }     // 16*16*64 = 16384 байт = 16 КБ
+        ];
+        let p2Current = null;
+
+        function initP2() {
+            p2Current = P2_VARIANTS[Math.floor(Math.random() * P2_VARIANTS.length)];
+            document.getElementById('p2-pages-val').textContent = `${p2Current.pages}`;
+            document.getElementById('p2-lines-val').textContent = `${p2Current.lines}`;
+            document.getElementById('p2-cols-val').textContent = `${p2Current.cols}`;
+            const inp = document.getElementById('p2-input');
+            inp.value = '';
+            inp.focus();
+        }
+
+        document.getElementById('p2-btn').onclick = checkP2;
+        document.getElementById('p2-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkP2();
+        });
+
+        function checkP2() {
+            const val = normalizeInput(document.getElementById('p2-input').value);
+            if (Number(val) === p2Current.ans) {
+                goToP3();
+            } else {
+                triggerPhaseError(document.getElementById('p2-feedback'), initP2);
+            }
+        }
+
+        // --- Фаза 3: Пик 1 / Реверс-расчет N (CCS = 7-8) ---
+        const P3_VARIANTS = [
+            // I_КБ = 1.5 КБ = 1536 байт = 12288 бит. K = 1536 => i = 8 => N = 256
+            { sizeKb: 1.5, k: 1536, i: 8, n: 256 },
+            // I_КБ = 0.75 КБ = 768 байт = 6144 бит. K = 1024 => i = 6 => N = 64
+            { sizeKb: 0.75, k: 1024, i: 6, n: 64 },
+            // I_КБ = 2.5 КБ = 2560 байт = 20480 бит. K = 4096 => i = 5 => N = 32
+            { sizeKb: 2.5, k: 4096, i: 5, n: 32 }
+        ];
+        let p3Current = null;
+
+        function initP3() {
+            p3Current = P3_VARIANTS[Math.floor(Math.random() * P3_VARIANTS.length)];
+            document.getElementById('p3-size-val').textContent = `${p3Current.sizeKb}`;
+            document.getElementById('p3-chars-val').textContent = `${p3Current.k}`;
+            const inp = document.getElementById('p3-input');
+            inp.value = '';
+            inp.focus();
+        }
+
+        document.getElementById('p3-btn').onclick = checkP3;
+        document.getElementById('p3-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkP3();
+        });
+
+        function checkP3() {
+            const val = normalizeInput(document.getElementById('p3-input').value);
+            if (Number(val) === p3Current.n) {
+                goToP4();
+            } else {
+                triggerPhaseError(document.getElementById('p3-feedback'), initP3);
+            }
+        }
+
+        // --- Фаза 4: Долина консолидации / Хартли для N (CCS = 5-6) ---
+        const P4_VARIANTS = [
+            { count: 200, ans: 8 },  // 128 < 200 <= 256 => 8 бит
+            { count: 350, ans: 9 },  // 256 < 350 <= 512 => 9 бит
+            { count: 80, ans: 7 },   // 64 < 80 <= 128 => 7 бит
+            { count: 60, ans: 6 }    // 32 < 60 <= 64 => 6 бит
+        ];
+        let p4Current = null;
+
+        function initP4() {
+            p4Current = P4_VARIANTS[Math.floor(Math.random() * P4_VARIANTS.length)];
+            document.getElementById('p4-users-desc').textContent = `${p4Current.count}`;
+            document.getElementById('p4-subjects-val').textContent = `${p4Current.count}`;
+            const inp = document.getElementById('p4-input');
+            inp.value = '';
+            inp.focus();
+        }
+
+        document.getElementById('p4-btn').onclick = checkP4;
+        document.getElementById('p4-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkP4();
+        });
+
+        function checkP4() {
+            const val = normalizeInput(document.getElementById('p4-input').value);
+            if (Number(val) === p4Current.ans) {
+                goToP5();
+            } else {
+                triggerPhaseError(document.getElementById('p4-feedback'), initP4);
+            }
+        }
+
+        // --- Фаза 5: Кульминация / Unicode и скорость (CCS = 8-9) ---
+        const P5_VARIANTS = [
+            // K = 16 * 32 * 64 = 32768. I_бит = 32768 * 16 = 524288 бит. v = 4096 бит/с. t = 524288 / 4096 = 128 с
+            { pages: 16, lines: 32, cols: 64, speed: 4096, ans: 128 },
+            // K = 8 * 32 * 64 = 16384. I_бит = 16384 * 16 = 262144 бит. v = 2048 бит/с. t = 262144 / 2048 = 128 с
+            { pages: 8, lines: 32, cols: 64, speed: 2048, ans: 128 },
+            // K = 4 * 32 * 64 = 8192. I_бит = 8192 * 16 = 131072 бит. v = 2048 бит/с. t = 131072 / 2048 = 64 с
+            { pages: 4, lines: 32, cols: 64, speed: 2048, ans: 64 }
+        ];
+        let p5Current = null;
+
+        function initP5() {
+            p5Current = P5_VARIANTS[Math.floor(Math.random() * P5_VARIANTS.length)];
+            document.getElementById('p5-pages-val').textContent = `${p5Current.pages}`;
+            document.getElementById('p5-lines-val').textContent = `${p5Current.lines}`;
+            document.getElementById('p5-cols-val').textContent = `${p5Current.cols}`;
+            document.getElementById('p5-speed-val').textContent = `${p5Current.speed}`;
+            const inp = document.getElementById('p5-input');
+            inp.value = '';
+            inp.focus();
+        }
+
+        document.getElementById('p5-btn').onclick = checkP5;
+        document.getElementById('p5-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkP5();
+        });
+
+        function checkP5() {
+            const val = normalizeInput(document.getElementById('p5-input').value);
+            if (Number(val) === p5Current.ans) {
+                finishLevel();
+            } else {
+                triggerPhaseError(document.getElementById('p5-feedback'), initP5);
+            }
+        }
+
+        // ==========================================
+        // ПЕРЕХОДЫ МЕЖДУ ФАЗАМИ
+        // ==========================================
+        function goToP2() {
+            currentPhase = 2;
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+            document.getElementById('phase-title').textContent = 'Многостраничный расчет объема в Килобайтах (Кбайт)';
+            initP2();
+        }
+
+        function goToP3() {
+            currentPhase = 3;
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 5 [Пик 1]';
+            document.getElementById('phase-title').textContent = 'Реверсивное определение мощности алфавита N по объему';
+            initP3();
+        }
+
+        function goToP4() {
+            currentPhase = 4;
+            document.getElementById('phase3').classList.add('d-none');
+            document.getElementById('phase4').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 4 из 5 [Долина]';
+            document.getElementById('phase-title').textContent = 'Минимальная разрядность кода для N объектов (2^k ≥ N)';
+            initP4();
+        }
+
+        function goToP5() {
+            currentPhase = 5;
+            document.getElementById('phase4').classList.add('d-none');
+            document.getElementById('phase5').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 5 из 5 [Кульминация]';
+            document.getElementById('phase-title').textContent = 'Передача массива Unicode (16 бит) по каналу связи';
+            initP5();
+        }
+
+        function finishLevel() {
+            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
+            const s = String(timeSpent % 60).padStart(2, '0');
+
+            document.getElementById('phase5').classList.add('d-none');
+            document.getElementById('phase-badge').classList.replace('bg-warning', 'bg-success');
+            document.getElementById('phase-badge').textContent = 'Пройдено';
+            document.getElementById('phase-title').textContent = 'Аттестация Уровня 2 завершена';
+
+            document.getElementById('victory-screen').classList.remove('d-none');
+            document.getElementById('final-time').textContent = `${m}:${s}`;
+            document.getElementById('final-attempts').textContent = attempts + 1;
+
+            sendTelemetry('level_complete', true);
+
+            document.getElementById('restart-level-btn').onclick = () => {
+                location.reload();
+            };
+        }
+
+        // Старт
+        initP1();
+    });
+</script>
