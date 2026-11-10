@@ -1,0 +1,865 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 8 класс, Урок 10 — Таблицы истинности
+// Архетип: «Logic Pulse Runner / Circuit Overdrive» (Бегущий логический импульс таблицы истинности)
+// 10 процедурных волн с динамическим таймером (7.0с -> 4.3с), конвейерная коммутация таблицы истинности + форсаж [Space / Enter].
+// Zero-Style Policy: запрещены теги style, только bootstrap утилиты.
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ АРКАДНОГО БОССА) -->
+        <div v-if="gameState === 'intro'" id="intro-screen" class="card bg-dark border-danger rounded-0 p-3 p-md-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 gap-2">
+                <h1 class="h4 text-danger mb-0 fw-bold">⚡ TRUTH TABLE OVERDRIVE // CIRCUIT RUNNER</h1>
+                <span class="badge bg-danger text-dark rounded-0 fw-bold px-3 py-2">АРКАДНЫЙ БОСС // УРОВЕНЬ 3</span>
+            </div>
+
+            <p class="text-light mb-3">
+                По магистрали логического сопроцессора со сверхвысокой скоростью транслируется поток векторов таблицы истинности.
+                На каждой из <strong class="text-danger">10 волн</strong> вам необходимо успеть рассчитать значения промежуточных колонок
+                (<code class="text-info">R₁</code>, <code class="text-info">R₂</code>) и финального шлюза (<code class="text-warning">F</code>)
+                для активной строки таблицы и нажать <strong>ФОРСАЖ ИМПУЛЬСА</strong> до того, как фронт сигнала врежется в терминал!
+            </p>
+
+            <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light py-2">
+                <div class="fw-bold text-danger mb-1">[ПРОТОКОЛ ТАКТОВОГО ВЫЧИСЛЕНИЯ ТАБЛИЦЫ ИСТИННОСТИ]:</div>
+                <ul class="mb-0 ps-3 small">
+                    <li class="mb-1"><strong>Пространственный конвейер 3 узлов:</strong> вычислите промежуточный столбец 1 (<code>R₁</code>), промежуточный столбец 2 (<code>R₂</code>) и результат выражения <code>F</code> для поступающего вектора входных сигналов.</li>
+                    <li class="mb-1"><strong>Динамический таймер волны:</strong> интервал прохождения волны сжимается от <span class="text-warning fw-bold">7.0 сек</span> на 1-й волне до <span class="text-danger fw-bold">4.3 сек</span> на 10-й волне.</li>
+                    <li class="mb-1"><strong>Форсаж импульса:</strong> клавиши <kbd class="bg-dark text-warning border border-warning">ПРОБЕЛ</kbd> или <kbd class="bg-dark text-warning border border-warning">Enter</kbd> мгновенно пускают импульс через настроенные шлюзы.</li>
+                    <li><strong>Тотальный хардкор-сброс:</strong> любая ошибка в любом из узлов или истечение таймера вызывает системную аварию шины и <strong>полный сброс прогресса на Волну 1</strong> с перегенерацией волн!</li>
+                </ul>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="text-secondary small">
+                    Горячие клавиши: <kbd class="bg-black text-info border border-secondary">1</kbd> — Узел R₁,
+                    <kbd class="bg-black text-info border border-secondary">2</kbd> — Узел R₂,
+                    <kbd class="bg-black text-warning border border-secondary">3</kbd> — Шлюз F,
+                    <kbd class="bg-black text-success border border-secondary">Space / Enter</kbd> — Форсаж
+                </div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger rounded-0 fw-bold px-4 py-2" style="min-height: 48px;">
+                    ЗАПУСТИТЬ КОНВЕЙЕР [ENTER]
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. ИГРОВОЙ ЭКРАН (КОНВЕЙЕР ВЫЧИСЛЕНИЯ ТАБЛИЦЫ ИСТИННОСТИ) -->
+        <div v-else-if="gameState === 'playing'" id="game-screen" class="card bg-dark border-danger rounded-0 p-3 p-md-4">
+
+            <!-- Верхняя панель: Волна, Таймер, Сбросы -->
+            <div class="row g-2 align-items-center border-bottom border-secondary pb-2 mb-3">
+                <div class="col-12 col-md-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-secondary small">МАГИСТРАЛЬ ТАБЛИЦ ИСТИННОСТИ:</span>
+                        <span id="wave-indicator" class="badge bg-danger text-dark rounded-0 fs-6 fw-bold">
+                            ВОЛНА <span v-text="currentWave + 1"></span> / 10
+                        </span>
+                    </div>
+                    <div class="progress bg-black border border-secondary rounded-0" style="height: 8px;">
+                        <div class="progress-bar bg-danger" :style="{ width: ((currentWave) * 10) + '%' }"></div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 text-center">
+                    <div class="text-secondary small">СБОЕВ СХЕМЫ: <span id="attempts-counter" class="text-warning fw-bold" v-text="attempts"></span></div>
+                    <div class="small text-info text-truncate" v-text="waveData.categoryName"></div>
+                </div>
+
+                <div class="col-12 col-md-4 text-md-end">
+                    <div class="d-flex justify-content-between justify-content-md-end align-items-center gap-2 mb-1">
+                        <span class="text-secondary small">ДО СТОЛКНОВЕНИЯ:</span>
+                        <span id="timer-display" :class="phaseTimeLeft <= 2.0 ? 'text-danger' : 'text-warning'" class="fs-5 fw-bold">
+                            <span v-text="phaseTimeLeft.toFixed(1)"></span> с
+                        </span>
+                    </div>
+                    <div class="progress bg-black border border-secondary rounded-0" style="height: 8px;">
+                        <div class="progress-bar" :class="phaseTimeLeft <= 2.0 ? 'bg-danger' : 'bg-warning'" :style="{ width: timerPercent + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сирена системного сбоя (Hardcore Reset) -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black border-danger rounded-0 text-center py-2 mb-3" role="alert">
+                <div class="fw-bold text-danger fs-5">[КОРОТКОЕ ЗАМЫКАНИЕ ШИНЫ // HARDCORE RESET]</div>
+                <div class="text-light small mb-1" v-text="alarmReason"></div>
+                <div class="text-warning small">Сброс магистрали на Волну 1 и процедурная перегенерация волн...</div>
+            </div>
+
+            <!-- Визуальная трасса бегущего логического импульса -->
+            <div class="card bg-black border-info rounded-0 p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center small mb-1">
+                    <span class="text-info fw-bold">⚡ ФРОНТ СВЕТОВОГО ИМПУЛЬСА НА ШИНЕ:</span>
+                    <span class="text-warning fw-bold" v-text="pulseProgress + '% ТРАССЫ'"></span>
+                </div>
+                <div class="progress bg-dark border border-info rounded-0" style="height: 12px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" :style="{ width: pulseProgress + '%' }"></div>
+                </div>
+            </div>
+
+            <!-- Формула функции и активный вектор операндов -->
+            <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-md-5 border-bottom border-md-bottom-0 border-secondary pb-2 pb-md-0">
+                        <div class="text-secondary small">ВХОДНОЙ ВЕКТОР СТРИМА:</div>
+                        <div id="packet-payload" class="fs-4 text-info fw-bold" v-text="waveData.vectorText"></div>
+                        <div class="text-secondary small">
+                            Переменные: <span class="text-light" v-text="waveData.varsCount === 2 ? 'A, B (4 строки)' : 'A, B, C (8 строк)'"></span>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <div class="text-secondary small">ЛОГИЧЕСКАЯ ФУНКЦИЯ F:</div>
+                        <div id="packet-formula" class="fs-5 text-warning fw-bold text-break" v-text="waveData.fullFormula"></div>
+                        <div class="text-secondary small" v-text="waveData.subFormulaText"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Матрица таблицы истинности (Data Source) -->
+            <div class="card bg-black border-secondary rounded-0 p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                    <span class="text-secondary small fw-bold">ТАБЛИЦА ИСТИННОСТИ [ТЕКУЩИЙ СРЕЗ]:</span>
+                    <span class="badge bg-warning text-dark rounded-0 small">АКТИВНАЯ СТРОКА: ВЕКТОР №<span v-text="waveData.activeRowIndex + 1"></span></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm table-bordered text-center align-middle mb-0" style="font-size: 0.85rem;">
+                        <thead class="text-secondary">
+                            <tr>
+                                <th style="width: 45px;">№</th>
+                                <th v-if="waveData.varsCount >= 1" style="width: 50px;">A</th>
+                                <th v-if="waveData.varsCount >= 2" style="width: 50px;">B</th>
+                                <th v-if="waveData.varsCount >= 3" style="width: 50px;">C</th>
+                                <th>R₁: <span class="text-info" v-text="waveData.colR1Name"></span></th>
+                                <th>R₂: <span class="text-info" v-text="waveData.colR2Name"></span></th>
+                                <th class="text-warning">ВЫХОД F</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, rIdx) in waveData.tableRows" :key="rIdx"
+                                :class="rIdx === waveData.activeRowIndex ? 'table-active border-warning border-2' : ''">
+                                <td class="text-secondary" v-text="rIdx + 1"></td>
+                                <td v-if="waveData.varsCount >= 1" :class="row.a === 1 ? 'text-success fw-bold' : 'text-secondary'" v-text="row.a"></td>
+                                <td v-if="waveData.varsCount >= 2" :class="row.b === 1 ? 'text-success fw-bold' : 'text-secondary'" v-text="row.b"></td>
+                                <td v-if="waveData.varsCount >= 3" :class="row.c === 1 ? 'text-success fw-bold' : 'text-secondary'" v-text="row.c"></td>
+
+                                <!-- Столбец R1 -->
+                                <td v-if="rIdx === waveData.activeRowIndex" class="bg-black border border-info">
+                                    <span class="badge rounded-0 fs-6" :class="nodeR1 === 1 ? 'bg-success text-dark' : 'bg-dark text-info border border-info'">
+                                        R₁ = <span v-text="nodeR1"></span>
+                                    </span>
+                                </td>
+                                <td v-else class="text-muted" v-text="row.r1"></td>
+
+                                <!-- Столбец R2 -->
+                                <td v-if="rIdx === waveData.activeRowIndex" class="bg-black border border-info">
+                                    <span class="badge rounded-0 fs-6" :class="nodeR2 === 1 ? 'bg-success text-dark' : 'bg-dark text-info border border-info'">
+                                        R₂ = <span v-text="nodeR2"></span>
+                                    </span>
+                                </td>
+                                <td v-else class="text-muted" v-text="row.r2"></td>
+
+                                <!-- Столбец F -->
+                                <td v-if="rIdx === waveData.activeRowIndex" class="bg-black border border-warning">
+                                    <span class="badge rounded-0 fs-6" :class="nodeF === 1 ? 'bg-warning text-dark' : 'bg-dark text-warning border border-warning'">
+                                        F = <span v-text="nodeF"></span>
+                                    </span>
+                                </td>
+                                <td v-else class="text-muted" v-text="row.f"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Пространственный конвейер 3 узлов (R1, R2 -> F) -->
+            <div class="row g-3 mb-3 align-items-stretch">
+
+                <!-- УЗЕЛ 1: Промежуточный столбец R1 -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between"
+                         :class="nodeR1 === 1 ? 'border-success' : 'border-secondary'">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-info text-dark rounded-0">УЗЕЛ 1 // СТОЛБЕЦ R₁</span>
+                                <span class="text-secondary small">Клавиша [1]</span>
+                            </div>
+                            <div class="text-light fw-bold mb-2 small" v-text="waveData.descR1"></div>
+                            <div class="text-info fw-bold mb-3" v-text="'R₁ = ' + waveData.colR1Name"></div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-r1"
+                                @click="toggleNode('R1')"
+                                :disabled="alarmActive"
+                                :data-val="nodeR1"
+                                :data-expected-r1="waveData.expectedR1"
+                                :data-expected-p="waveData.expectedR1"
+                                class="btn rounded-0 w-100 py-3 fs-5 fw-bold"
+                                style="min-height: 52px;"
+                                :class="nodeR1 === 1 ? 'btn-success text-dark' : 'btn-outline-secondary text-light'">
+                            R₁ = <span v-text="nodeR1"></span> (<span v-text="nodeR1 === 1 ? 'ИСТИНА' : 'ЛОЖЬ'"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ 2: Промежуточный столбец R2 -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between"
+                         :class="nodeR2 === 1 ? 'border-success' : 'border-secondary'">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-info text-dark rounded-0">УЗЕЛ 2 // СТОЛБЕЦ R₂</span>
+                                <span class="text-secondary small">Клавиша [2]</span>
+                            </div>
+                            <div class="text-light fw-bold mb-2 small" v-text="waveData.descR2"></div>
+                            <div class="text-info fw-bold mb-3" v-text="'R₂ = ' + waveData.colR2Name"></div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-r2"
+                                @click="toggleNode('R2')"
+                                :disabled="alarmActive"
+                                :data-val="nodeR2"
+                                :data-expected-r2="waveData.expectedR2"
+                                :data-expected-q="waveData.expectedR2"
+                                class="btn rounded-0 w-100 py-3 fs-5 fw-bold"
+                                style="min-height: 52px;"
+                                :class="nodeR2 === 1 ? 'btn-success text-dark' : 'btn-outline-secondary text-light'">
+                            R₂ = <span v-text="nodeR2"></span> (<span v-text="nodeR2 === 1 ? 'ИСТИНА' : 'ЛОЖЬ'"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ 3: Выходной магистральный шлюз F -->
+                <div class="col-12 col-md-4">
+                    <div class="card bg-black rounded-0 h-100 p-3 d-flex flex-column justify-content-between"
+                         :class="nodeF === 1 ? 'border-warning' : 'border-secondary'">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-warning text-dark rounded-0">УЗЕЛ 3 // РЕЗУЛЬТАТ F</span>
+                                <span class="text-secondary small">Клавиша [3]</span>
+                            </div>
+                            <div class="text-light fw-bold mb-2 small" v-text="waveData.descF"></div>
+                            <div class="text-warning fw-bold mb-3" v-text="'F = ' + waveData.colFName"></div>
+                        </div>
+                        <button type="button"
+                                id="gate-node-f"
+                                @click="toggleNode('F')"
+                                :disabled="alarmActive"
+                                :data-val="nodeF"
+                                :data-expected-f="waveData.expectedF"
+                                class="btn rounded-0 w-100 py-3 fs-5 fw-bold"
+                                style="min-height: 52px;"
+                                :class="nodeF === 1 ? 'btn-warning text-dark' : 'btn-outline-secondary text-light'">
+                            F = <span v-text="nodeF"></span> (<span v-text="nodeF === 1 ? 'ИСТИНА' : 'ЛОЖЬ'"></span>)
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Кнопка форсажа импульса -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="text-secondary small">
+                    Управление: клик мыши по блокам или клавиши <kbd class="bg-black text-info border border-secondary">1</kbd>,
+                    <kbd class="bg-black text-info border border-secondary">2</kbd>,
+                    <kbd class="bg-black text-warning border border-secondary">3</kbd>, пуск —
+                    <kbd class="bg-black text-success border border-secondary">Space / Enter</kbd>
+                </div>
+                <button type="button"
+                        id="btn-boost"
+                        @click="firePulse"
+                        :disabled="alarmActive"
+                        class="btn btn-warning rounded-0 fw-bold px-4 py-2 fs-5 flex-grow-1 flex-md-grow-0"
+                        style="min-height: 48px;">
+                    ⚡ ФОРСАЖ ИМПУЛЬСА [SPACE / ENTER]
+                </button>
+            </div>
+
+        </div>
+
+        <!-- 3. ЭКРАН ПОБЕДЫ (АТТЕСТАЦИЯ АРКАДЫ ЗАВЕРШЕНА) -->
+        <div v-else-if="gameState === 'success'" id="success-screen" class="card bg-dark border-success rounded-0 p-3 p-md-4 text-center">
+            <div class="badge bg-success text-dark rounded-0 fs-6 fw-bold mb-3 d-inline-block px-3 py-2">
+                АРКАДНЫЙ БОСС УНИЧТОЖЕН // СИНХРОНИЗАЦИЯ 100%
+            </div>
+            <h2 class="h3 text-success fw-bold mb-3">ВСЕ 10 ВОЛН ТАБЛИЦ ИСТИННОСТИ ПРОЙДЕНЫ!</h2>
+            <p class="text-light mb-4">
+                Магистраль логического сопроцессора полностью откалибрована.
+                Вы безошибочно вычислили все промежуточные и итоговые столбцы таблиц истинности
+                в условиях экстремального динамического тайминга.
+            </p>
+
+            <div class="row g-2 justify-content-center mb-4">
+                <div class="col-12 col-sm-4">
+                    <div class="card bg-black border-secondary rounded-0 p-2">
+                        <div class="text-secondary small">УСПЕШНЫХ ВОЛН:</div>
+                        <div class="fs-4 text-success fw-bold">10 / 10</div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4">
+                    <div class="card bg-black border-secondary rounded-0 p-2">
+                        <div class="text-secondary small">СБОЕВ (ХАРДКОР-СБРОСОВ):</div>
+                        <div class="fs-4 text-warning fw-bold" v-text="attempts"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-center gap-2">
+                <button id="restart-btn" @click="startGame" class="btn btn-outline-success rounded-0 fw-bold px-4 py-2" style="min-height: 48px;">
+                    ПОВТОРИТЬ МАРШРУТИЗАЦИЮ
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/vue.global.js" is:inline></script>
+    <script is:inline>
+        const missionName = 'Урок 10 :: Таблицы истинности (Уровень 3)';
+        const sessionStartTime = Date.now();
+        let totalAttemptsCount = 0;
+
+        function sendTelemetry(action_type, success = false) {
+            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: action_type,
+                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
+                start_time: new Date(sessionStartTime).toISOString(),
+                time_spent_sec: timeSpent,
+                attempts_count: totalAttemptsCount,
+                success: success
+            }, '*');
+        }
+
+        // Web Audio Синтезатор звуковых сигналов
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playTone(freq, type, duration, gainVal = 0.12) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        function playClickTick() {
+            playTone(600, 'sine', 0.04, 0.08);
+        }
+
+        function playSuccessChime() {
+            playTone(523.25, 'sine', 0.1, 0.1);
+            setTimeout(() => playTone(659.25, 'sine', 0.1, 0.1), 80);
+            setTimeout(() => playTone(783.99, 'sine', 0.18, 0.12), 160);
+        }
+
+        function playAlarmSiren() {
+            playTone(440, 'sawtooth', 0.22, 0.15);
+            setTimeout(() => playTone(880, 'sawtooth', 0.22, 0.15), 140);
+            setTimeout(() => playTone(440, 'sawtooth', 0.25, 0.15), 280);
+        }
+
+        function rnd(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // Определение 10 процедурных волн
+        const waveArchetypes = [
+            // Волна 1: 2 переменные, НЕ и ИЛИ
+            {
+                varsCount: 2,
+                categoryName: 'Волна 1/10: 2 переменные // Инверсия и Дизъюнкция',
+                formula: 'F = ¬A ∨ (A ∧ B)',
+                colR1Name: '¬A',
+                colR2Name: 'A ∧ B',
+                colFName: 'R₁ ∨ R₂',
+                descR1: 'Инверсия первого сигнала A',
+                descR2: 'Конъюнкция сигналов A и B',
+                descF: 'Дизъюнкция: R₁ ИЛИ R₂',
+                evalRow: (a, b) => {
+                    const r1 = (!a ? 1 : 0);
+                    const r2 = (a && b ? 1 : 0);
+                    const f = (r1 || r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 2: 2 переменные, НЕ и И
+            {
+                varsCount: 2,
+                categoryName: 'Волна 2/10: 2 переменные // Конъюнкция с отрицанием',
+                formula: 'F = ¬B ∧ (A ∨ B)',
+                colR1Name: '¬B',
+                colR2Name: 'A ∨ B',
+                colFName: 'R₁ ∧ R₂',
+                descR1: 'Инверсия сигнала B',
+                descR2: 'Дизъюнкция сигналов A и B',
+                descF: 'Конъюнкция: R₁ И R₂',
+                evalRow: (a, b) => {
+                    const r1 = (!b ? 1 : 0);
+                    const r2 = (a || b ? 1 : 0);
+                    const f = (r1 && r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 3: 2 переменные, Исключающее ИЛИ (XOR)
+            {
+                varsCount: 2,
+                categoryName: 'Волна 3/10: 2 переменные // XOR и Двойная инверсия',
+                formula: 'F = (A ⊕ B) ∨ (¬A ∧ ¬B)',
+                colR1Name: 'A ⊕ B',
+                colR2Name: '¬A ∧ ¬B',
+                colFName: 'R₁ ∨ R₂',
+                descR1: 'XOR: 1, если A ≠ B',
+                descR2: 'Конъюнкция инверсий A и B',
+                descF: 'Дизъюнкция: R₁ ИЛИ R₂',
+                evalRow: (a, b) => {
+                    const r1 = (a !== b ? 1 : 0);
+                    const r2 = ((!a && !b) ? 1 : 0);
+                    const f = (r1 || r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 4: 3 переменные, Конъюнкция подвыражений
+            {
+                varsCount: 3,
+                categoryName: 'Волна 4/10: 3 переменные // Каскадная дизъюнкция и конъюнкция',
+                formula: 'F = (¬A ∨ B) ∧ (B ∧ C)',
+                colR1Name: '¬A ∨ B',
+                colR2Name: 'B ∧ C',
+                colFName: 'R₁ ∧ R₂',
+                descR1: 'Инверсия A ИЛИ B',
+                descR2: 'Конъюнкция B И C',
+                descF: 'Конъюнкция: R₁ И R₂',
+                evalRow: (a, b, c) => {
+                    const r1 = ((!a || b) ? 1 : 0);
+                    const r2 = ((b && c) ? 1 : 0);
+                    const f = ((r1 && r2) ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 5: 3 переменные, Закон де Моргана (Инверсия конъюнкции)
+            {
+                varsCount: 3,
+                categoryName: 'Волна 5/10: 3 переменные // Закон де Моргана (¬(A ∧ B))',
+                formula: 'F = ¬(A ∧ B) ∧ (A ∨ ¬C)',
+                colR1Name: '¬(A ∧ B)',
+                colR2Name: 'A ∨ ¬C',
+                colFName: 'R₁ ∧ R₂',
+                descR1: 'Инверсия конъюнкции A и B',
+                descR2: 'Дизъюнкция A ИЛИ (НЕ C)',
+                descF: 'Конъюнкция: R₁ И R₂',
+                evalRow: (a, b, c) => {
+                    const r1 = (!(a && b) ? 1 : 0);
+                    const r2 = ((a || !c) ? 1 : 0);
+                    const f = ((r1 && r2) ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 6: 3 переменные, Закон де Моргана (Инверсия дизъюнкции)
+            {
+                varsCount: 3,
+                categoryName: 'Волна 6/10: 3 переменные // Инверсия скобки де Моргана',
+                formula: 'F = ¬(B ∨ C) ∨ (A ∧ C)',
+                colR1Name: '¬(B ∨ C)',
+                colR2Name: 'A ∧ C',
+                colFName: 'R₁ ∨ R₂',
+                descR1: 'Инверсия дизъюнкции B и C',
+                descR2: 'Конъюнкция A И C',
+                descF: 'Дизъюнкция: R₁ ИЛИ R₂',
+                evalRow: (a, b, c) => {
+                    const r1 = (!(b || c) ? 1 : 0);
+                    const r2 = ((a && c) ? 1 : 0);
+                    const f = ((r1 || r2) ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 7: 3 переменные, Импликация (Следование)
+            {
+                varsCount: 3,
+                categoryName: 'Волна 7/10: 3 переменные // Импликация (Следование A → B)',
+                formula: 'F = (A → B) ∨ (¬B ∧ C)',
+                colR1Name: 'A → B',
+                colR2Name: '¬B ∧ C',
+                colFName: 'R₁ ∨ R₂',
+                descR1: 'Импликация: ложна только при 1 → 0',
+                descR2: 'Конъюнкция (НЕ B) И C',
+                descF: 'Дизъюнкция: R₁ ИЛИ R₂',
+                evalRow: (a, b, c) => {
+                    const r1 = (!a || b ? 1 : 0);
+                    const r2 = (!b && c ? 1 : 0);
+                    const f = (r1 || r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 8: 3 переменные, Эквивалентность и XOR
+            {
+                varsCount: 3,
+                categoryName: 'Волна 8/10: 3 переменные // Эквивалентность (≡) и XOR (⊕)',
+                formula: 'F = (A ≡ B) ∧ (B ⊕ C)',
+                colR1Name: 'A ≡ B',
+                colR2Name: 'B ⊕ C',
+                colFName: 'R₁ ∧ R₂',
+                descR1: 'Эквивалентность: 1, если A = B',
+                descR2: 'XOR: 1, если B ≠ C',
+                descF: 'Конъюнкция: R₁ И R₂',
+                evalRow: (a, b, c) => {
+                    const r1 = (a === b ? 1 : 0);
+                    const r2 = (b !== c ? 1 : 0);
+                    const f = (r1 && r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 9: 3 переменные, Двойное отрицание скобки
+            {
+                varsCount: 3,
+                categoryName: 'Волна 9/10: 3 переменные // Комплексная деструкция скобок',
+                formula: 'F = ¬(¬A ∨ B) ∨ ((A ∧ C) ∨ ¬B)',
+                colR1Name: '¬(¬A ∨ B)',
+                colR2Name: '(A ∧ C) ∨ ¬B',
+                colFName: 'R₁ ∨ R₂',
+                descR1: 'Инверсия (¬A ∨ B) [де Морган: A ∧ ¬B]',
+                descR2: 'Дизъюнкция: (A И C) ИЛИ (НЕ B)',
+                descF: 'Дизъюнкция: R₁ ИЛИ R₂',
+                evalRow: (a, b, c) => {
+                    const r1 = (!(!a || b) ? 1 : 0);
+                    const r2 = ((a && c) || !b ? 1 : 0);
+                    const f = (r1 || r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            },
+            // Волна 10: 3 переменные, Финальный босс (Импликация + Эквивалентность)
+            {
+                varsCount: 3,
+                categoryName: 'Волна 10/10: 3 переменные // Финальный босс (Импликация ∧ Эквивалентность)',
+                formula: 'F = ((A ∧ B) → C) ∧ (¬A ≡ (B ∨ ¬C))',
+                colR1Name: '(A ∧ B) → C',
+                colR2Name: '¬A ≡ (B ∨ ¬C)',
+                colFName: 'R₁ ∧ R₂',
+                descR1: 'Импликация: (A ∧ B) влечет C',
+                descR2: 'Эквивалентность: ¬A равносильно (B ∨ ¬C)',
+                descF: 'Конъюнкция: R₁ И R₂',
+                evalRow: (a, b, c) => {
+                    const prem = (a && b ? 1 : 0);
+                    const r1 = (!prem || c ? 1 : 0);
+                    const left = (!a ? 1 : 0);
+                    const right = (b || !c ? 1 : 0);
+                    const r2 = (left === right ? 1 : 0);
+                    const f = (r1 && r2 ? 1 : 0);
+                    return { r1, r2, f };
+                }
+            }
+        ];
+
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                const gameState = ref('intro');
+                const currentWave = ref(0);
+                const phaseTimeLeft = ref(7.0);
+                const waveMaxTime = ref(7.0);
+                const attempts = ref(0);
+                const alarmActive = ref(false);
+                const alarmReason = ref('');
+
+                const nodeR1 = ref(0);
+                const nodeR2 = ref(0);
+                const nodeF = ref(0);
+
+                const waveData = ref({
+                    varsCount: 2,
+                    categoryName: '',
+                    fullFormula: '',
+                    subFormulaText: '',
+                    vectorText: '',
+                    colR1Name: '',
+                    colR2Name: '',
+                    colFName: '',
+                    descR1: '',
+                    descR2: '',
+                    descF: '',
+                    activeRowIndex: 0,
+                    expectedR1: 0,
+                    expectedR2: 0,
+                    expectedF: 0,
+                    tableRows: []
+                });
+
+                let timerId = null;
+                let resetTimeoutId = null;
+
+                const timerPercent = computed(() => {
+                    if (waveMaxTime.value <= 0) return 0;
+                    return Math.max(0, Math.min(100, (phaseTimeLeft.value / waveMaxTime.value) * 100));
+                });
+
+                const pulseProgress = computed(() => {
+                    if (waveMaxTime.value <= 0) return 100;
+                    const elapsed = waveMaxTime.value - phaseTimeLeft.value;
+                    return Math.max(0, Math.min(100, Math.round((elapsed / waveMaxTime.value) * 100)));
+                });
+
+                function buildWave(waveIdx) {
+                    nodeR1.value = 0;
+                    nodeR2.value = 0;
+                    nodeF.value = 0;
+
+                    // Динамический таймер: сжатие от 7.0с до 4.3с
+                    const limit = Number((7.0 - waveIdx * 0.3).toFixed(1));
+                    waveMaxTime.value = limit;
+                    phaseTimeLeft.value = limit;
+
+                    const arch = waveArchetypes[waveIdx];
+                    const rows = [];
+
+                    if (arch.varsCount === 2) {
+                        for (let a = 0; a <= 1; a++) {
+                            for (let b = 0; b <= 1; b++) {
+                                const res = arch.evalRow(a, b);
+                                rows.push({ a, b, r1: res.r1, r2: res.r2, f: res.f });
+                            }
+                        }
+                    } else {
+                        for (let a = 0; a <= 1; a++) {
+                            for (let b = 0; b <= 1; b++) {
+                                for (let c = 0; c <= 1; c++) {
+                                    const res = arch.evalRow(a, b, c);
+                                    rows.push({ a, b, c, r1: res.r1, r2: res.r2, f: res.f });
+                                }
+                            }
+                        }
+                    }
+
+                    // Выбираем случайную активную строку
+                    const activeRowIdx = rnd(0, rows.length - 1);
+                    const activeRow = rows[activeRowIdx];
+
+                    let vectorText = '';
+                    if (arch.varsCount === 2) {
+                        vectorText = `A = ${activeRow.a},  B = ${activeRow.b}`;
+                    } else {
+                        vectorText = `A = ${activeRow.a},  B = ${activeRow.b},  C = ${activeRow.c}`;
+                    }
+
+                    waveData.value = {
+                        varsCount: arch.varsCount,
+                        categoryName: arch.categoryName,
+                        fullFormula: arch.formula,
+                        subFormulaText: `Промежуточные: R₁ = ${arch.colR1Name},  R₂ = ${arch.colR2Name}`,
+                        vectorText: vectorText,
+                        colR1Name: arch.colR1Name,
+                        colR2Name: arch.colR2Name,
+                        colFName: arch.colFName,
+                        descR1: arch.descR1,
+                        descR2: arch.descR2,
+                        descF: arch.descF,
+                        activeRowIndex: activeRowIdx,
+                        expectedR1: activeRow.r1,
+                        expectedR2: activeRow.r2,
+                        expectedF: activeRow.f,
+                        tableRows: rows
+                    };
+                }
+
+                function stopTimer() {
+                    if (timerId) {
+                        clearInterval(timerId);
+                        timerId = null;
+                    }
+                }
+
+                function startWaveTimer() {
+                    stopTimer();
+                    timerId = setInterval(() => {
+                        if (alarmActive.value || gameState.value !== 'playing') return;
+                        phaseTimeLeft.value = Math.max(0, Number((phaseTimeLeft.value - 0.1).toFixed(1)));
+                        if (phaseTimeLeft.value <= 0) {
+                            triggerHardcoreReset('Время истекло! Фронт импульса врезался в некорректный шлюз.');
+                        }
+                    }, 100);
+                }
+
+                function triggerHardcoreReset(reason) {
+                    if (alarmActive.value) return;
+                    stopTimer();
+                    alarmActive.value = true;
+                    alarmReason.value = reason;
+                    attempts.value++;
+                    totalAttemptsCount = attempts.value;
+                    playAlarmSiren();
+                    sendTelemetry('hardcore_reset', false);
+
+                    resetTimeoutId = setTimeout(() => {
+                        alarmActive.value = false;
+                        currentWave.value = 0;
+                        buildWave(0);
+                        startWaveTimer();
+                    }, 1100);
+                }
+
+                function toggleNode(which) {
+                    if (alarmActive.value || gameState.value !== 'playing') return;
+                    playClickTick();
+                    if (which === 'R1') nodeR1.value = nodeR1.value === 1 ? 0 : 1;
+                    else if (which === 'R2') nodeR2.value = nodeR2.value === 1 ? 0 : 1;
+                    else if (which === 'F') nodeF.value = nodeF.value === 1 ? 0 : 1;
+                }
+
+                function firePulse() {
+                    if (alarmActive.value || gameState.value !== 'playing') return;
+
+                    const okR1 = nodeR1.value === waveData.value.expectedR1;
+                    const okR2 = nodeR2.value === waveData.value.expectedR2;
+                    const okF = nodeF.value === waveData.value.expectedF;
+
+                    if (okR1 && okR2 && okF) {
+                        playSuccessChime();
+                        if (currentWave.value + 1 >= 10) {
+                            stopTimer();
+                            gameState.value = 'success';
+                            sendTelemetry('level_complete', true);
+                        } else {
+                            currentWave.value++;
+                            buildWave(currentWave.value);
+                        }
+                    } else {
+                        triggerHardcoreReset('Ошибка вычисления столбцов! Значения R₁, R₂ или F не соответствуют строке таблицы.');
+                    }
+                }
+
+                function startGame() {
+                    if (resetTimeoutId) clearTimeout(resetTimeoutId);
+                    alarmActive.value = false;
+                    currentWave.value = 0;
+                    gameState.value = 'playing';
+                    buildWave(0);
+                    startWaveTimer();
+                }
+
+                function handleKeyDown(e) {
+                    if (gameState.value === 'intro' && e.key === 'Enter') {
+                        e.preventDefault();
+                        startGame();
+                        return;
+                    }
+                    if (gameState.value === 'success' && e.key === 'Enter') {
+                        e.preventDefault();
+                        startGame();
+                        return;
+                    }
+                    if (gameState.value !== 'playing' || alarmActive.value) return;
+
+                    if (e.key === '1') {
+                        e.preventDefault();
+                        toggleNode('R1');
+                    } else if (e.key === '2') {
+                        e.preventDefault();
+                        toggleNode('R2');
+                    } else if (e.key === '3') {
+                        e.preventDefault();
+                        toggleNode('F');
+                    } else if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        firePulse();
+                    }
+                }
+
+                // Экспорт состояния для автотестов Playwright и симулятора персон
+                window.__DEV_LEVEL3_STATE__ = {
+                    get started() { return gameState.value === 'playing'; },
+                    get completed() { return gameState.value === 'success'; },
+                    get currentWaveIndex() { return currentWave.value; },
+                    get currentWave() { return currentWave.value + 1; },
+                    get waves() { return waveArchetypes; },
+                    get waveData() { return waveData.value; },
+                    get attempts() { return attempts.value; },
+                    getCurrentPacket: () => waveData.value,
+                    solveCurrentWave() {
+                        if (gameState.value !== 'playing') {
+                            startGame();
+                        }
+                        nodeR1.value = waveData.value.expectedR1;
+                        nodeR2.value = waveData.value.expectedR2;
+                        nodeF.value = waveData.value.expectedF;
+                        firePulse();
+                    },
+                    submitAction(action) {
+                        if (!action || action === 'boost' || action === 'fire') {
+                            firePulse();
+                        } else if (action === 'solve') {
+                            this.solveCurrentWave();
+                        } else if (typeof action === 'object') {
+                            if (action.r1 !== undefined) nodeR1.value = action.r1;
+                            if (action.r2 !== undefined) nodeR2.value = action.r2;
+                            if (action.f !== undefined) nodeF.value = action.f;
+                            firePulse();
+                        }
+                    },
+                    submitChoice(choice) {
+                        if (typeof choice === 'boolean') {
+                            if (choice) {
+                                this.solveCurrentWave();
+                            } else {
+                                nodeF.value = waveData.value.expectedF === 1 ? 0 : 1;
+                                firePulse();
+                            }
+                        }
+                    },
+                    toggleNode,
+                    firePulse,
+                    startGame
+                };
+
+                onMounted(() => {
+                    window.addEventListener('keydown', handleKeyDown);
+                });
+
+                onUnmounted(() => {
+                    stopTimer();
+                    if (resetTimeoutId) clearTimeout(resetTimeoutId);
+                    window.removeEventListener('keydown', handleKeyDown);
+                });
+
+                return {
+                    gameState,
+                    currentWave,
+                    phaseTimeLeft,
+                    waveMaxTime,
+                    timerPercent,
+                    pulseProgress,
+                    attempts,
+                    alarmActive,
+                    alarmReason,
+                    nodeR1,
+                    nodeR2,
+                    nodeF,
+                    waveData,
+                    startGame,
+                    toggleNode,
+                    firePulse
+                };
+            }
+        }).mount('#app');
+    </script>
+</TaskLayout>
