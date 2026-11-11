@@ -8,5 +8,5 @@
 - [x] **Этап 3:** Разработка Уровня 2 (`level2.astro`, аналитический ввод, 5 фаз, Sawtooth 2-1-2)
 - [x] **Этап 4:** Разработка Уровня 3 (`level3.astro`, Vue 3, 10 волн, таймеры, хардкор-сброс)
 - [x] **Этап 5:** Наполнение разделов «Дополнительная информация» в `theory.md` (Zero-Leakage Policy)
-- [ ] **Этап 6:** Автотесты (Playwright E2E + цифровые персоны NOVICE, CARELESS, CHAOS, DILIGENT)
+- [x] **Этап 6:** Автотесты (Playwright E2E + цифровые персоны NOVICE, CARELESS, CHAOS, DILIGENT)
 - [ ] **Этап 7:** Релиз и деплой (PR, Merge, удаление worktree, миграция/сборка dist, перезапуск сервера, smoke check)
