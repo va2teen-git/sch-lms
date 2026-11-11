@@ -44,10 +44,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         <span id="phase-counter" class="badge bg-danger text-light rounded-0 fs-6 me-2">
                             ВОЛНА <span v-text="currentWaveIndex + 1"></span> ИЗ <span v-text="waves.length"></span>
                         </span>
-                        <span class="text-light fw-bold fs-6" v-text="currentWave.title"></span>
+                        <span id="wave-title" class="text-light fw-bold fs-6" v-text="currentWave.title"></span>
                     </div>
                     <div class="text-secondary small">
-                        Ошибок: <span class="text-warning fw-bold" v-text="attemptsCount"></span> | 
+                        Ошибок: <span id="alarm-count" class="text-warning fw-bold" v-text="attemptsCount"></span> | 
                         Таймер: <span class="text-danger fw-bold fs-5" v-text="phaseTimeLeft.toFixed(1) + 'с'"></span>
                     </div>
                 </div>
@@ -107,7 +107,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="row g-3">
                         <!-- Шлюз 1: PREFIX_GATE -->
                         <div class="col-12 col-md-4">
-                            <button @click="submitAction('prefix')" 
+                            <button id="btn-gate-prefix"
+                                    @click="submitAction('prefix')" 
                                     :disabled="isActionBlocked" 
                                     class="btn btn-outline-success w-100 rounded-0 p-3 text-start d-flex flex-column justify-content-between shadow"
                                     style="min-height: 64px;">
@@ -123,7 +124,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                         <!-- Шлюз 2: POSTFIX_GATE -->
                         <div class="col-12 col-md-4">
-                            <button @click="submitAction('postfix')" 
+                            <button id="btn-gate-postfix"
+                                    @click="submitAction('postfix')" 
                                     :disabled="isActionBlocked" 
                                     class="btn btn-outline-warning w-100 rounded-0 p-3 text-start d-flex flex-column justify-content-between shadow"
                                     style="min-height: 64px;">
@@ -139,7 +141,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                         <!-- Шлюз 3: MARKOV_COLLISION -->
                         <div class="col-12 col-md-4">
-                            <button @click="submitAction('collision')" 
+                            <button id="btn-gate-collision"
+                                    @click="submitAction('collision')" 
                                     :disabled="isActionBlocked" 
                                     class="btn btn-outline-danger w-100 rounded-0 p-3 text-start d-flex flex-column justify-content-between shadow"
                                     style="min-height: 64px;">
@@ -159,24 +162,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         </div>
 
         <!-- Экран победы (Пройдены все 10 волн) -->
-        <div v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-4 p-md-5 text-center shadow">
+        <div id="victory-screen" v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-4 p-md-5 text-center shadow">
             <div class="display-4 text-success mb-3">✔ ВЗЛОМ СИСТЕМЫ ЗАВЕРШЕН ✔</div>
             <h2 class="text-light mb-3">БОСС УРОВНЯ 3 ПОВЕРЖЕН! ШЛЮЗ ДЕКОДЕРА ПОД КОНТРОЛЕМ</h2>
             <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
                 Вы выдержали экстремальный натиск 10 нарастающих волн, безошибочно фильтруя мгновенные префиксные деревья, постфиксные буферы и коллизии графа Маркова!
             </p>
 
-            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-4" style="max-width: 520px;">
-                <div class="d-flex justify-content-around text-center">
-                    <div>
+            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-4" style="max-width: 580px;">
+                <div class="d-flex justify-content-around text-center gap-3 px-3">
+                    <div class="px-2">
                         <div class="text-secondary small">ОТРАЖЕНО ВОЛН</div>
                         <div class="fs-4 fw-bold text-success">10 / 10</div>
                     </div>
-                    <div>
+                    <div class="px-2">
                         <div class="text-secondary small">АВАРИЙНЫХ СБОЕВ</div>
                         <div class="fs-4 fw-bold text-warning" v-text="attemptsCount"></div>
                     </div>
-                    <div>
+                    <div class="px-2">
                         <div class="text-secondary small">ИТОГОВОЕ ВРЕМЯ</div>
                         <div class="fs-4 fw-bold text-info" v-text="sessionDurationStr"></div>
                     </div>
@@ -597,6 +600,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         mounted() {
             window.addEventListener('keydown', this.handleKeydown);
+            this.generateWaves();
 
             // Экспорт глобального тестового хука
             const stateHook = {
@@ -604,9 +608,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 currentWaveIndex: () => this.currentWaveIndex,
                 currentWave: () => this.currentWave,
                 solveCurrentWave: () => {
-                    if (this.currentWave && this.currentWave.correctAction) {
-                        this.submitAction(this.currentWave.correctAction);
-                    }
+                    return (this.currentWave && this.currentWave.correctAction) ? this.currentWave.correctAction : 'prefix';
                 },
                 submitAction: (action) => {
                     this.submitAction(action);
