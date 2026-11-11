@@ -1,0 +1,998 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="vue-app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+        
+        <!-- Верхняя строка заголовка -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div>
+                <h2 class="h5 text-danger mb-0 fw-bold">Тренажер: Диспетчер компьютерного моделирования и резонансной калибровки</h2>
+                <span class="text-secondary small">Параллель 11 (Базовый / Гуманитарный) // Урок 9 // Уровень 3 (Аркада)</span>
+            </div>
+            <span class="badge border border-danger text-danger bg-black rounded-0 px-3 py-2">
+                Архетип: Simulation Pipeline & Model Resonance // Хардкор-сброс
+            </span>
+        </div>
+
+        <!-- Главный контейнер тренажера -->
+        <div class="card bg-black border border-danger rounded-0 shadow-lg">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- ========================================== -->
+                <!-- 1. ЭКРАН ИНСТРУКТАЖА (INTRO)               -->
+                <!-- ========================================== -->
+                <div v-if="gameState === 'intro'" class="text-center py-4">
+                    <div class="mb-3">
+                        <span class="badge bg-danger text-black rounded-0 fs-5 px-4 py-2 fw-bold">
+                            КЛАСТЕР ВАЛИДАЦИИ И КАЛИБРОВКИ МОДЕЛЕЙ [ACTIVE]
+                        </span>
+                    </div>
+                    
+                    <h3 class="text-light fw-bold mb-3">Аркадное испытание: Диспетчер компьютерного эксперимента</h3>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 720px;">
+                        В суперкомпьютерный шлюз поступает непрерывный поток из <strong>10 скоростных вычислительных моделей</strong> 
+                        гуманитарных и междисциплинарных процессов (стилометрия, эпидемиология, цифровые двойники, социологические опросы, in silico фармакология).
+                    </p>
+
+                    <div class="card bg-dark border border-secondary rounded-0 p-3 mx-auto mb-4 text-start small" style="max-width: 720px;">
+                        <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ АУДИТА И УПРАВЛЕНИЯ // 10 ВОЛН]:</div>
+                        <ul class="mb-2 ps-3 text-secondary">
+                            <li class="mb-2">
+                                <strong class="text-danger">[1] Проверка адекватности (Sanity Check):</strong> 
+                                Некоторые модели содержат критические физические абсурды (вероятность &gt; 100%, отрицательная численность населения). 
+                                При обнаружении аномалии немедленно жмите <strong class="text-danger">[ОТКЛОНИТЬ: СБОЙ АДЕКВАТНОСТИ]</strong> (клавиша <code>X</code>).
+                            </li>
+                            <li class="mb-2">
+                                <strong class="text-warning">[2] Резонансная калибровка (&delta; &le; 5%):</strong> 
+                                Если модель физически корректна, подстройте параметр аппроксимации <code>k</code> регуляторами <code>[-]</code>/<code>[+]</code> или стрелками клавиатуры, 
+                                пока расчетная кривая не совпадет с эмпирическими точками в пределах допуска (&delta; &le; 5.0%).
+                            </li>
+                            <li class="mb-2">
+                                <strong class="text-info">[3] Коммутация проектора представления:</strong> 
+                                Подключите шлюз отображения под структуру данных:
+                                <div class="mt-1 ps-2">
+                                    • <span class="text-light fw-bold">[1] Временной ряд</span> — процессы во времени (кинетика, вибромониторинг, хронология).<br>
+                                    • <span class="text-light fw-bold">[2] ГИС / Карта</span> — пространственные распределения и тепловые зоны территорий.<br>
+                                    • <span class="text-light fw-bold">[3] Сетевой граф</span> — топология связей, цитирования, лексические сети.<br>
+                                    • <span class="text-light fw-bold">[4] BI-дашборд</span> — многомерные срезы по категориям, электорат, сводные пульты.
+                                </div>
+                            </li>
+                            <li class="mb-1">
+                                <strong class="text-success">[4] Ввод в эксплуатацию:</strong> 
+                                Жмите <strong class="text-success">[УТВЕРДИТЬ МОДЕЛЬ / COMMIT]</strong> (клавиша <code>ПРОБЕЛ</code>).
+                            </li>
+                        </ul>
+                        <div class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-0 py-2 px-3 small">
+                            <strong>ТОТАЛЬНЫЙ ХАРДКОР-СБРОС:</strong> Любая ошибка (неверный формат, расхождение &delta; &gt; 5%, утверждение абсурдной модели, ложный сброс) или истечение таймера вызывают аварийную сирену и <strong>ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</strong> с процедурной перегенерацией волн!
+                        </div>
+                    </div>
+
+                    <div>
+                        <button id="start-btn" @click="startGame" class="btn btn-danger rounded-0 px-5 py-3 fw-bold fs-5 text-black shadow">
+                            АКТИВИРОВАТЬ ШЛЮЗ МОДЕЛИРОВАНИЯ (ВОЛНА 1) →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- 2. ИГРОВОЙ ЭКРАН (PLAYING)                  -->
+                <!-- ========================================== -->
+                <div v-if="gameState === 'playing'">
+                    
+                    <!-- Шапка со счетчиками и таймером -->
+                    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-2 flex-wrap gap-2">
+                        <div>
+                            <span id="wave-counter-badge" class="badge bg-danger text-black rounded-0 fs-6 me-2">
+                                ВОЛНА <span v-text="currentWave"></span> / <span v-text="totalWaves"></span>
+                            </span>
+                            <span class="text-light fw-bold small">
+                                <span class="text-secondary">Сценарий:</span> <span v-text="currentWaveData.title"></span>
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-secondary small">
+                                Сбросы: <span class="text-warning fw-bold" v-text="attempts"></span>
+                            </span>
+                            <span class="badge border border-danger text-danger bg-black rounded-0 fs-6">
+                                Время: <span :class="{ 'text-danger fw-bold': phaseTimeLeft <= 3.5 }" v-text="phaseTimeLeft.toFixed(1)"></span> с
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Индикатор убывающего таймера раунда -->
+                    <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 10px;">
+                        <div class="progress-bar transition-none" 
+                             :class="phaseTimeLeft <= 3.5 ? 'bg-danger' : 'bg-warning'" 
+                             role="progressbar" 
+                             :style="{ width: timerPercentage + '%' }">
+                        </div>
+                    </div>
+
+                    <!-- Тревожный бокс (Аварийная сирена) -->
+                    <div id="alarm-box" v-if="alarmActive" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-3 py-3 text-center" role="alert">
+                        <div class="d-flex align-items-center justify-content-center gap-3">
+                            <span class="spinner-grow spinner-grow-sm text-danger"></span>
+                            <span class="fw-bold fs-6">[КРИТИЧЕСКИЙ СБОЙ] <span v-text="alarmMessage"></span> СБРОС НА ВОЛНУ 1!</span>
+                            <span class="spinner-grow spinner-grow-sm text-danger"></span>
+                        </div>
+                    </div>
+
+                    <!-- Основное рабочее пространство (Две колонки) -->
+                    <div class="row g-3">
+                        
+                        <!-- Левая колонка: SVG Монитор компьютерной модели и калибровка -->
+                        <div class="col-12 col-lg-7">
+                            <div class="card bg-dark border border-secondary rounded-0 p-3 h-100 d-flex flex-column justify-content-between">
+                                
+                                <!-- Верхняя плашка монитора -->
+                                <div class="d-flex justify-content-between align-items-center mb-2 small">
+                                    <span class="text-secondary">
+                                        ID МОДЕЛИ: <code class="text-info fw-bold" v-text="currentWaveData.id"></code>
+                                    </span>
+                                    <span v-if="currentWaveData.isSanityAnomaly" class="badge bg-danger text-black rounded-0 fw-bold">
+                                        ⚠️ КРИТИЧЕСКАЯ АНОМАЛИЯ АДЕКВАТНОСТИ
+                                    </span>
+                                    <span v-else-if="currentDiscrepancy <= 5.0" class="badge bg-success text-black rounded-0 fw-bold">
+                                        ✓ РЕЗОНАНС ДОСТИГНУТ (&delta; = {{ currentDiscrepancy.toFixed(1) }}% &le; 5%)
+                                    </span>
+                                    <span v-else class="badge bg-warning text-black rounded-0 fw-bold">
+                                        ⚠ РАСХОЖДЕНИЕ &delta; = {{ currentDiscrepancy.toFixed(1) }}% &gt; 5%
+                                    </span>
+                                </div>
+
+                                <!-- Интерактивный координатный SVG монитор модели -->
+                                <div class="border border-secondary bg-black p-2 position-relative mb-3">
+                                    <svg viewBox="0 0 540 240" class="w-100 d-block" style="background-color: #03070b;">
+                                        <!-- Сетка координат -->
+                                        <defs>
+                                            <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
+                                                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#162533" stroke-width="1"/>
+                                            </pattern>
+                                        </defs>
+                                        <rect width="540" height="240" fill="url(#grid-pattern)" />
+
+                                        <!-- Оси X и Y -->
+                                        <line x1="40" y1="20" x2="40" y2="210" stroke="#375a7f" stroke-width="2" />
+                                        <line x1="40" y1="210" x2="520" y2="210" stroke="#375a7f" stroke-width="2" />
+                                        <text x="525" y="215" fill="#6c757d" font-size="11" font-family="monospace">t, x</text>
+                                        <text x="35" y="15" fill="#6c757d" font-size="11" font-family="monospace">Y</text>
+
+                                        <!-- Аварийная область при сбое адекватности -->
+                                        <g v-if="currentWaveData.isSanityAnomaly">
+                                            <rect x="40" y="20" width="480" height="190" fill="#dc3545" fill-opacity="0.12" stroke="#dc3545" stroke-dasharray="4 4" />
+                                            <text x="280" y="115" text-anchor="middle" fill="#ff4d5a" font-size="14" font-weight="bold" font-family="monospace">
+                                                [SANITY VIOLATION: {{ currentWaveData.anomalyTag }}]
+                                            </text>
+                                            <text x="280" y="140" text-anchor="middle" fill="#ff9999" font-size="12" font-family="monospace">
+                                                ФИЗИЧЕСКИ НЕВОЗМОЖНЫЕ ЗНАЧЕНИЯ // ТРЕБУЕТСЯ ОТКЛОНЕНИЕ
+                                            </text>
+                                        </g>
+
+                                        <!-- Допустимый коридор погрешности (±5%) вокруг точек эталона -->
+                                        <polygon v-if="!currentWaveData.isSanityAnomaly"
+                                                 :points="corridorPointsString" 
+                                                 :fill="currentDiscrepancy <= 5.0 ? '#198754' : '#ffc107'" 
+                                                 fill-opacity="0.18" />
+
+                                        <!-- Эмпирические контрольные точки эталона (Data Source) -->
+                                        <g v-if="!currentWaveData.isSanityAnomaly">
+                                            <g v-for="(pt, idx) in currentWaveData.benchmarkPoints" :key="'bm-'+idx">
+                                                <circle :cx="pt.x" :cy="pt.y" r="5" fill="#ffc107" stroke="#ffffff" stroke-width="1.5" />
+                                                <line :x1="pt.x" :y1="pt.y - 7" :x2="pt.x" :y2="pt.y + 7" stroke="#ffc107" stroke-width="1" />
+                                            </g>
+                                        </g>
+
+                                        <!-- Динамическая кривая расчетной модели -->
+                                        <path :d="modelPathString" 
+                                              fill="none" 
+                                              :stroke="currentWaveData.isSanityAnomaly ? '#dc3545' : (currentDiscrepancy <= 5.0 ? '#00ff88' : '#0dcaf0')" 
+                                              stroke-width="3" 
+                                              stroke-linecap="round" />
+
+                                        <!-- Метки значений осей -->
+                                        <text x="45" y="225" fill="#6c757d" font-size="10" font-family="monospace">0</text>
+                                        <text x="270" y="225" fill="#6c757d" font-size="10" font-family="monospace">T/2</text>
+                                        <text x="500" y="225" fill="#6c757d" font-size="10" font-family="monospace">T_max</text>
+                                    </svg>
+                                </div>
+
+                                <!-- Органы прямого управления калибровкой модели (Direct Surface) -->
+                                <div class="bg-black border border-secondary p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-light small fw-bold">
+                                            РЕГУЛЯТОР КАЛИБРОВКИ (ПАРАМЕТР k):
+                                        </span>
+                                        <span class="badge bg-dark border border-info text-info rounded-0 font-monospace fs-6 px-3">
+                                            k = <span v-text="currentK"></span>
+                                        </span>
+                                    </div>
+
+                                    <!-- Ползунок прямого позиционирования -->
+                                    <div class="mb-3">
+                                        <input type="range" 
+                                               class="form-range" 
+                                               min="10" 
+                                               max="90" 
+                                               step="1" 
+                                               v-model.number="currentK" 
+                                               @input="onSliderInput"
+                                               :disabled="isActionBlocked || currentWaveData.isSanityAnomaly">
+                                    </div>
+
+                                    <!-- Кнопки прецизионной подстройки хитбоксы >= 48x48 px -->
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <button class="btn btn-outline-secondary rounded-0 flex-fill fw-bold py-2" 
+                                                style="min-height: 48px;"
+                                                @click="adjustK(-5)" 
+                                                :disabled="isActionBlocked || currentWaveData.isSanityAnomaly">
+                                            -5
+                                        </button>
+                                        <button class="btn btn-outline-secondary rounded-0 flex-fill fw-bold py-2" 
+                                                style="min-height: 48px;"
+                                                @click="adjustK(-1)" 
+                                                :disabled="isActionBlocked || currentWaveData.isSanityAnomaly">
+                                            -1 [←]
+                                        </button>
+                                        <button class="btn btn-outline-secondary rounded-0 flex-fill fw-bold py-2" 
+                                                style="min-height: 48px;"
+                                                @click="adjustK(1)" 
+                                                :disabled="isActionBlocked || currentWaveData.isSanityAnomaly">
+                                            +1 [→]
+                                        </button>
+                                        <button class="btn btn-outline-secondary rounded-0 flex-fill fw-bold py-2" 
+                                                style="min-height: 48px;"
+                                                @click="adjustK(5)" 
+                                                :disabled="isActionBlocked || currentWaveData.isSanityAnomaly">
+                                            +5
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- Правая колонка: Описание, коммутация проекторов и финализация -->
+                        <div class="col-12 col-lg-5">
+                            <div class="card bg-dark border border-secondary rounded-0 p-3 h-100 d-flex flex-column justify-content-between">
+                                
+                                <!-- Описание предметной модели -->
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="badge border border-info text-info bg-black rounded-0" v-text="currentWaveData.domain"></span>
+                                        <span class="badge border border-secondary text-secondary bg-black rounded-0" v-text="currentWaveData.modelType"></span>
+                                    </div>
+                                    <h4 class="text-light fw-bold fs-6 mb-2" v-text="currentWaveData.title"></h4>
+                                    <p class="text-secondary small mb-3" v-text="currentWaveData.description"></p>
+
+                                    <!-- Параметры телеметрии модели -->
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-dark table-bordered border-secondary small font-monospace mb-0">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="text-secondary" style="width: 140px;">Структура данных:</td>
+                                                    <td class="text-light fw-bold" v-text="currentWaveData.dataNature"></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-secondary">Статус адекватности:</td>
+                                                    <td :class="currentWaveData.isSanityAnomaly ? 'text-danger fw-bold' : 'text-success'">
+                                                        <span v-if="currentWaveData.isSanityAnomaly">✕ СБОЙ: {{ currentWaveData.sanityStatus }}</span>
+                                                        <span v-else>✓ В пределах физических границ</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Панель выбора проектора представления (Direct Surface) -->
+                                <div class="mb-3">
+                                    <div class="text-light small fw-bold mb-2">
+                                        КОММУТАЦИЯ ПРОЕКТОРА ПРЕДСТАВЛЕНИЯ (1-4):
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <button id="format-timeseries-btn"
+                                                    class="btn w-100 rounded-0 text-start p-2 border-2 d-flex flex-column justify-content-center"
+                                                    style="min-height: 52px;"
+                                                    :class="selectedFormat === 'timeseries' ? 'btn-outline-info active bg-black border-info text-info' : 'btn-outline-secondary text-secondary'"
+                                                    @click="selectFormat('timeseries')"
+                                                    :disabled="isActionBlocked">
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="fw-bold">[1] Временной ряд</span>
+                                                </div>
+                                                <div class="small text-truncate" style="font-size: 0.72rem;">График тренда / динамика t</div>
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button id="format-gis-btn"
+                                                    class="btn w-100 rounded-0 text-start p-2 border-2 d-flex flex-column justify-content-center"
+                                                    style="min-height: 52px;"
+                                                    :class="selectedFormat === 'gis' ? 'btn-outline-info active bg-black border-info text-info' : 'btn-outline-secondary text-secondary'"
+                                                    @click="selectFormat('gis')"
+                                                    :disabled="isActionBlocked">
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="fw-bold">[2] ГИС / Карта</span>
+                                                </div>
+                                                <div class="small text-truncate" style="font-size: 0.72rem;">Тепловая карта территорий</div>
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button id="format-graph-btn"
+                                                    class="btn w-100 rounded-0 text-start p-2 border-2 d-flex flex-column justify-content-center"
+                                                    style="min-height: 52px;"
+                                                    :class="selectedFormat === 'graph' ? 'btn-outline-info active bg-black border-info text-info' : 'btn-outline-secondary text-secondary'"
+                                                    @click="selectFormat('graph')"
+                                                    :disabled="isActionBlocked">
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="fw-bold">[3] Сетевой граф</span>
+                                                </div>
+                                                <div class="small text-truncate" style="font-size: 0.72rem;">Матрица связей / цитирований</div>
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button id="format-bi-btn"
+                                                    class="btn w-100 rounded-0 text-start p-2 border-2 d-flex flex-column justify-content-center"
+                                                    style="min-height: 52px;"
+                                                    :class="selectedFormat === 'bi' ? 'btn-outline-info active bg-black border-info text-info' : 'btn-outline-secondary text-secondary'"
+                                                    @click="selectFormat('bi')"
+                                                    :disabled="isActionBlocked">
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="fw-bold">[4] BI-дашборд</span>
+                                                </div>
+                                                <div class="small text-truncate" style="font-size: 0.72rem;">Многомерные категории / срезы</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Органы отправки решения / Аварийного сброса -->
+                                <div>
+                                    <div class="d-grid gap-2">
+                                        <!-- Главная кнопка утверждения (Fast-Forward: Space / Enter) -->
+                                        <button id="commit-btn"
+                                                class="btn btn-outline-success rounded-0 py-3 fw-bold fs-6 border-2 shadow"
+                                                style="min-height: 52px;"
+                                                @click="commitModel"
+                                                :disabled="isActionBlocked">
+                                            УТВЕРДИТЬ МОДЕЛЬ В ЭКСПЛУАТАЦИЮ [ПРОБЕЛ]
+                                        </button>
+
+                                        <!-- Аварийный автомат отбраковки (Hotkey: X) -->
+                                        <button id="reject-sanity-btn"
+                                                class="btn btn-outline-danger rounded-0 py-2 fw-bold small border-2"
+                                                style="min-height: 48px;"
+                                                @click="rejectSanity"
+                                                :disabled="isActionBlocked">
+                                            ⚠️ ОТКЛОНИТЬ: СБОЙ АДЕКВАТНОСТИ [X]
+                                        </button>
+                                    </div>
+
+                                    <div class="text-center text-secondary small mt-2">
+                                        Хоткеи: <strong>[1-4]</strong> — Проекторы | <strong>[←/→]</strong> — Калибровка | <strong>[ПРОБЕЛ]</strong> — Пуск | <strong>[X]</strong> — Сброс
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ========================================== -->
+                <!-- 3. ЭКРАН ПОБЕДЫ (VICTORY)                  -->
+                <!-- ========================================== -->
+                <div v-if="gameState === 'victory'" class="text-center py-5">
+                    <div class="mb-3">
+                        <span class="badge bg-success text-black rounded-0 fs-4 px-4 py-2 fw-bold">
+                            ✓ ВСЕ 10 ВОЛН МОДЕЛИРОВАНИЯ УСПЕШНО КАЛИБРОВАНЫ
+                        </span>
+                    </div>
+                    <h2 class="text-light mb-3 fw-bold">АРКАДНЫЙ БОСС УРОВНЯ 3 ПОВЕРЖЕН!</h2>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 650px;">
+                        Вы блестяще справились с суперкомпьютерным потоком: своевременно отсеяли физически абсурдные модели, 
+                        довели относительную погрешность сходимости до нормативных &delta; &le; 5.0% и точно коммутировали 
+                        проекторы визуализации результатов для гуманитарных и междисциплинарных задач.
+                    </p>
+                    <div class="border border-success bg-black p-3 d-inline-block text-start mb-4">
+                        <div class="text-success small fw-bold mb-1">ФИНАЛЬНЫЙ СТАТУС ТЕЛЕМЕТРИИ:</div>
+                        <div class="text-light small">Миссия: <code>11 класс // Урок 9 (Уровень 3 / Аркада)</code></div>
+                        <div class="text-light small">Статус: <code>PASSED / SUCCESS</code></div>
+                        <div class="text-light small">Общее время: <code v-text="formattedFinalTime"></code></div>
+                        <div class="text-light small">Количество сбросов (Hardcore Resets): <span class="text-warning fw-bold" v-text="attempts"></span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<!-- Локальный Vue 3 без внешних CDN -->
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+(function() {
+    const { createApp } = Vue;
+
+    // Синтезатор звуков Web Audio API (чистая генерация сигналов без внешних файлов)
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) audioCtx = new AudioContext();
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type, duration, vol = 0.15) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    }
+
+    function playSuccessSound() {
+        playTone(784, 'sine', 0.12, 0.15); // G5
+        setTimeout(() => playTone(1046.5, 'sine', 0.22, 0.15), 90); // C6
+    }
+
+    function playTickSound() {
+        playTone(1200, 'sine', 0.04, 0.05);
+    }
+
+    function playErrorSound() {
+        playTone(220, 'sawtooth', 0.35, 0.2);
+        setTimeout(() => playTone(146, 'sawtooth', 0.4, 0.2), 120);
+    }
+
+    function playAlarmSiren() {
+        playTone(520, 'triangle', 0.2, 0.25);
+        setTimeout(() => playTone(880, 'triangle', 0.25, 0.25), 150);
+        setTimeout(() => playTone(440, 'triangle', 0.25, 0.25), 320);
+    }
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                currentWave: 1,
+                totalWaves: 10,
+                attempts: 0,
+                startTime: Date.now(),
+                phaseTimeLeft: 15.0,
+                maxPhaseTime: 15.0,
+                timerInterval: null,
+                alarmActive: false,
+                alarmMessage: '',
+                isActionBlocked: false,
+
+                // Текущие органы ввода
+                currentK: 50,
+                selectedFormat: null,
+
+                // Базовый пул шаблонов 10 волн
+                wavesConfig: [
+                    {
+                        waveNum: 1,
+                        id: 'SIM-101',
+                        title: 'Лингвистическая стилометрия: частотный профиль служебных слов рукописи',
+                        domain: 'Гуманитарные науки / Филология',
+                        modelType: 'Дискретная стохастическая модель',
+                        dataNature: 'Семантическая матрица лексических связей',
+                        description: 'Определение авторства спорной исторической рукописи XIX в. по частотному распределению предлогов и союзов.',
+                        targetFormat: 'graph',
+                        targetK: 50,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'zipf',
+                        timeLimit: 15.0
+                    },
+                    {
+                        waveNum: 2,
+                        id: 'SIM-202',
+                        title: 'Эпидемиология мегаполиса: распространение штамма по административным округам',
+                        domain: 'Социальная информатика / Здравоохранение',
+                        modelType: 'Пространственная динамическая модель (SIR)',
+                        dataNature: 'Территориальное районирование заболеваемости',
+                        description: 'Моделирование скорости передачи инфекции между районами с учетом плотности пассажиропотоков метро.',
+                        targetFormat: 'gis',
+                        targetK: 45,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'diffusion',
+                        timeLimit: 13.5
+                    },
+                    {
+                        waveNum: 3,
+                        id: 'SIM-303',
+                        title: 'Фармакологическое связывание: кинетика ингибирования рецептора (In Silico)',
+                        domain: 'Биоинформатика / Хемоинформатика',
+                        modelType: 'Детерминированная непрерывная модель',
+                        dataNature: 'Временная траектория концентрации комплекса',
+                        description: 'Численный расчет константы связывания ингибитора с вирусной протеазой в масштабе времени.',
+                        targetFormat: 'timeseries',
+                        targetK: 55,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'saturation',
+                        timeLimit: 12.0
+                    },
+                    {
+                        waveNum: 4,
+                        id: 'SIM-404',
+                        title: 'Агентная модель медиа: динамика вирусных репостов новости в соцсети',
+                        domain: 'Медиаведение / Теория коммуникаций',
+                        modelType: 'Имитационная мультиагентная модель',
+                        dataNature: 'Вероятностные переходы состояний агентов',
+                        description: 'Распространение сенсационного сообщения. Обнаружено расхождение: вероятность репоста превышает единицу!',
+                        targetFormat: 'gis',
+                        targetK: 50,
+                        isSanityAnomaly: true,
+                        anomalyTag: 'P = 144% > 100%',
+                        sanityStatus: 'Критический сбой: Вероятность репоста P = 144% > 100% (невозможная мера)',
+                        curveType: 'anomaly_divergence',
+                        timeLimit: 11.0
+                    },
+                    {
+                        waveNum: 5,
+                        id: 'SIM-505',
+                        title: 'Цифровой двойник Собора: тензометрический мониторинг смещения сводов',
+                        domain: 'Культурное наследие / Памятники архитектуры',
+                        modelType: 'Физико-математический цифровой двойник',
+                        dataNature: 'Непрерывный временной ряд вибродатчиков',
+                        description: 'Оценка затухающих микроколебаний центрального купола под действием ветровых и акустических нагрузок.',
+                        targetFormat: 'timeseries',
+                        targetK: 40,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'damped_oscillation',
+                        timeLimit: 10.0
+                    },
+                    {
+                        waveNum: 6,
+                        id: 'SIM-606',
+                        title: 'Социологический опрос: электоральные предпочтения по демографическим срезам',
+                        domain: 'Социология / Политология',
+                        modelType: 'Многофакторная регрессионная модель',
+                        dataNature: 'Сводные категории (возраст, доход, регион)',
+                        description: 'Анализ распределения симпатий избирателей по взаимно пересекающимся демографическим когортам.',
+                        targetFormat: 'bi',
+                        targetK: 60,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'logistic',
+                        timeLimit: 9.0
+                    },
+                    {
+                        waveNum: 7,
+                        id: 'SIM-707',
+                        title: 'Демографический прогноз: численность населения промышленного моногорода',
+                        domain: 'Экономическая география / Демография',
+                        modelType: 'Динамическая балансовая модель',
+                        dataNature: 'Численный баланс рождаемости и миграции',
+                        description: 'Прогноз миграционного оттока при закрытии комбината. Модель ушла в физически невозможные отрицательные значения!',
+                        targetFormat: 'timeseries',
+                        targetK: 50,
+                        isSanityAnomaly: true,
+                        anomalyTag: 'N = -18 400 чел. < 0',
+                        sanityStatus: 'Критический сбой: Численность населения N = -18 400 (отрицательная популяция)',
+                        curveType: 'anomaly_negative',
+                        timeLimit: 8.0
+                    },
+                    {
+                        waveNum: 8,
+                        id: 'SIM-808',
+                        title: 'Историческая климатология: вековой ход засух по дендрохронологии Поволжья',
+                        domain: 'Историческая информатика / Климатология',
+                        modelType: 'Гармонический спектральный анализ',
+                        dataNature: 'Хронологический временной ряд (годовые кольца)',
+                        description: 'Реконструкция цикличности солнечной активности и засушливых периодов по ширине годичных колец вековых дубов.',
+                        targetFormat: 'timeseries',
+                        targetK: 48,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'harmonic',
+                        timeLimit: 7.5
+                    },
+                    {
+                        waveNum: 9,
+                        id: 'SIM-909',
+                        title: 'Информационная сеть: топология цитирования архивных первоисточников',
+                        domain: 'Источниковедение / Архивоведение',
+                        modelType: 'Графовая безмасштабная модель (Барабаши-Альберт)',
+                        dataNature: 'Матрица смежности и весов цитирования',
+                        description: 'Выявление ключевых системообразующих архивных документов через кластеризацию графа ссылок.',
+                        targetFormat: 'graph',
+                        targetK: 52,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'power_law',
+                        timeLimit: 6.5
+                    },
+                    {
+                        waveNum: 10,
+                        id: 'SIM-999',
+                        title: 'Финальный босс: Комплексный цифровой мониторинг экосистемы озера Байкал',
+                        domain: 'Междисциплинарное экологическое моделирование',
+                        modelType: 'Многотрофическая нелинейная экосистема',
+                        dataNature: 'Интегрированный сводный дашборд биосферы',
+                        description: 'Сводная калибровка трофических связей фитопланктона, эндемичной фауны и химического баланса воды.',
+                        targetFormat: 'bi',
+                        targetK: 54,
+                        isSanityAnomaly: false,
+                        sanityStatus: 'В норме',
+                        curveType: 'ecosystem',
+                        timeLimit: 5.5
+                    }
+                ],
+
+                activeWaves: [],
+                currentWaveData: {}
+            };
+        },
+
+        computed: {
+            timerPercentage() {
+                return Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
+            },
+
+            currentDiscrepancy() {
+                if (!this.currentWaveData || this.currentWaveData.isSanityAnomaly) return 99.9;
+                const targetK = this.currentWaveData.targetK || 50;
+                const diff = Math.abs(this.currentK - targetK);
+                return (diff / targetK) * 100;
+            },
+
+            formattedFinalTime() {
+                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
+                return `${m}:${s}`;
+            },
+
+            // Генератор SVG пути расчетной кривой на основе текущего k
+            modelPathString() {
+                if (!this.currentWaveData || !this.currentWaveData.curveType) return 'M 40 210 L 520 210';
+                
+                const type = this.currentWaveData.curveType;
+                const kRatio = this.currentWaveData.isSanityAnomaly ? 1.0 : (this.currentK / this.currentWaveData.targetK);
+                const points = [];
+                const steps = 40;
+
+                for (let i = 0; i <= steps; i++) {
+                    const normX = i / steps; // 0 .. 1
+                    const svgX = 40 + normX * 480;
+                    let normY = 0; // 0 .. 1 (0 = дно, 1 = верх)
+
+                    if (type === 'zipf') {
+                        normY = 0.85 / Math.pow(1 + normX * 3.5, 1.2);
+                    } else if (type === 'diffusion') {
+                        normY = 0.88 * Math.exp(-0.5 * Math.pow((normX - 0.45) / 0.22, 2));
+                    } else if (type === 'saturation') {
+                        normY = 0.9 * (normX / (normX + 0.22));
+                    } else if (type === 'damped_oscillation') {
+                        normY = 0.45 + 0.42 * Math.exp(-normX * 2.2) * Math.cos(normX * 14);
+                    } else if (type === 'logistic') {
+                        normY = 0.88 / (1 + Math.exp(-8 * (normX - 0.48)));
+                    } else if (type === 'harmonic') {
+                        normY = 0.48 + 0.25 * Math.sin(normX * 12) + 0.15 * Math.cos(normX * 20);
+                    } else if (type === 'power_law') {
+                        normY = 0.9 * Math.pow(normX + 0.15, -0.75) * 0.35;
+                    } else if (type === 'ecosystem') {
+                        normY = 0.5 + 0.28 * Math.sin(normX * 10) * Math.cos(normX * 6);
+                    } else if (type === 'anomaly_divergence') {
+                        // Кривая улетает за пределы графика вверх
+                        normY = 0.4 + Math.pow(normX * 1.8, 3.2);
+                    } else if (type === 'anomaly_negative') {
+                        // Кривая падает ниже оси X
+                        normY = 0.6 - normX * 1.1;
+                    }
+
+                    // Моделируем деформацию кривой при расхождении k
+                    if (!this.currentWaveData.isSanityAnomaly) {
+                        normY = normY * (0.3 + 0.7 * kRatio);
+                    }
+
+                    const svgY = 210 - normY * 180;
+                    points.push(`${svgX.toFixed(1)},${svgY.toFixed(1)}`);
+                }
+
+                return 'M ' + points.join(' L ');
+            },
+
+            // Коридор допустимой погрешности (±5%) вокруг эталонных точек
+            corridorPointsString() {
+                if (!this.currentWaveData || !this.currentWaveData.benchmarkPoints) return '';
+                const pts = this.currentWaveData.benchmarkPoints;
+                const topPts = pts.map(p => `${p.x.toFixed(1)},${(p.y - 12).toFixed(1)}`);
+                const bottomPts = pts.slice().reverse().map(p => `${p.x.toFixed(1)},${(p.y + 12).toFixed(1)}`);
+                return topPts.concat(bottomPts).join(' ');
+            }
+        },
+
+        mounted() {
+            window.addEventListener('keydown', this.handleKeydown);
+
+            // Экспорт тестового API для Playwright и E2E проверки
+            const self = this;
+            window.__DEV_LEVEL3_STATE__ = {
+                get waves() { return self.activeWaves; },
+                get currentWaveIndex() { return self.currentWave - 1; },
+                get currentWave() { return self.currentWave; },
+                getCurrentWaveData: () => self.currentWaveData,
+                getAttempts: () => self.attempts,
+                solveCurrentWave: () => {
+                    if (!self.currentWaveData) return;
+                    if (self.currentWaveData.isSanityAnomaly) {
+                        self.rejectSanity();
+                    } else {
+                        self.currentK = self.currentWaveData.targetK;
+                        self.selectedFormat = self.currentWaveData.targetFormat;
+                        self.commitModel();
+                    }
+                },
+                submitAction: (action, payload) => {
+                    if (action === 'commit') self.commitModel();
+                    else if (action === 'reject') self.rejectSanity();
+                    else if (action === 'set_format') self.selectFormat(payload);
+                    else if (action === 'set_k') self.currentK = Number(payload);
+                }
+            };
+        },
+
+        beforeUnmount() {
+            window.removeEventListener('keydown', this.handleKeydown);
+            this.stopTimer();
+        },
+
+        methods: {
+            sendTelemetry(actionType, status, success) {
+                const timeSpent = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: 'Урок 9 :: Модели и моделирование (Уровень 3 / Аркада)',
+                    action_type: actionType,
+                    status: status,
+                    start_time: new Date(this.startTime).toISOString(),
+                    time_spent_sec: timeSpent,
+                    attempts_count: this.attempts,
+                    success: success
+                }, '*');
+            },
+
+            // Процедурная генерация параметров 10 волн
+            generateWaves() {
+                this.activeWaves = this.wavesConfig.map((cfg) => {
+                    const wave = JSON.parse(JSON.stringify(cfg));
+                    
+                    if (!wave.isSanityAnomaly) {
+                        // Процедурно варьируем целевое k около 50 (например 42..58)
+                        const deltaK = Math.floor(Math.random() * 9) - 4; // -4 .. +4
+                        wave.targetK = Math.max(30, Math.min(70, wave.targetK + deltaK));
+
+                        // Генерируем 7 эталонных точек эталона на кривой при k = targetK
+                        wave.benchmarkPoints = [];
+                        const steps = 6;
+                        for (let i = 0; i <= steps; i++) {
+                            const normX = i / steps;
+                            const svgX = 40 + normX * 480;
+                            let normY = 0;
+
+                            if (wave.curveType === 'zipf') {
+                                normY = 0.85 / Math.pow(1 + normX * 3.5, 1.2);
+                            } else if (wave.curveType === 'diffusion') {
+                                normY = 0.88 * Math.exp(-0.5 * Math.pow((normX - 0.45) / 0.22, 2));
+                            } else if (wave.curveType === 'saturation') {
+                                normY = 0.9 * (normX / (normX + 0.22));
+                            } else if (wave.curveType === 'damped_oscillation') {
+                                normY = 0.45 + 0.42 * Math.exp(-normX * 2.2) * Math.cos(normX * 14);
+                            } else if (wave.curveType === 'logistic') {
+                                normY = 0.88 / (1 + Math.exp(-8 * (normX - 0.48)));
+                            } else if (wave.curveType === 'harmonic') {
+                                normY = 0.48 + 0.25 * Math.sin(normX * 12) + 0.15 * Math.cos(normX * 20);
+                            } else if (wave.curveType === 'power_law') {
+                                normY = 0.9 * Math.pow(normX + 0.15, -0.75) * 0.35;
+                            } else if (wave.curveType === 'ecosystem') {
+                                normY = 0.5 + 0.28 * Math.sin(normX * 10) * Math.cos(normX * 6);
+                            }
+
+                            const svgY = 210 - normY * 180;
+                            wave.benchmarkPoints.push({ x: svgX, y: svgY });
+                        }
+                    } else {
+                        wave.benchmarkPoints = [];
+                    }
+
+                    return wave;
+                });
+            },
+
+            startGame() {
+                this.startTime = Date.now();
+                this.currentWave = 1;
+                this.generateWaves();
+                this.loadWave(1);
+                this.gameState = 'playing';
+                this.sendTelemetry('in_progress', 'started', true);
+            },
+
+            loadWave(waveNum) {
+                this.currentWave = waveNum;
+                this.currentWaveData = this.activeWaves[waveNum - 1];
+                this.selectedFormat = null;
+
+                // Случайное стартовое k со смещением от targetK, чтобы требовалась калибровка
+                if (!this.currentWaveData.isSanityAnomaly) {
+                    const offset = (Math.random() > 0.5 ? 1 : -1) * (14 + Math.floor(Math.random() * 8));
+                    this.currentK = Math.max(15, Math.min(85, this.currentWaveData.targetK + offset));
+                } else {
+                    this.currentK = 50;
+                }
+
+                // Таймер раунда
+                this.maxPhaseTime = this.currentWaveData.timeLimit;
+                this.phaseTimeLeft = this.maxPhaseTime;
+                this.isActionBlocked = false;
+
+                this.startTimer();
+            },
+
+            startTimer() {
+                this.stopTimer();
+                const tickInterval = 100;
+                this.timerInterval = setInterval(() => {
+                    this.phaseTimeLeft -= tickInterval / 1000;
+                    if (this.phaseTimeLeft <= 0) {
+                        this.phaseTimeLeft = 0;
+                        this.stopTimer();
+                        this.triggerHardcoreReset('Время ожидания модели истекло! Срыв синхронизации вычислителя.');
+                    }
+                }, tickInterval);
+            },
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            },
+
+            adjustK(delta) {
+                if (this.isActionBlocked || this.currentWaveData.isSanityAnomaly) return;
+                this.currentK = Math.max(10, Math.min(90, this.currentK + delta));
+                playTickSound();
+            },
+
+            onSliderInput() {
+                playTickSound();
+            },
+
+            selectFormat(format) {
+                if (this.isActionBlocked) return;
+                this.selectedFormat = format;
+                playTickSound();
+            },
+
+            // Утверждение модели в эксплуатацию
+            commitModel() {
+                if (this.gameState !== 'playing' || this.isActionBlocked) return;
+
+                // Проверка 1: Если модель была с аномалией Sanity Check, ее утверждение — грубейшая ошибка!
+                if (this.currentWaveData.isSanityAnomaly) {
+                    this.triggerHardcoreReset('Грубая ошибка: утверждена физически абсурдная модель, нарушающая границы предметной области!');
+                    return;
+                }
+
+                // Проверка 2: Выбран ли формат визуализации?
+                if (!this.selectedFormat) {
+                    this.triggerHardcoreReset('Шлюз не скоммутирован: не выбран проектор представления данных!');
+                    return;
+                }
+
+                // Проверка 3: Соответствует ли формат структуре данных?
+                if (this.selectedFormat !== this.currentWaveData.targetFormat) {
+                    this.triggerHardcoreReset('Неверная коммутация: выбранный проектор не соответствует типу и структуре данных модели!');
+                    return;
+                }
+
+                // Проверка 4: Достигнут ли резонанс сходимости (относительная погрешность delta <= 5.0%)?
+                if (this.currentDiscrepancy > 5.0) {
+                    this.triggerHardcoreReset(`Модель не откалибрована! Относительная погрешность δ = ${this.currentDiscrepancy.toFixed(1)}% превышает норматив 5.0%.`);
+                    return;
+                }
+
+                // Все проверки пройдены — успех текущей волны!
+                this.handleWaveSuccess();
+            },
+
+            // Отклонение аномальной модели (Sanity Reject)
+            rejectSanity() {
+                if (this.gameState !== 'playing' || this.isActionBlocked) return;
+
+                if (this.currentWaveData.isSanityAnomaly) {
+                    // Верное выявление и отбраковка абсурдной модели
+                    this.handleWaveSuccess();
+                } else {
+                    // Ложная отбраковка корректной модели
+                    this.triggerHardcoreReset('Ложная отбраковка: отклонена корректная физическая модель!');
+                }
+            },
+
+            handleWaveSuccess() {
+                playSuccessSound();
+                this.stopTimer();
+                this.isActionBlocked = true;
+
+                if (this.currentWave >= this.totalWaves) {
+                    // Финальная победа
+                    this.gameState = 'victory';
+                    this.sendTelemetry('level_complete', 'passed', true);
+                } else {
+                    this.sendTelemetry('in_progress', `wave_${this.currentWave}_complete`, true);
+                    setTimeout(() => {
+                        this.loadWave(this.currentWave + 1);
+                    }, 300);
+                }
+            },
+
+            triggerHardcoreReset(reason) {
+                this.stopTimer();
+                this.isActionBlocked = true;
+                this.attempts++;
+                playErrorSound();
+                playAlarmSiren();
+
+                this.sendTelemetry('hardcore_reset', 'failed', false);
+                this.alarmMessage = reason;
+                this.alarmActive = true;
+
+                setTimeout(() => {
+                    this.alarmActive = false;
+                    this.generateWaves();
+                    this.loadWave(1);
+                }, 1700);
+            },
+
+            handleKeydown(e) {
+                if (this.gameState !== 'playing' || this.isActionBlocked) return;
+
+                if (e.key === '1' || e.code === 'Numpad1') {
+                    this.selectFormat('timeseries');
+                } else if (e.key === '2' || e.code === 'Numpad2') {
+                    this.selectFormat('gis');
+                } else if (e.key === '3' || e.code === 'Numpad3') {
+                    this.selectFormat('graph');
+                } else if (e.key === '4' || e.code === 'Numpad4') {
+                    this.selectFormat('bi');
+                } else if (e.key === 'ArrowLeft' || e.code === 'KeyA') {
+                    const step = e.shiftKey ? 5 : 1;
+                    this.adjustK(-step);
+                } else if (e.key === 'ArrowRight' || e.code === 'KeyD') {
+                    const step = e.shiftKey ? 5 : 1;
+                    this.adjustK(step);
+                } else if (e.code === 'Space' || e.key === 'Enter') {
+                    e.preventDefault();
+                    this.commitModel();
+                } else if (e.code === 'KeyX' || e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    this.rejectSanity();
+                }
+            }
+        }
+    }).mount('#vue-app');
+})();
+</script>
