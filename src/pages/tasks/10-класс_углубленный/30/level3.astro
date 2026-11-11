@@ -1,0 +1,639 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+        
+        <!-- Стартовый экран (Брифинг) -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow">
+            <div class="display-4 text-danger mb-3">⚠️ MARKOV GATEWAY: PROTOCOL BREACH ⚠️</div>
+            <h2 class="text-light mb-3">АРКАДНЫЙ ШЛЮЗ РАЗДЕЛИМОСТИ КОДОВ (УРОВЕНЬ 3)</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                По защищенной шине передачи данных непрерывно поступают сетевые кодовые словари.
+                Вам предстоит выступить в роли аппаратного диспетчера декодера и безошибочно отразить 
+                <span class="text-danger fw-bold">10 нарастающих волн входящих транзакций</span> в условиях жесткого динамического таймера!
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start small" style="max-width: 680px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ АППАРАТНОЙ МАРШРУТИЗАЦИИ]:</div>
+                <div class="text-light mb-1">• <span class="text-success fw-bold">[1] PREFIX_GATE (Клавиша 1):</span> Прямое условие Фано соблюдено (ни одно слово не является префиксом другого). Мгновенное декодирование.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">[2] POSTFIX_GATE (Клавиша 2):</span> Прямое условие нарушено, но обратное условие Фано строго выполняется (суффиксы уникальны). Буферное декодирование с конца.</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">[3] MARKOV_COLLISION (Клавиша 3):</span> Оба условия нарушены и в графе Маркова обнаружен цикл через пустое слово Λ (код неоднозначен). Аварийный сброс коллизии!</div>
+                <div class="text-light mb-1">• <span class="text-warning">Динамический таймер:</span> От 12 секунд на волне 1 до 5 секунд на финальной волне 10!</div>
+                <div class="text-light">• <span class="text-danger fw-bold">ТОТАЛЬНЫЙ СБРОС (Zero-Tolerance):</span> Любая ошибка, неверный вентиль или тайм-аут вызывают сирену и ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1!</div>
+                <div class="text-secondary mt-2 border-top border-secondary pt-2">
+                    💡 <em>Поддерживаются горячие клавиши: <strong>1</strong> (Prefix), <strong>2</strong> (Postfix), <strong>3</strong> (Collision), <strong>Space</strong> (Старт).</em>
+                </div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow" style="min-height: 54px;">
+                    ЗАПУСТИТЬ ШЛЮЗ ДЕКОДЕРА [SPACE] →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой экран: Активный шлюз декодера -->
+        <div v-else-if="gameState === 'playing'" class="card bg-dark border-danger rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Хедер волны и таймер -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-counter" class="badge bg-danger text-light rounded-0 fs-6 me-2">
+                            ВОЛНА <span v-text="currentWaveIndex + 1"></span> ИЗ <span v-text="waves.length"></span>
+                        </span>
+                        <span id="wave-title" class="text-light fw-bold fs-6" v-text="currentWave.title"></span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="alarm-count" class="text-warning fw-bold" v-text="attemptsCount"></span> | 
+                        Таймер: <span class="text-danger fw-bold fs-5" v-text="phaseTimeLeft.toFixed(1) + 'с'"></span>
+                    </div>
+                </div>
+
+                <!-- Прогресс-бар динамического таймера -->
+                <div class="progress rounded-0 bg-black border border-secondary mb-3" style="height: 10px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-danger" 
+                         role="progressbar" 
+                         :style="{ width: ((phaseTimeLeft / currentWave.timeLimit) * 100) + '%' }">
+                    </div>
+                </div>
+
+                <!-- Системная аварийная сирена (#alarm-box) -->
+                <div id="alarm-box" v-if="alarmActive" class="alert alert-danger bg-black text-danger border border-2 border-danger rounded-0 p-3 mb-3" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-bold fs-5 mb-1">🚨 КРИТИЧЕСКИЙ СБОЙ ДЕКОДЕРА! 🚨</div>
+                            <div v-text="alarmMessage"></div>
+                            <div class="small text-secondary mt-1">ТОТАЛЬНЫЙ СБРОС ПРОГРЕССА НА ВОЛНУ 1...</div>
+                        </div>
+                        <div class="spinner-border text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- Блок кодовой системы транзакции (Data Source) -->
+                <div class="card bg-black border-secondary rounded-0 p-3 p-md-4 mb-3 text-center">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-1">
+                            ПАКЕТ ДАННЫХ #<span v-text="currentWaveIndex + 1"></span>
+                        </span>
+                        <span class="text-secondary small">
+                            Мощность алфавита M = <span class="text-light fw-bold" v-text="currentWave.codes.length"></span>
+                        </span>
+                    </div>
+
+                    <!-- Таблица кодовых слов транзакции -->
+                    <div class="d-flex flex-wrap justify-content-center gap-3 mb-3">
+                        <div v-for="item in currentWave.codes" :key="item.letter" class="border border-secondary bg-dark p-2 px-3 text-center rounded-0" style="min-width: 100px;">
+                            <div class="text-secondary small">Буква <span class="text-light fw-bold" v-text="item.letter"></span></div>
+                            <div class="fs-4 fw-bold font-monospace text-warning" v-text="item.code"></div>
+                        </div>
+                    </div>
+
+                    <!-- Контекстная диагностика перекрытий -->
+                    <div class="p-2 bg-dark border border-secondary rounded-0 d-inline-block px-4">
+                        <span class="text-secondary small">Аппаратный статус анализатора: </span>
+                        <strong class="text-light font-monospace small" v-text="currentWave.hint"></strong>
+                    </div>
+                </div>
+
+                <!-- Органы прямого управления: 3 аппаратных шлюза (Direct Surface) -->
+                <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                    <div class="text-secondary small mb-3 text-uppercase">
+                        ВЫБЕРИТЕ ШЛЮЗ ДЕКОДИРОВАНИЯ (ИЛИ НАЖМИТЕ КЛАВИШИ 1, 2, 3):
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Шлюз 1: PREFIX_GATE -->
+                        <div class="col-12 col-md-4">
+                            <button id="btn-gate-prefix"
+                                    @click="submitAction('prefix')" 
+                                    :disabled="isActionBlocked" 
+                                    class="btn btn-outline-success w-100 rounded-0 p-3 text-start d-flex flex-column justify-content-between shadow"
+                                    style="min-height: 64px;">
+                                <div class="d-flex justify-content-between align-items-center w-100 mb-1">
+                                    <span class="fw-bold fs-5">[1] PREFIX_GATE</span>
+                                    <span class="badge bg-success text-dark rounded-0">КЛАВИША 1</span>
+                                </div>
+                                <div class="small text-light opacity-75">
+                                    Прямое условие Фано соблюдено (префиксы уникальны)
+                                </div>
+                            </button>
+                        </div>
+
+                        <!-- Шлюз 2: POSTFIX_GATE -->
+                        <div class="col-12 col-md-4">
+                            <button id="btn-gate-postfix"
+                                    @click="submitAction('postfix')" 
+                                    :disabled="isActionBlocked" 
+                                    class="btn btn-outline-warning w-100 rounded-0 p-3 text-start d-flex flex-column justify-content-between shadow"
+                                    style="min-height: 64px;">
+                                <div class="d-flex justify-content-between align-items-center w-100 mb-1">
+                                    <span class="fw-bold fs-5">[2] POSTFIX_GATE</span>
+                                    <span class="badge bg-warning text-dark rounded-0">КЛАВИША 2</span>
+                                </div>
+                                <div class="small text-light opacity-75">
+                                    Постфиксный код (префиксы совпадают, суффиксы уникальны)
+                                </div>
+                            </button>
+                        </div>
+
+                        <!-- Шлюз 3: MARKOV_COLLISION -->
+                        <div class="col-12 col-md-4">
+                            <button id="btn-gate-collision"
+                                    @click="submitAction('collision')" 
+                                    :disabled="isActionBlocked" 
+                                    class="btn btn-outline-danger w-100 rounded-0 p-3 text-start d-flex flex-column justify-content-between shadow"
+                                    style="min-height: 64px;">
+                                <div class="d-flex justify-content-between align-items-center w-100 mb-1">
+                                    <span class="fw-bold fs-5">[3] COLLISION_DROP</span>
+                                    <span class="badge bg-danger text-light rounded-0">КЛАВИША 3</span>
+                                </div>
+                                <div class="small text-light opacity-75">
+                                    Коллизия / Цикл через Λ в графе Маркова (код неоднозначен)
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Экран победы (Пройдены все 10 волн) -->
+        <div id="victory-screen" v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-4 p-md-5 text-center shadow">
+            <div class="display-4 text-success mb-3">✔ ВЗЛОМ СИСТЕМЫ ЗАВЕРШЕН ✔</div>
+            <h2 class="text-light mb-3">БОСС УРОВНЯ 3 ПОВЕРЖЕН! ШЛЮЗ ДЕКОДЕРА ПОД КОНТРОЛЕМ</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                Вы выдержали экстремальный натиск 10 нарастающих волн, безошибочно фильтруя мгновенные префиксные деревья, постфиксные буферы и коллизии графа Маркова!
+            </p>
+
+            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-4" style="max-width: 580px;">
+                <div class="d-flex justify-content-around text-center gap-3 px-3">
+                    <div class="px-2">
+                        <div class="text-secondary small">ОТРАЖЕНО ВОЛН</div>
+                        <div class="fs-4 fw-bold text-success">10 / 10</div>
+                    </div>
+                    <div class="px-2">
+                        <div class="text-secondary small">АВАРИЙНЫХ СБОЕВ</div>
+                        <div class="fs-4 fw-bold text-warning" v-text="attemptsCount"></div>
+                    </div>
+                    <div class="px-2">
+                        <div class="text-secondary small">ИТОГОВОЕ ВРЕМЯ</div>
+                        <div class="fs-4 fw-bold text-info" v-text="sessionDurationStr"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <span class="badge bg-success text-dark rounded-0 px-4 py-2 fs-6">
+                    Уровень 3 завершен. Все телеметрические события зафиксированы.
+                </span>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+(function() {
+    const { createApp } = Vue;
+    const MISSION_NAME = 'Урок 30 :: Условие Фано. Построение однозначно декодируемых кодов с помощью дерева. Граф Ал. А. Маркова (Уровень 3)';
+
+    // Web Audio API Синтезатор
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) audioCtx = new AudioContext();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.08) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch(e) {}
+    }
+
+    function playSuccessTone() {
+        playTone(880, 'triangle', 0.12, 0.1);
+        setTimeout(() => playTone(1174, 'triangle', 0.16, 0.1), 80);
+    }
+
+    function playAlarmTone() {
+        playTone(180, 'sawtooth', 0.35, 0.25);
+        setTimeout(() => playTone(130, 'sawtooth', 0.45, 0.3), 140);
+    }
+
+    function playClickTone() {
+        playTone(520, 'sine', 0.05, 0.05);
+    }
+
+    // Банк процедурных шаблонов для 10 волн
+    const WAVE_TEMPLATES = [
+        {
+            waveNum: 1,
+            title: 'ВОЛНА 1: ВХОД В РИТМ (Базовое префиксное дерево)',
+            timeLimit: 12.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '11' }],
+                    correctAction: 'prefix',
+                    hint: 'Все листья уникальны. Начала кодовых слов не пересекаются.'
+                },
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '00' }],
+                    correctAction: 'prefix',
+                    hint: 'Префиксы изолированы. Прямое условие Фано соблюдено.'
+                }
+            ]
+        },
+        {
+            waveNum: 2,
+            title: 'ВОЛНА 2: ПОСТФИКСНЫЙ БУФЕР (Реверсивный разбор)',
+            timeLimit: 11.5,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '011' }],
+                    correctAction: 'postfix',
+                    hint: 'Слово 0 — префикс 01, но концы (суффиксы) уникальны: 0, 1, 11.'
+                },
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '100' }],
+                    correctAction: 'postfix',
+                    hint: 'Префикс 1 общий, но слова оканчиваются на 1, 0, 00. Обратное условие Фано!'
+                }
+            ]
+        },
+        {
+            waveNum: 3,
+            title: 'ВОЛНА 3: ДЕТЕКТОР КОЛЛИЗИЙ (Цикл Маркова Λ → 0 → Λ)',
+            timeLimit: 11.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '01' }],
+                    correctAction: 'collision',
+                    hint: 'Обнаружен контур перекрытий: 101 декодируется как БА и как АВ!'
+                },
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '10' }],
+                    correctAction: 'collision',
+                    hint: 'Обнаружен контур: 010 декодируется как БА и как АВ!'
+                }
+            ]
+        },
+        {
+            waveNum: 4,
+            title: 'ВОЛНА 4: РАВНОМЕРНЫЕ ТЕТРАДЫ (Симметрия префиксов)',
+            timeLimit: 10.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '00' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '10' }, { letter: 'Г', code: '11' }],
+                    correctAction: 'prefix',
+                    hint: 'Равномерный код фиксированной длины L=2. Идеальный префиксный контур.'
+                },
+                {
+                    codes: [{ letter: 'А', code: '000' }, { letter: 'Б', code: '001' }, { letter: 'В', code: '01' }, { letter: 'Г', code: '1' }],
+                    correctAction: 'prefix',
+                    hint: 'Префиксное дерево с глубокой левой ветвью. Коллизий нет.'
+                }
+            ]
+        },
+        {
+            waveNum: 5,
+            title: 'ВОЛНА 5: АВАРИЙНЫЙ ЦИКЛ (Сдвиг границ слов)',
+            timeLimit: 9.5,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '110' }, { letter: 'В', code: '01' }],
+                    correctAction: 'collision',
+                    hint: 'Цепочка 1101 допускает двойную трактовку: БА vs ААВ. Цикл в графе Маркова!'
+                },
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '001' }, { letter: 'В', code: '10' }],
+                    correctAction: 'collision',
+                    hint: 'Цепочка 0010 декодируется как БА и как ААВ. Коллизия!'
+                }
+            ]
+        },
+        {
+            waveNum: 6,
+            title: 'ВОЛНА 6: КЛАССИКА ХАФФМАНА (4 символа)',
+            timeLimit: 8.5,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '110' }, { letter: 'Г', code: '111' }],
+                    correctAction: 'prefix',
+                    hint: 'Каноническое дерево Хаффмана. Мгновенное декодирование слева направо.'
+                },
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '001' }, { letter: 'Г', code: '000' }],
+                    correctAction: 'prefix',
+                    hint: 'Зеркальное дерево Хаффмана с правой ветвью 1. Префиксный код!'
+                }
+            ]
+        },
+        {
+            waveNum: 7,
+            title: 'ВОЛНА 7: ГЛУБОКИЙ ПОСТФИКСНЫЙ ТРАНК (4 разряда)',
+            timeLimit: 8.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '001' }, { letter: 'Г', code: '1001' }],
+                    correctAction: 'postfix',
+                    hint: 'Префиксы 1, 01, 001 перекрываются, но суффиксы уникальны. Чтение справа налево!'
+                },
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '110' }, { letter: 'Г', code: '0110' }],
+                    correctAction: 'postfix',
+                    hint: 'Постфиксный код: суффиксы позволяют однозначно читать поток с конца.'
+                }
+            ]
+        },
+        {
+            waveNum: 8,
+            title: 'ВОЛНА 8: ЗАМАСКИРОВАННАЯ КОЛЛИЗИЯ',
+            timeLimit: 7.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '010' }, { letter: 'Г', code: '00' }],
+                    correctAction: 'collision',
+                    hint: 'Цепочка 1010 декодируется как ББ и как АВ. Граф Маркова содержит цикл через Λ!'
+                },
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '101' }, { letter: 'Г', code: '11' }],
+                    correctAction: 'collision',
+                    hint: 'Цепочка 0101 декодируется как ББ и как АВ. Коллизия!'
+                }
+            ]
+        },
+        {
+            waveNum: 9,
+            title: 'ВОЛНА 9: ВЫСОКОСКОРОСТНОЙ ШЛЮЗ ХАФФМАНА',
+            timeLimit: 6.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '00' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '10' }, { letter: 'Г', code: '110' }, { letter: 'Д', code: '111' }],
+                    correctAction: 'prefix',
+                    hint: '5 кодовых слов, насыщенное дерево Крафта. Полный префиксный код!'
+                },
+                {
+                    codes: [{ letter: 'А', code: '1' }, { letter: 'Б', code: '01' }, { letter: 'В', code: '001' }, { letter: 'Г', code: '0001' }],
+                    correctAction: 'postfix',
+                    hint: 'Все слова оканчиваются на 1. Постфиксная демаркация буфера.'
+                }
+            ]
+        },
+        {
+            waveNum: 10,
+            title: 'ВОЛНА 10: ФИНАЛЬНЫЙ БОСС — СУПЕР-МАРКОВ (5 секунд!)',
+            timeLimit: 5.0,
+            variants: [
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '011' }, { letter: 'В', code: '110' }, { letter: 'Г', code: '11' }, { letter: 'Д', code: '1' }],
+                    correctAction: 'collision',
+                    hint: 'Критическая петля: 0110 допускает расшифровки АВ и Б0 (коллизия потока)!'
+                },
+                {
+                    codes: [{ letter: 'А', code: '0' }, { letter: 'Б', code: '10' }, { letter: 'В', code: '110' }, { letter: 'Г', code: '1110' }, { letter: 'Д', code: '1111' }],
+                    correctAction: 'prefix',
+                    hint: 'Каскадное префиксное дерево максимальной глубины. Префиксный код!'
+                }
+            ]
+        }
+    ];
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro' | 'playing' | 'victory'
+                currentWaveIndex: 0,
+                attemptsCount: 0,
+                sessionStartTime: null,
+                sessionDurationStr: '00:00',
+                sessionTimerInterval: null,
+                phaseTimeLeft: 12.0,
+                waveTimerInterval: null,
+                isActionBlocked: false,
+                alarmActive: false,
+                alarmMessage: '',
+                waves: []
+            };
+        },
+
+        computed: {
+            currentWave() {
+                if (this.waves.length > 0 && this.currentWaveIndex < this.waves.length) {
+                    return this.waves[this.currentWaveIndex];
+                }
+                return {
+                    title: 'Инициализация...',
+                    codes: [],
+                    timeLimit: 10.0,
+                    correctAction: 'prefix',
+                    hint: ''
+                };
+            }
+        },
+
+        methods: {
+            generateWaves() {
+                this.waves = WAVE_TEMPLATES.map(tpl => {
+                    const vIdx = Math.floor(Math.random() * tpl.variants.length);
+                    const chosen = tpl.variants[vIdx];
+                    return {
+                        waveNum: tpl.waveNum,
+                        title: tpl.title,
+                        timeLimit: tpl.timeLimit,
+                        codes: chosen.codes,
+                        correctAction: chosen.correctAction,
+                        hint: chosen.hint
+                    };
+                });
+            },
+
+            startGame() {
+                playClickTone();
+                this.generateWaves();
+                this.currentWaveIndex = 0;
+                this.attemptsCount = 0;
+                this.gameState = 'playing';
+                this.sessionStartTime = Date.now();
+                this.alarmActive = false;
+                this.isActionBlocked = false;
+
+                if (this.sessionTimerInterval) clearInterval(this.sessionTimerInterval);
+                this.sessionTimerInterval = setInterval(() => {
+                    if (this.sessionStartTime) {
+                        const sec = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+                        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+                        const s = String(sec % 60).padStart(2, '0');
+                        this.sessionDurationStr = `${m}:${s}`;
+                    }
+                }, 1000);
+
+                this.startWave();
+            },
+
+            startWave() {
+                if (this.waveTimerInterval) clearInterval(this.waveTimerInterval);
+                this.phaseTimeLeft = this.currentWave.timeLimit;
+                this.isActionBlocked = false;
+
+                const tickMs = 100;
+                this.waveTimerInterval = setInterval(() => {
+                    this.phaseTimeLeft = Math.max(0, this.phaseTimeLeft - (tickMs / 1000));
+                    if (this.phaseTimeLeft <= 0) {
+                        clearInterval(this.waveTimerInterval);
+                        this.triggerHardcoreReset('Время шлюза истекло! Тайм-аут пакета данных.');
+                    }
+                }, tickMs);
+            },
+
+            submitAction(action) {
+                if (this.isActionBlocked || this.gameState !== 'playing') return;
+                playClickTone();
+
+                if (action === this.currentWave.correctAction) {
+                    // Успех волны!
+                    playSuccessTone();
+                    if (this.currentWaveIndex + 1 >= this.waves.length) {
+                        // Полная победа!
+                        if (this.waveTimerInterval) clearInterval(this.waveTimerInterval);
+                        if (this.sessionTimerInterval) clearInterval(this.sessionTimerInterval);
+                        this.gameState = 'victory';
+                        this.sendTelemetry('level_complete', true, 'completed');
+                    } else {
+                        this.currentWaveIndex++;
+                        this.sendTelemetry('in_progress', false, 'in_progress');
+                        this.startWave();
+                    }
+                } else {
+                    // Ошибка -> Хардкор-сброс
+                    let detail = 'Выбран неверный шлюз декодирования!';
+                    if (this.currentWave.correctAction === 'prefix') {
+                        detail = 'Код удовлетворяет прямому условию Фано (PREFIX_GATE)!';
+                    } else if (this.currentWave.correctAction === 'postfix') {
+                        detail = 'Код постфиксный (POSTFIX_GATE)! Прямое условие нарушено, но суффиксы уникальны.';
+                    } else if (this.currentWave.correctAction === 'collision') {
+                        detail = 'Код содержит цикл через Λ в графе Маркова (COLLISION_DROP)!';
+                    }
+                    this.triggerHardcoreReset(detail);
+                }
+            },
+
+            triggerHardcoreReset(reason) {
+                this.isActionBlocked = true;
+                if (this.waveTimerInterval) clearInterval(this.waveTimerInterval);
+                this.attemptsCount++;
+                this.alarmActive = true;
+                this.alarmMessage = reason;
+                playAlarmTone();
+
+                this.sendTelemetry('hardcore_reset', false, 'in_progress');
+
+                setTimeout(() => {
+                    this.alarmActive = false;
+                    this.generateWaves();
+                    this.currentWaveIndex = 0;
+                    this.startWave();
+                }, 1500);
+            },
+
+            sendTelemetry(actionType, successStatus, statusStr) {
+                const payload = {
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: MISSION_NAME,
+                    action_type: actionType,
+                    status: statusStr,
+                    start_time: this.sessionStartTime ? new Date(this.sessionStartTime).toISOString() : new Date().toISOString(),
+                    time_spent_sec: this.sessionStartTime ? Math.max(1, Math.round((Date.now() - this.sessionStartTime) / 1000)) : 1,
+                    attempts_count: this.attemptsCount,
+                    success: successStatus
+                };
+                try {
+                    window.parent.postMessage(payload, '*');
+                } catch(e) {
+                    console.error('Telemetry error:', e);
+                }
+            },
+
+            handleKeydown(e) {
+                if (this.gameState === 'intro') {
+                    if (e.key === ' ' || e.code === 'Space' || e.key === 'Enter') {
+                        e.preventDefault();
+                        this.startGame();
+                    }
+                    return;
+                }
+                if (this.gameState === 'playing' && !this.isActionBlocked) {
+                    if (e.key === '1' || e.code === 'Digit1') {
+                        e.preventDefault();
+                        this.submitAction('prefix');
+                    } else if (e.key === '2' || e.code === 'Digit2') {
+                        e.preventDefault();
+                        this.submitAction('postfix');
+                    } else if (e.key === '3' || e.code === 'Digit3') {
+                        e.preventDefault();
+                        this.submitAction('collision');
+                    }
+                }
+            }
+        },
+
+        mounted() {
+            window.addEventListener('keydown', this.handleKeydown);
+            this.generateWaves();
+
+            // Экспорт глобального тестового хука
+            const stateHook = {
+                waves: () => this.waves,
+                currentWaveIndex: () => this.currentWaveIndex,
+                currentWave: () => this.currentWave,
+                solveCurrentWave: () => {
+                    return (this.currentWave && this.currentWave.correctAction) ? this.currentWave.correctAction : 'prefix';
+                },
+                submitAction: (action) => {
+                    this.submitAction(action);
+                }
+            };
+
+            // Делаем свойства доступными и как поля, и как геттеры
+            Object.defineProperty(stateHook, 'waves', {
+                get: () => this.waves
+            });
+            Object.defineProperty(stateHook, 'currentWaveIndex', {
+                get: () => this.currentWaveIndex
+            });
+            Object.defineProperty(stateHook, 'currentWave', {
+                get: () => this.currentWave
+            });
+
+            window.__DEV_LEVEL3_STATE__ = stateHook;
+        },
+
+        beforeUnmount() {
+            window.removeEventListener('keydown', this.handleKeydown);
+            if (this.waveTimerInterval) clearInterval(this.waveTimerInterval);
+            if (this.sessionTimerInterval) clearInterval(this.sessionTimerInterval);
+        }
+    }).mount('#app');
+})();
+</script>
