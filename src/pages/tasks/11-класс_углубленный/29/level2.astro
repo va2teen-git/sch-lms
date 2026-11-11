@@ -1,0 +1,564 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 text-warning mb-0">Тренажер: Длинная арифметика и анализ алгоритмов (Уровень 2)</h2>
+                <div class="text-secondary small">Урок 29 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">
+                Аналитический ввод // Anti-Paste Guard
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, ошибки и таймер -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет: Емкость блоков основания</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ОШИБКА РАСЧЕТА]</strong> <span id="feedback-text">Неверное значение!</span> 
+                            Регенерация параметров...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 1: Прямой расчет емкости блоков (CCS = 4)           -->
+                <!-- ========================================================= -->
+                <div id="phase1" class="phase-container">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">УСЛОВИЕ ЗАДАЧИ (БАЗОВОЕ РАЗБИЕНИЕ ЧИСЛА НА БЛОКИ):</div>
+                        <div class="text-light mb-2">
+                            Для хранения многоразрядного целого числа, состоящего из <strong id="p1-digits-val" class="text-warning">74</strong> десятичных цифр, 
+                            используется динамический массив <code>std::vector&lt;int&gt;</code> в системе счисления с основанием&nbsp;<strong id="p1-base-val" class="text-info">B = 10⁴ = 10 000</strong> (по <span id="p1-k-val" class="text-info">4</span> дес. цифр на ячейку).
+                            <br><br>
+                            Сколько элементов (ячеек) потребуется выделить в массиве для гарантированного хранения всех разрядов этого числа?
+                        </div>
+                        <div class="text-secondary small">
+                            (Напоминание: даже если в самом старшем блоке остаётся всего 1 цифра, для неё выделяется полноценная ячейка массива: <code>L = ⌈D / k⌉</code>).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p1-input" class="form-label text-warning small">ВВЕДИТЕ ЧИСЛО ЯЧЕЕК МАССИВА:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p1-input" onpaste="return false;" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 19" autocomplete="off">
+                            <button id="p1-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold" style="min-height: 48px;">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 2: Многошаговый расчет сложности (CCS = 6)           -->
+                <!-- ========================================================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">УСЛОВИЕ ЗАДАЧИ (СЛОЖНОСТЬ УМНОЖЕНИЯ В БАЗЕ B):</div>
+                        <div class="text-light mb-2">
+                            Два многоразрядных числа имеют десятичную длину <strong id="p2-len-a" class="text-warning">48</strong> и 
+                            <strong id="p2-len-b" class="text-warning">36</strong> знаков соответственно.
+                            Оба числа представлены в памяти массивами блоков по основанию <strong id="p2-base-val" class="text-info">B = 10⁴</strong> 
+                            (каждый блок содержит <code>k = 4</code> цифры).
+                            <br><br>
+                            Сколько <strong>элементарных операций умножения пар блоков</strong> (умножений машинных слов) выполнит школьный алгоритм «в столбик» 
+                            при перемножении этих двух чисел?
+                        </div>
+                        <div class="text-secondary small">
+                            (Подсказка: сначала найдите количество блоков <code>L_A = ⌈N / 4⌉</code> и <code>L_B = ⌈M / 4⌉</code>, затем вычислите число шагов двойного цикла: <code>L_A × L_B</code>).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p2-input" class="form-label text-warning small">ЧИСЛО ОПЕРАЦИЙ УМНОЖЕНИЯ БЛОКОВ:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p2-input" onpaste="return false;" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 108" autocomplete="off">
+                            <button id="p2-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold" style="min-height: 48px;">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 3: Обратная задача / Инверсия заема (CCS = 7-8)      -->
+                <!-- ========================================================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">ОБРАТНАЯ ЗАДАЧА (ИНВЕРСИЯ ПРАВИЛА ЗАЕМА ПРИ ВЫЧИТАНИИ):</div>
+                        <div class="text-light mb-2">
+                            В системе длинной арифметики с основанием <strong id="p3-base-val" class="text-info">B = 1000</strong> выполняется вычитание 
+                            многоразрядных чисел: <code>A - B = C</code>.
+                            <br><br>
+                            В младшем разряде <code>i = 0</code> значение уменьшаемого равно <strong id="p3-val-a0" class="text-warning">240</strong>, 
+                            а результат вычитания в этом разряде составил <code>C[0] = </code><strong id="p3-val-c0" class="text-success">690</strong>.
+                            При этом в старший разряд гарантированно ушёл <strong>заем (borrow = 1)</strong>.
+                            <br><br>
+                            Восстановите исходное значение младшего разряда вычитаемого: <strong>B[0]</strong>.
+                        </div>
+                        <div class="text-secondary small">
+                            (Напоминание: при заеме разность вычисляется как <code>C[0] = A[0] - B[0] + B</code>).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p3-input" class="form-label text-warning small">ЗНАЧЕНИЕ РАЗРЯДА B[0]:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p3-input" onpaste="return false;" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 550" autocomplete="off">
+                            <button id="p3-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold" style="min-height: 48px;">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 4: Долина консолидации: Бинарное возведение (CCS = 5)-->
+                <!-- ========================================================= -->
+                <div id="phase4" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">КОНЦЕПТУАЛЬНЫЙ АНАЛИЗ (БЫСТРОЕ БИНАРНОЕ ВОЗВЕДЕНИЕ В СТЕПЕНЬ):</div>
+                        <div class="text-light mb-2">
+                            Для криптографических вычислений длинное число <code>A</code> возводится в степень <code>K</code> по алгоритму быстрого бинарного возведения 
+                            (Binary Exponentiation).
+                            <br><br>
+                            Показатель степени равен <strong id="p4-k-val" class="text-warning">45</strong> и имеет двоичную запись 
+                            <strong id="p4-bin-val" class="text-info">101101₂</strong> (длина <span id="p4-bits-len" class="text-light">6</span> бит, 
+                            из них <span id="p4-ones-cnt" class="text-light">4</span> единичных бита).
+                            <br><br>
+                            Сколько <strong>всего операций умножения длинных чисел</strong> (включая возведения базы в квадрат и умножения на текущий результат) 
+                            выполнит данный алгоритм?
+                        </div>
+                        <div class="text-secondary small">
+                            (Формула: для каждого шага кроме первого выполняется 1 возведение в квадрат: <code>(bits - 1)</code>, плюс по 1 умножению на результат для каждого единичного бита, кроме начальной инициализации <code>(ones - 1)</code>).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p4-input" class="form-label text-warning small">ОБЩЕЕ ЧИСЛО ОПЕРАЦИЙ УМНОЖЕНИЯ:</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p4-input" onpaste="return false;" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 8" autocomplete="off">
+                            <button id="p4-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold" style="min-height: 48px;">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 5: Кульминационный пик: Метод Карацубы (CCS = 8-9)  -->
+                <!-- ========================================================= -->
+                <div id="phase5" class="phase-container d-none">
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2 text-uppercase">КУЛЬМИНАЦИОННЫЙ СИНТЕЗ (ПЕРЕКРЕСТНЫЙ ЧЛЕН КАРАЦУБЫ):</div>
+                        <div class="text-light mb-2">
+                            В алгоритме Анатолия Карацубы для быстрого перемножения двух чисел <code>A</code> и <code>B</code> они разделены на половины:
+                            <br><code>A = A₁ · 10⁴ + A₀</code>, где <code>A₁ = </code><strong id="p5-val-a1" class="text-info">30</strong>, <code>A₀ = </code><strong id="p5-val-a0" class="text-info">20</strong>.
+                            <br><code>B = B₁ · 10⁴ + B₀</code>, где <code>B₁ = </code><strong id="p5-val-b1" class="text-info">40</strong>, <code>B₀ = </code><strong id="p5-val-b0" class="text-info">50</strong>.
+                            <br><br>
+                            Алгоритм вычисляет три вспомогательных произведения:
+                            <br><code>P₁ = A₁ · B₁ = </code><span id="p5-val-p1" class="text-light">1200</span>
+                            <br><code>P₂ = A₀ · B₀ = </code><span id="p5-val-p2" class="text-light">1000</span>
+                            <br><code>P₃ = (A₁ + A₀) · (B₁ + B₀) = </code><span id="p5-val-p3" class="text-light">4500</span>
+                            <br><br>
+                            Вычислите значение <strong>перекрестного члена</strong> <code>Cross = A₁B₀ + A₀B₁</code>, используя формулу Карацубы:
+                            <br><strong class="text-warning">Cross = P₃ - P₁ - P₂</strong>.
+                        </div>
+                        <div class="text-secondary small">
+                            (Введите итоговое числовое значение коэффициента Cross).
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p5-input" class="form-label text-warning small">ЗНАЧЕНИЕ ПЕРЕКРЕСТНОГО ЧЛЕНА (CROSS):</label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p5-input" onpaste="return false;" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" placeholder="Например: 2300" autocomplete="off">
+                            <button id="p5-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold" style="min-height: 48px;">
+                                ОТВЕТИТЬ [ENTER]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФИНАЛЬНЫЙ ЭКРАН ПОБЕДЫ                                    -->
+                <!-- ========================================================= -->
+                <div id="victory-screen" class="text-center py-5 d-none">
+                    <div class="display-1 text-warning mb-3">✓</div>
+                    <h3 class="text-warning mb-2">УРОВЕНЬ 2 УСПЕШНО ПРОЙДЕН!</h3>
+                    <p class="text-secondary mb-4">
+                        Вы продемонстрировали глубокое аналитическое владение расчетом емкости блоков, 
+                        поразрядным вычитанием с заемом, оптимизацией Карацубы и бинарным возведением в степень.
+                    </p>
+                    <div class="d-inline-flex border border-warning p-3 bg-black gap-4 text-start rounded-0 mb-4">
+                        <div>
+                            <div class="text-secondary small">Затраченное время:</div>
+                            <div id="final-time" class="text-info fw-bold fs-5">00:00</div>
+                        </div>
+                        <div class="border-start border-secondary ps-4">
+                            <div class="text-secondary small">Количество ошибок:</div>
+                            <div id="final-attempts" class="text-warning fw-bold fs-5">0</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    const missionName = 'Урок 29 :: Многоразрядные целые числа, задачи длинной арифметики (Уровень 2)';
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Таймер
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Обработка ошибок с процедурной перегенерацией
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'hardcore_reset',
+            status: 'failed',
+            attempts_count: attemptsCount
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1500);
+    }
+
+    // Завершение всего Уровня 2
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        for (let i = 1; i <= 5; i++) {
+            const el = document.getElementById(`phase${i}`);
+            if (el) el.classList.add('d-none');
+        }
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Прямой расчет емкости блоков (CCS = 4)
+    // =========================================================================
+    let p1ExpectedAnswer = 0;
+
+    function initPhase1() {
+        // Выбираем k = 4 (B = 10^4) или k = 9 (B = 10^9)
+        const isBase4 = Math.random() > 0.5;
+        const k = isBase4 ? 4 : 9;
+        const baseStr = isBase4 ? 'B = 10⁴ = 10 000' : 'B = 10⁹ = 1 000 000 000';
+
+        // Генерируем число цифр D не кратное k
+        const multiplier = Math.floor(Math.random() * 8) + 6; // 6..13
+        const remainder = Math.floor(Math.random() * (k - 1)) + 1; // 1..k-1
+        const digits = multiplier * k + remainder; // гарантированно не делится нацело
+
+        p1ExpectedAnswer = Math.ceil(digits / k);
+
+        document.getElementById('p1-digits-val').textContent = String(digits);
+        document.getElementById('p1-base-val').textContent = baseStr;
+        document.getElementById('p1-k-val').textContent = String(k);
+
+        const inp = document.getElementById('p1-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase1() {
+        if (isLocked) return;
+        const val = document.getElementById('p1-input').value.trim();
+        if (!val) return;
+
+        if (parseInt(val, 10) === p1ExpectedAnswer) {
+            currentPhase = 2;
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+            document.getElementById('phase-title').textContent = 'Многошаговый расчет: Сложность школьного умножения';
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            initPhase2();
+        } else {
+            triggerErrorReset(`Неверно! Для ${document.getElementById('p1-digits-val').textContent} цифр по ${document.getElementById('p1-k-val').textContent} в блоке требуется ⌈D/k⌉ ячеек.`, () => {
+                initPhase1();
+            });
+        }
+    }
+
+    document.getElementById('p1-submit-btn').addEventListener('click', verifyPhase1);
+    document.getElementById('p1-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase1();
+    });
+
+    // =========================================================================
+    // ФАЗА 2: Многошаговый расчет сложности умножения (CCS = 6)
+    // =========================================================================
+    let p2ExpectedAnswer = 0;
+
+    function initPhase2() {
+        const k = 4; // база 10^4
+        const blocksA = Math.floor(Math.random() * 6) + 8; // 8..13 блоков
+        const blocksB = Math.floor(Math.random() * 5) + 6; // 6..10 блоков
+
+        const lenA = (blocksA - 1) * k + (Math.floor(Math.random() * 3) + 2); // гарантирует blocksA блоков
+        const lenB = (blocksB - 1) * k + (Math.floor(Math.random() * 3) + 2); // гарантирует blocksB блоков
+
+        p2ExpectedAnswer = blocksA * blocksB;
+
+        document.getElementById('p2-len-a').textContent = String(lenA);
+        document.getElementById('p2-len-b').textContent = String(lenB);
+
+        const inp = document.getElementById('p2-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase2() {
+        if (isLocked) return;
+        const val = document.getElementById('p2-input').value.trim();
+        if (!val) return;
+
+        if (parseInt(val, 10) === p2ExpectedAnswer) {
+            currentPhase = 3;
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+            document.getElementById('phase-title').textContent = 'Пик инверсии: Восстановление вычитаемого при заеме';
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            initPhase3();
+        } else {
+            triggerErrorReset(`Неверное число умножений! Сначала определите число блоков каждого числа: L_A = ⌈N/4⌉ и L_B = ⌈M/4⌉, затем перемножьте их.`, () => {
+                initPhase2();
+            });
+        }
+    }
+
+    document.getElementById('p2-submit-btn').addEventListener('click', verifyPhase2);
+    document.getElementById('p2-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase2();
+    });
+
+    // =========================================================================
+    // ФАЗА 3: Обратная задача / Инверсия заема (CCS = 7-8)
+    // =========================================================================
+    let p3ExpectedAnswer = 0;
+
+    function initPhase3() {
+        const base = 1000;
+        // Генерируем A0 < B0, чтобы гарантировать заем borrow = 1
+        const a0 = Math.floor(Math.random() * 350) + 120; // 120..469
+        const b0 = Math.floor(Math.random() * 350) + 550; // 550..899
+        // diff = A0 - B0 + base
+        const c0 = a0 - b0 + base;
+
+        p3ExpectedAnswer = b0;
+
+        document.getElementById('p3-val-a0').textContent = String(a0);
+        document.getElementById('p3-val-c0').textContent = String(c0);
+
+        const inp = document.getElementById('p3-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase3() {
+        if (isLocked) return;
+        const val = document.getElementById('p3-input').value.trim();
+        if (!val) return;
+
+        if (parseInt(val, 10) === p3ExpectedAnswer) {
+            currentPhase = 4;
+            document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+            document.getElementById('phase-title').textContent = 'Долина консолидации: Операции бинарного возведения';
+            document.getElementById('phase3').classList.add('d-none');
+            document.getElementById('phase4').classList.remove('d-none');
+            initPhase4();
+        } else {
+            triggerErrorReset(`Неверный вычитаемый разряд B[0]! При заеме C[0] = A[0] - B[0] + B, следовательно B[0] = A[0] + B - C[0].`, () => {
+                initPhase3();
+            });
+        }
+    }
+
+    document.getElementById('p3-submit-btn').addEventListener('click', verifyPhase3);
+    document.getElementById('p3-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase3();
+    });
+
+    // =========================================================================
+    // ФАЗА 4: Долина консолидации: Бинарное возведение (CCS = 5)
+    // =========================================================================
+    let p4ExpectedAnswer = 0;
+
+    function initPhase4() {
+        // Генерируем показатель степени K от 25 до 60
+        const kVal = Math.floor(Math.random() * 36) + 25;
+        const binStr = kVal.toString(2);
+        const bitsLen = binStr.length;
+        const onesCnt = binStr.split('').filter(b => b === '1').length;
+
+        // Число умножений: (bitsLen - 1) возведений в квадрат + (onesCnt - 1) умножений на базу
+        p4ExpectedAnswer = (bitsLen - 1) + (onesCnt - 1);
+
+        document.getElementById('p4-k-val').textContent = String(kVal);
+        document.getElementById('p4-bin-val').textContent = `${binStr}₂`;
+        document.getElementById('p4-bits-len').textContent = String(bitsLen);
+        document.getElementById('p4-ones-cnt').textContent = String(onesCnt);
+
+        const inp = document.getElementById('p4-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase4() {
+        if (isLocked) return;
+        const val = document.getElementById('p4-input').value.trim();
+        if (!val) return;
+
+        if (parseInt(val, 10) === p4ExpectedAnswer) {
+            currentPhase = 5;
+            document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+            document.getElementById('phase-title').textContent = 'Кульминационный синтез: Перекрестный член Карацубы';
+            document.getElementById('phase4').classList.add('d-none');
+            document.getElementById('phase5').classList.remove('d-none');
+            initPhase5();
+        } else {
+            triggerErrorReset(`Неверное число умножений! Выполняется (бит - 1) возведений в квадрат плюс (единиц - 1) умножений на результат.`, () => {
+                initPhase4();
+            });
+        }
+    }
+
+    document.getElementById('p4-submit-btn').addEventListener('click', verifyPhase4);
+    document.getElementById('p4-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase4();
+    });
+
+    // =========================================================================
+    // ФАЗА 5: Кульминационный синтез: Метод Карацубы (CCS = 8-9)
+    // =========================================================================
+    let p5ExpectedAnswer = 0;
+
+    function initPhase5() {
+        // Генерируем A1, A0, B1, B0 (круглые двузначные числа для чистоты вычислений)
+        const a1 = (Math.floor(Math.random() * 5) + 2) * 10; // 20, 30, 40, 50, 60
+        const a0 = (Math.floor(Math.random() * 5) + 2) * 10; // 20, 30, 40, 50, 60
+        const b1 = (Math.floor(Math.random() * 5) + 2) * 10; // 20, 30, 40, 50, 60
+        const b0 = (Math.floor(Math.random() * 5) + 2) * 10; // 20, 30, 40, 50, 60
+
+        const p1 = a1 * b1;
+        const p2 = a0 * b0;
+        const p3 = (a1 + a0) * (b1 + b0);
+
+        // Cross = P3 - P1 - P2 = a1*b0 + a0*b1
+        const cross = p3 - p1 - p2;
+        p5ExpectedAnswer = cross;
+
+        document.getElementById('p5-val-a1').textContent = String(a1);
+        document.getElementById('p5-val-a0').textContent = String(a0);
+        document.getElementById('p5-val-b1').textContent = String(b1);
+        document.getElementById('p5-val-b0').textContent = String(b0);
+
+        document.getElementById('p5-val-p1').textContent = String(p1);
+        document.getElementById('p5-val-p2').textContent = String(p2);
+        document.getElementById('p5-val-p3').textContent = String(p3);
+
+        const inp = document.getElementById('p5-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase5() {
+        if (isLocked) return;
+        const val = document.getElementById('p5-input').value.trim();
+        if (!val) return;
+
+        if (parseInt(val, 10) === p5ExpectedAnswer) {
+            completeLevel();
+        } else {
+            triggerErrorReset(`Неверное значение Cross! По формуле Карацубы: Cross = P₃ - P₁ - P₂ = ${document.getElementById('p5-val-p3').textContent} - ${document.getElementById('p5-val-p1').textContent} - ${document.getElementById('p5-val-p2').textContent}.`, () => {
+                initPhase5();
+            });
+        }
+    }
+
+    document.getElementById('p5-submit-btn').addEventListener('click', verifyPhase5);
+    document.getElementById('p5-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyPhase5();
+    });
+
+    // Запуск таймера и первой фазы
+    startTimer();
+    initPhase1();
+})();
+</script>
