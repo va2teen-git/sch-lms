@@ -996,6 +996,56 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             sendTelemetry('level_complete', true);
         });
 
+        // Экспорт DEV-состояния для Playwright автотестов и симулятора персон
+        window.__DEV_LEVEL1_STATE__ = {
+            getPhase: () => currentPhase,
+            getAttempts: () => attempts,
+            getP1Template: () => p1CurrentTemplate,
+            getP2Scenario: () => p2CurrentScenario,
+            solvePhase1: () => {
+                const inputRows = [
+                    { a: 0, b: 0 },
+                    { a: 0, b: 1 },
+                    { a: 1, b: 0 },
+                    { a: 1, b: 1 }
+                ];
+                inputRows.forEach((r, rowIdx) => {
+                    const expected = p1CurrentTemplate.evalRow(r.a, r.b);
+                    for (let colIdx = 0; colIdx < 3; colIdx++) {
+                        const btn = document.querySelector(`.p1-cell[data-row="${rowIdx}"][data-col="${colIdx}"]`);
+                        const targetVal = expected[colIdx];
+                        btn.setAttribute('data-val', String(targetVal));
+                        btn.textContent = String(targetVal);
+                        if (targetVal === 1) {
+                            btn.className = 'btn btn-dark text-success border border-success p1-cell font-monospace fs-5 fw-bold rounded-0 w-100';
+                        } else {
+                            btn.className = 'btn btn-dark text-warning border border-warning p1-cell font-monospace fs-5 fw-bold rounded-0 w-100';
+                        }
+                    }
+                });
+                updatePhase1VerifyBtn();
+                document.getElementById('p1-verify-btn').click();
+            },
+            solvePhase2: () => {
+                const targetCols = p2CurrentScenario.targetColumns;
+                for (let i = 0; i < 3; i++) {
+                    const slot = document.getElementById(`p2-slot-${i}`);
+                    assignTokenToSlot(slot, targetCols[i]);
+                }
+                updatePhase2VerifyBtn();
+                document.getElementById('p2-verify-btn').click();
+            },
+            solvePhase3: () => {
+                const cards = Array.from(document.querySelectorAll('#p3-source-pool .p3-card'));
+                cards.forEach(c => {
+                    const cat = c.getAttribute('data-category');
+                    const targetBody = document.getElementById(`p3-bucket-${cat}-body`);
+                    moveCardToContainer(c, targetBody);
+                });
+                document.getElementById('p3-verify-btn').click();
+            }
+        };
+
         // =========================================================================
         // ИНИЦИАЛИЗАЦИЯ ТРЕНАЖЕРА
         // =========================================================================
