@@ -34,6 +34,30 @@ test.describe('Curriculum & Architecture Linting Suite (Lesson 20)', () => {
     expect(content).toMatch(/<sub.*>|<sup.*>/);
   });
 
+  test('Theory file supports Logo-Storm markup when data-term spans are present', async () => {
+    const theoryFile = path.join(lessonPath, 'theory.md');
+    const content = fs.readFileSync(theoryFile, 'utf-8');
+
+    const spanRegex = /<span\s+data-term[^>]*>(.*?)<\/span>/gis;
+    let match;
+    const terms = [];
+    while ((match = spanRegex.exec(content)) !== null) {
+      const term = match[1].replace(/<[^>]+>/g, '').trim();
+      if (term.length > 0) {
+        terms.push(term);
+        // Each term must be reasonable length (2 to 50 characters)
+        expect(term.length).toBeGreaterThanOrEqual(2);
+        expect(term.length).toBeLessThanOrEqual(50);
+      }
+    }
+
+    // If lesson has terms, verify quota of 5 to 12
+    if (terms.length > 0) {
+      expect(terms.length).toBeGreaterThanOrEqual(5);
+      expect(terms.length).toBeLessThanOrEqual(12);
+    }
+  });
+
   test('Level 1 adheres to architectural requirements', async () => {
     const level1File = path.join(tasksPath, 'level1.astro');
     expect(fs.existsSync(level1File)).toBe(true);

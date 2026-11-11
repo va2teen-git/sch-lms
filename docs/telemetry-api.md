@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS telemetry (
 * `idx_telemetry_student_attempt` ON `telemetry(student_class, lesson_id, attempt_id)` — быстрый доступ к истории попыток ученика на уроке.
 * `idx_telemetry_student_cohort` ON `telemetry(student_class, timestamp)` — поиск активности учеников конкретного класса во времени.
 * `idx_telemetry_course_lesson` ON `telemetry(course_slug, lesson_id, timestamp)` — выборка результатов прохождения конкретного урока заданной программы.
+* `idx_telemetry_sprint` ON `telemetry(course_slug, lesson_id, student_class, action_type)` — мгновенная выборка лучших результатов тренажера «Лого-Шторм».
 * `idx_telemetry_student` ON `telemetry(class_name, last_name, first_name)` — легаси-совместимость.
 * `idx_telemetry_timestamp` ON `telemetry(timestamp)` — срезы по датам уроков.
 * `idx_telemetry_mission` ON `telemetry(mission_name)` — текстовый поиск по названиям.
@@ -149,7 +150,33 @@ window.parent.postMessage({
 
 > **Обогащение контекстом:** Платформа перехватывает сообщение, добавляет постоянный класс учащегося `student_class`, слаг курса `course_slug`, номер урока `lesson_id`, а также метаданные активной попытки: `attempt_id`, `attempt_number` и `attempt_mode`.
 
-### 4.2 Конечный Автомат Попыток (Client-Side Attempt State Machine)
+### 4.2 Событие «Лого-Шторм» (`action_type: 'sprint_complete'`)
+Отправляется клиентом урока по завершении скоростного набора ключевых терминов:
+```javascript
+{
+  student_class: "10-a",
+  course_slug: "10-класс_углубленный",
+  lesson_id: "27",
+  action_type: "sprint_complete",
+  level_number: 0,
+  status: "completed",
+  time_spent_sec: 44,
+  attempts_count: 1,
+  success: true,
+  action_log: JSON.stringify({
+    cpm: 265,
+    wpm: 53,
+    accuracy: 98.5,
+    chars_count: 194,
+    terms_count: 7,
+    errors_count: 2
+  })
+}
+```
+* `level_number: 0` указывает, что событие относится к общему мини-тренажеру урока, а не к трем базовым уровням задач.
+* Повторные фиксации результатов не затирают предыдущие строки в `telemetry`, а агрегатор дашборда автоматически отбирает `MIN(time_spent_sec)`.
+
+### 4.3 Конечный Автомат Попыток (Client-Side Attempt State Machine)
 В браузере ученика текущая попытка сохраняется в `sessionStorage` по ключу `lms_attempt_${classSlug}_${lessonId}`:
 ```json
 {

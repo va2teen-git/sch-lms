@@ -41,6 +41,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_telemetry_course_lesson ON telemetry(course_slug, lesson_id, timestamp);
   CREATE INDEX IF NOT EXISTS idx_telemetry_attempt ON telemetry(attempt_id);
   CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, lesson_id, attempt_id);
+  CREATE INDEX IF NOT EXISTS idx_telemetry_sprint ON telemetry(course_slug, lesson_id, student_class, action_type);
 `);
 console.log('Indexes created/verified.');
 

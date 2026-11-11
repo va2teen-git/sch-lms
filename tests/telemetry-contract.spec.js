@@ -27,6 +27,11 @@ test.describe('Telemetry & Database Contract Integrity', () => {
     expect(columnNames).toContain('attempt_number');
     expect(columnNames).toContain('attempt_mode');
     expect(columnNames).toContain('timestamp');
+
+    const indexList = db.prepare("PRAGMA index_list(telemetry)").all();
+    const indexNames = indexList.map(i => i.name);
+    expect(indexNames).toContain('idx_telemetry_sprint');
+
     db.close();
   });
 
@@ -147,6 +152,50 @@ test.describe('Telemetry & Database Contract Integrity', () => {
     expect(row.attempt_id).toBe('att_test_123');
     expect(Number(row.attempt_number)).toBe(2);
     expect(row.attempt_mode).toBe('hardcore');
+    db.close();
+  });
+
+  test('POST /api/telemetry correctly records sprint_complete event with level_number: 0 and action_log', async ({ request }) => {
+    const testMission = `Урок 20 :: Logo-Storm Sprint Contract [${Date.now()}]`;
+    const actionLog = {
+      cpm: 265,
+      wpm: 53,
+      accuracy: 98.5,
+      chars_count: 194,
+      terms_count: 7,
+      errors_count: 2
+    };
+
+    const payload = {
+      student_firstName: 'Спринтер',
+      student_lastName: 'Турбо',
+      student_class: '11-ИТ',
+      course_slug: '11-класс_углубленный',
+      lesson_id: '20',
+      mission_name: testMission,
+      action_type: 'sprint_complete',
+      level_number: 0,
+      time_spent_sec: 44,
+      attempts_count: 1,
+      success: true,
+      status: 'completed',
+      action_log: JSON.stringify(actionLog)
+    };
+
+    const res = await request.post('http://localhost:4321/api/telemetry', {
+      data: payload,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    expect(res.status()).toBe(200);
+
+    const db = new Database(dbPath);
+    const row = db.prepare("SELECT * FROM telemetry WHERE mission_name = ?").get(testMission);
+    expect(row).toBeDefined();
+    expect(row.action_type).toBe('sprint_complete');
+    expect(Number(row.level_number)).toBe(0);
+    expect(Number(row.time_spent_sec)).toBe(44);
+    expect(row.action_log).toContain('265');
     db.close();
   });
 });

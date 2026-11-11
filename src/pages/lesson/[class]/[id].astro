@@ -19,13 +19,41 @@ if (!course || !lesson) {
 
 const princeBonusLevel = lesson?.princeBonusLevel ? parseInt(lesson.princeBonusLevel, 10) : null;
 
-// Попытка загрузить теорию
+// Попытка загрузить теорию и извлечь термины для Лого-Шторма
 const theoryPath = path.join(process.cwd(), 'src', 'content', 'lessons', classSlug, lessonId, 'theory.md');
 let theoryHtml = '<p class="text-gray-500">Теоретический материал еще не добавлен.</p>';
+const sprintTerms: string[] = [];
 
 if (fs.existsSync(theoryPath)) {
   const mdContent = fs.readFileSync(theoryPath, 'utf-8');
   theoryHtml = marked.parse(mdContent);
+
+  // 1. Поиск инлайн тегов <span data-term>
+  const spanRegex = /<span\s+data-term[^>]*>(.*?)<\/span>/gis;
+  let match;
+  while ((match = spanRegex.exec(mdContent)) !== null) {
+    const term = match[1].replace(/<[^>]+>/g, '').trim();
+    if (term.length > 1 && !sprintTerms.includes(term)) {
+      sprintTerms.push(term);
+    }
+  }
+
+  // 2. Резервный поиск из YAML Frontmatter (если инлайн-тегов нет)
+  if (sprintTerms.length === 0) {
+    const fmMatch = mdContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (fmMatch) {
+      const sprintTermsMatch = fmMatch[1].match(/sprintTerms:\s*\n((?:\s*-\s*["']?[^\n\r"']+["']?\r?\n?)+)/);
+      if (sprintTermsMatch) {
+        const lines = sprintTermsMatch[1].split(/\r?\n/);
+        for (const line of lines) {
+          const itemMatch = line.match(/^\s*-\s*["']?([^"'\r\n]+)["']?/);
+          if (itemMatch && itemMatch[1].trim() && !sprintTerms.includes(itemMatch[1].trim())) {
+            sprintTerms.push(itemMatch[1].trim());
+          }
+        }
+      }
+    }
+  }
 }
 
 // Check if monolithic legacy task.html exists
@@ -58,6 +86,26 @@ const tasks = [
         <h1 class="text-base sm:text-xl font-bold truncate" title={`Урок ${lesson.id}: ${lesson.topic}`}>Урок {lesson.id}: {lesson.topic}</h1>
       </div>
       <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+        {sprintTerms.length > 0 ? (
+          <button 
+            id="sprint-toggle" 
+            class="border border-cyan-500/80 bg-cyan-950/70 text-cyan-300 hover:bg-cyan-900 px-2 sm:px-3 py-1 flex items-center gap-1.5 transition-all cursor-pointer select-none shadow-[0_0_12px_rgba(6,182,212,0.25)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] active:scale-95" 
+            title="ЛОГО-ШТОРМ: скоростной кибер-набор терминов урока"
+          >
+            <span class="text-base sm:text-lg animate-pulse">⚡</span>
+            <span class="text-xs sm:text-sm font-bold uppercase tracking-wider font-mono">Лого-Шторм</span>
+          </button>
+        ) : (
+          <button 
+            id="sprint-toggle" 
+            disabled 
+            class="border border-gray-700 bg-gray-800/50 text-gray-500 px-2 sm:px-3 py-1 flex items-center gap-1.5 opacity-40 cursor-not-allowed select-none" 
+            title="В этом уроке термины для Лого-Шторма еще не настроены"
+          >
+            <span class="text-base sm:text-lg opacity-40">⚡</span>
+            <span class="text-xs sm:text-sm font-semibold uppercase tracking-wider font-mono">Лого-Шторм</span>
+          </button>
+        )}
         <button id="hardcore-toggle" class="border border-gray-600 bg-gray-700 px-2 sm:px-3 py-1 flex items-center gap-1.5 sm:gap-2 hover:bg-red-900 transition-colors" title="Режим Хардкора">
           <span class="text-lg sm:text-xl opacity-50 transition-opacity" id="hardcore-icon">💀</span>
           <span class="text-xs sm:text-sm font-semibold uppercase tracking-wider">Хардкор</span>
@@ -248,10 +296,120 @@ const tasks = [
       </section>
     </main>
 
+    <!-- LOGO-STORM (ЛОГО-ШТОРМ) OVERLAY -->
+    <div id="sprint-overlay" class="hidden fixed inset-0 z-40 bg-black/95 backdrop-blur-lg flex-col font-mono text-gray-100 select-none">
+      <!-- Header bar -->
+      <div class="bg-gray-950/90 border-b border-cyan-500/30 px-4 py-3 flex items-center justify-between shrink-0 shadow-lg">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl text-cyan-400 animate-pulse">⚡</span>
+          <div>
+            <div class="text-sm sm:text-base font-bold text-cyan-300 tracking-wider flex items-center gap-2">
+              ЛОГО-ШТОРМ <span class="text-[10px] bg-cyan-950 border border-cyan-500/50 text-cyan-400 px-1.5 py-0.5 uppercase tracking-widest font-mono">v1.0</span>
+            </div>
+            <div class="text-xs text-gray-400">СКОРОСТНОЙ КЛАВИАТУРНЫЙ ТРЕНАЖЕР ПО ТЕРМИНАМ ТЕОРИИ</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="sprint-sound-toggle" class="border border-gray-700 bg-gray-900 hover:bg-gray-800 text-gray-300 px-2.5 py-1 text-xs transition-colors flex items-center gap-1 cursor-pointer" title="Звук переключателей и ошибок">
+            <span id="sprint-sound-icon">🔊</span>
+            <span class="hidden sm:inline">Звук</span>
+          </button>
+          <button id="close-sprint-btn" class="border border-red-900/60 bg-red-950/80 hover:bg-red-900 text-red-200 px-3 py-1 text-xs font-bold transition-colors cursor-pointer" title="Закрыть тренажер [Esc]">
+            ✖ Закрыть <span class="text-[10px] text-red-400 opacity-70 hidden sm:inline">[Esc]</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Status / Metrics Strip -->
+      <div class="bg-gray-900/80 border-b border-gray-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs text-gray-400 gap-2 shrink-0">
+        <div class="flex items-center gap-4">
+          <div>ТЕРМИНОВ: <span id="sprint-terms-count" class="text-cyan-400 font-bold">{sprintTerms.length}</span> <span class="text-[10px] text-gray-500">(рандомизация)</span></div>
+          <div>СИМВОЛОВ: <span id="sprint-chars-progress" class="text-emerald-400 font-bold">0</span>/<span id="sprint-chars-total" class="text-gray-300">0</span></div>
+          <div>ОШИБОК: <span id="sprint-errors-count" class="text-red-400 font-bold">0</span></div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div>СКОРОСТЬ: <span id="sprint-live-cpm" class="text-amber-400 font-bold">0</span> CPM</div>
+          <div>ТОЧНОСТЬ: <span id="sprint-live-accuracy" class="text-emerald-400 font-bold">100%</span></div>
+          <div class="text-cyan-300 font-bold text-sm bg-cyan-950/80 px-2 py-0.5 border border-cyan-800/60">⏱️ <span id="sprint-live-timer">00:00.0</span></div>
+        </div>
+      </div>
+
+      <!-- Arena Container -->
+      <div class="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
+        <!-- Background Cyber Matrix Pattern -->
+        <div class="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:16px_16px]"></div>
+
+        <!-- Hidden input for keyboard focus & mobile capture -->
+        <input id="sprint-hidden-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="absolute opacity-0 pointer-events-none" aria-hidden="true" />
+
+        <!-- Typing Container -->
+        <div id="sprint-play-arena" class="max-w-4xl w-full bg-gray-950/80 border border-cyan-900/60 shadow-[0_0_50px_rgba(6,182,212,0.1)] p-6 sm:p-10 relative flex flex-col gap-6">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div class="text-xs text-gray-400 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+              <span>НАЖМИТЕ ПЕРВУЮ КЛАВИШУ ДЛЯ СТАРТА // РЕЖИМ STOP-ON-ERROR</span>
+            </div>
+            <button id="sprint-shuffle-btn" class="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 border border-cyan-900 px-2 py-0.5 hover:bg-cyan-950 transition-colors cursor-pointer" title="Перемешать термины заново">
+              🔀 Перемешать
+            </button>
+          </div>
+
+          <!-- Rendered Text Box with Caret -->
+          <div id="sprint-text-display" class="font-mono text-xl sm:text-2xl leading-relaxed tracking-wider select-none min-h-[140px] flex flex-wrap content-start items-center gap-y-2 break-words">
+            <!-- Spans populated by JS -->
+          </div>
+
+          <div class="text-xs text-gray-500 border-t border-gray-800/80 pt-3 flex flex-wrap justify-between items-center gap-2">
+            <span>Правило: При неверном нажатии ввод блокируется до нажатия нужной буквы.</span>
+            <span class="text-gray-400 font-semibold">[Shift / CapsLock поддерживаются]</span>
+          </div>
+        </div>
+
+        <!-- Results / Victory HUD Card (hidden initially) -->
+        <div id="sprint-results-card" class="hidden max-w-xl w-full bg-gradient-to-b from-gray-900 via-gray-950 to-black border-2 border-cyan-500 shadow-[0_0_40px_rgba(6,182,212,0.3)] p-6 sm:p-8 flex-col items-center text-center relative z-10">
+          <div class="text-cyan-400 text-xs tracking-widest uppercase mb-1 font-bold">✦ ЛОГО-ШТОРМ // ТРИУМФ ✦</div>
+          <div class="text-3xl sm:text-4xl font-black text-cyan-300 tracking-wide mb-4">ШТОРМ ПОКОРЕН!</div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full my-4">
+            <div class="bg-gray-900 border border-gray-800 p-3">
+              <div class="text-[10px] text-gray-400 uppercase">Время</div>
+              <div id="sprint-res-time" class="text-lg sm:text-xl font-bold text-cyan-400">00:00.0</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 p-3">
+              <div class="text-[10px] text-gray-400 uppercase">Скорость</div>
+              <div id="sprint-res-cpm" class="text-lg sm:text-xl font-bold text-amber-400">0 CPM</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 p-3">
+              <div class="text-[10px] text-gray-400 uppercase">Точность</div>
+              <div id="sprint-res-acc" class="text-lg sm:text-xl font-bold text-emerald-400">100%</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 p-3">
+              <div class="text-[10px] text-gray-400 uppercase">Ошибки</div>
+              <div id="sprint-res-errors" class="text-lg sm:text-xl font-bold text-red-400">0</div>
+            </div>
+          </div>
+
+          <div id="sprint-telemetry-banner" class="hidden w-full p-2.5 my-2 border border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-xs font-semibold">
+            ⚡ Результат зафиксирован в дашборде учителя!
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 w-full mt-4 font-mono">
+            <button id="sprint-save-btn" class="flex-1 py-2.5 px-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg">
+              💾 Зафиксировать результат в дашборд
+            </button>
+            <button id="sprint-retry-btn" class="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-cyan-300 border border-cyan-600/60 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+              🔄 Попробовать снова
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </Layout>
 
-<script define:vars={{ classSlug, lessonId, princeBonusLevel }}>
+<script define:vars={{ classSlug, lessonId, princeBonusLevel, sprintTerms }}>
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
@@ -828,6 +986,432 @@ const tasks = [
         princeFullscreenBtn.textContent = '⛶ На весь экран';
       }
       setTimeout(focusPrince, 100);
+    });
+  }
+
+  // ==========================================
+  // «ЛОГО-ШТОРМ» (LOGO-STORM) KEYBOARD TRAINER
+  // ==========================================
+  const sprintToggleBtn = document.getElementById('sprint-toggle');
+  const sprintOverlay = document.getElementById('sprint-overlay');
+  const closeSprintBtn = document.getElementById('close-sprint-btn');
+  const sprintSoundToggle = document.getElementById('sprint-sound-toggle');
+  const sprintSoundIcon = document.getElementById('sprint-sound-icon');
+  const sprintShuffleBtn = document.getElementById('sprint-shuffle-btn');
+  const sprintHiddenInput = document.getElementById('sprint-hidden-input');
+  const sprintTextDisplay = document.getElementById('sprint-text-display');
+  const sprintPlayArena = document.getElementById('sprint-play-arena');
+  const sprintResultsCard = document.getElementById('sprint-results-card');
+  const sprintSaveBtn = document.getElementById('sprint-save-btn');
+  const sprintRetryBtn = document.getElementById('sprint-retry-btn');
+  const sprintTelemetryBanner = document.getElementById('sprint-telemetry-banner');
+
+  const sprintTermsCountEl = document.getElementById('sprint-terms-count');
+  const sprintCharsProgressEl = document.getElementById('sprint-chars-progress');
+  const sprintCharsTotalEl = document.getElementById('sprint-chars-total');
+  const sprintErrorsCountEl = document.getElementById('sprint-errors-count');
+  const sprintLiveCpmEl = document.getElementById('sprint-live-cpm');
+  const sprintLiveAccEl = document.getElementById('sprint-live-accuracy');
+  const sprintLiveTimerEl = document.getElementById('sprint-live-timer');
+
+  const sprintResTimeEl = document.getElementById('sprint-res-time');
+  const sprintResCpmEl = document.getElementById('sprint-res-cpm');
+  const sprintResAccEl = document.getElementById('sprint-res-acc');
+  const sprintResErrorsEl = document.getElementById('sprint-res-errors');
+
+  // Web Audio API Sound Synth
+  let sprintAudioCtx = null;
+  let sprintSoundEnabled = true;
+
+  function initSprintAudio() {
+    if (!sprintAudioCtx) {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtxClass) {
+        sprintAudioCtx = new AudioCtxClass();
+      }
+    }
+    if (sprintAudioCtx && sprintAudioCtx.state === 'suspended') {
+      sprintAudioCtx.resume().catch(() => {});
+    }
+  }
+
+  function playKeyClickSound() {
+    if (!sprintSoundEnabled) return;
+    try {
+      initSprintAudio();
+      if (!sprintAudioCtx) return;
+      const osc = sprintAudioCtx.createOscillator();
+      const gain = sprintAudioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, sprintAudioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, sprintAudioCtx.currentTime + 0.015);
+      gain.gain.setValueAtTime(0.08, sprintAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, sprintAudioCtx.currentTime + 0.015);
+      osc.connect(gain);
+      gain.connect(sprintAudioCtx.destination);
+      osc.start();
+      osc.stop(sprintAudioCtx.currentTime + 0.015);
+    } catch (e) {}
+  }
+
+  function playErrorGlitchSound() {
+    if (!sprintSoundEnabled) return;
+    try {
+      initSprintAudio();
+      if (!sprintAudioCtx) return;
+      const osc = sprintAudioCtx.createOscillator();
+      const gain = sprintAudioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(180, sprintAudioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(60, sprintAudioCtx.currentTime + 0.07);
+      gain.gain.setValueAtTime(0.2, sprintAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, sprintAudioCtx.currentTime + 0.07);
+      osc.connect(gain);
+      gain.connect(sprintAudioCtx.destination);
+      osc.start();
+      osc.stop(sprintAudioCtx.currentTime + 0.07);
+    } catch (e) {}
+  }
+
+  if (sprintSoundToggle && sprintSoundIcon) {
+    sprintSoundToggle.addEventListener('click', () => {
+      sprintSoundEnabled = !sprintSoundEnabled;
+      sprintSoundIcon.textContent = sprintSoundEnabled ? '🔊' : '🔇';
+      sprintSoundToggle.title = sprintSoundEnabled ? 'Звук включен' : 'Звук выключен';
+    });
+  }
+
+  // Engine state
+  let sprintActiveTerms = [];
+  let currentTargetText = '';
+  let currentIndex = 0;
+  let sprintStartTime = null;
+  let sprintTimerInterval = null;
+  let sprintErrorsCount = 0;
+  let isSprintStarted = false;
+  let isSprintFinished = false;
+  let lastSprintResult = null;
+
+  function shuffleArray(arr) {
+    const res = [...arr];
+    for (let i = res.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [res[i], res[j]] = [res[j], res[i]];
+    }
+    return res;
+  }
+
+  function formatSprintTimer(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    const tenths = Math.floor((ms % 1000) / 100);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${tenths}`;
+  }
+
+  function updateLiveMetrics() {
+    if (sprintCharsProgressEl) sprintCharsProgressEl.textContent = String(currentIndex);
+    if (sprintCharsTotalEl) sprintCharsTotalEl.textContent = String(currentTargetText.length);
+    if (sprintErrorsCountEl) sprintErrorsCountEl.textContent = String(sprintErrorsCount);
+
+    const totalTyped = currentIndex + sprintErrorsCount;
+    const accuracy = totalTyped > 0 
+      ? Math.max(0, Math.min(100, Math.round(((currentIndex) / totalTyped) * 1000) / 10))
+      : 100;
+    if (sprintLiveAccEl) sprintLiveAccEl.textContent = `${accuracy}%`;
+
+    if (isSprintStarted && sprintStartTime) {
+      const elapsedMs = performance.now() - sprintStartTime;
+      const elapsedMin = elapsedMs / 60000;
+      const cpm = elapsedMin > 0 ? Math.round(currentIndex / elapsedMin) : 0;
+      if (sprintLiveCpmEl) sprintLiveCpmEl.textContent = String(cpm);
+      if (sprintLiveTimerEl) sprintLiveTimerEl.textContent = formatSprintTimer(elapsedMs);
+    } else {
+      if (sprintLiveCpmEl) sprintLiveCpmEl.textContent = '0';
+      if (sprintLiveTimerEl) sprintLiveTimerEl.textContent = '00:00.0';
+    }
+  }
+
+  function renderTextDisplay(errorCharIndex = -1) {
+    if (!sprintTextDisplay) return;
+    sprintTextDisplay.innerHTML = '';
+
+    for (let i = 0; i < currentTargetText.length; i++) {
+      const char = currentTargetText[i];
+      const span = document.createElement('span');
+      span.textContent = char;
+      span.dataset.idx = String(i);
+
+      if (char === ' ') {
+        span.classList.add('inline-block', 'w-2.5');
+      }
+
+      if (i < currentIndex) {
+        span.className = 'text-emerald-400 font-semibold drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] transition-colors' + (char === ' ' ? ' inline-block w-2.5' : '');
+      } else if (i === currentIndex) {
+        if (i === errorCharIndex) {
+          span.className = 'bg-red-500 text-white font-bold px-0.5 rounded-xs scale-110 shadow-[0_0_12px_rgba(239,68,68,0.8)]' + (char === ' ' ? ' inline-block w-2.5' : '');
+        } else {
+          span.className = 'bg-cyan-500 text-black font-bold animate-pulse px-0.5 rounded-xs shadow-[0_0_10px_rgba(6,182,212,0.6)]' + (char === ' ' ? ' inline-block w-2.5' : '');
+        }
+      } else {
+        span.className = 'text-gray-500 opacity-60' + (char === ' ' ? ' inline-block w-2.5' : '');
+      }
+
+      sprintTextDisplay.appendChild(span);
+    }
+  }
+
+  function focusSprintInput() {
+    if (sprintHiddenInput) {
+      sprintHiddenInput.value = '';
+      sprintHiddenInput.focus();
+    }
+  }
+
+  function resetSprint(shuffle = true) {
+    if (!sprintTerms || !Array.isArray(sprintTerms) || sprintTerms.length === 0) return;
+    clearInterval(sprintTimerInterval);
+    sprintTimerInterval = null;
+    isSprintStarted = false;
+    isSprintFinished = false;
+    sprintStartTime = null;
+    sprintErrorsCount = 0;
+    currentIndex = 0;
+    lastSprintResult = null;
+
+    sprintActiveTerms = shuffle ? shuffleArray(sprintTerms) : [...sprintTerms];
+    currentTargetText = sprintActiveTerms.join(' ');
+
+    if (sprintTermsCountEl) sprintTermsCountEl.textContent = String(sprintActiveTerms.length);
+
+    renderTextDisplay();
+    updateLiveMetrics();
+
+    if (sprintPlayArena) sprintPlayArena.classList.remove('hidden');
+    if (sprintResultsCard) {
+      sprintResultsCard.classList.add('hidden');
+      sprintResultsCard.classList.remove('flex');
+    }
+    if (sprintTelemetryBanner) sprintTelemetryBanner.classList.add('hidden');
+    if (sprintSaveBtn) {
+      sprintSaveBtn.disabled = false;
+      sprintSaveBtn.textContent = '💾 Зафиксировать результат в дашборд';
+      sprintSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    focusSprintInput();
+  }
+
+  function finishSprint() {
+    isSprintFinished = true;
+    clearInterval(sprintTimerInterval);
+    const elapsedMs = performance.now() - sprintStartTime;
+    const elapsedSec = Math.max(1, Math.round(elapsedMs / 1000));
+    const totalChars = currentTargetText.length;
+    const cpm = Math.round((totalChars / (elapsedMs / 60000)));
+    const wpm = Math.round(cpm / 5);
+    const totalTyped = totalChars + sprintErrorsCount;
+    const accuracy = totalTyped > 0 
+      ? Math.max(0, Math.min(100, Math.round((totalChars / totalTyped) * 1000) / 10))
+      : 100;
+
+    lastSprintResult = {
+      cpm,
+      wpm,
+      accuracy,
+      timeSpentSec: elapsedSec,
+      charsCount: totalChars,
+      termsCount: sprintActiveTerms.length,
+      errorsCount: sprintErrorsCount
+    };
+
+    if (sprintResTimeEl) sprintResTimeEl.textContent = formatSprintTimer(elapsedMs);
+    if (sprintResCpmEl) sprintResCpmEl.textContent = `${cpm} CPM / ${wpm} WPM`;
+    if (sprintResAccEl) sprintResAccEl.textContent = `${accuracy}%`;
+    if (sprintResErrorsEl) sprintResErrorsEl.textContent = String(sprintErrorsCount);
+
+    if (sprintPlayArena) sprintPlayArena.classList.add('hidden');
+    if (sprintResultsCard) {
+      sprintResultsCard.classList.remove('hidden');
+      sprintResultsCard.classList.add('flex');
+    }
+  }
+
+  function handleSprintKey(key) {
+    if (isSprintFinished || !currentTargetText || currentIndex >= currentTargetText.length) return;
+
+    if (!isSprintStarted) {
+      isSprintStarted = true;
+      sprintStartTime = performance.now();
+      initSprintAudio();
+      sprintTimerInterval = setInterval(() => {
+        if (isSprintStarted && !isSprintFinished) {
+          updateLiveMetrics();
+        }
+      }, 100);
+    }
+
+    const expectedChar = currentTargetText[currentIndex];
+
+    if (key === expectedChar) {
+      playKeyClickSound();
+      currentIndex++;
+      updateLiveMetrics();
+      if (currentIndex >= currentTargetText.length) {
+        renderTextDisplay();
+        finishSprint();
+      } else {
+        renderTextDisplay();
+      }
+    } else {
+      playErrorGlitchSound();
+      sprintErrorsCount++;
+      updateLiveMetrics();
+      renderTextDisplay(currentIndex);
+      setTimeout(() => {
+        if (!isSprintFinished && currentIndex < currentTargetText.length) {
+          renderTextDisplay();
+        }
+      }, 120);
+    }
+  }
+
+  if (sprintOverlay) {
+    window.addEventListener('keydown', (e) => {
+      if (sprintOverlay.classList.contains('hidden')) return;
+
+      if (e.key === 'Escape') {
+        sprintOverlay.classList.remove('flex');
+        sprintOverlay.classList.add('hidden');
+        clearInterval(sprintTimerInterval);
+        return;
+      }
+
+      if ([
+        'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab',
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        'Home', 'End', 'PageUp', 'PageDown', 'Insert', 'Delete', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
+      ].includes(e.key)) {
+        return;
+      }
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        return;
+      }
+
+      if (e.key.length === 1) {
+        e.preventDefault();
+        handleSprintKey(e.key);
+      }
+    });
+
+    ['paste', 'copy', 'cut', 'drop', 'dragstart'].forEach(evt => {
+      sprintOverlay.addEventListener(evt, (e) => {
+        e.preventDefault();
+      });
+    });
+
+    sprintOverlay.addEventListener('click', (e) => {
+      if (e.target && e.target.tagName !== 'BUTTON') {
+        focusSprintInput();
+      }
+    });
+
+    if (sprintHiddenInput) {
+      sprintHiddenInput.addEventListener('input', (e) => {
+        if (sprintOverlay.classList.contains('hidden') || isSprintFinished) return;
+        const text = e.data || sprintHiddenInput.value;
+        sprintHiddenInput.value = '';
+        if (text) {
+          for (const char of text) {
+            handleSprintKey(char);
+          }
+        }
+      });
+    }
+  }
+
+  if (sprintToggleBtn) {
+    sprintToggleBtn.addEventListener('click', () => {
+      if (!sprintTerms || !Array.isArray(sprintTerms) || sprintTerms.length === 0) return;
+      if (sprintOverlay) {
+        sprintOverlay.classList.remove('hidden');
+        sprintOverlay.classList.add('flex');
+        resetSprint(true);
+      }
+    });
+  }
+
+  if (closeSprintBtn && sprintOverlay) {
+    closeSprintBtn.addEventListener('click', () => {
+      sprintOverlay.classList.remove('flex');
+      sprintOverlay.classList.add('hidden');
+      clearInterval(sprintTimerInterval);
+    });
+  }
+
+  if (sprintShuffleBtn) {
+    sprintShuffleBtn.addEventListener('click', () => {
+      resetSprint(true);
+    });
+  }
+
+  if (sprintRetryBtn) {
+    sprintRetryBtn.addEventListener('click', () => {
+      resetSprint(true);
+    });
+  }
+
+  if (sprintSaveBtn) {
+    sprintSaveBtn.addEventListener('click', async () => {
+      if (!lastSprintResult) return;
+      sprintSaveBtn.disabled = true;
+      sprintSaveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      sprintSaveBtn.textContent = '⏳ Сохранение...';
+
+      const fName = localStorage.getItem('student_firstName') || 'Unknown';
+      const lName = localStorage.getItem('student_lastName') || 'Unknown';
+      const cName = localStorage.getItem('student_class') || classSlug;
+
+      try {
+        const payload = {
+          student_firstName: fName,
+          student_lastName: lName,
+          student_class: cName,
+          course_slug: classSlug,
+          lesson_id: lessonId,
+          mission_name: `Урок ${lessonId} :: Лого-Шторм`,
+          action_type: 'sprint_complete',
+          level_number: 0,
+          status: 'completed',
+          time_spent_sec: lastSprintResult.timeSpentSec,
+          attempts_count: 1,
+          success: true,
+          action_log: JSON.stringify(lastSprintResult)
+        };
+
+        const res = await fetch('/api/telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          if (sprintTelemetryBanner) sprintTelemetryBanner.classList.remove('hidden');
+          sprintSaveBtn.textContent = '✓ Зафиксировано в журнале';
+        } else {
+          sprintSaveBtn.disabled = false;
+          sprintSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          sprintSaveBtn.textContent = '⚠️ Ошибка сохранения, повторить';
+        }
+      } catch (err) {
+        console.error('Logo-Storm Save Error:', err);
+        sprintSaveBtn.disabled = false;
+        sprintSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        sprintSaveBtn.textContent = '⚠️ Ошибка сети, повторить';
+      }
     });
   }
 </script>
