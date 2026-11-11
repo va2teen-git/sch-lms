@@ -114,7 +114,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         <!-- Генерируется процедурно -->
                     </div>
 
-                    <button id="btn-phase2" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold" disabled>ПРОВЕРИТЬ СБОРКУ ПРОТОКОЛА (ШАГ 2)</button>
+                    <button id="btn-phase2" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold" disabled>ПРОВЕРИТЬ СООТВЕТСТВИЕ (ШАГ 2)</button>
                 </div>
 
                 <!-- ================= ФАЗА 3: КАЛИБРАТОР ПАРАМЕТРОВ АБЗАЦА И СТРАНИЦЫ (Slider & Toggle) ================= -->
@@ -161,7 +161,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                     <input type="range" id="p3-slider-indent" class="form-range" min="0" max="2.5" step="0.25" value="0">
                                 </div>
 
-                                <!-- 3. Левое поле страницы -->
+                                <!-- 3. Поля страницы (левое и правое) -->
                                 <div class="mb-3">
                                     <div class="d-flex justify-content-between small mb-1">
                                         <label for="p3-slider-margin" class="text-light">3. Поля страницы (левое и правое):</label>
@@ -297,7 +297,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         { id: 'pa3', text: 'Настройка междустрочного интервала на 1,15 строки', bucket: 'para' },
         { id: 'pa4', text: 'Выравнивание заголовка главы посередине строки (Ctrl+E)', bucket: 'para' },
         { id: 'pa5', text: 'Задание интервала 6 пт после каждого абзаца текста', bucket: 'para' },
-        { id: 'pa6', text: 'Увеличение левого отступа всего текстового блока цитаты на 2 см', bucket: 'para' }
+        { id: 'pa6', text: 'Увеличение левого отступа абзаца с цитатой на 2 см', bucket: 'para' }
     ];
 
     let p1ActiveItems = [];
@@ -441,10 +441,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // ФАЗА 2: СЛОТ-ПАЗЛ СЛУЖЕБНЫХ ЗНАКОВ И ГОРЯЧИХ КЛАВИШ (Slot & Snap)
     // =========================================================================
     const P2_SLOTS_BANK = [
-        { slotId: 's_para', desc: 'Служебный маркер конца абзаца (вводится клавишей Enter)', expectedToken: '¶ (Конец абзаца)' },
-        { slotId: 's_nbsp', desc: 'Неразрывный пробел между числом и единицей измерения (Ctrl+Shift+Space)', expectedToken: '° (Неразрывный пробел)' },
-        { slotId: 's_br', desc: 'Принудительный разрыв строки без начала нового абзаца (Shift+Enter)', expectedToken: '↵ (Разрыв строки)' },
-        { slotId: 's_tab', desc: 'Непечатаемый знак сдвига к позиции табуляции или перехода в ячейку (Tab)', expectedToken: '→ (Символ табуляции)' },
+        { slotId: 's_para', desc: 'Служебный маркер конца абзаца (вводится клавишей Enter)', expectedToken: '¶' },
+        { slotId: 's_nbsp', desc: 'Неразрывный пробел между числом и единицей измерения (Ctrl+Shift+Space)', expectedToken: '°' },
+        { slotId: 's_br', desc: 'Принудительный разрыв строки без начала нового абзаца (Shift+Enter)', expectedToken: '↵' },
+        { slotId: 's_tab', desc: 'Непечатаемый знак сдвига к позиции табуляции или перехода в ячейку (Tab)', expectedToken: '→' },
         { slotId: 's_just', desc: 'Горячая клавиша выравнивания абзаца по ширине страницы (стандарт ОГЭ)', expectedToken: 'Ctrl + J' },
         { slotId: 's_cent', desc: 'Горячая клавиша центрирования заголовка или названия таблицы', expectedToken: 'Ctrl + E' },
         { slotId: 's_nonp', desc: 'Горячая клавиша включения режима непечатаемых символов в LibreOffice Writer', expectedToken: 'Ctrl + F10' },
@@ -452,7 +452,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     ];
 
     const P2_DISTRACTORS = [
-        '§ (Знак параграфа)',
+        '§',
         'Alt + F4',
         'Ctrl + Alt + Space',
         'Ctrl + W'
@@ -506,7 +506,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             col.className = 'col-12 col-md-6';
             col.innerHTML = `
                 <div class="card bg-black border-secondary rounded-0 h-100 p-3 p2-slot-box" data-slot-id="${slot.slotId}" data-expected="${slot.expectedToken}" style="cursor: pointer;">
-                    <div class="text-secondary small mb-1">ГНЕЗДО ПРОТОКОЛА #${idx + 1}:</div>
+                    <div class="text-secondary small mb-1">Элемент верстки #${idx + 1}:</div>
                     <div class="text-light small mb-2">${slot.desc}</div>
                     <div class="p-2 border rounded-0 text-center fw-bold ${val ? 'border-success bg-dark text-success' : 'border-secondary bg-black text-secondary'}">
                         ${val ? val : '[ КЛИКНИТЕ ДЛЯ УСТАНОВКИ ТОКЕНА ]'}
@@ -578,7 +578,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     const LH_MODES = [
         { key: '1.0', label: 'Одинарный (1.0)' },
-        { key: '1.15', label: 'Комфортный (1.15)' },
+        { key: '1.15', label: '1.15 строки' },
         { key: '1.5', label: 'Полуторный (1.5)' },
         { key: '2.0', label: 'Двойной (2.0)' }
     ];
@@ -614,7 +614,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             specList.innerHTML = `
                 <li class="p-2 bg-dark border border-secondary">1. Кегль шрифта: <strong class="text-success" id="p3-target-size" data-val="${p3Target.size}">${p3Target.size} пт</strong></li>
                 <li class="p-2 bg-dark border border-secondary">2. Отступ первой строки: <strong class="text-info" id="p3-target-indent" data-val="${p3Target.indent.toFixed(2)}">${p3Target.indent.toFixed(2)} см</strong></li>
-                <li class="p-2 bg-dark border border-secondary">3. Поля страницы (левое/правое): <strong class="text-warning" id="p3-target-margin" data-val="${p3Target.margin.toFixed(1)}">${p3Target.margin.toFixed(1)} см</strong></li>
+                <li class="p-2 bg-dark border border-secondary">3. Поля страницы (левое и правое): <strong class="text-warning" id="p3-target-margin" data-val="${p3Target.margin.toFixed(1)}">${p3Target.margin.toFixed(1)} см</strong></li>
                 <li class="p-2 bg-dark border border-secondary">4. Выравнивание абзаца: <strong class="text-success" id="p3-target-align" data-val="${p3Target.align}">${alignObj?.label}</strong></li>
                 <li class="p-2 bg-dark border border-secondary">5. Междустрочный интервал: <strong class="text-info" id="p3-target-lh" data-val="${p3Target.lh}">${lhObj?.label}</strong></li>
             `;
