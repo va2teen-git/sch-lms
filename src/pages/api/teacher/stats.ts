@@ -70,6 +70,9 @@ export interface StudentMetric {
   isNormalMastered: boolean;
   bestNormalTimeSec: number | null;
   bestHardcoreTimeSec: number | null;
+  bestSprintTimeSec: number | null;
+  sprintCpm?: number | null;
+  sprintAccuracy?: number | null;
   currentAttempt?: AttemptMetric | null;
   attempts: AttemptMetric[];
 
@@ -226,6 +229,9 @@ export const GET: APIRoute = async ({ request }) => {
           isNormalMastered: false,
           bestNormalTimeSec: null,
           bestHardcoreTimeSec: null,
+          bestSprintTimeSec: null,
+          sprintCpm: null,
+          sprintAccuracy: null,
           currentAttempt: null,
           attempts: [],
           recentEvents: [],
@@ -308,6 +314,22 @@ export const GET: APIRoute = async ({ request }) => {
       }
       if (r.action_type === 'normal_reset' && r.is_hardcore === 0) {
         s.normalCompletedLevels.clear();
+      }
+
+      // Track Logo-Storm (sprint_complete)
+      if (r.action_type === 'sprint_complete' && typeof r.time_spent_sec === 'number') {
+        if (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec) {
+          s.bestSprintTimeSec = r.time_spent_sec;
+          try {
+            const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
+            if (logData && typeof logData.cpm === 'number') {
+              s.sprintCpm = Math.round(logData.cpm);
+            }
+            if (logData && typeof logData.accuracy === 'number') {
+              s.sprintAccuracy = Math.round(logData.accuracy * 10) / 10;
+            }
+          } catch (e) {}
+        }
       }
 
       if (lvlNum) {

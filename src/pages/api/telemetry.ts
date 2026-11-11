@@ -67,6 +67,7 @@ try {
     CREATE INDEX IF NOT EXISTS idx_telemetry_course_lesson ON telemetry(course_slug, lesson_id, timestamp);
     CREATE INDEX IF NOT EXISTS idx_telemetry_attempt ON telemetry(attempt_id);
     CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, last_name, first_name, attempt_id);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_sprint ON telemetry(course_slug, lesson_id, student_class, action_type);
   `);
 } catch(e) {
   // Indexes might already exist, ignore
@@ -112,7 +113,7 @@ export const POST: APIRoute = async ({ request }) => {
       const attemptNum = body.attempt_number ? Math.max(1, parseInt(body.attempt_number, 10) || 1) : 1;
       const attemptMode = body.attempt_mode ? String(body.attempt_mode).trim() : (isHc ? 'hardcore' : 'normal');
 
-      if (!levelNum && mName) {
+      if (levelNum === null && mName) {
         if (/Уровень\s*1/i.test(mName) || /Ур\s*1/i.test(mName)) levelNum = 1;
         else if (/Уровень\s*2/i.test(mName) || /Ур\s*2/i.test(mName)) levelNum = 2;
         else if (/Уровень\s*3/i.test(mName) || /Ур\s*3/i.test(mName)) levelNum = 3;

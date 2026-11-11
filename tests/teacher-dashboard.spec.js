@@ -41,6 +41,7 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     expect(Array.isArray(sample.attempts)).toBe(true);
     expect(typeof sample.attemptsCount).toBe('number');
     expect(typeof sample.isNormalMastered).toBe('boolean');
+    expect('bestSprintTimeSec' in sample).toBe(true);
   });
 
   test('Teacher dashboard page /teacher renders responsive layout, filters and table', async ({ page }) => {
@@ -103,6 +104,11 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     await page.locator('th[data-sort="time"]').click();
     await expect(page.locator('#sort-time-icon')).toHaveText('↓');
     await expect(page.locator('#sort-name-icon')).toHaveText('↕');
+
+    // Click Logo-Storm sprint column header: sorts ascending
+    await page.locator('th[data-sort="sprint"]').click();
+    await expect(page.locator('#sort-sprint-icon')).toHaveText('↓');
+    await expect(page.locator('#sort-time-icon')).toHaveText('↕');
 
     expect(pageErrors.length).toBe(0);
   });
