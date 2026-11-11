@@ -1,0 +1,603 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 text-warning mb-0 fw-bold">Тренажер: Аналитика и расчет параметров моделирования (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+                
+                <!-- Шапка и индикаторы текущей фазы -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="level-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="level-title" class="text-light fw-bold fs-6">Прямой расчет: Абсолютная и относительная погрешность модели</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках -->
+                <div id="error-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА РАСЧЕТА] <span id="error-msg">Неверное числовое значение!</span> Перекалибровка параметров...</span>
+                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: ПРЯМОЙ РАСЧЕТ ПОГРЕШНОСТИ ================= -->
+                <div id="phase1">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 1 — ПРЯМОЙ РАСЧЕТ]:</strong> В социологическом исследовании была построена прогностическая модель посещаемости электронного архива.
+                        Сопоставьте расчетное модельное значение с фактическими данными и вычислите абсолютную погрешность <code>Δ = |x<sub>мод</sub> - x<sub>факт</sub>|</code> 
+                        и относительную погрешность <code>δ = (|x<sub>мод</sub> - x<sub>факт</sub>| / x<sub>факт</sub>) × 100%</code>.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-2 mb-3">
+                            <div class="col-12 col-sm-6">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Фактическое значение (x<sub>факт</sub>):</div>
+                                    <div id="p1-fact-val" class="fs-4 text-light fw-bold">800 тыс.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Значение модели (x<sub>мод</sub>):</div>
+                                    <div id="p1-mod-val" class="fs-4 text-warning fw-bold">840 тыс.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    1. Абсолютная погрешность Δ (тыс. чел.):
+                                </label>
+                                <input id="p1-input-abs" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите число..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    2. Относительная погрешность δ (целое число %):
+                                </label>
+                                <input id="p1-input-rel" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите %..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-submit-btn" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;">
+                            ПРОВЕРИТЬ РАСЧЕТ [ФАЗА 1]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: ДИСКРЕТИЗАЦИЯ И МАСШТАБ ================= -->
+                <div id="phase2" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 2 — МНОГОШАГОВЫЙ РАСЧЕТ С КОНВЕРТАЦИЕЙ]:</strong> Компьютерная модель имитирует динамику распространения новостного инфоповода в социальной сети.
+                        Вычислите количество временных шагов дискретизации модели и суммарный информационный объем журнала состояний в Килобайтах (1 КБ = 1024 байта).
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-2 mb-3">
+                            <div class="col-12 col-sm-4">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Общая длительность (T):</div>
+                                    <div id="p2-hours-val" class="fs-4 text-light fw-bold">24 часа</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-4">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Шаг дискретизации (Δt):</div>
+                                    <div id="p2-dt-val" class="fs-4 text-warning fw-bold">30 секунд</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-4">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Размер записи шага (S):</div>
+                                    <div id="p2-record-val" class="fs-4 text-info fw-bold">64 байта</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    1. Число шагов симуляции N (шагов):
+                                </label>
+                                <input id="p2-input-steps" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите количество шагов..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    2. Суммарный объем лога в Килобайтах (КБ):
+                                </label>
+                                <input id="p2-input-kb" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите КБ..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-submit-btn" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;">
+                            ПРОВЕРИТЬ ДИСКРЕТИЗАЦИЮ [ФАЗА 2]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: ПИК 1 (ОБРАТНАЯ ЗАДАЧА) ================= -->
+                <div id="phase3" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 3 — ПИК 1 / ОБРАТНАЯ ЗАДАЧА]:</strong> В биоинформатике при молекулярном докинге лекарства вычисляется энергия связывания молекулы с белком.
+                        Эталонная энергия связи равна <code>E<sub>факт</sub></code>. Для признания молекулы перспективной относительная погрешность модели не должна превышать заданный процент <code>δ<sub>max</sub></code>.
+                        Определите предельно допустимую абсолютную погрешность и границы допустимого интервала модельных значений <code>[E<sub>min</sub>, E<sub>max</sub>]</code>.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-2 mb-3">
+                            <div class="col-12 col-sm-6">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Эталонная энергия связи (E<sub>факт</sub>):</div>
+                                    <div id="p3-efact-val" class="fs-4 text-light fw-bold">250 кДж/моль</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Предельный допуск погрешности (δ<sub>max</sub>):</div>
+                                    <div id="p3-delta-val" class="fs-4 text-warning fw-bold">4%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    1. Макс. абсолютная погрешность Δ<sub>max</sub>:
+                                </label>
+                                <input id="p3-input-delta" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="кДж/моль..." style="min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    2. Нижняя граница E<sub>min</sub>:
+                                </label>
+                                <input id="p3-input-emin" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="кДж/моль..." style="min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    3. Верхняя граница E<sub>max</sub>:
+                                </label>
+                                <input id="p3-input-emax" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="кДж/моль..." style="min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-submit-btn" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;">
+                            ПРОВЕРИТЬ ИНТЕРВАЛ ДОПУСКА [ФАЗА 3]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ (ИНТЕРПОЛЯЦИЯ) ================= -->
+                <div id="phase4" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 4 — ДОЛИНА КОНСОЛИДАЦИИ]:</strong> Модель отражает рост объема оцифрованного фонда исторической библиотеки.
+                        Известны фактические объемы архива в два опорных года. Считая динамику роста строго линейной, определите среднегодовой прирост и найдите промежуточное значение в целевом году методом линейной интерполяции.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-2 mb-3">
+                            <div class="col-12 col-sm-4">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Точка 1 (<span id="p4-y1-label">2020</span> г.):</div>
+                                    <div id="p4-v1-val" class="fs-4 text-light fw-bold">120 тыс. стр.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-4">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Точка 2 (<span id="p4-y2-label">2024</span> г.):</div>
+                                    <div id="p4-v2-val" class="fs-4 text-light fw-bold">200 тыс. стр.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-4">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Целевой год интерполяции:</div>
+                                    <div id="p4-ytarget-val" class="fs-4 text-warning fw-bold">2022 год</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    1. Среднегодовой прирост (тыс. стр. в год):
+                                </label>
+                                <input id="p4-input-growth" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="тыс. стр./год..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    2. Расчетный объем методом интерполяции (тыс. стр.):
+                                </label>
+                                <input id="p4-input-target" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="тыс. стр...." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p4-submit-btn" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;">
+                            ПРОВЕРИТЬ ИНТЕРПОЛЯЦИЮ [ФАЗА 4]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 5: КУЛЬМИНАЦИЯ (ЭКСТРАПОЛЯЦИЯ И ОКРУГЛЕНИЕ ВВЕРХ) ================= -->
+                <div id="phase5" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 5 — КУЛЬМИНАЦИОННЫЙ ПИК]:</strong> Прогнозирование емкости серверного хранилища для долговременной модели данных методом экстраполяции на несколько лет вперед.
+                        Учтите растущую погрешность экстраполяции (конус неопределенности) и рассчитайте количество стандартных серверных полок, округлив значение вверх до целого (потолочное квантование).
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-2 mb-3">
+                            <div class="col-6 col-sm-3">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Текущий объем (V<sub>0</sub>):</div>
+                                    <div id="p5-v0-val" class="fs-5 text-light fw-bold">150 ТБ</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Прирост в год:</div>
+                                    <div id="p5-annual-val" class="fs-5 text-light fw-bold">+30 ТБ/год</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Горизонт прогноза:</div>
+                                    <div id="p5-years-val" class="fs-5 text-warning fw-bold">3 года</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <div class="p-2 border border-secondary bg-dark">
+                                    <div class="text-secondary small">Разброс погрешности:</div>
+                                    <div id="p5-margin-val" class="fs-5 text-danger fw-bold">+10%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-secondary small mb-3">
+                            Емкость одной серверной полки расширения: <strong id="p5-rack-val" class="text-info">32 ТБ</strong>.
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    1. Номинальный прогноз V<sub>ном</sub> (ТБ):
+                                </label>
+                                <input id="p5-input-nom" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="ТБ..." style="min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    2. Пиковый объем с запасом +10% (ТБ):
+                                </label>
+                                <input id="p5-input-peak" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="ТБ..." style="min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label text-light small fw-bold mb-1">
+                                    3. Число полок (округление вверх):
+                                </label>
+                                <input id="p5-input-racks" type="number" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="целое число..." style="min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p5-submit-btn" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;">
+                            ЗАВЕРШИТЬ РАСЧЕТ [ФАЗА 5]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФИНАЛЬНЫЙ ЭКРАН ПОБЕДЫ ================= -->
+                <div id="final-screen" class="d-none text-center py-4">
+                    <div class="badge bg-warning text-dark fs-5 rounded-0 px-4 py-2 mb-3">
+                        МИССИЯ УСПЕШНО ВЫПОЛНЕНА // УРОВЕНЬ 2 ПРОЙДЕН
+                    </div>
+                    <h3 class="h4 text-warning mb-3 fw-bold">Аналитический расчет моделирования завершен</h3>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 600px;">
+                        Вы успешно справились со всеми 5 аналитическими задачами: рассчитали абсолютную и относительную погрешность, определили параметры дискретизации, решили обратную задачу интервала допуска, выполнили линейную интерполяцию и спрогнозировали емкость системы методом экстраполяции с потолочным квантованием.
+                    </p>
+                    <div class="d-inline-flex gap-4 border border-secondary bg-black p-3 rounded-0 font-monospace mb-4">
+                        <div>
+                            <div class="text-secondary small">Затраченное время:</div>
+                            <div id="stat-time" class="text-warning fs-5 fw-bold">0 с</div>
+                        </div>
+                        <div class="border-end border-secondary"></div>
+                        <div>
+                            <div class="text-secondary small">Число попыток:</div>
+                            <div id="stat-attempts" class="text-danger fs-5 fw-bold">0</div>
+                        </div>
+                        <div class="border-end border-secondary"></div>
+                        <div>
+                            <div class="text-secondary small">Статус:</div>
+                            <div class="text-success fs-5 fw-bold">100% ЗАЧЕТ</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const startTime = Date.now();
+    let attemptsCount = 0;
+    const missionName = 'Урок 9 :: Модели и моделирование (Уровень 2)';
+
+    function sendTelemetry(actionType, status, success) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success
+        }, '*');
+    }
+
+    // Инициализирующий сигнал
+    sendTelemetry('in_progress', 'in_progress', false);
+
+    function recordError(msg, retryFn) {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+        sendTelemetry('hardcore_reset', 'failed', false);
+        const fb = document.getElementById('error-feedback');
+        if (msg) document.getElementById('error-msg').textContent = msg;
+        fb.classList.remove('d-none');
+        setTimeout(() => {
+            fb.classList.add('d-none');
+            retryFn();
+        }, 1300);
+    }
+
+    function advancePhase(currNum, nextNum, nextSetupFn, nextTitle) {
+        document.getElementById(`phase${currNum}`).classList.add('d-none');
+        document.getElementById(`phase${nextNum}`).classList.remove('d-none');
+        document.getElementById('level-badge').textContent = `Шаг ${nextNum} из 5`;
+        document.getElementById('level-title').textContent = nextTitle;
+        nextSetupFn();
+    }
+
+    function parseCleanInt(str) {
+        if (str === null || str === undefined) return NaN;
+        const clean = String(str).trim().replace(/\s+/g, '').replace(',', '.');
+        return parseInt(clean, 10);
+    }
+
+    // =========================================================================
+    // ФАЗА 1: ПРЯМОЙ РАСЧЕТ ПОГРЕШНОСТИ (CCS = 4)
+    // =========================================================================
+    const p1Variants = [
+        { fact: 800, mod: 840, abs: 40, rel: 5 },
+        { fact: 500, mod: 480, abs: 20, rel: 4 },
+        { fact: 600, mod: 636, abs: 36, rel: 6 },
+        { fact: 400, mod: 412, abs: 12, rel: 3 },
+        { fact: 1000, mod: 960, abs: 40, rel: 4 }
+    ];
+    let p1Current = null;
+
+    function setupPhase1() {
+        p1Current = p1Variants[Math.floor(Math.random() * p1Variants.length)];
+        document.getElementById('p1-fact-val').textContent = `${p1Current.fact} тыс.`;
+        document.getElementById('p1-mod-val').textContent = `${p1Current.mod} тыс.`;
+        document.getElementById('p1-input-abs').value = '';
+        document.getElementById('p1-input-rel').value = '';
+    }
+
+    document.getElementById('p1-submit-btn').addEventListener('click', () => {
+        const userAbs = parseCleanInt(document.getElementById('p1-input-abs').value);
+        const userRel = parseCleanInt(document.getElementById('p1-input-rel').value);
+
+        if (userAbs === p1Current.abs && userRel === p1Current.rel) {
+            sendTelemetry('in_progress', 'in_progress', false);
+            advancePhase(1, 2, setupPhase2, 'Многошаговый расчет: Дискретизация и информационный объем модели');
+        } else {
+            recordError('Неверно вычислена абсолютная или относительная погрешность!', setupPhase1);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: ДИСКРЕТИЗАЦИЯ И МАСШТАБ (CCS = 6)
+    // =========================================================================
+    const p2Variants = [
+        { hours: 24, dt: 30, recordBytes: 64, steps: 2880, kb: 180 },
+        { hours: 12, dt: 15, recordBytes: 128, steps: 2880, kb: 360 },
+        { hours: 8, dt: 20, recordBytes: 256, steps: 1440, kb: 360 },
+        { hours: 16, dt: 30, recordBytes: 128, steps: 1920, kb: 240 }
+    ];
+    let p2Current = null;
+
+    function setupPhase2() {
+        p2Current = p2Variants[Math.floor(Math.random() * p2Variants.length)];
+        document.getElementById('p2-hours-val').textContent = `${p2Current.hours} ч (${p2Current.hours * 3600} с)`;
+        document.getElementById('p2-dt-val').textContent = `${p2Current.dt} с`;
+        document.getElementById('p2-record-val').textContent = `${p2Current.recordBytes} байт`;
+        document.getElementById('p2-input-steps').value = '';
+        document.getElementById('p2-input-kb').value = '';
+    }
+
+    document.getElementById('p2-submit-btn').addEventListener('click', () => {
+        const userSteps = parseCleanInt(document.getElementById('p2-input-steps').value);
+        const userKb = parseCleanInt(document.getElementById('p2-input-kb').value);
+
+        if (userSteps === p2Current.steps && userKb === p2Current.kb) {
+            sendTelemetry('in_progress', 'in_progress', false);
+            advancePhase(2, 3, setupPhase3, 'Пик 1: Обратная задача и доверительный интервал адекватности');
+        } else {
+            recordError('Ошибка в подсчете числа шагов или конвертации байт в КБ!', setupPhase2);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: ПИК 1 (ОБРАТНАЯ ЗАДАЧА) (CCS = 7-8)
+    // =========================================================================
+    const p3Variants = [
+        { eFact: 250, deltaPct: 4, deltaMax: 10, eMin: 240, eMax: 260 },
+        { eFact: 200, deltaPct: 5, deltaMax: 10, eMin: 190, eMax: 210 },
+        { eFact: 300, deltaPct: 3, deltaMax: 9, eMin: 291, eMax: 309 },
+        { eFact: 400, deltaPct: 2, deltaMax: 8, eMin: 392, eMax: 408 }
+    ];
+    let p3Current = null;
+
+    function setupPhase3() {
+        p3Current = p3Variants[Math.floor(Math.random() * p3Variants.length)];
+        document.getElementById('p3-efact-val').textContent = `${p3Current.eFact} кДж/моль`;
+        document.getElementById('p3-delta-val').textContent = `${p3Current.deltaPct}%`;
+        document.getElementById('p3-input-delta').value = '';
+        document.getElementById('p3-input-emin').value = '';
+        document.getElementById('p3-input-emax').value = '';
+    }
+
+    document.getElementById('p3-submit-btn').addEventListener('click', () => {
+        const userDelta = parseCleanInt(document.getElementById('p3-input-delta').value);
+        const userEmin = parseCleanInt(document.getElementById('p3-input-emin').value);
+        const userEmax = parseCleanInt(document.getElementById('p3-input-emax').value);
+
+        if (userDelta === p3Current.deltaMax && userEmin === p3Current.eMin && userEmax === p3Current.eMax) {
+            sendTelemetry('in_progress', 'in_progress', false);
+            advancePhase(3, 4, setupPhase4, 'Долина консолидации: Линейная интерполяция промежуточных значений');
+        } else {
+            recordError('Неверно вычислен допуск Δ_max или границы доверительного интервала [E_min, E_max]!', setupPhase3);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ (ИНТЕРПОЛЯЦИЯ) (CCS = 5-6)
+    // =========================================================================
+    const p4Variants = [
+        { y1: 2020, v1: 120, y2: 2024, v2: 200, yTarget: 2022, growth: 20, vTarget: 160 },
+        { y1: 2018, v1: 100, y2: 2024, v2: 280, yTarget: 2021, growth: 30, vTarget: 190 },
+        { y1: 2019, v1: 150, y2: 2025, v2: 330, yTarget: 2023, growth: 30, vTarget: 270 },
+        { y1: 2021, v1: 80, y2: 2025, v2: 240, yTarget: 2023, growth: 40, vTarget: 160 }
+    ];
+    let p4Current = null;
+
+    function setupPhase4() {
+        p4Current = p4Variants[Math.floor(Math.random() * p4Variants.length)];
+        document.getElementById('p4-y1-label').textContent = p4Current.y1;
+        document.getElementById('p4-y2-label').textContent = p4Current.y2;
+        document.getElementById('p4-v1-val').textContent = `${p4Current.v1} тыс.`;
+        document.getElementById('p4-v2-val').textContent = `${p4Current.v2} тыс.`;
+        document.getElementById('p4-ytarget-val').textContent = `${p4Current.yTarget} год`;
+        document.getElementById('p4-input-growth').value = '';
+        document.getElementById('p4-input-target').value = '';
+    }
+
+    document.getElementById('p4-submit-btn').addEventListener('click', () => {
+        const userGrowth = parseCleanInt(document.getElementById('p4-input-growth').value);
+        const userTarget = parseCleanInt(document.getElementById('p4-input-target').value);
+
+        if (userGrowth === p4Current.growth && userTarget === p4Current.vTarget) {
+            sendTelemetry('in_progress', 'in_progress', false);
+            advancePhase(4, 5, setupPhase5, 'Кульминация: Экстраполяция, конус погрешности и потолочное квантование');
+        } else {
+            recordError('Ошибка в расчете годового прироста или интерполированного значения!', setupPhase4);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 5: КУЛЬМИНАЦИОННЫЙ ПИК (CCS = 8-9)
+    // =========================================================================
+    const p5Variants = [
+        { v0: 150, annual: 30, years: 3, marginPct: 10, rackSize: 32, nom: 240, peak: 264, racks: 9 },
+        { v0: 120, annual: 40, years: 4, marginPct: 15, rackSize: 48, nom: 280, peak: 322, racks: 7 },
+        { v0: 200, annual: 50, years: 2, marginPct: 20, rackSize: 64, nom: 300, peak: 360, racks: 6 },
+        { v0: 180, annual: 35, years: 4, marginPct: 10, rackSize: 40, nom: 320, peak: 352, racks: 9 }
+    ];
+    let p5Current = null;
+
+    function setupPhase5() {
+        p5Current = p5Variants[Math.floor(Math.random() * p5Variants.length)];
+        document.getElementById('p5-v0-val').textContent = `${p5Current.v0} ТБ`;
+        document.getElementById('p5-annual-val').textContent = `+${p5Current.annual} ТБ/год`;
+        document.getElementById('p5-years-val').textContent = `${p5Current.years} г.`;
+        document.getElementById('p5-margin-val').textContent = `+${p5Current.marginPct}%`;
+        document.getElementById('p5-rack-val').textContent = `${p5Current.rackSize} ТБ`;
+        document.getElementById('p5-input-nom').value = '';
+        document.getElementById('p5-input-peak').value = '';
+        document.getElementById('p5-input-racks').value = '';
+    }
+
+    document.getElementById('p5-submit-btn').addEventListener('click', () => {
+        const userNom = parseCleanInt(document.getElementById('p5-input-nom').value);
+        const userPeak = parseCleanInt(document.getElementById('p5-input-peak').value);
+        const userRacks = parseCleanInt(document.getElementById('p5-input-racks').value);
+
+        if (userNom === p5Current.nom && userPeak === p5Current.peak && userRacks === p5Current.racks) {
+            // Завершение Уровня 2
+            document.getElementById('phase5').classList.add('d-none');
+            document.getElementById('final-screen').classList.remove('d-none');
+            document.getElementById('level-badge').textContent = 'Завершено';
+            document.getElementById('level-badge').className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
+            document.getElementById('level-title').textContent = 'Уровень 2 успешно пройден';
+
+            const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+            document.getElementById('stat-time').textContent = `${timeSpent} с`;
+            document.getElementById('stat-attempts').textContent = attemptsCount;
+
+            sendTelemetry('level_complete', 'completed', true);
+        } else {
+            recordError('Ошибка в расчете номинала, пика с запасом или округлении числа полок вверх!', setupPhase5);
+        }
+    });
+
+    // Инициализация при старте
+    setupPhase1();
+
+    // =========================================================================
+    // DEV / E2E TEST HOOKS
+    // =========================================================================
+    window.__DEV_LEVEL2_STATE__ = {
+        solvePhase1() {
+            document.getElementById('p1-input-abs').value = p1Current.abs;
+            document.getElementById('p1-input-rel').value = p1Current.rel;
+            document.getElementById('p1-submit-btn').click();
+        },
+        solvePhase2() {
+            document.getElementById('p2-input-steps').value = p2Current.steps;
+            document.getElementById('p2-input-kb').value = p2Current.kb;
+            document.getElementById('p2-submit-btn').click();
+        },
+        solvePhase3() {
+            document.getElementById('p3-input-delta').value = p3Current.deltaMax;
+            document.getElementById('p3-input-emin').value = p3Current.eMin;
+            document.getElementById('p3-input-emax').value = p3Current.eMax;
+            document.getElementById('p3-submit-btn').click();
+        },
+        solvePhase4() {
+            document.getElementById('p4-input-growth').value = p4Current.growth;
+            document.getElementById('p4-input-target').value = p4Current.vTarget;
+            document.getElementById('p4-submit-btn').click();
+        },
+        solvePhase5() {
+            document.getElementById('p5-input-nom').value = p5Current.nom;
+            document.getElementById('p5-input-peak').value = p5Current.peak;
+            document.getElementById('p5-input-racks').value = p5Current.racks;
+            document.getElementById('p5-submit-btn').click();
+        }
+    };
+
+})();
+</script>

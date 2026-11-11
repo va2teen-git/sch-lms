@@ -1,0 +1,1005 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 text-success mb-0 fw-bold">Тренажер: Модели и моделирование. Представление результатов (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+                
+                <!-- Шапка и индикаторы текущей фазы -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификационный шлюз: Формы и природа моделей</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Попытки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках / калибровке -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>[ОШИБКА МОДЕЛИРОВАНИЯ] <span id="feedback-text">Неверное распределение параметров!</span> Перекалибровка...</span>
+                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: СОРТИРОВКА ПО БАКЕТАМ ================= -->
+                <div id="phase-1-container">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-success">[ИНСТРУКЦИЯ К ФАЗЕ 1]:</strong> Распределите поступившие прикладные и научные модели по 3 классификационным секторам. 
+                        Перетаскивайте карточки зажатой мышью или кликните по карточке, а затем по целевому сектору.
+                    </div>
+
+                    <!-- Пул нераспределенных карточек -->
+                    <div class="card bg-black border-secondary rounded-0 mb-3">
+                        <div class="card-header border-secondary bg-dark text-success small py-2 d-flex justify-content-between">
+                            <span>ВХОДЯЩИЙ ПУЛ МОДЕЛЕЙ ДЛЯ КЛАССИФИКАЦИИ</span>
+                            <span id="p1-pool-counter" class="text-warning">Осталось: 6</span>
+                        </div>
+                        <div class="card-body p-2">
+                            <div id="p1-cards-pool" class="d-flex flex-wrap gap-2" style="min-height: 80px;">
+                                <!-- Процедурные карточки генерируются скриптом -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3 целевые корзины -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-sm-4">
+                            <div id="bucket-material" class="card bg-black border-success rounded-0 h-100" data-bucket-type="material">
+                                <div class="card-header border-success bg-dark text-success fw-bold small py-2 d-flex justify-content-between">
+                                    <span>НАТУРНЫЕ (МАТЕРИАЛЬНЫЕ)</span>
+                                    <span class="bucket-counter badge bg-black text-success border border-success rounded-0">0</span>
+                                </div>
+                                <div class="card-body p-2 bucket-slots" style="min-height: 180px; cursor: pointer;">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <div id="bucket-static" class="card bg-black border-info rounded-0 h-100" data-bucket-type="static">
+                                <div class="card-header border-info bg-dark text-info fw-bold small py-2 d-flex justify-content-between">
+                                    <span>ИНФОРМАЦИОННЫЕ СТАТИЧЕСКИЕ</span>
+                                    <span class="bucket-counter badge bg-black text-info border border-info rounded-0">0</span>
+                                </div>
+                                <div class="card-body p-2 bucket-slots" style="min-height: 180px; cursor: pointer;">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <div id="bucket-dynamic" class="card bg-black border-warning rounded-0 h-100" data-bucket-type="dynamic">
+                                <div class="card-header border-warning bg-dark text-warning fw-bold small py-2 d-flex justify-content-between">
+                                    <span>ИНФОРМАЦИОННЫЕ ДИНАМИЧЕСКИЕ</span>
+                                    <span class="bucket-counter badge bg-black text-warning border border-warning rounded-0">0</span>
+                                </div>
+                                <div class="card-body p-2 bucket-slots" style="min-height: 180px; cursor: pointer;">
+                                    <!-- Сюда падают карточки -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;" disabled>
+                            ПОДТВЕРДИТЬ КЛАССИФИКАЦИЮ [ШАГ 1]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: КОНВЕЙЕР МОДЕЛИРОВАНИЯ (SLOT & SNAP) ================= -->
+                <div id="phase-2-container" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-success">[ИНСТРУКЦИЯ К ФАЗЕ 2]:</strong> Соберите строгий технологический конвейер научного моделирования из 5 последовательных этапов для задачи:
+                        <span id="p2-scenario-title" class="text-info fw-bold">«Динамика распространения информации в медиапространстве»</span>.
+                        Остерегайтесь антинаучных действий и фальсификаций в палитре строительных блоков!
+                    </div>
+
+                    <!-- Целевой конвейер со слотами -->
+                    <div class="card bg-black border-secondary rounded-0 mb-3">
+                        <div class="card-header border-secondary bg-dark text-success small py-2">
+                            ПОСЛЕДОВАТЕЛЬНЫЙ КОНВЕЙЕР ЭТАПОВ МОДЕЛИРОВАНИЯ
+                        </div>
+                        <div class="card-body p-2 d-flex flex-column gap-2">
+                            <div class="slot-row d-flex flex-column flex-md-row align-items-md-center gap-2 border border-secondary p-2 bg-dark">
+                                <div class="text-success fw-bold small" style="min-width: 170px;">1. Постановка задачи:</div>
+                                <div class="slot-target flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center" data-slot="step1" style="min-height: 52px; cursor: pointer;">
+                                    <span class="placeholder-text text-muted">[Перетащите этап постановки задачи]</span>
+                                </div>
+                            </div>
+                            <div class="slot-row d-flex flex-column flex-md-row align-items-md-center gap-2 border border-secondary p-2 bg-dark">
+                                <div class="text-success fw-bold small" style="min-width: 170px;">2. Информационная модель:</div>
+                                <div class="slot-target flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center" data-slot="step2" style="min-height: 52px; cursor: pointer;">
+                                    <span class="placeholder-text text-muted">[Перетащите этап абстрагирования]</span>
+                                </div>
+                            </div>
+                            <div class="slot-row d-flex flex-column flex-md-row align-items-md-center gap-2 border border-secondary p-2 bg-dark">
+                                <div class="text-success fw-bold small" style="min-width: 170px;">3. Формализация:</div>
+                                <div class="slot-target flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center" data-slot="step3" style="min-height: 52px; cursor: pointer;">
+                                    <span class="placeholder-text text-muted">[Перетащите этап математических формул]</span>
+                                </div>
+                            </div>
+                            <div class="slot-row d-flex flex-column flex-md-row align-items-md-center gap-2 border border-secondary p-2 bg-dark">
+                                <div class="text-success fw-bold small" style="min-width: 170px;">4. Компьютерная модель:</div>
+                                <div class="slot-target flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center" data-slot="step4" style="min-height: 52px; cursor: pointer;">
+                                    <span class="placeholder-text text-muted">[Перетащите этап алгоритмизации и кода]</span>
+                                </div>
+                            </div>
+                            <div class="slot-row d-flex flex-column flex-md-row align-items-md-center gap-2 border border-secondary p-2 bg-dark">
+                                <div class="text-success fw-bold small" style="min-width: 170px;">5. Анализ адекватности:</div>
+                                <div class="slot-target flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center" data-slot="step5" style="min-height: 52px; cursor: pointer;">
+                                    <span class="placeholder-text text-muted">[Перетащите этап оценки погрешности]</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Палитра блоков -->
+                    <div class="card bg-black border-secondary rounded-0 mb-3">
+                        <div class="card-header border-secondary bg-dark text-secondary small py-2 d-flex justify-content-between">
+                            <span>ПАЛИТРА СТРОИТЕЛЬНЫХ БЛОКОВ (ВКЛЮЧАЕТ ДИСТРАКТОРЫ)</span>
+                            <span class="text-muted">Кликните токен, затем целевой слот</span>
+                        </div>
+                        <div class="card-body p-2">
+                            <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2" style="min-height: 70px;">
+                                <!-- Процедурные токены генерируются скриптом -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;" disabled>
+                            ПОДТВЕРДИТЬ КОНВЕЙЕР [ШАГ 2]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: ПУЛЬТ АНАЛИТИЧЕСКОЙ КАЛИБРОВКИ ================= -->
+                <div id="phase-3-container" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-success">[ИНСТРУКЦИЯ К ФАЗЕ 3]:</strong> Сконфигурируйте аналитический пульт представления результатов для мониторинга динамики процесса во времени.
+                        Устраните манипуляцию масштабом, выберите семантически корректный формат графика и настройте нормативный порог погрешности модели (δ ≤ 5%) и оптимальный шаг дискретизации.
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <!-- Левая колонка: Органы прямого управления -->
+                        <div class="col-12 col-lg-6">
+                            <div class="card bg-black border-secondary rounded-0 h-100">
+                                <div class="card-header border-secondary bg-dark text-success fw-bold small py-2">
+                                    ПАРАМЕТРЫ ПРЕДСТАВЛЕНИЯ И КАЛИБРОВКИ
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-3">
+                                    
+                                    <!-- 1. Тумблер формата визуализации -->
+                                    <div>
+                                        <label class="form-label text-light small fw-bold mb-1 d-block">
+                                            1. Формат визуализации данных:
+                                        </label>
+                                        <button id="toggle-format-btn" type="button" class="btn btn-outline-danger rounded-0 w-100 text-start py-2 px-3 fw-bold" style="min-height: 48px;" data-state="pie">
+                                            <span class="d-block text-secondary small">Текущий формат:</span>
+                                            <span class="status-label">Круговая диаграмма (Срез долей целого)</span>
+                                        </button>
+                                        <div class="text-muted small mt-1">Кликайте для циклического выбора (Круговая / Линейный график / Лепестковая / Тепловая)</div>
+                                    </div>
+
+                                    <!-- 2. Тумблер масштабирования оси Y -->
+                                    <div>
+                                        <label class="form-label text-light small fw-bold mb-1 d-block">
+                                            2. Базис вертикальной шкалы (Ось Y):
+                                        </label>
+                                        <button id="toggle-axis-btn" type="button" class="btn btn-outline-danger rounded-0 w-100 text-start py-2 px-3 fw-bold" style="min-height: 48px;" data-state="truncated">
+                                            <span class="d-block text-secondary small">Текущий масштаб:</span>
+                                            <span class="status-label">Усеченная шкала (Срез 95%..100% // Манипуляция)</span>
+                                        </button>
+                                        <div class="text-muted small mt-1">Кликайте для переключения между честной шкалой (Y=0) и усеченной</div>
+                                    </div>
+
+                                    <!-- 3. Слайдер допустимой погрешности -->
+                                    <div>
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label class="form-label text-light small fw-bold mb-0">
+                                                3. Нормативный допуск погрешности (δ):
+                                            </label>
+                                            <span id="val-delta" class="badge bg-danger rounded-0 font-monospace fs-6">14%</span>
+                                        </div>
+                                        <input type="range" class="form-range" id="slider-delta" min="1" max="20" step="1" value="14" style="height: 38px;">
+                                        <div class="d-flex justify-content-between text-secondary small">
+                                            <span>Строгий: 1%</span>
+                                            <span class="text-success">Норма ТЗ: ≤ 5%</span>
+                                            <span>Грубый: 20%</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Слайдер шага дискретизации -->
+                                    <div>
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label class="form-label text-light small fw-bold mb-0">
+                                                4. Временной шаг дискретизации (Δt):
+                                            </label>
+                                            <span id="val-step" class="badge bg-warning text-dark rounded-0 font-monospace fs-6">2.5 с</span>
+                                        </div>
+                                        <input type="range" class="form-range" id="slider-step" min="1" max="50" step="1" value="25" style="height: 38px;">
+                                        <div class="d-flex justify-content-between text-secondary small">
+                                            <span>Высокая нагрузка: 0.1 с</span>
+                                            <span class="text-success">Оптимум: 0.2–0.5 с</span>
+                                            <span>Потеря точности: 5.0 с</span>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Правая колонка: Динамический монитор и статус адекватности -->
+                        <div class="col-12 col-lg-6">
+                            <div class="card bg-black border-secondary rounded-0 h-100">
+                                <div class="card-header border-secondary bg-dark text-info fw-bold small py-2 d-flex justify-content-between align-items-center">
+                                    <span>МОНИТОР ВИЗУАЛИЗАЦИИ РЕЗУЛЬТАТОВ</span>
+                                    <span id="monitor-badge" class="badge bg-danger text-light rounded-0">ОШИБКА КАЛИБРОВКИ</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column justify-content-between">
+                                    
+                                    <!-- Графический холст SVG -->
+                                    <div class="border border-secondary bg-black p-2 mb-2 d-flex align-items-center justify-content-center" style="min-height: 220px;">
+                                        <svg id="preview-svg" viewBox="0 0 400 200" width="100%" height="200" class="d-block">
+                                            <!-- Сетка -->
+                                            <line x1="40" y1="20" x2="40" y2="170" stroke="#333" stroke-width="1" />
+                                            <line x1="40" y1="170" x2="380" y2="170" stroke="#333" stroke-width="1" />
+                                            <line x1="40" y1="95" x2="380" y2="95" stroke="#222" stroke-dasharray="4" />
+                                            <!-- График / Фигуры обновляются через JS -->
+                                            <g id="svg-content"></g>
+                                        </svg>
+                                    </div>
+
+                                    <!-- Диагностическая сводка параметров -->
+                                    <div class="bg-dark border border-secondary p-2 small font-monospace">
+                                        <div class="d-flex justify-content-between border-bottom border-secondary pb-1 mb-1">
+                                            <span class="text-secondary">Семантика формата:</span>
+                                            <span id="diag-format" class="text-danger">НЕСООТВЕТСТВИЕ ДИНАМИКЕ</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between border-bottom border-secondary pb-1 mb-1">
+                                            <span class="text-secondary">Масштаб оси Y:</span>
+                                            <span id="diag-axis" class="text-danger">ИСКАЖЕН (ГИПЕРБОЛИЗАЦИЯ)</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between border-bottom border-secondary pb-1 mb-1">
+                                            <span class="text-secondary">Погрешность δ:</span>
+                                            <span id="diag-delta" class="text-danger">ПРЕВЫШЕНИЕ ДОПУСКА (&gt; 5%)</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-secondary">Дискретизация Δt:</span>
+                                            <span id="diag-step" class="text-warning">СЛИШКОМ ГРУБЫЙ ШАГ</span>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold font-monospace" style="min-height: 48px;" disabled>
+                            ЗАФИКСИРОВАТЬ РЕЗУЛЬТАТЫ И ЗАВЕРШИТЬ МИССИЮ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФИНАЛЬНЫЙ ЭКРАН ПОБЕДЫ ================= -->
+                <div id="final-screen" class="d-none text-center py-4">
+                    <div class="badge bg-success text-dark fs-5 rounded-0 px-4 py-2 mb-3">
+                        МИССИЯ УСПЕШНО ВЫПОЛНЕНА // УРОВЕНЬ 1 ПРОЙДЕН
+                    </div>
+                    <h3 class="h4 text-success mb-3 fw-bold">Аналитический комплекс верифицирован</h3>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 600px;">
+                        Вы успешно классифицировали модели по фундаментальным категориям, сконструировали строгий научный конвейер моделирования и откалибровали дашборд представления результатов в соответствии со стандартами научной честности и адекватности.
+                    </p>
+                    <div class="d-inline-flex gap-4 border border-secondary bg-black p-3 rounded-0 font-monospace mb-4">
+                        <div>
+                            <div class="text-secondary small">Затраченное время:</div>
+                            <div id="stat-time" class="text-success fs-5 fw-bold">0 с</div>
+                        </div>
+                        <div class="border-end border-secondary"></div>
+                        <div>
+                            <div class="text-secondary small">Число попыток:</div>
+                            <div id="stat-attempts" class="text-warning fs-5 fw-bold">0</div>
+                        </div>
+                        <div class="border-end border-secondary"></div>
+                        <div>
+                            <div class="text-secondary small">Статус:</div>
+                            <div class="text-info fs-5 fw-bold">100% ЗАЧЕТ</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const startTime = Date.now();
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let selectedCardElement = null;
+    let selectedTokenElement = null;
+
+    const missionName = 'Урок 9 :: Модели и моделирование (Уровень 1)';
+
+    function sendTelemetry(actionType, status, success) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: success
+        }, '*');
+    }
+
+    // Инициализирующий сигнал
+    sendTelemetry('in_progress', 'in_progress', false);
+
+    function showFeedback(message) {
+        const box = document.getElementById('feedback-box');
+        const text = document.getElementById('feedback-text');
+        text.textContent = message;
+        box.classList.remove('d-none');
+        setTimeout(() => {
+            box.classList.add('d-none');
+        }, 2200);
+    }
+
+    function triggerFailure(message, phaseResetCallback) {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+        showFeedback(message);
+        sendTelemetry('hardcore_reset', 'in_progress', false);
+        setTimeout(() => {
+            phaseResetCallback();
+        }, 1200);
+    }
+
+    // =========================================================================
+    // ФАЗА 1: КЛАССИФИКАЦИОННЫЙ ШЛЮЗ (МАТЕРИАЛЬНЫЕ / СТАТИЧЕСКИЕ / ДИНАМИЧЕСКИЕ)
+    // =========================================================================
+
+    const phase1Bank = [
+        // Натурные (материальные)
+        { id: 'm_wing', type: 'material', name: 'Макет крыла самолета', desc: 'Уменьшенная модель для продувки в аэродинамической трубе' },
+        { id: 'm_arch', type: 'material', name: 'Архитектурный макет', desc: 'Физический макет исторического квартала города в масштабе 1:500' },
+        { id: 'm_eye', type: 'material', name: 'Анатомический муляж глаза', desc: 'Разборный натурный образец зрительного аппарата для студентов' },
+        { id: 'm_tellur', type: 'material', name: 'Механический теллурий', desc: 'Действующая модель движения Земли и Луны вокруг Солнца' },
+        { id: 'm_crash', type: 'material', name: 'Тестовый макет кузова', desc: 'Натурная конструкция автомобиля для краш-теста безопасности' },
+
+        // Информационные статические
+        { id: 's_tree', type: 'static', name: 'Генеалогическое древо', desc: 'Иерархическая схема родственных связей царской династии' },
+        { id: 's_mendeleev', type: 'static', name: 'Таблица Менделеева', desc: 'Периодическая система химических элементов' },
+        { id: 's_metro', type: 'static', name: 'Схема линий метрополитена', desc: 'Граф станций и пересадочных узлов городского транспорта' },
+        { id: 's_balance', type: 'static', name: 'Бухгалтерский баланс', desc: 'Финансовый срез активов и пассивов на 31 декабря' },
+        { id: 's_cad', type: 'static', name: 'Поэтажный чертеж здания', desc: 'План размещения несущих стен и эвакуационных выходов' },
+
+        // Информационные динамические
+        { id: 'd_viral', type: 'dynamic', name: 'Модель вирусного контента', desc: 'Симуляция распространения новости в социальной сети во времени' },
+        { id: 'd_meteo', type: 'dynamic', name: 'Метеопрогноз перемещения циклона', desc: 'Компьютерная модель изменения атмосферного давления и осадков' },
+        { id: 'd_agent', type: 'dynamic', name: 'Агентная модель толпы', desc: 'Поминутная симуляция эвакуации людей из здания вокзала при пожаре' },
+        { id: 'd_stocks', type: 'dynamic', name: 'Прогноз курса валют', desc: 'Стохастическая модель колебаний котировок на биржевом рынке' },
+        { id: 'd_ecol', type: 'dynamic', name: 'Модель популяции осетровых', desc: 'Динамика численности рыб с учетом сезонных нерестов и вылова' }
+    ];
+
+    let currentPhase1Cards = [];
+
+    function setupPhase1() {
+        const pool = document.getElementById('p1-cards-pool');
+        pool.innerHTML = '';
+        selectedCardElement = null;
+
+        // Очистить корзины
+        document.querySelectorAll('.bucket-slots').forEach(b => b.innerHTML = '');
+        updatePhase1Counters();
+
+        // Процедурно выбираем по 2 карточки каждого типа (всего 6)
+        const materials = phase1Bank.filter(x => x.type === 'material').sort(() => 0.5 - Math.random()).slice(0, 2);
+        const statics = phase1Bank.filter(x => x.type === 'static').sort(() => 0.5 - Math.random()).slice(0, 2);
+        const dynamics = phase1Bank.filter(x => x.type === 'dynamic').sort(() => 0.5 - Math.random()).slice(0, 2);
+
+        currentPhase1Cards = [...materials, ...statics, ...dynamics].sort(() => 0.5 - Math.random());
+
+        currentPhase1Cards.forEach(item => {
+            const card = createPhase1Card(item);
+            pool.appendChild(card);
+        });
+
+        document.getElementById('p1-verify-btn').disabled = true;
+    }
+
+    function createPhase1Card(item) {
+        const card = document.createElement('div');
+        card.className = 'phase1-card card bg-black border border-secondary rounded-0 p-2 text-start user-select-none mb-2';
+        card.style.cursor = 'grab';
+        card.style.minHeight = '52px';
+        card.style.width = 'calc(50% - 4px)';
+        card.draggable = true;
+        card.dataset.id = item.id;
+        card.dataset.expectedType = item.type;
+
+        card.innerHTML = `
+            <div class="fw-bold text-light small">${item.name}</div>
+            <div class="text-secondary" style="font-size: 0.75rem;">${item.desc}</div>
+        `;
+
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', item.id);
+            card.classList.add('opacity-50');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('opacity-50');
+        });
+
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (card.parentElement.id === 'p1-cards-pool') {
+                if (selectedCardElement === card) {
+                    card.classList.remove('border-white', 'border-2');
+                    selectedCardElement = null;
+                } else {
+                    if (selectedCardElement) {
+                        selectedCardElement.classList.remove('border-white', 'border-2');
+                    }
+                    selectedCardElement = card;
+                    card.classList.add('border-white', 'border-2');
+                }
+            } else {
+                // Если кликнули на карточку в корзине — вернуть в пул
+                document.getElementById('p1-cards-pool').appendChild(card);
+                updatePhase1Counters();
+            }
+        });
+
+        return card;
+    }
+
+    function setupDragAndDropPhase1() {
+        const buckets = [
+            document.getElementById('bucket-material'),
+            document.getElementById('bucket-static'),
+            document.getElementById('bucket-dynamic')
+        ];
+
+        buckets.forEach(bucket => {
+            const slot = bucket.querySelector('.bucket-slots');
+
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                bucket.classList.add('border-white');
+            });
+
+            slot.addEventListener('dragleave', () => {
+                bucket.classList.remove('border-white');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bucket.classList.remove('border-white');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const card = document.querySelector(`.phase1-card[data-id="${cardId}"]`);
+                if (card) {
+                    slot.appendChild(card);
+                    if (selectedCardElement === card) {
+                        card.classList.remove('border-white', 'border-2');
+                        selectedCardElement = null;
+                    }
+                    updatePhase1Counters();
+                }
+            });
+
+            slot.addEventListener('click', () => {
+                if (selectedCardElement) {
+                    slot.appendChild(selectedCardElement);
+                    selectedCardElement.classList.remove('border-white', 'border-2');
+                    selectedCardElement = null;
+                    updatePhase1Counters();
+                }
+            });
+        });
+    }
+
+    function updatePhase1Counters() {
+        const poolCount = document.querySelectorAll('#p1-cards-pool .phase1-card').length;
+        document.getElementById('p1-pool-counter').textContent = `Осталось: ${poolCount}`;
+
+        document.querySelectorAll('[data-bucket-type]').forEach(bucket => {
+            const count = bucket.querySelectorAll('.phase1-card').length;
+            bucket.querySelector('.bucket-counter').textContent = count;
+        });
+
+        // Кнопка разблокируется, когда все 6 карточек разложены по корзинам
+        document.getElementById('p1-verify-btn').disabled = (poolCount > 0);
+    }
+
+    document.getElementById('p1-verify-btn').addEventListener('click', () => {
+        let isAllCorrect = true;
+
+        document.querySelectorAll('[data-bucket-type]').forEach(bucket => {
+            const bucketType = bucket.dataset.bucketType;
+            const placedCards = bucket.querySelectorAll('.phase1-card');
+            placedCards.forEach(card => {
+                if (card.dataset.expectedType !== bucketType) {
+                    isAllCorrect = false;
+                }
+            });
+        });
+
+        if (isAllCorrect) {
+            sendTelemetry('in_progress', 'in_progress', false);
+            // Переход на Фазу 2
+            document.getElementById('phase-1-container').classList.add('d-none');
+            document.getElementById('phase-2-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Конструирование конвейера: Этапы компьютерного моделирования';
+            currentPhase = 2;
+            setupPhase2();
+        } else {
+            triggerFailure('Некоторые модели отнесены не в свои сектора!', setupPhase1);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: КОНВЕЙЕР ЭТАПОВ МОДЕЛИРОВАНИЯ (SLOT & SNAP)
+    // =========================================================================
+
+    const phase2Scenarios = [
+        {
+            title: '«Динамика распространения информации в медиапространстве»',
+            tokens: [
+                { slot: 'step1', name: 'Постановка задачи', desc: 'Сбор логов активности и формулировка цели: оценка охвата аудитории' },
+                { slot: 'step2', name: 'Информационная модель', desc: 'Абстрагирование: отсечение дизайна профилей, выделение графа связей' },
+                { slot: 'step3', name: 'Математическая модель', desc: 'Построение системы уравнений диффузии информации' },
+                { slot: 'step4', name: 'Компьютерный алгоритм', desc: 'Разработка симулятора на Python и серия из 500 вычислительных прогонов' },
+                { slot: 'step5', name: 'Оценка адекватности', desc: 'Сопоставление расчетных кривых с фактической статистикой просмотров' }
+            ],
+            distractors: [
+                { slot: 'distractor', name: 'Слепая публикация', desc: 'Публикация непроверенной сенсации в соцсетях без верификации' },
+                { slot: 'distractor', name: 'Подгонка данных', desc: 'Ручная фальсификация графиков под ожидания рекламного спонсора' }
+            ]
+        },
+        {
+            title: '«Компьютерный дизайн нового лекарственного препарата (In Silico)»',
+            tokens: [
+                { slot: 'step1', name: 'Постановка задачи', desc: 'Определение белка-мишени вируса и требований к блокирующей молекуле' },
+                { slot: 'step2', name: 'Информационная модель', desc: 'Выделение активного кармана фермента и электростатических свойств' },
+                { slot: 'step3', name: 'Математическая модель', desc: 'Формулы энергии связывания Ван-дер-Ваальса и потенциалов Кулона' },
+                { slot: 'step4', name: 'Компьютерный докинг', desc: 'Виртуальный скрининг 1 000 000 химических структур на суперкомпьютере' },
+                { slot: 'step5', name: 'Оценка адекватности', desc: 'Лабораторный синтез топ-10 молекул-кандидатов и сверка с расчетом' }
+            ],
+            distractors: [
+                { slot: 'distractor', name: 'Случайный синтез', desc: 'Слепое смешивание химических реактивов без математической модели' },
+                { slot: 'distractor', name: 'Игнорирование побочных эффектов', desc: 'Запуск в массовую продажу без этапа клинической верификации' }
+            ]
+        }
+    ];
+
+    let currentPhase2Scenario = null;
+
+    function setupPhase2() {
+        const pool = document.getElementById('p2-tokens-pool');
+        pool.innerHTML = '';
+        selectedTokenElement = null;
+
+        // Очистить слоты
+        document.querySelectorAll('.slot-target').forEach(slot => {
+            slot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+            slot.removeAttribute('data-placed-slot');
+        });
+
+        document.getElementById('p2-verify-btn').disabled = true;
+
+        // Выбираем сценарий
+        currentPhase2Scenario = phase2Scenarios[Math.floor(Math.random() * phase2Scenarios.length)];
+        document.getElementById('p2-scenario-title').textContent = currentPhase2Scenario.title;
+
+        // Объединяем этапы и дистракторы и перемешиваем
+        const allTokens = [...currentPhase2Scenario.tokens, ...currentPhase2Scenario.distractors].sort(() => 0.5 - Math.random());
+
+        allTokens.forEach((tok, idx) => {
+            const tokenEl = createPhase2Token(tok, idx);
+            pool.appendChild(tokenEl);
+        });
+
+        setupDragAndDropPhase2();
+    }
+
+    function createPhase2Token(tok, idx) {
+        const token = document.createElement('div');
+        const isDistractor = tok.slot === 'distractor';
+        token.className = `p2-token card bg-black border ${isDistractor ? 'border-secondary' : 'border-success'} rounded-0 p-2 text-start user-select-none mb-1`;
+        token.style.cursor = 'grab';
+        token.style.minHeight = '48px';
+        token.draggable = true;
+        token.dataset.tokenId = 'tok_' + idx;
+        token.dataset.expectedSlot = tok.slot;
+
+        token.innerHTML = `
+            <div class="fw-bold ${isDistractor ? 'text-light' : 'text-success'} small">${tok.name}</div>
+            <div class="text-secondary" style="font-size: 0.72rem;">${tok.desc}</div>
+        `;
+
+        token.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', token.dataset.tokenId);
+            token.classList.add('opacity-50');
+        });
+
+        token.addEventListener('dragend', () => {
+            token.classList.remove('opacity-50');
+        });
+
+        token.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (token.parentElement.id === 'p2-tokens-pool') {
+                if (selectedTokenElement === token) {
+                    token.classList.remove('border-white', 'border-2');
+                    selectedTokenElement = null;
+                } else {
+                    if (selectedTokenElement) {
+                        selectedTokenElement.classList.remove('border-white', 'border-2');
+                    }
+                    selectedTokenElement = token;
+                    token.classList.add('border-white', 'border-2');
+                }
+            } else {
+                // Если кликнули на токен в слоте — вернуть в пул
+                const slot = token.parentElement;
+                slot.innerHTML = '<span class="placeholder-text text-muted small">[Перетащите токен]</span>';
+                slot.removeAttribute('data-placed-slot');
+                document.getElementById('p2-tokens-pool').appendChild(token);
+                checkPhase2Completion();
+            }
+        });
+
+        return token;
+    }
+
+    function setupDragAndDropPhase2() {
+        const slots = document.querySelectorAll('.slot-target');
+        const pool = document.getElementById('p2-tokens-pool');
+
+        slots.forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                slot.classList.add('border-success');
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('border-success');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('border-success');
+                const tokenId = e.dataTransfer.getData('text/plain');
+                const token = document.querySelector(`.p2-token[data-token-id="${tokenId}"]`);
+                if (token) {
+                    placeTokenInSlot(token, slot);
+                }
+            });
+
+            slot.addEventListener('click', () => {
+                if (selectedTokenElement) {
+                    placeTokenInSlot(selectedTokenElement, slot);
+                    selectedTokenElement.classList.remove('border-white', 'border-2');
+                    selectedTokenElement = null;
+                }
+            });
+        });
+    }
+
+    function placeTokenInSlot(token, slot) {
+        // Если в слоте уже был токен — вернуть его в пул
+        const existingToken = slot.querySelector('.p2-token');
+        if (existingToken) {
+            document.getElementById('p2-tokens-pool').appendChild(existingToken);
+        }
+
+        slot.innerHTML = '';
+        slot.appendChild(token);
+        slot.dataset.placedSlot = token.dataset.expectedSlot;
+        checkPhase2Completion();
+    }
+
+    function checkPhase2Completion() {
+        const slots = document.querySelectorAll('.slot-target');
+        let filledCount = 0;
+        slots.forEach(s => {
+            if (s.querySelector('.p2-token')) {
+                filledCount++;
+            }
+        });
+
+        document.getElementById('p2-verify-btn').disabled = (filledCount < 5);
+    }
+
+    document.getElementById('p2-verify-btn').addEventListener('click', () => {
+        const step1 = document.querySelector('.slot-target[data-slot="step1"]').dataset.placedSlot;
+        const step2 = document.querySelector('.slot-target[data-slot="step2"]').dataset.placedSlot;
+        const step3 = document.querySelector('.slot-target[data-slot="step3"]').dataset.placedSlot;
+        const step4 = document.querySelector('.slot-target[data-slot="step4"]').dataset.placedSlot;
+        const step5 = document.querySelector('.slot-target[data-slot="step5"]').dataset.placedSlot;
+
+        const isCorrect = (step1 === 'step1' && step2 === 'step2' && step3 === 'step3' && step4 === 'step4' && step5 === 'step5');
+
+        if (isCorrect) {
+            sendTelemetry('in_progress', 'in_progress', false);
+            // Переход на Фазу 3
+            document.getElementById('phase-2-container').classList.add('d-none');
+            document.getElementById('phase-3-container').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Пульт аналитической калибровки: Представление результатов';
+            currentPhase = 3;
+            setupPhase3();
+        } else {
+            triggerFailure('Нарушена логика конвейера или встроен псевдонаучный дистрактор!', setupPhase2);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: ПУЛЬТ АНАЛИТИЧЕСКОЙ КАЛИБРОВКИ И ДАШБОРДА
+    // =========================================================================
+
+    const formatCycle = [
+        { state: 'pie', label: 'Круговая диаграмма (Срез долей целого)', valid: false, err: 'НЕСООТВЕТСТВИЕ СЕМАНТИКЕ ВРЕМЕНИ' },
+        { state: 'line', label: 'Линейный график (Временной ряд динамики)', valid: true, err: 'ОК: КОРРЕКТНЫЙ ФОРМАТ' },
+        { state: 'radar', label: 'Лепестковая диаграмма (Многоосевой профиль)', valid: false, err: 'НЕПРИГОДНО ДЛЯ ВРЕМЕННОГО РЯДА' },
+        { state: 'heatmap', label: 'Тепловая карта (Пространственная плотность ГИС)', valid: false, err: 'ОТСУТСТВУЕТ ГЕОПРИВЯЗКА' }
+    ];
+    let formatIndex = 0;
+
+    const axisCycle = [
+        { state: 'truncated', label: 'Усеченная шкала (Срез 95%..100% // Манипуляция)', valid: false, err: 'МАСШТАБ ИСКАЖЕН (ГИПЕРБОЛИЗАЦИЯ)' },
+        { state: 'zero_based', label: 'Честная шкала (Базис Y = 0 // Объективный масштаб)', valid: true, err: 'ОК: ОБЪЕКТИВНЫЙ МАСШТАБ' }
+    ];
+    let axisIndex = 0;
+
+    function setupPhase3() {
+        formatIndex = 0; // pie
+        axisIndex = 0; // truncated
+        const sDelta = document.getElementById('slider-delta');
+        const sStep = document.getElementById('slider-step');
+
+        sDelta.value = 14;
+        sStep.value = 25;
+
+        updatePhase3UI();
+    }
+
+    document.getElementById('toggle-format-btn').addEventListener('click', () => {
+        formatIndex = (formatIndex + 1) % formatCycle.length;
+        updatePhase3UI();
+    });
+
+    document.getElementById('toggle-axis-btn').addEventListener('click', () => {
+        axisIndex = (axisIndex + 1) % axisCycle.length;
+        updatePhase3UI();
+    });
+
+    document.getElementById('slider-delta').addEventListener('input', updatePhase3UI);
+    document.getElementById('slider-step').addEventListener('input', updatePhase3UI);
+
+    function updatePhase3UI() {
+        const curFormat = formatCycle[formatIndex];
+        const curAxis = axisCycle[axisIndex];
+        const deltaVal = parseInt(document.getElementById('slider-delta').value, 10);
+        const stepVal = parseInt(document.getElementById('slider-step').value, 10);
+        const stepSec = (stepVal / 10).toFixed(1);
+
+        // Обновление кнопок
+        const btnFormat = document.getElementById('toggle-format-btn');
+        btnFormat.dataset.state = curFormat.state;
+        btnFormat.className = `btn ${curFormat.valid ? 'btn-outline-success' : 'btn-outline-danger'} rounded-0 w-100 text-start py-2 px-3 fw-bold`;
+        btnFormat.querySelector('.status-label').textContent = curFormat.label;
+
+        const btnAxis = document.getElementById('toggle-axis-btn');
+        btnAxis.dataset.state = curAxis.state;
+        btnAxis.className = `btn ${curAxis.valid ? 'btn-outline-success' : 'btn-outline-danger'} rounded-0 w-100 text-start py-2 px-3 fw-bold`;
+        btnAxis.querySelector('.status-label').textContent = curAxis.label;
+
+        // Обновление текстовых значений слайдеров
+        const elDeltaVal = document.getElementById('val-delta');
+        elDeltaVal.textContent = `${deltaVal}%`;
+        const isDeltaValid = deltaVal <= 5;
+        elDeltaVal.className = `badge ${isDeltaValid ? 'bg-success' : 'bg-danger'} rounded-0 font-monospace fs-6`;
+
+        const elStepVal = document.getElementById('val-step');
+        elStepVal.textContent = `${stepSec} с`;
+        const isStepValid = (stepVal >= 2 && stepVal <= 5); // 0.2c - 0.5c
+        elStepVal.className = `badge ${isStepValid ? 'bg-success' : 'bg-warning text-dark'} rounded-0 font-monospace fs-6`;
+
+        // Диагностика
+        const diagFormat = document.getElementById('diag-format');
+        diagFormat.textContent = curFormat.err;
+        diagFormat.className = curFormat.valid ? 'text-success' : 'text-danger';
+
+        const diagAxis = document.getElementById('diag-axis');
+        diagAxis.textContent = curAxis.err;
+        diagAxis.className = curAxis.valid ? 'text-success' : 'text-danger';
+
+        const diagDelta = document.getElementById('diag-delta');
+        diagDelta.textContent = isDeltaValid ? 'ОК: ПОГРЕШНОСТЬ В НОРМЕ (≤ 5%)' : `ПРЕВЫШЕНИЕ ДОПУСКА (${deltaVal}% > 5%)`;
+        diagDelta.className = isDeltaValid ? 'text-success' : 'text-danger';
+
+        const diagStep = document.getElementById('diag-step');
+        diagStep.textContent = isStepValid ? 'ОК: ОПТИМАЛЬНАЯ ДИСКРЕТИЗАЦИЯ' : (stepVal < 2 ? 'ИЗБЫТОЧНАЯ ВЫЧИСЛИТЕЛЬНАЯ НАГРУЗКА' : 'СЛИШКОМ ГРУБЫЙ ШАГ (ПОТЕРЯ ФАКТОРОВ)');
+        diagStep.className = isStepValid ? 'text-success' : 'text-warning';
+
+        // Рендер графика в SVG
+        renderPreviewGraph(curFormat.state, curAxis.state, isDeltaValid, isStepValid, deltaVal, stepVal);
+
+        // Общий статус
+        const isAllValid = curFormat.valid && curAxis.valid && isDeltaValid && isStepValid;
+        const monBadge = document.getElementById('monitor-badge');
+        if (isAllValid) {
+            monBadge.textContent = 'МОДЕЛЬ АДЕКВАТНА // ВИЗУАЛИЗАЦИЯ ВАЛИДНА';
+            monBadge.className = 'badge bg-success text-dark rounded-0';
+            document.getElementById('p3-verify-btn').disabled = false;
+        } else {
+            monBadge.textContent = 'ПАРАМЕТРЫ ТРЕБУЮТ КАЛИБРОВКИ';
+            monBadge.className = 'badge bg-danger text-light rounded-0';
+            document.getElementById('p3-verify-btn').disabled = true;
+        }
+    }
+
+    function renderPreviewGraph(format, axis, isDeltaOk, isStepOk, delta, step) {
+        const g = document.getElementById('svg-content');
+        g.innerHTML = '';
+
+        if (format === 'pie') {
+            // Рисуем круговую диаграмму (ошибочно для временного ряда)
+            g.innerHTML = `
+                <circle cx="210" cy="95" r="55" fill="#333" stroke="#e63946" stroke-width="2" />
+                <path d="M 210,95 L 210,40 A 55,55 0 0,1 260,115 Z" fill="#e63946" />
+                <path d="M 210,95 L 260,115 A 55,55 0 0,1 170,135 Z" fill="#457b9d" />
+                <text x="210" y="180" fill="#e63946" font-size="11" text-anchor="middle" font-family="monospace">
+                    [КРУГОВАЯ ДИАГРАММА НЕ ОТРАЖАЕТ ДИНАМИКУ ВО ВРЕМЕНИ]
+                </text>
+            `;
+            return;
+        }
+
+        if (format === 'radar') {
+            g.innerHTML = `
+                <polygon points="210,45 255,80 240,140 180,140 165,80" fill="none" stroke="#e63946" stroke-width="2" />
+                <polygon points="210,65 240,90 230,125 190,125 180,90" fill="#e63946" fill-opacity="0.3" stroke="#e63946" stroke-width="1" />
+                <text x="210" y="180" fill="#e63946" font-size="11" text-anchor="middle" font-family="monospace">
+                    [ЛЕПЕСТКОВЫЙ ПРОФИЛЬ НЕ ПРИГОДЕН ДЛЯ ВРЕМЕННОГО РЯДА]
+                </text>
+            `;
+            return;
+        }
+
+        if (format === 'heatmap') {
+            g.innerHTML = `
+                <rect x="100" y="50" width="40" height="40" fill="#1d3557" />
+                <rect x="145" y="50" width="40" height="40" fill="#457b9d" />
+                <rect x="190" y="50" width="40" height="40" fill="#e63946" />
+                <rect x="235" y="50" width="40" height="40" fill="#f1faee" />
+                <rect x="280" y="50" width="40" height="40" fill="#457b9d" />
+                <text x="210" y="180" fill="#e63946" font-size="11" text-anchor="middle" font-family="monospace">
+                    [ТЕПЛОВАЯ КАРТА НЕ ИМЕЕТ ГЕОГРАФИЧЕСКИХ КООРДИНАТ]
+                </text>
+            `;
+            return;
+        }
+
+        // Формат 'line' — строим график
+        const isTruncated = (axis === 'truncated');
+        const strokeColor = (isDeltaOk && isStepOk && !isTruncated) ? '#2ecc71' : '#e63946';
+
+        // Генерация точек симуляции
+        let pathD = '';
+        const numPoints = isStepOk ? 18 : (step < 2 ? 35 : 6);
+        const yBase = isTruncated ? 160 : 170;
+        const amplitude = isTruncated ? 80 : 40; // Усеченная ось визуально взрывает колебания
+
+        for (let i = 0; i <= numPoints; i++) {
+            const x = 40 + (i / numPoints) * 330;
+            // Кривая логистического роста с шумом от delta
+            const progress = i / numPoints;
+            const trend = 1 / (1 + Math.exp(-6 * (progress - 0.4)));
+            const noise = (Math.sin(i * 2.3) * (delta / 25)) * (isTruncated ? 25 : 10);
+            const y = yBase - (trend * amplitude) - noise;
+            
+            pathD += (i === 0 ? `M ${x.toFixed(1)},${y.toFixed(1)}` : ` L ${x.toFixed(1)},${y.toFixed(1)}`);
+        }
+
+        g.innerHTML = `
+            <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="${isStepOk ? 2.5 : 1.5}" stroke-linejoin="round" />
+            <text x="45" y="30" fill="${strokeColor}" font-size="10" font-family="monospace">
+                ${isTruncated ? 'Ось Y: [95%..100%] (ИСКАЖЕНИЕ!)' : 'Ось Y: [0%..100%] (ОБЪЕКТИВНО)'}
+            </text>
+            <text x="375" y="165" fill="#888" font-size="9" text-anchor="end" font-family="monospace">Время t →</text>
+        `;
+    }
+
+    document.getElementById('p3-verify-btn').addEventListener('click', () => {
+        const curFormat = formatCycle[formatIndex];
+        const curAxis = axisCycle[axisIndex];
+        const deltaVal = parseInt(document.getElementById('slider-delta').value, 10);
+        const stepVal = parseInt(document.getElementById('slider-step').value, 10);
+
+        const isDeltaValid = deltaVal <= 5;
+        const isStepValid = (stepVal >= 2 && stepVal <= 5);
+
+        if (curFormat.valid && curAxis.valid && isDeltaValid && isStepValid) {
+            // Финиш уровня
+            document.getElementById('phase-3-container').classList.add('d-none');
+            document.getElementById('final-screen').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Завершено';
+            document.getElementById('phase-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
+            document.getElementById('phase-title').textContent = 'Уровень 1 успешно пройден';
+
+            const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+            document.getElementById('stat-time').textContent = `${timeSpent} с`;
+            document.getElementById('stat-attempts').textContent = attemptsCount;
+
+            sendTelemetry('level_complete', 'completed', true);
+        } else {
+            triggerFailure('Параметры аналитического представления не удовлетворяют критериям адекватности!', setupPhase3);
+        }
+    });
+
+    // Инициализация при загрузке
+    setupPhase1();
+    setupDragAndDropPhase1();
+
+    // =========================================================================
+    // DEV / E2E TEST HOOKS
+    // =========================================================================
+    window.__DEV_LEVEL1_STATE__ = {
+        solvePhase1() {
+            // Раскладывает все карточки по их правильным корзинам
+            const cards = Array.from(document.querySelectorAll('#p1-cards-pool .phase1-card'));
+            cards.forEach(card => {
+                const targetBucket = document.getElementById(`bucket-${card.dataset.expectedType}`);
+                if (targetBucket) {
+                    targetBucket.querySelector('.bucket-slots').appendChild(card);
+                }
+            });
+            updatePhase1Counters();
+            document.getElementById('p1-verify-btn').click();
+        },
+        solvePhase2() {
+            // Раскладывает все 5 этапов конвейера
+            const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
+            steps.forEach(stepName => {
+                const token = document.querySelector(`.p2-token[data-expected-slot="${stepName}"]`);
+                const slot = document.querySelector(`.slot-target[data-slot="${stepName}"]`);
+                if (token && slot) {
+                    placeTokenInSlot(token, slot);
+                }
+            });
+            document.getElementById('p2-verify-btn').click();
+        },
+        solvePhase3() {
+            // Устанавливает верные параметры Фазы 3
+            formatIndex = 1; // line
+            axisIndex = 1; // zero_based
+            document.getElementById('slider-delta').value = 4;
+            document.getElementById('slider-step').value = 3;
+            updatePhase3UI();
+            document.getElementById('p3-verify-btn').click();
+        }
+    };
+
+})();
+</script>
