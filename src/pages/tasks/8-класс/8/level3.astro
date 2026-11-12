@@ -2,7 +2,7 @@
 import TaskLayout from '../../../../layouts/TaskLayout.astro';
 // Уровень 3 (Аркада / Финальный босс): 8 класс, Урок 8 - Логические операции «и», «или», «не»
 // Архетип: «Short-Circuit WAF / Logic Stream Interceptor» (Аудит сетевого шлюза и ленивые вычисления)
-// 10 процедурных волн, жесткий динамический таймер (7.0 - 5.0 сек на волну), тотальный сброс на шаг 1 при любой ошибке.
+// 10 процедурных волн, динамический таймер (14.0 - 10.0 сек на волну), тотальный сброс на шаг 1 при любой ошибке.
 ---
 
 <TaskLayout level={3} bodyClass="font-monospace m-0 p-0">
@@ -25,7 +25,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light">
                 <div class="fw-bold text-danger mb-2 text-uppercase">[ПРОТОКОЛ ХАРДКОР-РЕАГИРОВАНИЯ]:</div>
                 <ul class="mb-0 ps-3">
-                    <li class="mb-1">• <span class="text-warning">Динамический таймер такта:</span> На принятие решения отводится от <span class="text-danger fw-bold">7.0 до 5.0 секунд</span> на волну!</li>
+                    <li class="mb-1">• <span class="text-warning">Динамический таймер такта:</span> На принятие решения отводится от <span class="text-danger fw-bold">14.0 до 10.0 секунд</span> на волну!</li>
                     <li class="mb-1">• <span class="text-warning">Тотальный сброс:</span> Любая ошибка классификации или истечение таймера вызывают Kernel Panic и <span class="text-danger fw-bold">ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</span> с новой генерацией пакетов!</li>
                     <li class="mb-1">• <span class="text-warning">2 тактических шлюза:</span> <span class="text-success fw-bold">[ALLOW: Истина (1)]</span> для пропуска и <span class="text-danger fw-bold">[DROP: Ложь (0)]</span> для блокировки.</li>
                     <li>• <span class="text-warning">Short-Circuit тактика:</span> Если в связке <span class="text-info">ИЛИ</span> левая часть равна 1, или в связке <span class="text-info">И</span> левая часть равна 0 — экономьте секунды и сразу фиксируйте ответ!</li>
@@ -87,11 +87,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="col-md-6 mt-3 mt-md-0 text-md-end">
                         <div class="text-secondary small fw-bold mb-1">ТАЙМЕР РЕАКЦИИ БУФЕРА:</div>
                         <div class="d-flex align-items-center justify-content-md-end gap-2">
-                            <span id="timer-display" :class="{'text-danger': timeLeft <= 2.5, 'text-warning': timeLeft > 2.5}" class="fs-4 fw-bold">
+                            <span id="timer-display" :class="{'text-danger': timeLeft <= 5.0, 'text-warning': timeLeft > 5.0}" class="fs-4 fw-bold">
                                 <span v-text="formattedTime"></span> сек
                             </span>
                             <div class="progress bg-black border border-secondary rounded-0 d-inline-block" style="width: 140px; height: 12px;">
-                                <div class="progress-bar" :class="timeLeft <= 2.5 ? 'bg-danger' : 'bg-warning'" :style="{ width: (timeLeft / waveTimeLimit * 100) + '%' }"></div>
+                                <div class="progress-bar" :class="timeLeft <= 5.0 ? 'bg-danger' : 'bg-warning'" :style="{ width: (timeLeft / waveTimeLimit * 100) + '%' }"></div>
                             </div>
                         </div>
                     </div>
@@ -260,8 +260,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 const alarmActive = ref(false);
                 const alarmMessage = ref('');
                 const currentWaveIndex = ref(0);
-                const waveTimeLimit = ref(7.0);
-                const timeLeft = ref(7.0);
+                const waveTimeLimit = ref(14.0);
+                const timeLeft = ref(14.0);
                 const totalTimeSpent = ref(0);
                 let timerInterval = null;
 
@@ -631,15 +631,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 function startWave(index) {
                     currentWaveIndex.value = index;
 
-                    // Динамический таймер такта:
-                    // Волны 1-3: 7.0 сек
-                    // Волны 4-6: 6.5 сек
-                    // Волны 7-9: 6.0 сек
-                    // Волна 10: 5.0 сек
-                    let limit = 7.0;
-                    if (index >= 9) limit = 5.0;
-                    else if (index >= 6) limit = 6.0;
-                    else if (index >= 3) limit = 6.5;
+                    // Динамический таймер такта (увеличен в 2 раза):
+                    // Волны 1-3: 14.0 сек
+                    // Волны 4-6: 13.0 сек
+                    // Волны 7-9: 12.0 сек
+                    // Волна 10: 10.0 сек
+                    let limit = 14.0;
+                    if (index >= 9) limit = 10.0;
+                    else if (index >= 6) limit = 12.0;
+                    else if (index >= 3) limit = 13.0;
 
                     waveTimeLimit.value = limit;
                     timeLeft.value = limit;
