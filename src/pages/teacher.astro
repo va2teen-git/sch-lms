@@ -95,6 +95,7 @@ try {
         bestHardcoreTimeSec: null,
         bestSprintTimeSec: null,
         sprintCpm: null,
+        sprintWpm: null,
         sprintAccuracy: null,
         currentAttempt: null,
         attempts: [],
@@ -175,17 +176,48 @@ try {
     }
 
     if (r.action_type === 'sprint_complete' && typeof r.time_spent_sec === 'number') {
-      if (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec) {
+      let logCpm = null;
+      let logWpm = null;
+      let logAcc = null;
+      try {
+        const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
+        if (logData) {
+          if (typeof logData.cpm === 'number') logCpm = Math.round(logData.cpm);
+          if (typeof logData.wpm === 'number') logWpm = Math.round(logData.wpm);
+          if (typeof logData.accuracy === 'number') logAcc = Math.round(logData.accuracy * 10) / 10;
+        }
+      } catch (e) {}
+
+      if (logCpm !== null && logWpm === null) {
+        logWpm = Math.round(logCpm / 5);
+      }
+
+      const currentBestCpm = s.sprintCpm ?? null;
+      let isBetter = false;
+
+      if (currentBestCpm === null) {
+        if (s.bestSprintTimeSec === null) {
+          isBetter = true;
+        } else if (logCpm !== null) {
+          isBetter = true;
+        } else if (r.time_spent_sec < s.bestSprintTimeSec) {
+          isBetter = true;
+        }
+      } else if (logCpm !== null) {
+        if (logCpm > currentBestCpm) {
+          isBetter = true;
+        } else if (logCpm === currentBestCpm && (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec)) {
+          isBetter = true;
+        }
+      } else if (s.bestSprintTimeSec !== null && r.time_spent_sec < s.bestSprintTimeSec) {
+        isBetter = true;
+      }
+
+      if (isBetter) {
         s.bestSprintTimeSec = r.time_spent_sec;
-        try {
-          const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
-          if (logData && typeof logData.cpm === 'number') {
-            s.sprintCpm = Math.round(logData.cpm);
-          }
-          if (logData && typeof logData.accuracy === 'number') {
-            s.sprintAccuracy = Math.round(logData.accuracy * 10) / 10;
-          }
-        } catch (e) {}
+        if (logCpm !== null) s.sprintCpm = logCpm;
+        if (logWpm !== null) s.sprintWpm = logWpm;
+        if (logAcc !== null) s.sprintAccuracy = logAcc;
       }
     }
 
@@ -688,9 +720,9 @@ function getAttemptsWord(count: number): string {
               <th class="p-3 text-center">Уровень 1</th>
               <th class="p-3 text-center">Уровень 2</th>
               <th class="p-3 text-center">Уровень 3</th>
-              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="sprint" title="Сортировка по времени Лого-Шторма. Удерживайте Ctrl/Shift для мульти-сортировки">
+              <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="sprint" title="Сортировка по скорости Лого-Шторма. Удерживайте Ctrl/Shift для мульти-сортировки">
                 <div class="leading-tight font-bold text-cyan-950">⚡ Лого-Шторм</div>
-                <div class="text-[10px] text-gray-500 font-normal normal-case">Время штурма</div>
+                <div class="text-[10px] text-gray-500 font-normal normal-case">зн/мин и сл/мин</div>
                 <span id="sort-sprint-icon">↕</span>
               </th>
               <th class="p-3 text-center cursor-pointer hover:bg-gray-200 transition" data-sort="time" title="Сортировка. Удерживайте Ctrl/Shift для мульти-сортировки">
@@ -851,10 +883,14 @@ function getAttemptsWord(count: number): string {
                       )}
                     </td>
 
-                    <!-- Logo-Storm Sprint Time -->
+                    <!-- Logo-Storm Sprint Speed -->
                     <td class="p-3 text-center whitespace-nowrap">
-                      {s.bestSprintTimeSec !== null ? (
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title={`${s.sprintCpm ? `${s.sprintCpm} зн/мин` : ''}${s.sprintAccuracy ? `, точность ${s.sprintAccuracy}%` : ''}`}>
+                      {s.sprintCpm ? (
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title={`Лого-Шторм: ${s.sprintCpm} зн/мин, ${s.sprintWpm || Math.round(s.sprintCpm / 5)} сл/мин${s.bestSprintTimeSec ? `, время ${formatSec(s.bestSprintTimeSec)}` : ''}${s.sprintAccuracy ? `, точность ${s.sprintAccuracy}%` : ''}`}>
+                          ⚡ {s.sprintCpm} <span class="text-[10px] text-cyan-900 font-normal">зн/мин</span> <span class="text-[10px] text-cyan-700 font-medium">({s.sprintWpm || Math.round(s.sprintCpm / 5)} сл/мин)</span>
+                        </span>
+                      ) : s.bestSprintTimeSec !== null ? (
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title={`Лого-Шторм: время ${formatSec(s.bestSprintTimeSec)}`}>
                           ⚡ {formatSec(s.bestSprintTimeSec)}
                         </span>
                       ) : (
@@ -1327,8 +1363,8 @@ function getAttemptsWord(count: number): string {
     } else if (col === 'attempts') {
       diff = (a.attemptsCount || 1) - (b.attemptsCount || 1);
     } else if (col === 'sprint') {
-      const valA = (a.bestSprintTimeSec !== null && a.bestSprintTimeSec !== undefined) ? a.bestSprintTimeSec : (asc ? Infinity : -Infinity);
-      const valB = (b.bestSprintTimeSec !== null && b.bestSprintTimeSec !== undefined) ? b.bestSprintTimeSec : (asc ? Infinity : -Infinity);
+      const valA = (a.sprintCpm !== null && a.sprintCpm !== undefined) ? a.sprintCpm : ((a.bestSprintTimeSec !== null && a.bestSprintTimeSec !== undefined) ? 1 : (asc ? Infinity : -Infinity));
+      const valB = (b.sprintCpm !== null && b.sprintCpm !== undefined) ? b.sprintCpm : ((b.bestSprintTimeSec !== null && b.bestSprintTimeSec !== undefined) ? 1 : (asc ? Infinity : -Infinity));
       diff = valA - valB;
     } else if (col === 'time') {
       diff = (a.totalActiveTimeSec || 0) - (b.totalActiveTimeSec || 0);
@@ -1440,10 +1476,13 @@ function getAttemptsWord(count: number): string {
       const activeDot = s.isActiveNow ? '<span class="w-2.5 h-2.5 inline-block bg-green-500 animate-pulse" title="Активен прямо сейчас"></span>' : '<span class="w-2.5 h-2.5 inline-block bg-gray-300" title="Офлайн"></span>';
 
       let sprintBadge = '<span class="text-gray-300 text-xs">—</span>';
-      if (s.bestSprintTimeSec !== null && s.bestSprintTimeSec !== undefined) {
-        const cpmInfo = s.sprintCpm ? `${s.sprintCpm} зн/мин` : '';
+      if (s.sprintCpm) {
+        const wpm = s.sprintWpm || Math.round(s.sprintCpm / 5);
+        const timeInfo = s.bestSprintTimeSec !== null && s.bestSprintTimeSec !== undefined ? `, время ${formatTime(s.bestSprintTimeSec)}` : '';
         const accInfo = s.sprintAccuracy ? `, точность ${s.sprintAccuracy}%` : '';
-        sprintBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title="${cpmInfo}${accInfo}">⚡ ${formatTime(s.bestSprintTimeSec)}</span>`;
+        sprintBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title="Лого-Шторм: ${s.sprintCpm} зн/мин, ${wpm} сл/мин${timeInfo}${accInfo}">⚡ ${s.sprintCpm} <span class="text-[10px] text-cyan-900 font-normal">зн/мин</span> <span class="text-[10px] text-cyan-700 font-medium">(${wpm} сл/мин)</span></span>`;
+      } else if (s.bestSprintTimeSec !== null && s.bestSprintTimeSec !== undefined) {
+        sprintBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title="Лого-Шторм: время ${formatTime(s.bestSprintTimeSec)}">⚡ ${formatTime(s.bestSprintTimeSec)}</span>`;
       }
 
       html += `
@@ -1692,7 +1731,7 @@ function getAttemptsWord(count: number): string {
       return;
     }
 
-    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Лого-Шторм (время)', 'Лого-Шторм (CPM)', 'Время решения (сек)', 'Время решения', 'Всего ошибок', 'Хардкор', 'Был на уроке', 'Детали забегов'];
+    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Лого-Шторм (зн/мин)', 'Лого-Шторм (сл/мин)', 'Лого-Шторм (время)', 'Время решения (сек)', 'Время решения', 'Всего ошибок', 'Хардкор', 'Был на уроке', 'Детали забегов'];
     const rows = currentStudents.map((s, idx) => [
       idx + 1,
       `"${s.displayName}"`,
@@ -1703,8 +1742,9 @@ function getAttemptsWord(count: number): string {
       `"${formatTime(s.levels[1]?.timeSpentSec)} / ${s.levels[1]?.errors || 0} ош."`,
       `"${formatTime(s.levels[2]?.timeSpentSec)} / ${s.levels[2]?.errors || 0} ош."`,
       `"${formatTime(s.levels[3]?.timeSpentSec)} / ${s.levels[3]?.errors || 0} ош."`,
-      s.bestSprintTimeSec !== null ? `"${formatTime(s.bestSprintTimeSec)}"` : '"—"',
       s.sprintCpm !== null && s.sprintCpm !== undefined ? s.sprintCpm : '"—"',
+      s.sprintCpm !== null && s.sprintCpm !== undefined ? (s.sprintWpm || Math.round(s.sprintCpm / 5)) : '"—"',
+      s.bestSprintTimeSec !== null ? `"${formatTime(s.bestSprintTimeSec)}"` : '"—"',
       s.totalActiveTimeSec,
       `"${formatTime(s.totalActiveTimeSec)}"`,
       s.totalErrors,
