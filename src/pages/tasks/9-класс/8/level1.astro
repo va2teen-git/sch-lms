@@ -1,0 +1,1151 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h2 class="h4 text-success mb-0">Тренажер: Конструктор и дешифратор табличных моделей (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+                
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 flex-wrap gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация структур: «Объект — Свойство» и «Объект — Объект»</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок / попыток: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Инструкция текущей фазы -->
+                <div id="phase-instruction" class="alert alert-secondary bg-black border-secondary text-light rounded-0 py-2 px-3 mb-3 small">
+                    <!-- Заполняется динамически -->
+                </div>
+
+                <!-- Сообщение о статусе (ошибка/успех) -->
+                <div id="status-alert" class="alert d-none rounded-0 py-2 px-3 mb-3 fw-bold small"></div>
+
+                <!-- РАБОЧАЯ ОБЛАСТЬ ФАЗЫ 1: Сортировка карточек по корзинам -->
+                <div id="phase-1-workspace" class="d-none">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <div id="bin-os" class="card bg-black border-2 border-secondary rounded-0 p-3 h-100" style="min-height: 180px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-1">
+                                    <span class="text-info fw-bold small">ШЛЮЗ [О-С]: «Объект — Свойство»</span>
+                                    <span id="count-os" class="badge bg-secondary text-dark rounded-0">0</span>
+                                </div>
+                                <div class="text-muted small mb-2" style="font-size: 0.75rem;">Таблицы характеристик независимых объектов (строка = объект, столбцы = свойства)</div>
+                                <div id="items-os" class="d-flex flex-column gap-2" style="min-height: 80px;"></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div id="bin-oo" class="card bg-black border-2 border-secondary rounded-0 p-3 h-100" style="min-height: 180px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-1">
+                                    <span class="text-warning fw-bold small">ШЛЮЗ [О-О]: «Объект — Объект»</span>
+                                    <span id="count-oo" class="badge bg-secondary text-dark rounded-0">0</span>
+                                </div>
+                                <div class="text-muted small mb-2" style="font-size: 0.75rem;">Таблицы взаимосвязей и отношений между парами объектов (матрицы, турниры, расстояния)</div>
+                                <div id="items-oo" class="d-flex flex-column gap-2" style="min-height: 80px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-light small fw-bold">Входящий буфер табличных моделей (перетащите в шлюз или кликните):</span>
+                            <span id="pool-count" class="badge bg-dark border border-secondary text-light rounded-0">Осталось: 5</span>
+                        </div>
+                        <div id="cards-pool" class="d-flex flex-wrap gap-2" style="min-height: 70px;">
+                            <!-- Карточки генерируются процедурно -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- РАБОЧАЯ ОБЛАСТЬ ФАЗЫ 2: Прямая манипуляция матрицей смежности графа -->
+                <div id="phase-2-workspace" class="d-none">
+                    <div class="row g-3 align-items-start mb-3">
+                        <!-- Визуализация графа (SVG) -->
+                        <div class="col-12 col-lg-5">
+                            <div class="card bg-black border-secondary rounded-0 p-3 text-center">
+                                <div class="text-info fw-bold small mb-2">СХЕМА НЕОРИЕНТИРОВАННОГО ГРАФА СВЯЗЕЙ</div>
+                                <div class="d-flex justify-content-center align-items-center" style="min-height: 220px;">
+                                    <svg id="graph-svg" viewBox="0 0 320 220" class="w-100" style="max-height: 230px;"></svg>
+                                </div>
+                                <div class="text-secondary small mt-2" style="font-size: 0.75rem;">
+                                    Вершины: A, B, C, D. Ребра неориентированные (двусторонние). Петель нет.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Интерактивная матрица смежности -->
+                        <div class="col-12 col-lg-7">
+                            <div class="card bg-black border-success rounded-0 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-success fw-bold small">ДВОИЧНАЯ МАТРИЦА СМЕЖНОСТИ 4×4</span>
+                                    <span class="badge border border-success text-success bg-dark rounded-0 small">Кликом переключайте 0 ↔ 1</span>
+                                </div>
+                                <p class="text-light small mb-3" style="font-size: 0.8rem;">
+                                    Настройте ячейки матрицы в точном соответствии с графом. Помните: граф неориентированный (матрица симметрична относительно диагонали), а на главной диагонали всегда стоят нули (нет петель).
+                                </p>
+                                
+                                <div class="table-responsive d-flex justify-content-center">
+                                    <table id="matrix-table" class="table table-bordered border-secondary text-center align-middle mb-0" style="max-width: 340px;">
+                                        <thead>
+                                            <tr class="text-info">
+                                                <th class="bg-dark text-secondary p-2" style="width: 52px;">#</th>
+                                                <th class="bg-dark text-info p-2" style="width: 52px;">A</th>
+                                                <th class="bg-dark text-info p-2" style="width: 52px;">B</th>
+                                                <th class="bg-dark text-info p-2" style="width: 52px;">C</th>
+                                                <th class="bg-dark text-info p-2" style="width: 52px;">D</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="matrix-tbody">
+                                            <!-- Сетка 4x4 генерируется динамически -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- РАБОЧАЯ ОБЛАСТЬ ФАЗЫ 3: Слот-пазл синтеза весовой матрицы -->
+                <div id="phase-3-workspace" class="d-none">
+                    <div class="row g-3 align-items-start mb-3">
+                        <!-- Взвешенный граф (SVG) -->
+                        <div class="col-12 col-lg-5">
+                            <div class="card bg-black border-secondary rounded-0 p-3 text-center">
+                                <div class="text-warning fw-bold small mb-2">ВЗВЕШЕННАЯ СЕТЬ АВТОДОРОГ (ВЕСА В КМ)</div>
+                                <div class="d-flex justify-content-center align-items-center" style="min-height: 220px;">
+                                    <svg id="weighted-graph-svg" viewBox="0 0 320 220" class="w-100" style="max-height: 230px;"></svg>
+                                </div>
+                                <div class="text-secondary small mt-2" style="font-size: 0.75rem;">
+                                    Числа у ребер указывают протяженность дорог между пунктами.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Поврежденная весовая матрица со слотами -->
+                        <div class="col-12 col-lg-7">
+                            <div class="card bg-black border-warning rounded-0 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-warning fw-bold small">ВЕСОВАЯ МАТРИЦА (МАТРИЦА РАССТОЯНИЙ)</span>
+                                    <span class="badge border border-warning text-warning bg-dark rounded-0 small">Слот-пазл // Snap & Drop</span>
+                                </div>
+                                <p class="text-light small mb-3" style="font-size: 0.8rem;">
+                                    В матрице повреждены несколько ячеек. Перетащите токены с весами дорог из нижней палитры в пустые слоты таблицы, соблюдая зеркальную симметрию относительно главной диагонали!
+                                </p>
+
+                                <div class="table-responsive d-flex justify-content-center mb-3">
+                                    <table id="weight-matrix-table" class="table table-bordered border-secondary text-center align-middle mb-0" style="max-width: 360px;">
+                                        <thead>
+                                            <tr class="text-warning">
+                                                <th class="bg-dark text-secondary p-2" style="width: 52px;">км</th>
+                                                <th class="bg-dark text-warning p-2" style="width: 52px;">A</th>
+                                                <th class="bg-dark text-warning p-2" style="width: 52px;">B</th>
+                                                <th class="bg-dark text-warning p-2" style="width: 52px;">C</th>
+                                                <th class="bg-dark text-warning p-2" style="width: 52px;">D</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="weight-matrix-tbody">
+                                            <!-- Генерируется процедурно со слотами -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Палитра числовых токенов -->
+                                <div class="border-top border-secondary pt-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-light small fw-bold">Палитра числовых токенов (с дистракторами):</span>
+                                        <button id="reset-slots-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 py-1 px-2" style="font-size: 0.75rem;">Сбросить слоты</button>
+                                    </div>
+                                    <div id="weight-tokens-palette" class="d-flex flex-wrap gap-2 justify-content-center p-2 bg-dark border border-secondary" style="min-height: 56px;">
+                                        <!-- Токены генерируются процедурно -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Панель управления и проверки -->
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary">
+                    <div class="text-secondary small">
+                        Режим: <span class="text-success">Direct Manipulation // No Multiple Choice</span>
+                    </div>
+                    <button id="verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 fw-bold" style="min-height: 48px; min-width: 160px;">
+                        ПРОВЕРИТЬ ШАГ
+                    </button>
+                </div>
+
+                <!-- Экран завершения уровня -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="display-5 text-success mb-3 fw-bold">МИССИЯ ВЫПОЛНЕНА!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы успешно освоили базовые табличные модели: классификацию структур «Объект — Свойство» и «Объект — Объект», синтез двоичных матриц смежности и калибровку весовых матриц расстояний.
+                    </p>
+                    <div class="badge bg-dark border border-success text-success p-3 fs-6 rounded-0 mb-4">
+                        Телеметрия зафиксирована: action_type = 'level_complete'
+                    </div>
+                    <div>
+                        <button id="continue-btn" type="button" class="btn btn-outline-success btn-lg rounded-0 px-5 py-3 fw-bold" style="min-height: 48px;">
+                            ПЕРЕЙТИ К УРОВНЮ 2 →
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    // --- СОСТОЯНИЕ ТРЕНАЖЕРА ---
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    const startTime = Date.now();
+    let isTransitioning = false;
+
+    // Данные активной фазы
+    let phase1Data = null;
+    let phase2Data = null;
+    let phase3Data = null;
+
+    // Выбранный элемент для клик-делегирования (доступность без drag-and-drop)
+    let selectedElement = null;
+
+    // --- БАЗА ДИДАКТИЧЕСКИХ ДАННЫХ ДЛЯ ФАЗЫ 1 (ОС vs ОО) ---
+    const POOL_OS = [
+        { id: 'os-1', title: 'Каталог видеокарт', desc: 'Модель, Видеопамять, Тактовая частота, Цена', type: 'os' },
+        { id: 'os-2', title: 'Медицинская карта', desc: 'Пациент, Рост, Вес, Группа крови, Давление', type: 'os' },
+        { id: 'os-3', title: 'Спецификация серверов', desc: 'Hostname, IP-адрес, Количество ядер CPU, Объем NVMe', type: 'os' },
+        { id: 'os-4', title: 'Характеристики планет', desc: 'Название, Радиус (км), Масса, Наличие колец', type: 'os' },
+        { id: 'os-5', title: 'Табель сотрудников', desc: 'Табельный номер, ФИО, Должность, Месячный оклад', type: 'os' },
+        { id: 'os-6', title: 'Инвентаризация склада', desc: 'Артикул товара, Наименование, Остаток на складе, Стеллаж', type: 'os' },
+        { id: 'os-7', title: 'Ведомость стипендий', desc: 'Студент, Номер группы, Средний балл, Сумма выплаты', type: 'os' },
+        { id: 'os-8', title: 'Справочник минералов', desc: 'Минерал, Твердость по шкале Мооса, Плотность, Цвет черты', type: 'os' }
+    ];
+
+    const POOL_OO = [
+        { id: 'oo-1', title: 'Матрица связей роутеров', desc: 'Сетевые маршрутизаторы R1..R5 и каналы связи между ними', type: 'oo' },
+        { id: 'oo-2', title: 'Таблица расстояний городов', desc: 'Километраж автодорог между парами населенных пунктов A..F', type: 'oo' },
+        { id: 'oo-3', title: 'Турнирная сетка турнира', desc: 'Счет встреч между парами команд киберспортивной лиги', type: 'oo' },
+        { id: 'oo-4', title: 'Матрица совместимости крови', desc: 'Правила совместимости донора и реципиента по группам крови', type: 'oo' },
+        { id: 'oo-5', title: 'Матрица авиатарифов', desc: 'Стоимость билетов на прямые рейсы между аэропортами', type: 'oo' },
+        { id: 'oo-6', title: 'Таблица факультативов', desc: 'Сетка посещения учащимися специализированных кружков (+ / -)', type: 'oo' },
+        { id: 'oo-7', title: 'Двоичная матрица смежности', desc: 'Наличие оптоволоконного кабеля между узлами дата-центра (0 / 1)', type: 'oo' },
+        { id: 'oo-8', title: 'Таблица торговых пошлин', desc: 'Размер взаимных таможенных тарифов между странами-партнерами', type: 'oo' }
+    ];
+
+    // --- ТЕЛЕМЕТРИЯ ---
+    function sendTelemetry(actionType, isSuccess = false) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        const payload = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 8 :: Табличные модели (Уровень 1)',
+            action_type: actionType,
+            status: isSuccess ? 'completed' : 'in_progress',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: isSuccess,
+            action_log: [{
+                time: new Date().toISOString(),
+                action: actionType,
+                phase: currentPhase
+            }]
+        };
+        try {
+            window.parent.postMessage(payload, '*');
+        } catch (e) {
+            console.warn('Telemetry postMessage error:', e);
+        }
+    }
+
+    // --- СЛУЖЕБНЫЕ УТИЛИТЫ ---
+    function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = a[i];
+            a[i] = a[j];
+            a[j] = tmp;
+        }
+        return a;
+    }
+
+    function showStatus(text, isError = false) {
+        const el = document.getElementById('status-alert');
+        if (!el) return;
+        el.className = isError 
+            ? 'alert alert-danger bg-danger text-white rounded-0 py-2 px-3 mb-3 fw-bold small border-0'
+            : 'alert alert-success bg-success text-dark rounded-0 py-2 px-3 mb-3 fw-bold small border-0';
+        el.textContent = text;
+        el.classList.remove('d-none');
+    }
+
+    function hideStatus() {
+        const el = document.getElementById('status-alert');
+        if (el) el.classList.add('d-none');
+    }
+
+    function triggerFailure(message) {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+        sendTelemetry('hardcore_reset');
+        showStatus('ОШИБКА СИНХРОНИЗАЦИИ: ' + message + ' Генерация нового варианта...', true);
+
+        const verifyBtn = document.getElementById('verify-btn');
+        if (verifyBtn) verifyBtn.disabled = true;
+
+        setTimeout(() => {
+            hideStatus();
+            initPhase(currentPhase);
+            if (verifyBtn) verifyBtn.disabled = false;
+        }, 1300);
+    }
+
+    // ==========================================
+    // ФАЗА 1: РАСПРЕДЕЛЕНИЕ КАРТОЧЕК ПО КОРЗИНАМ
+    // ==========================================
+    function setupPhase1() {
+        document.getElementById('phase-badge').textContent = 'Шаг 1 из 3';
+        document.getElementById('phase-title').textContent = 'Классификация: «Объект — Свойство» vs «Объект — Объект»';
+        document.getElementById('phase-instruction').innerHTML = 
+            '<strong>Задание:</strong> Распределите 5 входящих табличных моделей по функциональным шлюзам. ' +
+            'Перетащите каждую карточку мышью или кликните по ней, а затем по целевому шлюзу.';
+
+        // Процедурный выбор: 2 или 3 ОС и соответственно 3 или 2 ОО
+        const countOS = Math.random() > 0.5 ? 3 : 2;
+        const countOO = 5 - countOS;
+
+        const selOS = shuffle(POOL_OS).slice(0, countOS);
+        const selOO = shuffle(POOL_OO).slice(0, countOO);
+        const cards = shuffle([...selOS, ...selOO]);
+
+        phase1Data = {
+            cards: cards,
+            bins: { os: [], oo: [] }
+        };
+
+        const poolEl = document.getElementById('cards-pool');
+        const itemsOSEl = document.getElementById('items-os');
+        const itemsOOEl = document.getElementById('items-oo');
+        poolEl.innerHTML = '';
+        itemsOSEl.innerHTML = '';
+        itemsOOEl.innerHTML = '';
+
+        updatePhase1Counters();
+
+        cards.forEach(card => {
+            const cardEl = document.createElement('div');
+            cardEl.id = 'card-' + card.id;
+            cardEl.className = 'draggable-card card bg-dark border border-secondary text-light p-2 rounded-0';
+            cardEl.style.minHeight = '48px';
+            cardEl.style.cursor = 'grab';
+            cardEl.draggable = true;
+            cardEl.dataset.cardId = card.id;
+            cardEl.dataset.cardType = card.type;
+
+            cardEl.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold small text-light">${card.title}</span>
+                    <span class="badge bg-black text-secondary border border-secondary rounded-0 px-2 py-1" style="font-size: 0.65rem;">ТАБЛИЦА</span>
+                </div>
+                <div class="text-secondary small mt-1" style="font-size: 0.75rem;">${card.desc}</div>
+            `;
+
+            // D&D события
+            cardEl.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', card.id);
+                cardEl.style.opacity = '0.5';
+            });
+            cardEl.addEventListener('dragend', () => {
+                cardEl.style.opacity = '1';
+            });
+
+            // Клик для выбора без перетаскивания
+            cardEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedElement === cardEl) {
+                    cardEl.classList.remove('border-warning');
+                    cardEl.classList.add('border-secondary');
+                    selectedElement = null;
+                } else {
+                    if (selectedElement) {
+                        selectedElement.classList.remove('border-warning');
+                        selectedElement.classList.add('border-secondary');
+                    }
+                    selectedElement = cardEl;
+                    cardEl.classList.remove('border-secondary');
+                    cardEl.classList.add('border-warning');
+                }
+            });
+
+            poolEl.appendChild(cardEl);
+        });
+
+        setupPhase1DropZones();
+    }
+
+    function setupPhase1DropZones() {
+        const binOS = document.getElementById('bin-os');
+        const binOO = document.getElementById('bin-oo');
+        const poolEl = document.getElementById('cards-pool');
+
+        [
+            { el: binOS, binId: 'os', targetItems: document.getElementById('items-os') },
+            { el: binOO, binId: 'oo', targetItems: document.getElementById('items-oo') }
+        ].forEach(({ el, binId, targetItems }) => {
+            el.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                el.classList.add('border-success');
+            });
+            el.addEventListener('dragleave', () => {
+                el.classList.remove('border-success');
+            });
+            el.addEventListener('drop', (e) => {
+                e.preventDefault();
+                el.classList.remove('border-success');
+                const cardId = e.dataTransfer.getData('text/plain');
+                moveCardToBin(cardId, binId, targetItems);
+            });
+
+            // Клик для переноса выбранного элемента
+            el.addEventListener('click', () => {
+                if (selectedElement && selectedElement.dataset.cardId) {
+                    moveCardToBin(selectedElement.dataset.cardId, binId, targetItems);
+                    selectedElement.classList.remove('border-warning');
+                    selectedElement.classList.add('border-secondary');
+                    selectedElement = null;
+                }
+            });
+        });
+
+        // Возможность вернуть карточку обратно в пул
+        poolEl.addEventListener('dragover', (e) => e.preventDefault());
+        poolEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const cardId = e.dataTransfer.getData('text/plain');
+            moveCardToPool(cardId);
+        });
+        poolEl.addEventListener('click', () => {
+            if (selectedElement && selectedElement.dataset.cardId) {
+                moveCardToPool(selectedElement.dataset.cardId);
+                selectedElement.classList.remove('border-warning');
+                selectedElement.classList.add('border-secondary');
+                selectedElement = null;
+            }
+        });
+    }
+
+    function moveCardToBin(cardId, targetBinId, containerEl) {
+        const cardEl = document.getElementById('card-' + cardId);
+        if (!cardEl) return;
+
+        // Удаляем из всех списков
+        phase1Data.bins.os = phase1Data.bins.os.filter(id => id !== cardId);
+        phase1Data.bins.oo = phase1Data.bins.oo.filter(id => id !== cardId);
+
+        // Добавляем в целевую корзину
+        phase1Data.bins[targetBinId].push(cardId);
+        containerEl.appendChild(cardEl);
+
+        cardEl.className = 'draggable-card card bg-black border ' + 
+            (targetBinId === 'os' ? 'border-info' : 'border-warning') + ' text-light p-2 rounded-0';
+
+        updatePhase1Counters();
+    }
+
+    function moveCardToPool(cardId) {
+        const cardEl = document.getElementById('card-' + cardId);
+        if (!cardEl) return;
+
+        phase1Data.bins.os = phase1Data.bins.os.filter(id => id !== cardId);
+        phase1Data.bins.oo = phase1Data.bins.oo.filter(id => id !== cardId);
+
+        document.getElementById('cards-pool').appendChild(cardEl);
+        cardEl.className = 'draggable-card card bg-dark border border-secondary text-light p-2 rounded-0';
+
+        updatePhase1Counters();
+    }
+
+    function updatePhase1Counters() {
+        document.getElementById('count-os').textContent = phase1Data.bins.os.length;
+        document.getElementById('count-oo').textContent = phase1Data.bins.oo.length;
+        const remaining = phase1Data.cards.length - phase1Data.bins.os.length - phase1Data.bins.oo.length;
+        document.getElementById('pool-count').textContent = 'Осталось: ' + remaining;
+    }
+
+    function verifyPhase1() {
+        const totalPlaced = phase1Data.bins.os.length + phase1Data.bins.oo.length;
+        if (totalPlaced < phase1Data.cards.length) {
+            triggerFailure('Не все карточки распределены по шлюзам.');
+            return;
+        }
+
+        let hasError = false;
+        // Проверяем корзину ОС
+        for (const id of phase1Data.bins.os) {
+            const item = phase1Data.cards.find(c => c.id === id);
+            if (item && item.type !== 'os') {
+                hasError = true;
+                break;
+            }
+        }
+        // Проверяем корзину ОО
+        if (!hasError) {
+            for (const id of phase1Data.bins.oo) {
+                const item = phase1Data.cards.find(c => c.id === id);
+                if (item && item.type !== 'oo') {
+                    hasError = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasError) {
+            triggerFailure('Обнаружено ошибочное распределение модели. Проверьте различие между свойствами объектов и взаимными отношениями.');
+        } else {
+            showStatus('ШАГ 1 ВЫПОЛНЕН! Классификация структур таблиц проведена безупречно.', false);
+            setTimeout(() => {
+                hideStatus();
+                currentPhase = 2;
+                sendTelemetry('in_progress');
+                initPhase(2);
+            }, 1000);
+        }
+    }
+
+    // ==========================================
+    // ФАЗА 2: ДВОИЧНАЯ МАТРИЦА СМЕЖНОСТИ ГРАФА
+    // ==========================================
+    function setupPhase2() {
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+        document.getElementById('phase-title').textContent = 'Прямая манипуляция: Матрица смежности графа 4×4';
+        document.getElementById('phase-instruction').innerHTML = 
+            '<strong>Задание:</strong> Исследуйте схему графа слева. Кликами по ячейкам таблицы справа ' +
+            'настройте двоичную матрицу смежности (<code>1</code> — ребро есть, <code>0</code> — ребра нет). ' +
+            'Помните о законе симметрии и отсутствии петель на главной диагонали!';
+
+        // Генерируем случайный связный граф из 4 вершин (A, B, C, D)
+        // Вершины: 0: A, 1: B, 2: C, 3: D
+        const possibleEdges = [
+            [0, 1], [0, 2], [0, 3],
+            [1, 2], [1, 3],
+            [2, 3]
+        ];
+
+        // Случайно выбираем от 3 до 5 ребер
+        let edges = [];
+        do {
+            const shuffledEdges = shuffle(possibleEdges);
+            const edgeCount = 3 + Math.floor(Math.random() * 3); // 3, 4 или 5
+            edges = shuffledEdges.slice(0, edgeCount);
+        } while (!isGraphConnected(edges, 4));
+
+        // Матрица 4x4
+        const targetMatrix = [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ];
+        edges.forEach(([u, v]) => {
+            targetMatrix[u][v] = 1;
+            targetMatrix[v][u] = 1;
+        });
+
+        // Пользовательская матрица (по умолчанию все 0)
+        const userMatrix = [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ];
+
+        phase2Data = {
+            edges: edges,
+            targetMatrix: targetMatrix,
+            userMatrix: userMatrix
+        };
+
+        renderPhase2Graph(edges);
+        renderPhase2Matrix();
+    }
+
+    function isGraphConnected(edges, n) {
+        const adj = Array.from({ length: n }, () => []);
+        edges.forEach(([u, v]) => {
+            adj[u].push(v);
+            adj[v].push(u);
+        });
+        const visited = new Array(n).fill(false);
+        function dfs(node) {
+            visited[node] = true;
+            adj[node].forEach(neighbor => {
+                if (!visited[neighbor]) dfs(neighbor);
+            });
+        }
+        dfs(0);
+        return visited.every(v => v === true);
+    }
+
+    function renderPhase2Graph(edges) {
+        const svg = document.getElementById('graph-svg');
+        svg.innerHTML = '';
+
+        // Координаты вершин (ромб)
+        const coords = [
+            { x: 160, y: 35, label: 'A' },   // 0: A (верх)
+            { x: 50,  y: 110, label: 'B' },  // 1: B (лево)
+            { x: 270, y: 110, label: 'C' },  // 2: C (право)
+            { x: 160, y: 185, label: 'D' }   // 3: D (низ)
+        ];
+
+        // Отрисовка ребер
+        edges.forEach(([u, v]) => {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', coords[u].x);
+            line.setAttribute('y1', coords[u].y);
+            line.setAttribute('x2', coords[v].x);
+            line.setAttribute('y2', coords[v].y);
+            line.setAttribute('stroke', '#0dcaf0');
+            line.setAttribute('stroke-width', '3');
+            svg.appendChild(line);
+        });
+
+        // Отрисовка вершин (круги и буквы)
+        coords.forEach(pt => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', pt.x);
+            circle.setAttribute('cy', pt.y);
+            circle.setAttribute('r', '20');
+            circle.setAttribute('fill', '#000000');
+            circle.setAttribute('stroke', '#198754');
+            circle.setAttribute('stroke-width', '3');
+            svg.appendChild(circle);
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', pt.x);
+            text.setAttribute('y', pt.y + 6);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', '#ffffff');
+            text.setAttribute('font-family', 'monospace');
+            text.setAttribute('font-weight', 'bold');
+            text.setAttribute('font-size', '16');
+            text.textContent = pt.label;
+            svg.appendChild(text);
+        });
+    }
+
+    function renderPhase2Matrix() {
+        const tbody = document.getElementById('matrix-tbody');
+        tbody.innerHTML = '';
+        const labels = ['A', 'B', 'C', 'D'];
+
+        for (let r = 0; r < 4; r++) {
+            const tr = document.createElement('tr');
+            
+            // Заголовок строки
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-info p-2';
+            th.textContent = labels[r];
+            tr.appendChild(th);
+
+            for (let c = 0; c < 4; c++) {
+                const td = document.createElement('td');
+                td.className = 'p-1';
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn rounded-0 fw-bold w-100 p-0 d-flex justify-content-center align-items-center matrix-cell';
+                btn.style.minWidth = '48px';
+                btn.style.minHeight = '48px';
+                btn.style.fontSize = '1.15rem';
+                btn.dataset.row = r;
+                btn.dataset.col = c;
+
+                if (r === c) {
+                    // Главная диагональ: петли отсутствуют, кнопка заблокирована
+                    btn.textContent = '0';
+                    btn.className += ' btn-dark text-secondary border border-secondary disabled';
+                    btn.style.opacity = '0.5';
+                    btn.disabled = true;
+                    btn.title = 'Главная диагональ (петель нет)';
+                } else {
+                    const val = phase2Data.userMatrix[r][c];
+                    btn.textContent = val;
+                    if (val === 1) {
+                        btn.className += ' btn-success text-dark border-success';
+                    } else {
+                        btn.className += ' btn-dark text-secondary border-secondary';
+                    }
+
+                    // Переключение 0 ↔ 1 по клику
+                    btn.addEventListener('click', () => {
+                        const newVal = phase2Data.userMatrix[r][c] === 1 ? 0 : 1;
+                        phase2Data.userMatrix[r][c] = newVal;
+                        btn.textContent = newVal;
+                        if (newVal === 1) {
+                            btn.classList.remove('btn-dark', 'text-secondary', 'border-secondary');
+                            btn.classList.add('btn-success', 'text-dark', 'border-success');
+                        } else {
+                            btn.classList.remove('btn-success', 'text-dark', 'border-success');
+                            btn.classList.add('btn-dark', 'text-secondary', 'border-secondary');
+                        }
+                    });
+                }
+
+                td.appendChild(btn);
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+    }
+
+    function verifyPhase2() {
+        let hasError = false;
+        let isAsymmetric = false;
+
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                if (phase2Data.userMatrix[r][c] !== phase2Data.targetMatrix[r][c]) {
+                    hasError = true;
+                }
+                if (phase2Data.userMatrix[r][c] !== phase2Data.userMatrix[c][r]) {
+                    isAsymmetric = true;
+                }
+            }
+        }
+
+        if (isAsymmetric) {
+            triggerFailure('Нарушена зеркальная симметрия матрицы! Для неориентированного графа ячейка (i, j) обязана равняться ячейке (j, i).');
+            return;
+        }
+
+        if (hasError) {
+            triggerFailure('Значения в матрице смежности не совпадают с ребрами графа. Проверьте соответствие ребер единицам.');
+            return;
+        }
+
+        showStatus('ШАГ 2 ВЫПОЛНЕН! Двоичная матрица смежности настроена безошибочно.', false);
+        setTimeout(() => {
+            hideStatus();
+            currentPhase = 3;
+            sendTelemetry('in_progress');
+            initPhase(3);
+        }, 1000);
+    }
+
+    // ==========================================
+    // ФАЗА 3: СЛОТ-ПАЗЛ ВЕСОВОЙ МАТРИЦЫ ДОРОГ
+    // ==========================================
+    function setupPhase3() {
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+        document.getElementById('phase-title').textContent = 'Слот-пазл: Восстановление весовой матрицы расстояний';
+        document.getElementById('phase-instruction').innerHTML = 
+            '<strong>Задание:</strong> В весовой матрице повреждены 4 симметричные ячейки. ' +
+            'Изучите схему сети автодорог с длинами в километрах. Перетащите числовые токены с весами дорог ' +
+            'в соответствующие пустые слоты матрицы, помня о законе зеркальной симметрии!';
+
+        // 4 вершины: A (0), B (1), C (2), D (3)
+        // Создаем взвешенный граф дорог
+        const edgesWithWeights = [
+            { u: 0, v: 1, w: 2 + Math.floor(Math.random() * 4) }, // A-B: 2..5
+            { u: 0, v: 2, w: 4 + Math.floor(Math.random() * 5) }, // A-C: 4..8
+            { u: 1, v: 2, w: 1 + Math.floor(Math.random() * 3) }, // B-C: 1..3
+            { u: 1, v: 3, w: 3 + Math.floor(Math.random() * 5) }, // B-D: 3..7
+            { u: 2, v: 3, w: 2 + Math.floor(Math.random() * 4) }  // C-D: 2..5
+        ];
+
+        // Полная целевая матрица весов (null если нет дороги)
+        const fullWeightMatrix = [
+            [null, null, null, null],
+            [null, null, null, null],
+            [null, null, null, null],
+            [null, null, null, null]
+        ];
+
+        edgesWithWeights.forEach(e => {
+            fullWeightMatrix[e.u][e.v] = e.w;
+            fullWeightMatrix[e.v][e.u] = e.w;
+        });
+
+        // Выбираем 2 ребра для маскирования под слоты: например A-B и C-D
+        // Это даст ровно 4 слота: (0,1), (1,0) и (2,3), (3,2)
+        const slotEdges = [edgesWithWeights[0], edgesWithWeights[4]];
+        const slotKeys = new Set();
+        slotEdges.forEach(e => {
+            slotKeys.add(`${e.u}-${e.v}`);
+            slotKeys.add(`${e.v}-${e.u}`);
+        });
+
+        // Токены в палитре: нужные веса + 3 дистрактора
+        const requiredWeights = [slotEdges[0].w, slotEdges[0].w, slotEdges[1].w, slotEdges[1].w];
+        const distractorWeights = [];
+        while (distractorWeights.length < 3) {
+            const d = 1 + Math.floor(Math.random() * 9);
+            if (!requiredWeights.includes(d) && !distractorWeights.includes(d)) {
+                distractorWeights.push(d);
+            }
+        }
+        const allTokens = shuffle([...requiredWeights, ...distractorWeights]).map((w, idx) => ({
+            id: 'tok-' + idx,
+            val: w
+        }));
+
+        phase3Data = {
+            edges: edgesWithWeights,
+            fullMatrix: fullWeightMatrix,
+            slotKeys: slotKeys,
+            slotsState: {}, // key: 'r-c' -> tokenVal
+            tokens: allTokens
+        };
+
+        renderPhase3Graph(edgesWithWeights);
+        renderPhase3Matrix();
+        renderPhase3Tokens();
+    }
+
+    function renderPhase3Graph(edges) {
+        const svg = document.getElementById('weighted-graph-svg');
+        svg.innerHTML = '';
+
+        const coords = [
+            { x: 50,  y: 45,  label: 'A' },
+            { x: 270, y: 45,  label: 'B' },
+            { x: 50,  y: 175, label: 'C' },
+            { x: 270, y: 175, label: 'D' }
+        ];
+
+        // Отрисовка ребер с бейджами весов
+        edges.forEach(e => {
+            const uPt = coords[e.u];
+            const vPt = coords[e.v];
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', uPt.x);
+            line.setAttribute('y1', uPt.y);
+            line.setAttribute('x2', vPt.x);
+            line.setAttribute('y2', vPt.y);
+            line.setAttribute('stroke', '#ffc107');
+            line.setAttribute('stroke-width', '2.5');
+            svg.appendChild(line);
+
+            // Бейдж веса в центре ребра
+            const midX = (uPt.x + vPt.x) / 2;
+            const midY = (uPt.y + vPt.y) / 2;
+
+            // Смещение для диагонального ребра B-C
+            const offsetX = (e.u === 1 && e.v === 2) ? 14 : 0;
+            const offsetY = (e.u === 1 && e.v === 2) ? -10 : 0;
+
+            const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bgRect.setAttribute('x', midX - 12 + offsetX);
+            bgRect.setAttribute('y', midY - 10 + offsetY);
+            bgRect.setAttribute('width', '24');
+            bgRect.setAttribute('height', '20');
+            bgRect.setAttribute('fill', '#000000');
+            bgRect.setAttribute('stroke', '#ffc107');
+            bgRect.setAttribute('stroke-width', '1.5');
+            svg.appendChild(bgRect);
+
+            const weightText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            weightText.setAttribute('x', midX + offsetX);
+            weightText.setAttribute('y', midY + 4 + offsetY);
+            weightText.setAttribute('text-anchor', 'middle');
+            weightText.setAttribute('fill', '#ffc107');
+            weightText.setAttribute('font-family', 'monospace');
+            weightText.setAttribute('font-weight', 'bold');
+            weightText.setAttribute('font-size', '13');
+            weightText.textContent = e.w;
+            svg.appendChild(weightText);
+        });
+
+        // Вершины
+        coords.forEach(pt => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', pt.x);
+            circle.setAttribute('cy', pt.y);
+            circle.setAttribute('r', '18');
+            circle.setAttribute('fill', '#000000');
+            circle.setAttribute('stroke', '#198754');
+            circle.setAttribute('stroke-width', '2.5');
+            svg.appendChild(circle);
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', pt.x);
+            text.setAttribute('y', pt.y + 5);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', '#ffffff');
+            text.setAttribute('font-family', 'monospace');
+            text.setAttribute('font-weight', 'bold');
+            text.setAttribute('font-size', '15');
+            text.textContent = pt.label;
+            svg.appendChild(text);
+        });
+    }
+
+    function renderPhase3Matrix() {
+        const tbody = document.getElementById('weight-matrix-tbody');
+        tbody.innerHTML = '';
+        const labels = ['A', 'B', 'C', 'D'];
+
+        for (let r = 0; r < 4; r++) {
+            const tr = document.createElement('tr');
+            
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-warning p-2';
+            th.textContent = labels[r];
+            tr.appendChild(th);
+
+            for (let c = 0; c < 4; c++) {
+                const td = document.createElement('td');
+                td.className = 'p-1';
+
+                const key = `${r}-${c}`;
+                const val = phase3Data.fullMatrix[r][c];
+
+                if (r === c) {
+                    // Главная диагональ пустая
+                    td.className += ' bg-dark text-secondary';
+                    td.innerHTML = '<span class="text-secondary small">—</span>';
+                } else if (phase3Data.slotKeys.has(key)) {
+                    // Слот для подстановки токена
+                    const slotDiv = document.createElement('div');
+                    slotDiv.id = 'slot-' + key;
+                    slotDiv.className = 'matrix-slot border-2 border-dashed border-warning bg-black text-warning fw-bold d-flex justify-content-center align-items-center rounded-0';
+                    slotDiv.style.minWidth = '48px';
+                    slotDiv.style.minHeight = '48px';
+                    slotDiv.style.cursor = 'pointer';
+                    slotDiv.dataset.slotKey = key;
+
+                    const curVal = phase3Data.slotsState[key];
+                    if (curVal !== undefined && curVal !== null) {
+                        slotDiv.textContent = curVal;
+                        slotDiv.classList.remove('border-dashed');
+                        slotDiv.classList.add('bg-warning', 'text-dark', 'border-solid');
+                    } else {
+                        slotDiv.innerHTML = '<span class="text-warning small" style="font-size: 0.7rem;">СЛОТ</span>';
+                    }
+
+                    // D&D
+                    slotDiv.addEventListener('dragover', (e) => e.preventDefault());
+                    slotDiv.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const tokenVal = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        const tokenId = e.dataTransfer.getData('token-id');
+                        placeTokenInSlot(key, tokenVal, tokenId);
+                    });
+
+                    // Клик
+                    slotDiv.addEventListener('click', () => {
+                        if (selectedElement && selectedElement.dataset.tokenVal) {
+                            const val = parseInt(selectedElement.dataset.tokenVal, 10);
+                            const id = selectedElement.dataset.tokenId;
+                            placeTokenInSlot(key, val, id);
+                            selectedElement.classList.remove('border-white');
+                            selectedElement = null;
+                        } else if (phase3Data.slotsState[key] !== undefined) {
+                            // Очистить слот кликом по нему
+                            removeTokenFromSlot(key);
+                        }
+                    });
+
+                    td.appendChild(slotDiv);
+                } else if (val !== null) {
+                    // Заранее известное числовое значение
+                    td.className += ' bg-black text-light fw-bold';
+                    td.textContent = val;
+                } else {
+                    // Дороги нет (пусто)
+                    td.className += ' bg-black text-muted';
+                    td.innerHTML = '<span class="text-secondary small">·</span>';
+                }
+
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+    }
+
+    function renderPhase3Tokens() {
+        const palette = document.getElementById('weight-tokens-palette');
+        palette.innerHTML = '';
+
+        phase3Data.tokens.forEach(tok => {
+            const btn = document.createElement('div');
+            btn.id = tok.id;
+            btn.className = 'token-chip btn btn-warning text-dark fw-bold rounded-0 d-flex justify-content-center align-items-center';
+            btn.style.minWidth = '48px';
+            btn.style.minHeight = '48px';
+            btn.style.fontSize = '1.1rem';
+            btn.style.cursor = 'grab';
+            btn.draggable = true;
+            btn.textContent = tok.val;
+            btn.dataset.tokenVal = tok.val;
+            btn.dataset.tokenId = tok.id;
+
+            btn.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', tok.val);
+                e.dataTransfer.setData('token-id', tok.id);
+            });
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedElement === btn) {
+                    btn.classList.remove('border-white', 'border-2');
+                    selectedElement = null;
+                } else {
+                    if (selectedElement) {
+                        selectedElement.classList.remove('border-white', 'border-2');
+                    }
+                    selectedElement = btn;
+                    btn.classList.add('border-white', 'border-2');
+                }
+            });
+
+            palette.appendChild(btn);
+        });
+
+        // Кнопка сброса всех слотов
+        const resetBtn = document.getElementById('reset-slots-btn');
+        if (resetBtn) {
+            resetBtn.onclick = () => {
+                phase3Data.slotsState = {};
+                renderPhase3Matrix();
+            };
+        }
+    }
+
+    function placeTokenInSlot(slotKey, tokenVal, tokenId) {
+        phase3Data.slotsState[slotKey] = tokenVal;
+        renderPhase3Matrix();
+    }
+
+    function removeTokenFromSlot(slotKey) {
+        delete phase3Data.slotsState[slotKey];
+        renderPhase3Matrix();
+    }
+
+    function verifyPhase3() {
+        const expectedSlotCount = phase3Data.slotKeys.size;
+        const filledKeys = Object.keys(phase3Data.slotsState);
+
+        if (filledKeys.length < expectedSlotCount) {
+            triggerFailure('Заполнены не все поврежденные слоты весовой матрицы.');
+            return;
+        }
+
+        let hasError = false;
+        let isAsymmetric = false;
+
+        for (const key of phase3Data.slotKeys) {
+            const [r, c] = key.split('-').map(Number);
+            const userVal = phase3Data.slotsState[key];
+            const targetVal = phase3Data.fullMatrix[r][c];
+
+            if (userVal !== targetVal) {
+                hasError = true;
+            }
+
+            // Проверка симметрии слота с зеркальным
+            const mirrorKey = `${c}-${r}`;
+            if (phase3Data.slotsState[mirrorKey] !== userVal) {
+                isAsymmetric = true;
+            }
+        }
+
+        if (isAsymmetric) {
+            triggerFailure('Нарушена симметрия весовой матрицы! Расстояние от A до B обязано равняться расстоянию от B до A.');
+            return;
+        }
+
+        if (hasError) {
+            triggerFailure('Один или несколько весов дорог расставлены неверно относительно схемы графа.');
+            return;
+        }
+
+        // Финал уровня!
+        finishLevel();
+    }
+
+    // ==========================================
+    // ФИНАЛ УРОВНЯ
+    // ==========================================
+    function finishLevel() {
+        document.getElementById('phase-1-workspace').classList.add('d-none');
+        document.getElementById('phase-2-workspace').classList.add('d-none');
+        document.getElementById('phase-3-workspace').classList.add('d-none');
+        document.getElementById('verify-btn').classList.add('d-none');
+        document.getElementById('phase-instruction').classList.add('d-none');
+
+        document.getElementById('phase-badge').textContent = 'Успешно';
+        document.getElementById('phase-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
+        document.getElementById('phase-title').textContent = 'Курс манипуляции табличными структурами завершен';
+
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        sendTelemetry('level_complete', true);
+
+        const continueBtn = document.getElementById('continue-btn');
+        if (continueBtn) {
+            continueBtn.addEventListener('click', () => {
+                window.location.href = '/tasks/9-класс/8/level2';
+            });
+        }
+    }
+
+    // ==========================================
+    // ДИСПЕТЧЕР ФАЗ
+    // ==========================================
+    function initPhase(phase) {
+        document.getElementById('phase-1-workspace').classList.add('d-none');
+        document.getElementById('phase-2-workspace').classList.add('d-none');
+        document.getElementById('phase-3-workspace').classList.add('d-none');
+
+        selectedElement = null;
+
+        if (phase === 1) {
+            document.getElementById('phase-1-workspace').classList.remove('d-none');
+            setupPhase1();
+        } else if (phase === 2) {
+            document.getElementById('phase-2-workspace').classList.remove('d-none');
+            setupPhase2();
+        } else if (phase === 3) {
+            document.getElementById('phase-3-workspace').classList.remove('d-none');
+            setupPhase3();
+        }
+    }
+
+    // Главная кнопка проверки
+    document.getElementById('verify-btn').addEventListener('click', () => {
+        if (currentPhase === 1) {
+            verifyPhase1();
+        } else if (currentPhase === 2) {
+            verifyPhase2();
+        } else if (currentPhase === 3) {
+            verifyPhase3();
+        }
+    });
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', () => {
+        sendTelemetry('in_progress');
+        initPhase(1);
+    });
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        sendTelemetry('in_progress');
+        initPhase(1);
+    }
+})();
+</script>
