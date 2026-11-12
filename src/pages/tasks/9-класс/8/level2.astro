@@ -1,0 +1,846 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический расчет табличных моделей (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Sawtooth 2-1-2</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок шага и счетчик попыток -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 flex-wrap gap-2">
+                    <div>
+                        <span id="level-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="level-title" class="text-light fw-bold fs-6">Расчет числа ребер графа по матрице смежности</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибок: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Сообщение о статусе (ошибка/успех) -->
+                <div id="status-alert" class="alert d-none rounded-0 py-2 px-3 mb-3 fw-bold small border-0"></div>
+
+                <!-- ======================================================== -->
+                <!-- ФАЗА 1: Прямой расчет (CCS = 4)                           -->
+                <!-- ======================================================== -->
+                <div id="phase1" class="phase-container">
+                    <h5 class="text-warning mb-2">Шаг 1: Подсчет количества дорог (ребер) в неориентированной сети</h5>
+                    <p class="text-light small mb-3">
+                        В центре управления связью получена двоичная матрица смежности для 5 сетевых узлов (A, B, C, D, E). 
+                        Связи являются двусторонними (неориентированными), петли отсутствуют.
+                    </p>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="table-responsive d-flex justify-content-center mb-2">
+                            <table class="table table-bordered border-secondary table-dark text-center align-middle mb-0" style="max-width: 320px;">
+                                <thead>
+                                    <tr class="text-info">
+                                        <th class="bg-dark text-secondary p-2" style="width: 48px;">#</th>
+                                        <th class="bg-dark text-info p-2" style="width: 48px;">A</th>
+                                        <th class="bg-dark text-info p-2" style="width: 48px;">B</th>
+                                        <th class="bg-dark text-info p-2" style="width: 48px;">C</th>
+                                        <th class="bg-dark text-info p-2" style="width: 48px;">D</th>
+                                        <th class="bg-dark text-info p-2" style="width: 48px;">E</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p1-matrix-tbody">
+                                    <!-- Генерируется процедурно -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-muted small text-center" style="font-size: 0.75rem;">
+                            В ячейках: 1 — наличие прямого канала связи, 0 — отсутствие.
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <label for="p1-input" class="form-label text-warning fw-bold small mb-2">
+                            Определите общее количество дорог (ребер) в данной сети:
+                        </label>
+                        <div class="input-group" style="max-width: 480px;">
+                            <input type="number" id="p1-input" class="form-control rounded-0 font-monospace bg-dark text-warning border-secondary" placeholder="Введите число..." style="min-height: 48px;" autocomplete="off" />
+                            <button id="p1-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">
+                                ПРОВЕРИТЬ
+                            </button>
+                        </div>
+                        <div class="text-secondary small mt-2" style="font-size: 0.75rem;">
+                            Подсказка: в неориентированном графе каждое ребро учитывается в таблице дважды (симметрично относительно главной диагонали).
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- ФАЗА 2: Многошаговый расчет кратчайшего пути (CCS = 6)   -->
+                <!-- ======================================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 2: Поиск кратчайшего пути по весовой матрице (ОГЭ Задание 4)</h5>
+                    <p class="text-light small mb-3">
+                        Дана весовая матрица расстояний между пунктами A, B, C, D (в километрах). 
+                        Пустые ячейки означают отсутствие прямого сообщения. Движение возможно в обоих направлениях.
+                    </p>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="table-responsive d-flex justify-content-center mb-2">
+                            <table class="table table-bordered border-secondary table-dark text-center align-middle mb-0" style="max-width: 320px;">
+                                <thead>
+                                    <tr class="text-warning">
+                                        <th class="bg-dark text-secondary p-2" style="width: 52px;">км</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">A</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">B</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">C</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">D</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p2-matrix-tbody">
+                                    <!-- Генерируется процедурно -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-muted small text-center" style="font-size: 0.75rem;">
+                            Проанализируйте все возможные маршруты из начального пункта A в конечный пункт D.
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-warning fw-bold small mb-2">
+                            Определите протяженность кратчайшего пути между пунктами A и D (в км):
+                        </label>
+                        <div class="input-group" style="max-width: 480px;">
+                            <input type="number" id="p2-input" class="form-control rounded-0 font-monospace bg-dark text-warning border-secondary" placeholder="Введите длину пути в км..." style="min-height: 48px;" autocomplete="off" />
+                            <button id="p2-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">
+                                ПРОВЕРИТЬ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- ФАЗА 3: ПИК 1 — Инверсия / Восстановление веса X (CCS = 7-8) -->
+                <!-- ======================================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 3: Обратная задача — Восстановление скрытой переменной X</h5>
+                    <p class="text-light small mb-3">
+                        В приведенной таблице расстояний автодорог протяженность участка между пунктами A и B повреждена и обозначена переменной <strong class="text-warning">X</strong>.
+                    </p>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="table-responsive d-flex justify-content-center mb-2">
+                            <table class="table table-bordered border-secondary table-dark text-center align-middle mb-0" style="max-width: 320px;">
+                                <thead>
+                                    <tr class="text-warning">
+                                        <th class="bg-dark text-secondary p-2" style="width: 52px;">км</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">A</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">B</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">C</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">D</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p3-matrix-tbody">
+                                    <!-- Генерируется процедурно с X -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="p3-condition-text" class="text-info small text-center fw-bold">
+                            <!-- Подставляется динамически -->
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-warning fw-bold small mb-2">
+                            Вычислите значение переменной X (длину дороги между пунктами A и B):
+                        </label>
+                        <div class="input-group" style="max-width: 480px;">
+                            <input type="number" id="p3-input" class="form-control rounded-0 font-monospace bg-dark text-warning border-secondary" placeholder="Введите целое число X..." style="min-height: 48px;" autocomplete="off" />
+                            <button id="p3-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">
+                                ПРОВЕРИТЬ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- ФАЗА 4: Долина консолидации / Логический запрос (CCS = 5-6) -->
+                <!-- ======================================================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 4: Логический анализ реляционной таблицы «Объект — Свойство»</h5>
+                    <p class="text-light small mb-3">
+                        Администратор базы данных выполняет аудит серверного парка ЦОД. Ниже представлена таблица характеристик серверов.
+                    </p>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="table-responsive mb-2">
+                            <table class="table table-bordered border-secondary table-dark text-center align-middle mb-0" style="font-size: 0.8rem;">
+                                <thead>
+                                    <tr class="text-info">
+                                        <th class="bg-dark text-secondary">ID Сервера</th>
+                                        <th class="bg-dark text-info">Ядра CPU</th>
+                                        <th class="bg-dark text-info">RAM (ГБ)</th>
+                                        <th class="bg-dark text-info">Тип накопителя</th>
+                                        <th class="bg-dark text-info">Архитектура</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p4-table-tbody">
+                                    <!-- Генерируется процедурно -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="p4-condition-box" class="p-2 bg-dark border border-info text-info small fw-bold text-center">
+                            <!-- Логическое условие -->
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-warning fw-bold small mb-2">
+                            Сколько записей (строк) в таблице удовлетворяют данному логическому условию?
+                        </label>
+                        <div class="input-group" style="max-width: 480px;">
+                            <input type="number" id="p4-input" class="form-control rounded-0 font-monospace bg-dark text-warning border-secondary" placeholder="Введите количество строк..." style="min-height: 48px;" autocomplete="off" />
+                            <button id="p4-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">
+                                ПРОВЕРИТЬ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- ФАЗА 5: Кульминационный пик — ОГЭ Задание 4 с ограничением (CCS = 8-9) -->
+                <!-- ======================================================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <h5 class="text-warning mb-2">Шаг 5: Кратчайший маршрут по матрице 5×5 с обязательным пунктом</h5>
+                    <p class="text-light small mb-3">
+                        В весовой матрице заданы протяженности дорог между 5 населенными пунктами (A, B, C, D, E). 
+                        Движение возможно только по указанным дорогам в обоих направлениях.
+                    </p>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="table-responsive d-flex justify-content-center mb-2">
+                            <table class="table table-bordered border-secondary table-dark text-center align-middle mb-0" style="max-width: 360px;">
+                                <thead>
+                                    <tr class="text-warning">
+                                        <th class="bg-dark text-secondary p-2" style="width: 52px;">км</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">A</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">B</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">C</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">D</th>
+                                        <th class="bg-dark text-warning p-2" style="width: 52px;">E</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p5-matrix-tbody">
+                                    <!-- Генерируется процедурно -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-2 bg-dark border border-warning text-warning small fw-bold text-center">
+                            ГРАНИЧНОЕ УСЛОВИЕ: Маршрут ОБЯЗАН проходить через промежуточный пункт C!
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border-warning rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-warning fw-bold small mb-2">
+                            Найдите длину кратчайшего пути из пункта A в пункт E, проходящего через пункт C (в км):
+                        </label>
+                        <div class="input-group" style="max-width: 480px;">
+                            <input type="number" id="p5-input" class="form-control rounded-0 font-monospace bg-dark text-warning border-secondary" placeholder="Введите длину пути в км..." style="min-height: 48px;" autocomplete="off" />
+                            <button id="p5-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">
+                                ПРОВЕРИТЬ
+                            </button>
+                        </div>
+                        <div class="text-secondary small mt-2" style="font-size: 0.75rem;">
+                            Подсказка: найдите кратчайший путь A → C, затем кратчайший путь C → E, и сложите их протяженности.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- ЭКРАН ПОБЕДЫ УРОВНЯ 2                                     -->
+                <!-- ======================================================== -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="display-5 text-warning mb-3 fw-bold">УРОВЕНЬ 2 ПРОЙДЕН!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы успешно справились со всеми аналитическими расчетами табличных моделей: расчетом топологии графов, поиском оптимальных путей ОГЭ, решением инверсивных уравнений и логической фильтрацией баз данных.
+                    </p>
+                    <div class="badge bg-dark border border-warning text-warning p-3 fs-6 rounded-0 mb-4">
+                        Телеметрия зафиксирована: action_type = 'level_complete'
+                    </div>
+                    <div>
+                        <button id="continue-btn" type="button" class="btn btn-outline-warning btn-lg rounded-0 px-5 py-3 fw-bold" style="min-height: 48px;">
+                            ПЕРЕЙТИ К АРКАДЕ (УРОВЕНЬ 3) →
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    const startTime = Date.now();
+
+    // Данные активных фаз
+    let p1Answer = 0;
+    let p2Answer = 0;
+    let p3Answer = 0;
+    let p4Answer = 0;
+    let p5Answer = 0;
+
+    // --- ТЕЛЕМЕТРИЯ ---
+    function sendTelemetry(actionType, isSuccess = false) {
+        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+        const payload = {
+            type: 'TELEMETRY_EVENT',
+            mission_name: 'Урок 8 :: Табличные модели (Уровень 2)',
+            action_type: actionType,
+            status: isSuccess ? 'completed' : 'in_progress',
+            start_time: new Date(startTime).toISOString(),
+            time_spent_sec: timeSpent,
+            attempts_count: attemptsCount,
+            success: isSuccess,
+            action_log: [{
+                time: new Date().toISOString(),
+                action: actionType,
+                phase: currentPhase
+            }]
+        };
+        try {
+            window.parent.postMessage(payload, '*');
+        } catch (e) {
+            console.warn('Telemetry postMessage error:', e);
+        }
+    }
+
+    // --- УТИЛИТЫ ---
+    function showStatus(text, isError = false) {
+        const el = document.getElementById('status-alert');
+        if (!el) return;
+        el.className = isError 
+            ? 'alert alert-danger bg-danger text-white rounded-0 py-2 px-3 mb-3 fw-bold small border-0'
+            : 'alert alert-success bg-success text-dark rounded-0 py-2 px-3 mb-3 fw-bold small border-0';
+        el.textContent = text;
+        el.classList.remove('d-none');
+    }
+
+    function hideStatus() {
+        const el = document.getElementById('status-alert');
+        if (el) el.classList.add('d-none');
+    }
+
+    function triggerFailure(phaseNum, initFunc, message) {
+        attemptsCount++;
+        document.getElementById('attempts-display').textContent = attemptsCount;
+        sendTelemetry('hardcore_reset');
+        showStatus('ОШИБКА РАСЧЕТА: ' + message + ' Генерация нового варианта...', true);
+
+        const btn = document.getElementById(`p${phaseNum}-btn`);
+        const input = document.getElementById(`p${phaseNum}-input`);
+        if (btn) btn.disabled = true;
+        if (input) input.disabled = true;
+
+        setTimeout(() => {
+            hideStatus();
+            if (btn) btn.disabled = false;
+            if (input) {
+                input.disabled = false;
+                input.value = '';
+                input.focus();
+            }
+            initFunc();
+        }, 1200);
+    }
+
+    function showPhase(phaseNum) {
+        currentPhase = phaseNum;
+        document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
+        const container = document.getElementById(`phase${phaseNum}`);
+        if (container) container.classList.remove('d-none');
+
+        document.getElementById('level-badge').textContent = `Шаг ${phaseNum} из 5`;
+        const titles = [
+            "Расчет числа ребер графа по матрице смежности",
+            "Поиск кратчайшего пути по весовой матрице (ОГЭ Задание 4)",
+            "Обратная задача — Восстановление скрытой переменной X",
+            "Логический анализ реляционной таблицы «Объект — Свойство»",
+            "Кратчайший маршрут по матрице 5×5 с обязательным пунктом"
+        ];
+        document.getElementById('level-title').textContent = titles[phaseNum - 1];
+
+        if (phaseNum === 1) initPhase1();
+        if (phaseNum === 2) initPhase2();
+        if (phaseNum === 3) initPhase3();
+        if (phaseNum === 4) initPhase4();
+        if (phaseNum === 5) initPhase5();
+    }
+
+    // ========================================================
+    // ФАЗА 1: Подсчет ребер неориентированного графа (5x5)
+    // ========================================================
+    function initPhase1() {
+        const n = 5;
+        const labels = ['A', 'B', 'C', 'D', 'E'];
+        const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
+
+        // Все возможные пары ребер (10 пар)
+        const pairs = [];
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) {
+                pairs.push([i, j]);
+            }
+        }
+
+        // Выбираем случайно от 4 до 7 ребер
+        const edgeCount = 4 + Math.floor(Math.random() * 4); // 4..7
+        // Перемешиваем пары
+        for (let i = pairs.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = pairs[i];
+            pairs[i] = pairs[j];
+            pairs[j] = tmp;
+        }
+
+        const selectedEdges = pairs.slice(0, edgeCount);
+        selectedEdges.forEach(([u, v]) => {
+            matrix[u][v] = 1;
+            matrix[v][u] = 1;
+        });
+
+        p1Answer = edgeCount;
+
+        // Рендерим таблицу
+        const tbody = document.getElementById('p1-matrix-tbody');
+        tbody.innerHTML = '';
+        for (let r = 0; r < n; r++) {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-info p-2';
+            th.textContent = labels[r];
+            tr.appendChild(th);
+
+            for (let c = 0; c < n; c++) {
+                const td = document.createElement('td');
+                td.className = 'p-2';
+                if (r === c) {
+                    td.className += ' text-secondary';
+                    td.textContent = '0';
+                } else if (matrix[r][c] === 1) {
+                    td.className += ' text-success fw-bold';
+                    td.textContent = '1';
+                } else {
+                    td.className += ' text-secondary';
+                    td.textContent = '0';
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        const input = document.getElementById('p1-input');
+        if (input) input.value = '';
+    }
+
+    function checkPhase1() {
+        const input = document.getElementById('p1-input');
+        const val = parseInt(input.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerFailure(1, initPhase1, 'Введите целое число.');
+            return;
+        }
+        if (val === p1Answer) {
+            showStatus('ШАГ 1 ВЫПОЛНЕН ВЕРНО! Количество ребер определено безошибочно.', false);
+            setTimeout(() => {
+                hideStatus();
+                sendTelemetry('in_progress');
+                showPhase(2);
+            }, 900);
+        } else {
+            triggerFailure(1, initPhase1, `Неверный ответ (${val}). Сумму единиц таблицы нужно разделить на 2.`);
+        }
+    }
+
+    // ========================================================
+    // ФАЗА 2: Кратчайший путь A → D по матрице 4×4
+    // ========================================================
+    function initPhase2() {
+        const labels = ['A', 'B', 'C', 'D'];
+        // Генерируем веса так, чтобы обходной путь был короче прямого
+        const wAB = 2 + Math.floor(Math.random() * 3); // 2..4
+        const wBC = 1 + Math.floor(Math.random() * 3); // 1..3
+        const wCD = 2 + Math.floor(Math.random() * 3); // 2..4
+        const wBD = 7 + Math.floor(Math.random() * 4); // 7..10
+        const wAC = 6 + Math.floor(Math.random() * 4); // 6..9
+        const wAD = 14 + Math.floor(Math.random() * 4); // 14..17
+
+        const matrix = [
+            [null, wAB, wAC, wAD],
+            [wAB, null, wBC, wBD],
+            [wAC, wBC, null, wCD],
+            [wAD, wBD, wCD, null]
+        ];
+
+        // Пути из A в D:
+        const p_direct = wAD;
+        const p_abd = wAB + wBD;
+        const p_acd = wAC + wCD;
+        const p_abcd = wAB + wBC + wCD;
+
+        p2Answer = Math.min(p_direct, p_abd, p_acd, p_abcd);
+
+        const tbody = document.getElementById('p2-matrix-tbody');
+        tbody.innerHTML = '';
+        for (let r = 0; r < 4; r++) {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-warning p-2';
+            th.textContent = labels[r];
+            tr.appendChild(th);
+
+            for (let c = 0; c < 4; c++) {
+                const td = document.createElement('td');
+                td.className = 'p-2';
+                if (r === c) {
+                    td.className += ' text-secondary';
+                    td.textContent = '—';
+                } else {
+                    const val = matrix[r][c];
+                    td.className += ' text-light fw-bold';
+                    td.textContent = val;
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        const input = document.getElementById('p2-input');
+        if (input) input.value = '';
+    }
+
+    function checkPhase2() {
+        const input = document.getElementById('p2-input');
+        const val = parseInt(input.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerFailure(2, initPhase2, 'Введите длину пути числом.');
+            return;
+        }
+        if (val === p2Answer) {
+            showStatus('ШАГ 2 ВЫПОЛНЕН ВЕРНО! Кратчайший маршрут A → D вычислен корректно.', false);
+            setTimeout(() => {
+                hideStatus();
+                sendTelemetry('in_progress');
+                showPhase(3);
+            }, 900);
+        } else {
+            triggerFailure(2, initPhase2, `Неверный расчет (${val} км). Проверьте альтернативные маршруты A-B-C-D и A-B-D.`);
+        }
+    }
+
+    // ========================================================
+    // ФАЗА 3: ПИК 1 — Инверсия / Восстановление X
+    // ========================================================
+    function initPhase3() {
+        const labels = ['A', 'B', 'C', 'D'];
+        
+        // Ребра:
+        // C-D = wCD
+        // A-C = wAC
+        // Альтернативный путь A -> C -> D = wAC + wCD (например 12..15)
+        const wCD = 3 + Math.floor(Math.random() * 3); // 3..5
+        const wAC = 6 + Math.floor(Math.random() * 4); // 6..9
+        const pathACD = wAC + wCD;
+
+        // B-D = wBD
+        const wBD = 4 + Math.floor(Math.random() * 3); // 4..6
+
+        // Искомый X = A-B
+        const targetX = 2 + Math.floor(Math.random() * 4); // 2..5
+
+        // Полный кратчайший путь L = targetX + wBD. Он строго меньше pathACD!
+        const totalL = targetX + wBD;
+        // Если вдруг totalL >= pathACD, скорректируем wAC
+        let finalAC = wAC;
+        if (totalL >= finalAC + wCD) {
+            finalAC = totalL + 2;
+        }
+
+        p3Answer = targetX;
+
+        // Матрица: A-B = 'X', A-C = finalAC, B-D = wBD, C-D = wCD. Остальные пустые!
+        const matrix = [
+            [null, 'X', finalAC, null],
+            ['X', null, null, wBD],
+            [finalAC, null, null, wCD],
+            [null, wBD, wCD, null]
+        ];
+
+        document.getElementById('p3-condition-text').innerHTML = 
+            `ИЗВЕСТНО: Протяженность кратчайшего пути из пункта A в пункт D равна <span class="badge bg-warning text-dark fs-6">${totalL} км</span>.`;
+
+        const tbody = document.getElementById('p3-matrix-tbody');
+        tbody.innerHTML = '';
+        for (let r = 0; r < 4; r++) {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-warning p-2';
+            th.textContent = labels[r];
+            tr.appendChild(th);
+
+            for (let c = 0; c < 4; c++) {
+                const td = document.createElement('td');
+                td.className = 'p-2';
+                const v = matrix[r][c];
+                if (r === c) {
+                    td.className += ' text-secondary';
+                    td.textContent = '—';
+                } else if (v === 'X') {
+                    td.className += ' text-warning fw-bold fs-5';
+                    td.textContent = 'X';
+                } else if (v !== null) {
+                    td.className += ' text-light fw-bold';
+                    td.textContent = v;
+                } else {
+                    td.className += ' text-secondary';
+                    td.textContent = '·';
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        const input = document.getElementById('p3-input');
+        if (input) input.value = '';
+    }
+
+    function checkPhase3() {
+        const input = document.getElementById('p3-input');
+        const val = parseInt(input.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerFailure(3, initPhase3, 'Введите числовое значение X.');
+            return;
+        }
+        if (val === p3Answer) {
+            showStatus('ШАГ 3 ВЫПОЛНЕН ВЕРНО! Неизвестный параметр X успешно восстановлен.', false);
+            setTimeout(() => {
+                hideStatus();
+                sendTelemetry('in_progress');
+                showPhase(4);
+            }, 900);
+        } else {
+            triggerFailure(3, initPhase3, `Неверное значение X (${val}). Сопоставьте длину кратчайшего пути с цепочкой A-B-D.`);
+        }
+    }
+
+    // ========================================================
+    // ФАЗА 4: Логический запрос к таблице «Объект — Свойство»
+    // ========================================================
+    function initPhase4() {
+        const servers = [
+            { id: 'SRV-01', cpu: 16, ram: 64,  disk: 'NVMe', arch: 'x86' },
+            { id: 'SRV-02', cpu: 8,  ram: 32,  disk: 'SATA', arch: 'ARM' },
+            { id: 'SRV-03', cpu: 32, ram: 128, disk: 'NVMe', arch: 'x86' },
+            { id: 'SRV-04', cpu: 4,  ram: 16,  disk: 'NVMe', arch: 'x86' },
+            { id: 'SRV-05', cpu: 16, ram: 32,  disk: 'SATA', arch: 'ARM' },
+            { id: 'SRV-06', cpu: 8,  ram: 64,  disk: 'NVMe', arch: 'x86' }
+        ];
+
+        // 3 варианта логических запросов
+        const scenarios = [
+            {
+                condText: '(Ядра CPU ≥ 16) И (Тип накопителя = "NVMe")',
+                predicate: (s) => s.cpu >= 16 && s.disk === 'NVMe'
+            },
+            {
+                condText: '(RAM ≥ 64) И НЕ (Архитектура = "ARM")',
+                predicate: (s) => s.ram >= 64 && s.arch !== 'ARM'
+            },
+            {
+                condText: '(Ядра CPU ≥ 8) И (Архитектура = "ARM")',
+                predicate: (s) => s.cpu >= 8 && s.arch === 'ARM'
+            }
+        ];
+
+        const sc = scenarios[Math.floor(Math.random() * scenarios.length)];
+        document.getElementById('p4-condition-box').innerHTML = 
+            `ЛОГИЧЕСКОЕ УСЛОВИЕ ЗАПРОСА: <span class="text-warning">${sc.condText}</span>`;
+
+        p4Answer = servers.filter(sc.predicate).length;
+
+        const tbody = document.getElementById('p4-table-tbody');
+        tbody.innerHTML = '';
+        servers.forEach(s => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-light fw-bold">${s.id}</td>
+                <td class="text-info">${s.cpu}</td>
+                <td class="text-light">${s.ram}</td>
+                <td class="text-${s.disk === 'NVMe' ? 'success' : 'secondary'}">${s.disk}</td>
+                <td class="text-${s.arch === 'x86' ? 'warning' : 'info'}">${s.arch}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const input = document.getElementById('p4-input');
+        if (input) input.value = '';
+    }
+
+    function checkPhase4() {
+        const input = document.getElementById('p4-input');
+        const val = parseInt(input.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerFailure(4, initPhase4, 'Введите целое число строк.');
+            return;
+        }
+        if (val === p4Answer) {
+            showStatus('ШАГ 4 ВЫПОЛНЕН ВЕРНО! Реляционный запрос выполнен безупречно.', false);
+            setTimeout(() => {
+                hideStatus();
+                sendTelemetry('in_progress');
+                showPhase(5);
+            }, 900);
+        } else {
+            triggerFailure(4, initPhase4, `Неверное число строк (${val}). Внимательно проверьте выполнение условий И и НЕ для каждого сервера.`);
+        }
+    }
+
+    // ========================================================
+    // ФАЗА 5: Кульминационный пик — ОГЭ Задание 4 с ограничением
+    // ========================================================
+    function initPhase5() {
+        const labels = ['A', 'B', 'C', 'D', 'E'];
+
+        // Генерация весов для графа 5 вершин
+        // A(0), B(1), C(2), D(3), E(4)
+        // Кратчайший путь A -> C:
+        const wAC_direct = 5 + Math.floor(Math.random() * 3); // 5..7
+        const wAB = 2 + Math.floor(Math.random() * 2); // 2..3
+        const wBC = 2 + Math.floor(Math.random() * 2); // 2..3
+        // min(A->C) = min(wAC_direct, wAB + wBC)
+        const minAC = Math.min(wAC_direct, wAB + wBC);
+
+        // Кратчайший путь C -> E:
+        const wCE_direct = 6 + Math.floor(Math.random() * 3); // 6..8
+        const wCD = 2 + Math.floor(Math.random() * 2); // 2..3
+        const wDE = 2 + Math.floor(Math.random() * 2); // 2..3
+        // min(C->E) = min(wCE_direct, wCD + wDE)
+        const minCE = Math.min(wCE_direct, wCD + wDE);
+
+        // Прямой обходной путь A-B-D-E мимо C (длинный или короткий, но НЕ через C):
+        const wBD = 6 + Math.floor(Math.random() * 3); // 6..8
+
+        // Полная матрица
+        const matrix = [
+            [null, wAB, wAC_direct, null, null],
+            [wAB, null, wBC, wBD, null],
+            [wAC_direct, wBC, null, wCD, wCE_direct],
+            [null, wBD, wCD, null, wDE],
+            [null, null, wCE_direct, wDE, null]
+        ];
+
+        // Ответ: кратчайший путь, ОБЯЗАТЕЛЬНО проходящий через C
+        p5Answer = minAC + minCE;
+
+        const tbody = document.getElementById('p5-matrix-tbody');
+        tbody.innerHTML = '';
+        for (let r = 0; r < 5; r++) {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-warning p-2';
+            th.textContent = labels[r];
+            tr.appendChild(th);
+
+            for (let c = 0; c < 5; c++) {
+                const td = document.createElement('td');
+                td.className = 'p-2';
+                const v = matrix[r][c];
+                if (r === c) {
+                    td.className += ' text-secondary';
+                    td.textContent = '—';
+                } else if (v !== null) {
+                    td.className += ' text-light fw-bold';
+                    td.textContent = v;
+                } else {
+                    td.className += ' text-secondary';
+                    td.textContent = '·';
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        const input = document.getElementById('p5-input');
+        if (input) input.value = '';
+    }
+
+    function checkPhase5() {
+        const input = document.getElementById('p5-input');
+        const val = parseInt(input.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerFailure(5, initPhase5, 'Введите числовое значение длины пути.');
+            return;
+        }
+        if (val === p5Answer) {
+            finishLevel();
+        } else {
+            triggerFailure(5, initPhase5, `Неверная протяженность пути (${val} км). Убедитесь, что маршрут обязательно проходит через пункт C (длина = кратчайший A→C + кратчайший C→E).`);
+        }
+    }
+
+    // ========================================================
+    // ФИНАЛ УРОВНЯ 2
+    // ========================================================
+    function finishLevel() {
+        document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
+        hideStatus();
+
+        document.getElementById('level-badge').textContent = 'Пройдено';
+        document.getElementById('level-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
+        document.getElementById('level-title').textContent = 'Аналитический расчет табличных моделей завершен';
+
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        sendTelemetry('level_complete', true);
+
+        const continueBtn = document.getElementById('continue-btn');
+        if (continueBtn) {
+            continueBtn.addEventListener('click', () => {
+                window.location.href = '/tasks/9-класс/8/level3';
+            });
+        }
+    }
+
+    // ========================================================
+    // ОБРАБОТЧИКИ СОБЫТИЙ
+    // ========================================================
+    document.getElementById('p1-btn').addEventListener('click', checkPhase1);
+    document.getElementById('p1-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase1(); });
+
+    document.getElementById('p2-btn').addEventListener('click', checkPhase2);
+    document.getElementById('p2-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase2(); });
+
+    document.getElementById('p3-btn').addEventListener('click', checkPhase3);
+    document.getElementById('p3-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase3(); });
+
+    document.getElementById('p4-btn').addEventListener('click', checkPhase4);
+    document.getElementById('p4-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase4(); });
+
+    document.getElementById('p5-btn').addEventListener('click', checkPhase5);
+    document.getElementById('p5-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase5(); });
+
+    // Инициализация при старте
+    document.addEventListener('DOMContentLoaded', () => {
+        sendTelemetry('in_progress');
+        showPhase(1);
+    });
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        sendTelemetry('in_progress');
+        showPhase(1);
+    }
+})();
+</script>
