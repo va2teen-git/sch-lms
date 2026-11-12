@@ -1,0 +1,660 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <!-- Архетип: Диспетчер хэш-таблицы реального времени (Real-Time Hash Table Dispatcher) -->
+    <div id="vue-app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+
+        <!-- Стартовый экран: Брифинг миссии -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">⚠️ ХАРДКОР-РЕЖИМ: ДИСПЕТЧЕР ХЭШ-ТАБЛИЦЫ ⚠️</div>
+            <h1 class="h2 text-light mb-3 fw-bold">REAL-TIME HASH TABLE & FREQUENCY DISPATCHER</h1>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 760px;">
+                В высоконагруженных поисковых системах и кэш-серверах (Redis, CPython Dict, Inverted Index) хэш-таблица непрерывно 
+                обрабатывает входящий поток запросов.
+                <br><br>
+                Вы выступаете в роли системного диспетчера ядра. Ваша цель — безошибочно отразить 
+                <span class="text-danger fw-bold">10 нарастающих волн транзакций</span> в условиях жесткого сжимающегося таймера!
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start small" style="max-width: 720px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ ДИСПЕТЧЕРИЗАЦИИ ТРАНЗАКЦИЙ]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Динамический таймер:</span> От 11.0 до 6.0 секунд на волну с нарастающим временным давлением!</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">ТОТАЛЬНЫЙ СБРОС (Zero-Tolerance):</span> Любая ошибка, неверный протокол или тайм-аут полностью сбрасывают весь прогресс на Волну 1!</div>
+                <div class="text-light mb-1">• <span class="text-success fw-bold">[1] DIRECT_INSERT:</span> Ячейка <code>h(k) mod M</code> свободна, и $\alpha < 0.75$. Прямая вставка ключа за O(1).</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">[2] COLLISION:</span> В ячейке <code>h(k) mod M</code> уже находится другой ключ. Активация цепочки коллизий / пробирования.</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">[3] REHASH:</span> Коэффициент заполнения $\alpha \ge 0.75$. Экстренное удвоение емкости таблицы для предотвращения $O(N)$.</div>
+                <div class="text-light mb-1">• <span class="text-info fw-bold">[4] INC_FREQ:</span> Ключ уже присутствует в словаре. Инкремент частотного счетчика <code>dict[key] += 1</code> без создания дубликата!</div>
+                <div class="text-secondary mt-2 border-top border-secondary pt-2">
+                    💡 <em>Поддерживаются горячие клавиши управления: <strong>1</strong> (Direct), <strong>2</strong> (Collision), <strong>3</strong> (Rehash), <strong>4</strong> (Inc Freq).</em>
+                </div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger btn-lg rounded-0 fw-bold px-5 py-3 shadow" style="min-height: 54px;">
+                    ЗАПУСТИТЬ ДИСПЕТЧЕР [SPACE] →
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой экран: Активная диспетчеризация транзакций -->
+        <div v-else-if="gameState === 'playing'" class="card bg-dark border-danger rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Хедер волны, таймер и системные метрики -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span class="badge bg-danger rounded-0 fs-6 me-2">ВОЛНА {{ currentWave }} / 10</span>
+                        <span class="text-light fw-bold fs-6">{{ currentWaveData.title }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-secondary small">
+                            Вайпы (сбросы): <span class="text-danger fw-bold">{{ failCount }}</span>
+                        </div>
+                        <div class="badge rounded-0 px-3 py-2 fs-6 font-monospace" :class="timerClass">
+                            ⏳ ТАЙМЕР: {{ timeLeft.toFixed(1) }}s
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Системный аварийный баннер (Сирена тревоги при сбросе) -->
+                <div id="alarm-box" v-if="isAlarm" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-3 py-3" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="fs-4 me-2">🚨</span>
+                            <strong>[КРИТИЧЕСКИЙ СБОЙ ЯДРА]:</strong> {{ alarmMessage }}
+                            <div class="small text-danger mt-1">ТОТАЛЬНЫЙ СБРОС СИСТЕМЫ НА ВОЛНУ 1...</div>
+                        </div>
+                        <div class="spinner-border text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- Панель статуса хэш-таблицы (Data Source) -->
+                <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-md-3">
+                            <div class="text-secondary small text-uppercase">Емкость таблицы (M):</div>
+                            <div class="text-light fw-bold fs-5 font-monospace">M = {{ currentWaveData.tableM }}</div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="text-secondary small text-uppercase">Занято ячеек (N):</div>
+                            <div class="text-light fw-bold fs-5 font-monospace">N = {{ currentWaveData.tableN }}</div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="text-secondary small text-uppercase">Коэффициент заполнения (α):</div>
+                            <div class="fw-bold fs-5 font-monospace" :class="loadFactorClass">
+                                α = {{ currentWaveData.loadFactor.toFixed(3) }}
+                                <span v-if="currentWaveData.loadFactor >= 0.75" class="badge bg-danger rounded-0 ms-1">КРИТИЧЕСКИЙ</span>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="text-secondary small text-uppercase">Порог рехэша:</div>
+                            <div class="text-warning fw-bold fs-5 font-monospace">α<sub>порог</sub> = 0.750</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Входящая транзакция (Direct Surface Focus) -->
+                <div class="card bg-black border border-danger rounded-0 p-3 mb-3 text-center">
+                    <div class="text-secondary small text-uppercase mb-1">Входящая транзакция ядра:</div>
+                    <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 my-2">
+                        <div class="p-2 bg-dark border border-secondary rounded-0 font-monospace">
+                            Ключ: <span class="text-warning fw-bold fs-5">"{{ currentWaveData.incomingKey }}"</span>
+                        </div>
+                        <div class="p-2 bg-dark border border-secondary rounded-0 font-monospace">
+                            Хэш-код: <span class="text-info fw-bold fs-5">{{ currentWaveData.incomingHash }}</span>
+                        </div>
+                        <div class="p-2 bg-dark border border-secondary rounded-0 font-monospace">
+                            Целевая ячейка: <span class="text-success fw-bold fs-5">[{{ currentWaveData.targetCellIndex }}]</span>
+                            <span class="text-secondary small">({{ currentWaveData.incomingHash }} mod {{ currentWaveData.tableM }})</span>
+                        </div>
+                    </div>
+
+                    <!-- Статус целевой ячейки -->
+                    <div class="p-2 bg-dark border rounded-0 font-monospace text-start mx-auto mt-2" style="max-width: 680px;" :class="cellBorderClass">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>
+                                <strong>Статус ячейки [{{ currentWaveData.targetCellIndex }}]:</strong> 
+                                <span :class="cellStatusTextClass">{{ currentWaveData.cellStatusDescription }}</span>
+                            </span>
+                            <span class="badge rounded-0" :class="cellBadgeClass">{{ currentWaveData.cellBadgeText }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Органы прямого управления: 4 системных шлюза (Direct Surface) -->
+                <div class="row g-2">
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <button 
+                            id="btn-action-direct"
+                            @click="handleAction('direct')" 
+                            :disabled="isActionBlocked"
+                            class="btn btn-outline-success rounded-0 w-100 p-2 p-sm-3 d-flex flex-column align-items-center justify-content-center transition-colors"
+                            style="min-height: 56px;"
+                        >
+                            <div class="fw-bold fs-6 text-uppercase">[1] DIRECT_INSERT</div>
+                            <div class="small text-secondary lh-1 mt-1">Прямая запись в пустую ячейку</div>
+                        </button>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <button 
+                            id="btn-action-collision"
+                            @click="handleAction('collision')" 
+                            :disabled="isActionBlocked"
+                            class="btn btn-outline-warning rounded-0 w-100 p-2 p-sm-3 d-flex flex-column align-items-center justify-content-center transition-colors"
+                            style="min-height: 56px;"
+                        >
+                            <div class="fw-bold fs-6 text-uppercase">[2] COLLISION_CHAIN</div>
+                            <div class="small text-secondary lh-1 mt-1">Связывание цепочки / пробинг</div>
+                        </button>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <button 
+                            id="btn-action-rehash"
+                            @click="handleAction('rehash')" 
+                            :disabled="isActionBlocked"
+                            class="btn btn-outline-danger rounded-0 w-100 p-2 p-sm-3 d-flex flex-column align-items-center justify-content-center transition-colors"
+                            style="min-height: 56px;"
+                        >
+                            <div class="fw-bold fs-6 text-uppercase">[3] REHASH (×2)</div>
+                            <div class="small text-secondary lh-1 mt-1">Удвоение размера (α ≥ 0.75)</div>
+                        </button>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <button 
+                            id="btn-action-inc-freq"
+                            @click="handleAction('inc_freq')" 
+                            :disabled="isActionBlocked"
+                            class="btn btn-outline-info rounded-0 w-100 p-2 p-sm-3 d-flex flex-column align-items-center justify-content-center transition-colors"
+                            style="min-height: 56px;"
+                        >
+                            <div class="fw-bold fs-6 text-uppercase">[4] INC_FREQ</div>
+                            <div class="small text-secondary lh-1 mt-1">Счетчик dict[key] += 1</div>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Экран победы (Финальный триумф) -->
+        <div v-else-if="gameState === 'victory'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow">
+            <div class="display-3 text-danger mb-3">★ СИСТЕМА ЗАЩИЩЕНА: РЕЖИМ БОССА ПРЕОДОЛЁН ★</div>
+            <h2 class="text-light mb-3">СЕРВЕР ИНДЕКСАЦИИ ВЫДЕРЖАЛ ПИКОВУЮ НАГРУЗКУ!</h2>
+            <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
+                Вы безупречно парировали 10 экстремальных волн транзакций, предотвратили коллизии, деградацию времени доступа и переполнение хэш-таблицы!
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-4 text-start font-monospace" style="max-width: 580px;">
+                <div class="text-danger fw-bold fs-6 mb-2">[ТЕЛЕМЕТРИЯ АРКАДНОЙ МИССИИ]:</div>
+                <div class="text-light">Статус: <span class="text-success fw-bold">ПОЛНЫЙ УСПЕХ</span></div>
+                <div class="text-light">Пройдено волн: <span class="text-info fw-bold">10 / 10</span></div>
+                <div class="text-light">Количество полных сбросов ядра: <span class="text-warning fw-bold">{{ failCount }}</span></div>
+                <div class="text-light">Суммарное время сессии: <span class="text-info fw-bold">{{ sessionTimeFormatted }}</span></div>
+            </div>
+
+            <div>
+                <button @click="restartGame" class="btn btn-outline-danger rounded-0 px-5 py-3 fw-bold text-uppercase" style="min-height: 54px;">
+                    ПЕРЕЗАПУСТИТЬ СИМУЛЯЦИЮ
+                </button>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<!-- Подключение локального Vue 3 -->
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+(() => {
+    const { createApp } = Vue;
+    const missionName = 'Урок 31 :: Словари (ассоциативные массивы, отображения). Хэш-таблицы (Уровень 3)';
+
+    // Синтезатор звука Web Audio API (Zero external assets)
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type, duration, vol = 0.15) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    }
+
+    function playSuccessSound() {
+        playTone(660, 'sine', 0.12);
+        setTimeout(() => playTone(990, 'sine', 0.18), 70);
+    }
+
+    function playErrorSound() {
+        playTone(180, 'sawtooth', 0.3);
+        setTimeout(() => playTone(120, 'sawtooth', 0.35), 100);
+    }
+
+    function playAlarmSiren() {
+        playTone(440, 'triangle', 0.2);
+        setTimeout(() => playTone(880, 'triangle', 0.2), 120);
+        setTimeout(() => playTone(440, 'triangle', 0.2), 240);
+        setTimeout(() => playTone(880, 'triangle', 0.2), 360);
+    }
+
+    // Процедурный генератор 10 волн с нарастающей сложностью
+    function generateWaves() {
+        return [
+            // Волна 1: Простая прямая вставка в пустую ячейку (M=8, N=2, alpha=0.25)
+            {
+                waveNumber: 1,
+                title: 'Первичная инициализация: Прямая вставка',
+                tableM: 8,
+                tableN: 2,
+                loadFactor: 2 / 8,
+                incomingKey: 'token_alpha',
+                incomingHash: 19,
+                targetCellIndex: 19 % 8, // 3
+                cellStatus: 'empty',
+                cellStatusDescription: 'Ячейка [3] свободна (EMPTY). Ключ отсутствует.',
+                cellBadgeText: 'EMPTY',
+                correctAction: 'direct',
+                maxTime: 11.0,
+                errorExplanation: 'Ячейка свободна, и коэффициент заполнения α = 0.25 < 0.75. Требовалась прямая вставка [1] DIRECT_INSERT!'
+            },
+            // Волна 2: Коллизия в ячейке (M=8, N=3, alpha=0.375)
+            {
+                waveNumber: 2,
+                title: 'Коллизия ключей: Метод цепочек',
+                tableM: 8,
+                tableN: 3,
+                loadFactor: 3 / 8,
+                incomingKey: 'token_beta',
+                incomingHash: 25,
+                targetCellIndex: 25 % 8, // 1
+                cellStatus: 'collision',
+                cellStatusDescription: 'Ячейка [1] занята ключом "data_pack" (h=9). Ключи не совпадают!',
+                cellBadgeText: 'OCCUPIED (COLLISION)',
+                correctAction: 'collision',
+                maxTime: 10.0,
+                errorExplanation: 'В ячейке уже находится другой ключ с таким же хэшем mod 8. Возникла коллизия, требовалось действие [2] COLLISION_CHAIN!'
+            },
+            // Волна 3: Повторный ключ — частотный инкремент (M=8, N=4, alpha=0.5)
+            {
+                waveNumber: 3,
+                title: 'Частотный анализ: Инкремент счетчика',
+                tableM: 8,
+                tableN: 4,
+                loadFactor: 4 / 8,
+                incomingKey: 'token_beta',
+                incomingHash: 25,
+                targetCellIndex: 25 % 8, // 1
+                cellStatus: 'exists',
+                cellStatusDescription: 'Ключ "token_beta" УЖЕ зарегистрирован в словаре (текущий счетчик: 1)!',
+                cellBadgeText: 'KEY EXISTS',
+                correctAction: 'inc_freq',
+                maxTime: 9.5,
+                errorExplanation: 'Ключ уже есть в словаре! Дублировать записи запрещено, требовалось увеличить счетчик частоты: [4] INC_FREQ!'
+            },
+            // Волна 4: Критическое заполнение (M=8, N=6, alpha=0.75)
+            {
+                waveNumber: 4,
+                title: 'Пороговая нагрузка: Экстренное рехэширование',
+                tableM: 8,
+                tableN: 6,
+                loadFactor: 6 / 8, // 0.75
+                incomingKey: 'token_gamma',
+                incomingHash: 34,
+                targetCellIndex: 34 % 8, // 2
+                cellStatus: 'empty',
+                cellStatusDescription: 'Ячейка [2] свободна, НО коэффициент заполнения α = 0.750 достиг предела!',
+                cellBadgeText: 'LOAD LIMIT (α ≥ 0.75)',
+                correctAction: 'rehash',
+                maxTime: 9.0,
+                errorExplanation: 'Коэффициент заполнения достиг порога α = 0.750! Для предотвращения деградации в O(N) требовалось немедленно вызвать [3] REHASH (×2)!'
+            },
+            // Волна 5: Прямая вставка в расширенную таблицу (M=16, N=7, alpha=0.4375)
+            {
+                waveNumber: 5,
+                title: 'Расширенная адресация: Таблица M = 16',
+                tableM: 16,
+                tableN: 7,
+                loadFactor: 7 / 16,
+                incomingKey: 'lex_omega',
+                incomingHash: 45,
+                targetCellIndex: 45 % 16, // 13
+                cellStatus: 'empty',
+                cellStatusDescription: 'Ячейка [13] свободна. Новый уникальный ключ.',
+                cellBadgeText: 'EMPTY',
+                correctAction: 'direct',
+                maxTime: 8.5,
+                errorExplanation: 'В таблице M=16 ячейка свободна, и α = 0.438 в норме. Требовалась прямая вставка: [1] DIRECT_INSERT!'
+            },
+            // Волна 6: Коллизия в таблице M=16 (M=16, N=9, alpha=0.5625)
+            {
+                waveNumber: 6,
+                title: 'Сложная коллизия: Таблица M = 16',
+                tableM: 16,
+                tableN: 9,
+                loadFactor: 9 / 16,
+                incomingKey: 'lex_sigma',
+                incomingHash: 37,
+                targetCellIndex: 37 % 16, // 5
+                cellStatus: 'collision',
+                cellStatusDescription: 'Ячейка [5] занята ключом "node_core". Ключи различны!',
+                cellBadgeText: 'OCCUPIED (COLLISION)',
+                correctAction: 'collision',
+                maxTime: 8.0,
+                errorExplanation: 'В целевой ячейке [5] находится посторонний ключ. Требовалось разрешить коллизию: [2] COLLISION_CHAIN!'
+            },
+            // Волна 7: Повторный ключ в расширенной таблице (M=16, N=10, alpha=0.625)
+            {
+                waveNumber: 7,
+                title: 'Частотный поток: Обновление весов',
+                tableM: 16,
+                tableN: 10,
+                loadFactor: 10 / 16,
+                incomingKey: 'node_core',
+                incomingHash: 21,
+                targetCellIndex: 21 % 16, // 5
+                cellStatus: 'exists',
+                cellStatusDescription: 'Ключ "node_core" УЖЕ присутствует в хэш-таблице (счетчик: 2)!',
+                cellBadgeText: 'KEY EXISTS',
+                correctAction: 'inc_freq',
+                maxTime: 7.5,
+                errorExplanation: 'Ключ уже находится в ассоциативном массиве. Требовалось инкрементировать счетчик: [4] INC_FREQ!'
+            },
+            // Волна 8: Второе рехэширование таблицы (M=16, N=12, alpha=0.75)
+            {
+                waveNumber: 8,
+                title: 'Предел емкости M=16: Масштабирование',
+                tableM: 16,
+                tableN: 12,
+                loadFactor: 12 / 16, // 0.75
+                incomingKey: 'lex_delta',
+                incomingHash: 51,
+                targetCellIndex: 51 % 16, // 3
+                cellStatus: 'empty',
+                cellStatusDescription: 'В таблице 12 элементов из 16 (α = 0.750). Лимит исчерпан!',
+                cellBadgeText: 'LOAD LIMIT (α ≥ 0.75)',
+                correctAction: 'rehash',
+                maxTime: 7.0,
+                errorExplanation: 'Текущий коэффициент заполнения равен ровно 0.750. Требовалось инициировать рехэширование: [3] REHASH (×2)!'
+            },
+            // Волна 9: Высокоскоростная коллизия в таблице M=32 (M=32, N=19, alpha=0.594)
+            {
+                waveNumber: 9,
+                title: 'Трансляция шины M=32: Высокая скорость',
+                tableM: 32,
+                tableN: 19,
+                loadFactor: 19 / 32,
+                incomingKey: 'lex_theta',
+                incomingHash: 75,
+                targetCellIndex: 75 % 32, // 11
+                cellStatus: 'collision',
+                cellStatusDescription: 'Ячейка [11] занята ключом "buffer_reg". Коллизия!',
+                cellBadgeText: 'OCCUPIED (COLLISION)',
+                correctAction: 'collision',
+                maxTime: 6.5,
+                errorExplanation: 'Ячейка занята другим ключом. Требовалось действие [2] COLLISION_CHAIN!'
+            },
+            // Волна 10 (ФИНАЛЬНЫЙ БОСС): Граничная коллизия и порог емкости (M=32, N=24, alpha=0.75)
+            {
+                waveNumber: 10,
+                title: 'ФИНАЛЬНЫЙ БОСС: Сингулярность потока',
+                tableM: 32,
+                tableN: 24,
+                loadFactor: 24 / 32, // 0.75
+                incomingKey: 'cyber_boss_key',
+                incomingHash: 100,
+                targetCellIndex: 100 % 32, // 4
+                cellStatus: 'empty',
+                cellStatusDescription: 'Ячейка [4] свободна, НО N=24, M=32 (α = 0.750). Вставка заблокирована до рехэша!',
+                cellBadgeText: 'CRITICAL LIMIT (α ≥ 0.75)',
+                correctAction: 'rehash',
+                maxTime: 6.0,
+                errorExplanation: 'Ловушка босса! Несмотря на свободную ячейку, коэффициент заполнения 24/32 достигает 0.75! Прямая вставка вызвала бы коллапс производительности. Требовалось действие [3] REHASH (×2)!'
+            }
+        ];
+    }
+
+    createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro' | 'playing' | 'victory'
+                currentWave: 1,
+                activeWaves: generateWaves(),
+                timeLeft: 11.0,
+                timerInterval: null,
+                failCount: 0,
+                isAlarm: false,
+                alarmMessage: '',
+                isActionBlocked: false,
+                sessionStartTime: null,
+                totalSessionElapsed: 0
+            };
+        },
+
+        computed: {
+            currentWaveData() {
+                return this.activeWaves[this.currentWave - 1] || this.activeWaves[0];
+            },
+
+            timerClass() {
+                if (this.timeLeft <= 3.0) return 'bg-danger text-white border border-light animate-pulse';
+                if (this.timeLeft <= 5.0) return 'bg-warning text-dark';
+                return 'bg-dark text-info border border-secondary';
+            },
+
+            loadFactorClass() {
+                if (this.currentWaveData.loadFactor >= 0.75) return 'text-danger';
+                if (this.currentWaveData.loadFactor >= 0.5) return 'text-warning';
+                return 'text-success';
+            },
+
+            cellBorderClass() {
+                const s = this.currentWaveData.cellStatus;
+                if (s === 'empty') return 'border-success';
+                if (s === 'collision') return 'border-warning';
+                return 'border-info';
+            },
+
+            cellStatusTextClass() {
+                const s = this.currentWaveData.cellStatus;
+                if (s === 'empty') return 'text-success fw-bold';
+                if (s === 'collision') return 'text-warning fw-bold';
+                return 'text-info fw-bold';
+            },
+
+            cellBadgeClass() {
+                const s = this.currentWaveData.cellStatus;
+                if (s === 'empty') return 'bg-success text-dark';
+                if (s === 'collision') return 'bg-warning text-dark';
+                return 'bg-info text-dark';
+            },
+
+            sessionTimeFormatted() {
+                const mins = String(Math.floor(this.totalSessionElapsed / 60)).padStart(2, '0');
+                const secs = String(this.totalSessionElapsed % 60).padStart(2, '0');
+                return `${mins}:${secs}`;
+            }
+        },
+
+        methods: {
+            startGame() {
+                this.gameState = 'playing';
+                this.sessionStartTime = Date.now();
+                this.failCount = 0;
+                this.activeWaves = generateWaves();
+                this.loadWave(1);
+            },
+
+            restartGame() {
+                this.gameState = 'intro';
+            },
+
+            loadWave(waveNum) {
+                this.stopWaveTimer();
+                this.currentWave = waveNum;
+                this.isAlarm = false;
+                this.isActionBlocked = false;
+
+                const waveData = this.currentWaveData;
+                this.timeLeft = waveData.maxTime;
+
+                // Запуск интервала таймера (дискретность 100 мс)
+                this.timerInterval = setInterval(() => {
+                    this.timeLeft = Math.max(0, this.timeLeft - 0.1);
+                    if (this.timeLeft <= 0) {
+                        this.handleTimeout();
+                    }
+                }, 100);
+            },
+
+            stopWaveTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            },
+
+            handleTimeout() {
+                this.triggerHardcoreWipe('Время обработки транзакции истекло! Очередь шлюза переполнена.');
+            },
+
+            handleAction(action) {
+                if (this.isActionBlocked || this.gameState !== 'playing') return;
+
+                const expected = this.currentWaveData.correctAction;
+
+                if (action === expected) {
+                    // Успешный проход волны
+                    playSuccessSound();
+
+                    if (this.currentWave >= 10) {
+                        // Финальная победа над боссом!
+                        this.stopWaveTimer();
+                        this.totalSessionElapsed = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+                        this.gameState = 'victory';
+
+                        window.parent.postMessage({
+                            type: 'TELEMETRY_EVENT',
+                            mission_name: missionName,
+                            action_type: 'level_complete',
+                            status: 'completed',
+                            success: true,
+                            attempts_count: this.failCount,
+                            time_spent_sec: this.totalSessionElapsed
+                        }, '*');
+                    } else {
+                        // Переход к следующей волне
+                        this.loadWave(this.currentWave + 1);
+
+                        window.parent.postMessage({
+                            type: 'TELEMETRY_EVENT',
+                            mission_name: missionName,
+                            action_type: 'in_progress',
+                            status: 'wave_complete',
+                            wave: this.currentWave,
+                            attempts_count: this.failCount
+                        }, '*');
+                    }
+                } else {
+                    // Ошибка действия -> Тотальный вайп
+                    const expReason = this.currentWaveData.errorExplanation || 'Неверное системное действие!';
+                    this.triggerHardcoreWipe(expReason);
+                }
+            },
+
+            triggerHardcoreWipe(reason) {
+                this.stopWaveTimer();
+                this.isActionBlocked = true;
+                this.isAlarm = true;
+                this.alarmMessage = reason;
+                this.failCount++;
+
+                playAlarmSiren();
+
+                window.parent.postMessage({
+                    type: 'TELEMETRY_EVENT',
+                    mission_name: missionName,
+                    action_type: 'hardcore_reset',
+                    status: 'failed',
+                    attempts_count: this.failCount
+                }, '*');
+
+                // Через 1.8 секунды тотальный сброс прогресса на Волну 1 с новой генерацией
+                setTimeout(() => {
+                    this.activeWaves = generateWaves();
+                    this.loadWave(1);
+                }, 1800);
+            },
+
+            handleKeydown(e) {
+                if (this.gameState === 'intro' && (e.code === 'Space' || e.key === ' ')) {
+                    e.preventDefault();
+                    this.startGame();
+                    return;
+                }
+
+                if (this.gameState !== 'playing' || this.isActionBlocked) return;
+
+                if (e.key === '1' || e.code === 'Digit1') {
+                    e.preventDefault();
+                    this.handleAction('direct');
+                } else if (e.key === '2' || e.code === 'Digit2') {
+                    e.preventDefault();
+                    this.handleAction('collision');
+                } else if (e.key === '3' || e.code === 'Digit3') {
+                    e.preventDefault();
+                    this.handleAction('rehash');
+                } else if (e.key === '4' || e.code === 'Digit4') {
+                    e.preventDefault();
+                    this.handleAction('inc_freq');
+                }
+            }
+        },
+
+        mounted() {
+            window.addEventListener('keydown', this.handleKeydown);
+
+            // Экспорт глобального тестового хука
+            window.__DEV_LEVEL3_STATE__ = {
+                waves: () => this.activeWaves,
+                currentWaveIndex: () => this.currentWave - 1,
+                currentWave: () => this.currentWaveData,
+                solveCurrentWave: () => {
+                    if (this.currentWaveData && this.currentWaveData.correctAction) {
+                        this.handleAction(this.currentWaveData.correctAction);
+                    }
+                },
+                submitAction: (action) => {
+                    this.handleAction(action);
+                }
+            };
+        },
+
+        beforeUnmount() {
+            window.removeEventListener('keydown', this.handleKeydown);
+            this.stopWaveTimer();
+        }
+    }).mount('#vue-app');
+})();
+</script>
