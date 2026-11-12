@@ -1538,8 +1538,22 @@ const tasks = [
         return;
       }
 
+      const isTestUser = (name = '', cls = '') => {
+        const n = String(name || '').toLowerCase();
+        const c = String(cls || '').toLowerCase();
+        return n.includes('тест') || n.includes('test') || n.includes('спринтер') || 
+               n.includes('unknown') || n.includes('аттемпт') || n.includes('симулятор') ||
+               (n.includes('алиса') && n.includes('спринтер')) ||
+               c.includes('test') || c.includes('тест') || c === '11-ит';
+      };
+
       const runners = data.students
-        .filter(s => (typeof s.sprintCpm === 'number' && s.sprintCpm > 0) || (typeof s.bestSprintTimeSec === 'number' && s.bestSprintTimeSec > 0))
+        .filter(s => {
+          if (isTestUser(s.displayName, s.className)) return false;
+          const cpm = typeof s.sprintCpm === 'number' ? s.sprintCpm : (s.bestSprintTimeSec ? Math.round((60 / s.bestSprintTimeSec) * 20) : 0);
+          if (cpm <= 0 || cpm > 1000) return false;
+          return true;
+        })
         .sort((a, b) => {
           const cpmA = typeof a.sprintCpm === 'number' ? a.sprintCpm : (a.bestSprintTimeSec ? Math.round((60 / a.bestSprintTimeSec) * 20) : 0);
           const cpmB = typeof b.sprintCpm === 'number' ? b.sprintCpm : (b.bestSprintTimeSec ? Math.round((60 / b.bestSprintTimeSec) * 20) : 0);

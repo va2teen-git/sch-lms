@@ -104,8 +104,8 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
 
     // Set student credentials in localStorage
     await page.evaluate(() => {
-      localStorage.setItem('student_firstName', 'Алиса');
-      localStorage.setItem('student_lastName', 'Спринтер');
+      localStorage.setItem('student_firstName', 'Тест-Алиса');
+      localStorage.setItem('student_lastName', 'Тест-Спринтер');
       localStorage.setItem('student_class', '10-класс_углубленный');
     });
 
@@ -148,6 +148,12 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     // Success banner must appear and leaderboard refreshes
     await expect(page.locator('#sprint-telemetry-banner')).toBeVisible();
     await expect(saveBtn).toHaveText('✓ Зафиксировано в журнале');
+
+    // Verify test persona is strictly filtered out from Top 10 leaderboard
+    await page.waitForTimeout(500);
+    const leaderboardText = await page.locator('#sprint-leaderboard-list').textContent();
+    expect(leaderboardText).not.toContain('Тест');
+    expect(leaderboardText).not.toContain('Алиса');
 
     sim.assertCleanSession();
   });
