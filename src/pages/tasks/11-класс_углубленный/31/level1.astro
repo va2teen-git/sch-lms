@@ -1,0 +1,1051 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-success mb-0 fw-bold">Тренажер: Архитектура ассоциативных массивов и хэш-таблиц (Уровень 1)</h1>
+                <div class="text-secondary small">Урок 31 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Прямое манипулирование // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик попыток и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Метод цепочек и фильтрация коллизий</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[СБОЙ СИСТЕМЫ]</strong> <span id="feedback-text">Неверное распределение данных!</span> 
+                            Регенерация фазы...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 1: Метод цепочек (Separate Chaining) и коллизии      -->
+                <!-- ========================================================= -->
+                <div id="phase1" class="phase-container">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-success mb-1">ДИРЕКТИВА ФАЗЫ 1:</div>
+                        <div>
+                            Сконструируйте хэш-таблицу с <span class="text-warning">методом цепочек</span>. 
+                            Размер таблицы: <span class="badge bg-secondary rounded-0 text-white font-monospace" id="p1-mod-badge">M = 5</span>. 
+                            Формула индекса: <code class="text-info">index = hash_code mod M</code>.
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            • Перетащите валидные токены из пула в соответствующие ячейки-корзины.<br>
+                            • <strong class="text-danger">Внимание:</strong> В пуле присутствуют токсичные дистракторы (дубликаты уникальных ключей или неверные хэши). Не помещайте их в таблицу!
+                        </div>
+                    </div>
+
+                    <!-- Палитра токенов -->
+                    <div class="mb-3">
+                        <div class="text-secondary small text-uppercase mb-2">Пул входных пар (Кликните токен, затем кликните слот в корзине):</div>
+                        <div id="p1-token-palette" class="d-flex flex-wrap gap-2 p-2 bg-black border border-secondary" style="min-height: 56px;">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                    </div>
+
+                    <!-- Корзины хэш-таблицы -->
+                    <div class="mb-3">
+                        <div class="text-secondary small text-uppercase mb-2">Корзины хэш-таблицы (Buckets 0..M-1):</div>
+                        <div id="p1-buckets-grid" class="row g-2">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                        <button id="p1-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold text-uppercase d-flex align-items-center gap-2" style="min-height: 48px;">
+                            <span>Зафиксировать структуру цепочек</span>
+                            <span>→</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 2: Открытая адресация и маркер «Надгробие» (Tombstone)-->
+                <!-- ========================================================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-success mb-1">ДИРЕКТИВА ФАЗЫ 2:</div>
+                        <div>
+                            Хэш-таблица с <span class="text-warning">открытой адресацией</span> (размер <span class="text-info" id="p2-size-badge">M = 7</span>) использует линейное пробирование: 
+                            <code class="text-info">idx = (h(k) + i) mod M</code>.
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            1. Кликните по удаляемой ячейке <span id="p2-target-delete-label" class="text-danger fw-bold"></span>, чтобы переключить ее в безопасный маркер <span class="badge bg-danger rounded-0">[DEL]</span> (Надгробие / Tombstone) без разрыва цепочки поиска.<br>
+                            2. Кликните по целевой свободной ячейке, куда обязан встать новый входящий ключ <span id="p2-target-insert-label" class="text-success fw-bold"></span> по правилу линейного пробирования.
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                            <div class="text-secondary small text-uppercase">Ячейки хэш-таблицы в оперативной памяти:</div>
+                            <div class="small">
+                                Входящий ключ: <span id="p2-incoming-badge" class="badge bg-success rounded-0 text-dark font-monospace fs-6"></span>
+                            </div>
+                        </div>
+
+                        <!-- Сетка ячеек открытой адресации -->
+                        <div id="p2-cells-strip" class="d-flex flex-wrap gap-2 justify-content-center py-2">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                        <button id="p2-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold text-uppercase d-flex align-items-center gap-2" style="min-height: 48px;">
+                            <span>Применить протокол адресации</span>
+                            <span>→</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 3: Алфавитно-частотный словарь и двухкритериальный порядок-->
+                <!-- ========================================================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-success mb-1">ДИРЕКТИВА ФАЗЫ 3:</div>
+                        <div>
+                            Постройте <span class="text-warning">алфавитно-частотный словарь</span> для входного потока токенов.
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            1. Посчитайте вхождения слов и выставите точные значения частот на интерактивных счетчиках <code class="text-success">[-] / [+]</code>.<br>
+                            2. Распределите слова по ранжированным слотам реестра по каноническому правилу: <strong class="text-light">по убыванию частоты</strong>, а при равных частотах — <strong class="text-light">строго по алфавиту</strong>!
+                        </div>
+                    </div>
+
+                    <!-- Входной текст / токены -->
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-2">Входной массив токенов текста:</div>
+                        <div id="p3-tokens-flow" class="d-flex flex-wrap gap-2 p-2 bg-dark border border-secondary">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                    </div>
+
+                    <!-- Интерактивные счетчики частот уникальных слов -->
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-2">Шаг 1: Аккумуляция частот (Интерактивные счетчики):</div>
+                        <div id="p3-counter-cards" class="row g-2">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                    </div>
+
+                    <!-- Слот-пазл ранжированного частотного словаря -->
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-2">Шаг 2: Ранжированный реестр словаря (Кликните плашку, затем слот ранга):</div>
+                        <div id="p3-rank-palette" class="d-flex flex-wrap gap-2 p-2 mb-3 bg-dark border border-secondary" style="min-height: 56px;">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                        <div id="p3-rank-slots" class="row g-2">
+                            <!-- Генерируется процедурно -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                        <button id="p3-verify-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold text-uppercase d-flex align-items-center gap-2" style="min-height: 48px;">
+                            <span>Верифицировать частотный словарь</span>
+                            <span>✔</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ЭКРАН ПОБЕДЫ (Успешное завершение 1-го уровня)            -->
+                <!-- ========================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="mb-3">
+                        <span class="display-3 text-success">✔</span>
+                    </div>
+                    <h2 class="h3 text-success text-uppercase fw-bold mb-2">Архитектурный рубеж преодолён!</h2>
+                    <p class="text-light mb-4">
+                        Вы успешно освоили методы цепочек, алгоритмы открытой адресации и построение алфавитно-частотных словарей.
+                    </p>
+                    <div class="d-inline-flex flex-column gap-2 text-start bg-black border border-success p-3 rounded-0 mb-4 font-monospace">
+                        <div>Телеметрия задания: <span class="text-success fw-bold">УСПЕХ</span></div>
+                        <div>Затраченное время: <span id="final-time" class="text-info fw-bold">00:00</span></div>
+                        <div>Штрафные сбои (ошибки): <span id="final-attempts" class="text-warning fw-bold">0</span></div>
+                    </div>
+                    <div>
+                        <button onclick="location.reload()" class="btn btn-outline-success rounded-0 px-4 py-2 text-uppercase fw-bold" style="min-height: 48px;">
+                            Пройти повторно (с новой генерацией)
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    const missionName = 'Урок 31 :: Словари (ассоциативные массивы, отображения). Хэш-таблицы (Уровень 1)';
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Вспомогательные генераторы случайных чисел
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    // Таймер
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Сбой с отправкой телеметрии и регенерацией текущей фазы
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'hardcore_reset',
+            status: 'failed',
+            attempts_count: attemptsCount
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1500);
+    }
+
+    // Завершение всего уровня
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Метод цепочек (Separate Chaining) и фильтрация коллизий
+    // =========================================================================
+    const p1WordsBank = [
+        { key: "alpha", val: "0x1A" },
+        { key: "beta",  val: "0x2B" },
+        { key: "gamma", val: "0x3C" },
+        { key: "delta", val: "0x4D" },
+        { key: "omega", val: "0x5E" },
+        { key: "sigma", val: "0x6F" },
+        { key: "theta", val: "0x7A" },
+        { key: "zeta",  val: "0x8B" }
+    ];
+
+    let p1Mod = 5;
+    let p1ValidItems = [];
+    let p1DistractorItems = [];
+    let p1AllTokens = [];
+    let p1PlacedTokens = {}; // token_id -> bucketIndex (null if in palette)
+    let p1SelectedTokenId = null;
+
+    function initPhase1() {
+        p1Mod = 5;
+        p1PlacedTokens = {};
+        p1SelectedTokenId = null;
+
+        const shuffledBank = shuffleArray(p1WordsBank);
+        // Выбираем 4 уникальных ключа
+        const chosen = shuffledBank.slice(0, 4);
+
+        // Процедурно генерируем хэш-коды так, чтобы возникла минимум 1 гарантированная коллизия
+        const targetBuckets = [
+            getRandomInt(0, 4),
+            getRandomInt(0, 4),
+            getRandomInt(0, 4),
+            getRandomInt(0, 4)
+        ];
+        // Гарантируем коллизию между элементами 0 и 1
+        targetBuckets[1] = targetBuckets[0];
+
+        p1ValidItems = chosen.map((item, idx) => {
+            const b = targetBuckets[idx];
+            const multiplier = getRandomInt(1, 9);
+            const hashCode = multiplier * p1Mod + b;
+            return {
+                id: `p1_valid_${idx}`,
+                key: item.key,
+                val: item.val,
+                hash: hashCode,
+                expectedBucket: b,
+                isDistractor: false
+            };
+        });
+
+        // Формируем 2 дистрактора:
+        // Дистрактор 1: дубликат ключа из валидных (нарушает уникальность ключей!)
+        const dupKey = p1ValidItems[0].key;
+        const d1 = {
+            id: 'p1_dist_dup',
+            key: dupKey,
+            val: "0xFF (DUP)",
+            hash: p1ValidItems[0].hash + 1,
+            expectedBucket: -1,
+            isDistractor: true,
+            distractorReason: 'Дубликат уникального ключа в словаре!'
+        };
+
+        // Дистрактор 2: фиктивный токен с битым значением
+        const d2Key = shuffledBank[4].key;
+        const d2 = {
+            id: 'p1_dist_corrupt',
+            key: d2Key,
+            val: "ERR_HASH",
+            hash: 999, // Заведомо неверный
+            expectedBucket: -1,
+            isDistractor: true,
+            distractorReason: 'Некорректная контрольная сумма хэша!'
+        };
+
+        p1DistractorItems = [d1, d2];
+        p1AllTokens = shuffleArray([...p1ValidItems, ...p1DistractorItems]);
+
+        renderPhase1();
+    }
+
+    function renderPhase1() {
+        const palette = document.getElementById('p1-token-palette');
+        const grid = document.getElementById('p1-buckets-grid');
+        if (!palette || !grid) return;
+
+        palette.innerHTML = '';
+        grid.innerHTML = '';
+
+        // Отрисовка токенов в палитре
+        p1AllTokens.forEach(t => {
+            const isPlaced = p1PlacedTokens[t.id] !== undefined;
+            if (isPlaced) return;
+
+            const isSelected = p1SelectedTokenId === t.id;
+            const btn = document.createElement('div');
+            btn.className = `btn rounded-0 text-start p-2 border font-monospace transition-colors ${
+                isSelected ? 'btn-success text-dark border-light fw-bold shadow' : 'btn-dark text-light border-success'
+            }`;
+            btn.style.minHeight = '48px';
+            btn.style.cursor = 'pointer';
+            btn.setAttribute('data-token-id', t.id);
+            btn.setAttribute('data-key', t.key);
+            btn.setAttribute('data-is-distractor', String(t.isDistractor));
+            btn.setAttribute('data-expected-bucket', String(t.expectedBucket));
+            btn.innerHTML = `
+                <div class="fw-bold fs-6">${t.key} ➔ "${t.val}"</div>
+                <div class="small ${isSelected ? 'text-dark' : 'text-info'}">hash: ${t.hash} (mod 5 = ${t.hash % 5})</div>
+            `;
+            btn.onclick = () => {
+                p1SelectedTokenId = (p1SelectedTokenId === t.id) ? null : t.id;
+                renderPhase1();
+            };
+            palette.appendChild(btn);
+        });
+
+        if (palette.children.length === 0) {
+            palette.innerHTML = '<span class="text-secondary small fst-italic p-2">Все токены размещены в таблице. Кликните на токен в корзине, чтобы вернуть его.</span>';
+        }
+
+        // Отрисовка 5 корзин (Buckets 0..4)
+        for (let b = 0; b < p1Mod; b++) {
+            const col = document.createElement('div');
+            col.className = 'col-12 col-sm-6 col-md-4 col-lg';
+
+            const card = document.createElement('div');
+            card.className = 'card bg-black border border-secondary rounded-0 h-100';
+            card.setAttribute('data-bucket-index', String(b));
+            card.id = `p1-bucket-${b}`;
+
+            const head = document.createElement('div');
+            head.className = 'card-header bg-dark text-success border-bottom border-secondary d-flex justify-content-between align-items-center py-2 px-2';
+            head.innerHTML = `
+                <span class="fw-bold">Ячейка [${b}]</span>
+                <span class="badge bg-secondary rounded-0 text-white">mod 5 = ${b}</span>
+            `;
+
+            const body = document.createElement('div');
+            body.className = 'card-body p-2 d-flex flex-column gap-2';
+            body.style.minHeight = '110px';
+
+            // Находим токены, помещенные в эту корзину
+            const placedInThisBucket = p1AllTokens.filter(t => p1PlacedTokens[t.id] === b);
+
+            if (placedInThisBucket.length === 0) {
+                const emptySlot = document.createElement('div');
+                emptySlot.className = 'border border-dashed border-secondary text-secondary p-2 text-center small rounded-0 flex-grow-1 d-flex align-items-center justify-content-center';
+                emptySlot.style.minHeight = '48px';
+                emptySlot.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
+                emptySlot.setAttribute('data-bucket-slot', String(b));
+                emptySlot.id = `p1-slot-${b}`;
+                emptySlot.textContent = p1SelectedTokenId ? '➔ Кликните сюда для вставки' : '∅ (Список пуст)';
+                emptySlot.onclick = () => {
+                    if (p1SelectedTokenId) {
+                        p1PlacedTokens[p1SelectedTokenId] = b;
+                        p1SelectedTokenId = null;
+                        renderPhase1();
+                    }
+                };
+                body.appendChild(emptySlot);
+            } else {
+                placedInThisBucket.forEach((t, idx) => {
+                    const tokenBox = document.createElement('div');
+                    tokenBox.className = 'p-2 bg-dark text-light border border-success rounded-0 small font-monospace d-flex justify-content-between align-items-center';
+                    tokenBox.style.minHeight = '48px';
+                    tokenBox.style.cursor = 'pointer';
+                    tokenBox.title = 'Кликните, чтобы вернуть токен в пул';
+                    tokenBox.innerHTML = `
+                        <div>
+                            <span class="text-secondary me-1">[${idx}]</span>
+                            <span class="text-success fw-bold">${t.key}</span>: "${t.val}"
+                            <div class="text-info" style="font-size: 11px;">h: ${t.hash}</div>
+                        </div>
+                        <span class="text-danger fw-bold fs-5 ms-2">×</span>
+                    `;
+                    tokenBox.onclick = () => {
+                        delete p1PlacedTokens[t.id];
+                        renderPhase1();
+                    };
+                    body.appendChild(tokenBox);
+                });
+
+                // Если есть выбранный токен, добавляем кнопку добавления в цепочку
+                if (p1SelectedTokenId) {
+                    const appendBtn = document.createElement('button');
+                    appendBtn.className = 'btn btn-outline-info rounded-0 btn-sm text-uppercase font-monospace py-1';
+                    appendBtn.style.minHeight = '40px';
+                    appendBtn.setAttribute('data-bucket-append', String(b));
+                    appendBtn.id = `p1-append-${b}`;
+                    appendBtn.textContent = '+ Добавить в цепочку';
+                    appendBtn.onclick = () => {
+                        p1PlacedTokens[p1SelectedTokenId] = b;
+                        p1SelectedTokenId = null;
+                        renderPhase1();
+                    };
+                    body.appendChild(appendBtn);
+                }
+            }
+
+            card.appendChild(head);
+            card.appendChild(body);
+            col.appendChild(card);
+            grid.appendChild(col);
+        }
+    }
+
+    // Проверка Фазы 1
+    const p1VerifyBtn = document.getElementById('p1-verify-btn');
+    if (p1VerifyBtn) {
+        p1VerifyBtn.onclick = () => {
+            if (isLocked) return;
+
+            // 1. Проверяем наличие дистракторов в таблице
+            for (const d of p1DistractorItems) {
+                if (p1PlacedTokens[d.id] !== undefined) {
+                    triggerErrorReset(`Ошибка! В таблицу помещен дистрактор "${d.key}": ${d.distractorReason}`, initPhase1);
+                    return;
+                }
+            }
+
+            // 2. Проверяем, все ли валидные элементы помещены
+            for (const v of p1ValidItems) {
+                const placedBucket = p1PlacedTokens[v.id];
+                if (placedBucket === undefined) {
+                    triggerErrorReset(`Ошибка! Токен "${v.key}" не был помещен в хэш-таблицу!`, initPhase1);
+                    return;
+                }
+                if (placedBucket !== v.expectedBucket) {
+                    triggerErrorReset(`Ошибка! Токен "${v.key}" с хэшем ${v.hash} помещен в корзину [${placedBucket}], а должен быть в [${v.expectedBucket}] (${v.hash} mod 5 = ${v.expectedBucket})!`, initPhase1);
+                    return;
+                }
+            }
+
+            // Успех Фазы 1!
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: 'in_progress',
+                status: 'phase_complete',
+                phase: 1,
+                attempts_count: attemptsCount
+            }, '*');
+
+            currentPhase = 2;
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-title').textContent = 'Открытая адресация и маркер «Надгробие» (Tombstone)';
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            initPhase2();
+        };
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Открытая адресация, линейное пробирование и Tombstone
+    // =========================================================================
+    const p2Size = 7;
+    let p2Cells = []; // array of { index, key, hash, status: 'occupied' | 'deleted' | 'empty' }
+    let p2TargetDeleteKey = '';
+    let p2TargetDeleteIdx = -1;
+    let p2IncomingKey = '';
+    let p2IncomingHash = 0;
+    let p2ExpectedInsertIdx = -1;
+    let p2UserDeletedState = ''; // 'occupied' | 'deleted' | 'empty'
+    let p2UserPlacedInsertIdx = -1;
+
+    function initPhase2() {
+        p2Cells = [];
+        p2UserPlacedInsertIdx = -1;
+
+        // Фиксируем исходную заполненность таблицы
+        // Генерируем коллизионный кластер из 3 элементов вокруг индекса baseIdx
+        const baseIdx = getRandomInt(1, 3);
+        const keysPool = ["gamma", "omega", "sigma", "delta", "theta", "kappa"];
+        const chosenKeys = shuffleArray(keysPool);
+
+        for (let i = 0; i < p2Size; i++) {
+            p2Cells.push({
+                index: i,
+                key: '',
+                hash: 0,
+                status: 'empty'
+            });
+        }
+
+        // Заполняем 3 ячейки подряд: baseIdx, baseIdx+1, baseIdx+2
+        const k1 = chosenKeys[0];
+        const k2 = chosenKeys[1];
+        const k3 = chosenKeys[2];
+
+        p2Cells[baseIdx] = { index: baseIdx, key: k1, hash: baseIdx, status: 'occupied' };
+        p2Cells[(baseIdx + 1) % p2Size] = { index: (baseIdx + 1) % p2Size, key: k2, hash: baseIdx, status: 'occupied' };
+        p2Cells[(baseIdx + 2) % p2Size] = { index: (baseIdx + 2) % p2Size, key: k3, hash: baseIdx, status: 'occupied' };
+
+        // Дополнительно ставим одиночный элемент вдалеке
+        const farIdx = (baseIdx + 4) % p2Size;
+        p2Cells[farIdx] = { index: farIdx, key: chosenKeys[3], hash: farIdx, status: 'occupied' };
+
+        // Задача 1: Удалить средний элемент k2
+        p2TargetDeleteKey = k2;
+        p2TargetDeleteIdx = (baseIdx + 1) % p2Size;
+        p2UserDeletedState = 'occupied';
+
+        // Задача 2: Вставить новый ключ kNew с базовым хэшем baseIdx
+        p2IncomingKey = chosenKeys[4];
+        p2IncomingHash = baseIdx;
+
+        // По канону открытой адресации: при вставке ищут первую ячейку с состоянием 'empty' или 'deleted'.
+        // Так как ячейка (baseIdx + 1) станет 'deleted', новый ключ должен занять именно ее!
+        p2ExpectedInsertIdx = p2TargetDeleteIdx;
+
+        const delLabel = document.getElementById('p2-target-delete-label');
+        const insLabel = document.getElementById('p2-target-insert-label');
+        const incBadge = document.getElementById('p2-incoming-badge');
+
+        if (delLabel) delLabel.textContent = `"${p2TargetDeleteKey}" (ячейка [${p2TargetDeleteIdx}])`;
+        if (insLabel) insLabel.textContent = `"${p2IncomingKey}" (hash = ${p2IncomingHash})`;
+        if (incBadge) incBadge.textContent = `"${p2IncomingKey}" (h mod 7 = ${p2IncomingHash})`;
+
+        renderPhase2();
+    }
+
+    function renderPhase2() {
+        const strip = document.getElementById('p2-cells-strip');
+        if (!strip) return;
+        strip.innerHTML = '';
+
+        p2Cells.forEach((c, idx) => {
+            const isDeleteTarget = (idx === p2TargetDeleteIdx);
+            const isInsertTargetChosen = (p2UserPlacedInsertIdx === idx);
+
+            const card = document.createElement('div');
+            card.className = 'card bg-dark border font-monospace text-center p-2 transition-colors';
+            card.style.width = '125px';
+            card.style.minHeight = '140px';
+            card.setAttribute('data-cell-index', String(idx));
+            card.id = `p2-cell-${idx}`;
+
+            let cellContent = '';
+            let borderClass = 'border-secondary';
+            let actionText = '';
+
+            if (isDeleteTarget) {
+                borderClass = 'border-warning';
+                if (p2UserDeletedState === 'occupied') {
+                    cellContent = `
+                        <div class="text-warning fw-bold">${c.key}</div>
+                        <div class="small text-secondary">h mod 7 = ${c.hash}</div>
+                        <div class="badge bg-secondary rounded-0 mt-2">[OCCUPIED]</div>
+                    `;
+                    actionText = '<div class="text-info small mt-2">Клик: Пометить [DEL]</div>';
+                } else if (p2UserDeletedState === 'deleted') {
+                    cellContent = `
+                        <div class="text-danger fw-bold">⚠ TOMBSTONE</div>
+                        <div class="small text-danger">[УДАЛЕНО]</div>
+                        <div class="badge bg-danger text-white rounded-0 mt-2">[DEL]</div>
+                    `;
+                    actionText = '<div class="text-warning small mt-2">Клик: Очистить в [EMPTY]</div>';
+                } else {
+                    cellContent = `
+                        <div class="text-secondary fst-italic">∅ Пусто</div>
+                        <div class="small text-secondary">-</div>
+                        <div class="badge bg-dark border border-secondary text-secondary rounded-0 mt-2">[EMPTY]</div>
+                    `;
+                    actionText = '<div class="text-info small mt-2">Клик: Вернуть [OCCUPIED]</div>';
+                }
+
+                card.onclick = () => {
+                    if (p2UserDeletedState === 'occupied') p2UserDeletedState = 'deleted';
+                    else if (p2UserDeletedState === 'deleted') p2UserDeletedState = 'empty';
+                    else p2UserDeletedState = 'occupied';
+                    renderPhase2();
+                };
+            } else if (c.status === 'occupied') {
+                borderClass = 'border-secondary';
+                cellContent = `
+                    <div class="text-light fw-bold">${c.key}</div>
+                    <div class="small text-secondary">h mod 7 = ${c.hash}</div>
+                    <div class="badge bg-secondary rounded-0 mt-2">[OCCUPIED]</div>
+                `;
+                actionText = '<div class="text-secondary small mt-2">Занято</div>';
+            } else {
+                // Пустая ячейка
+                borderClass = isInsertTargetChosen ? 'border-success bg-black' : 'border-secondary';
+                cellContent = `
+                    <div class="${isInsertTargetChosen ? 'text-success fw-bold' : 'text-secondary'}">
+                        ${isInsertTargetChosen ? `★ ${p2IncomingKey}` : '∅ Пусто'}
+                    </div>
+                    <div class="small text-secondary">${isInsertTargetChosen ? `h mod 7 = ${p2IncomingHash}` : '-'}</div>
+                    <div class="badge ${isInsertTargetChosen ? 'bg-success text-dark' : 'bg-dark border border-secondary text-secondary'} rounded-0 mt-2">
+                        ${isInsertTargetChosen ? '[INSERT HERE]' : '[EMPTY]'}
+                    </div>
+                `;
+                actionText = `<div class="small mt-2 ${isInsertTargetChosen ? 'text-success' : 'text-info'}">
+                    ${isInsertTargetChosen ? 'Выбрана для вставки' : 'Клик: Вставить сюда'}
+                </div>`;
+
+                card.onclick = () => {
+                    p2UserPlacedInsertIdx = (p2UserPlacedInsertIdx === idx) ? -1 : idx;
+                    renderPhase2();
+                };
+            }
+
+            // Если удаляемая ячейка помечена как [DEL] или [EMPTY], она тоже может стать целью вставки входящего элемента!
+            if (isDeleteTarget && (p2UserDeletedState === 'deleted' || p2UserDeletedState === 'empty')) {
+                if (isInsertTargetChosen) {
+                    borderClass = 'border-success bg-black';
+                    cellContent += `
+                        <div class="badge bg-success text-dark rounded-0 mt-1">[+ВСТАВКА "${p2IncomingKey}"]</div>
+                    `;
+                }
+            }
+
+            card.className = `card bg-dark border ${borderClass} font-monospace text-center p-2 transition-colors`;
+            card.innerHTML = `
+                <div class="fw-bold text-success border-bottom border-secondary pb-1 mb-2">Ячейка [${idx}]</div>
+                ${cellContent}
+                ${actionText}
+            `;
+            strip.appendChild(card);
+        });
+
+        // Добавим контекстное меню для выбора удаленной ячейки в качестве слота вставки
+        if (p2UserDeletedState === 'deleted' || p2UserDeletedState === 'empty') {
+            const delCard = strip.children[p2TargetDeleteIdx];
+            if (delCard) {
+                const insertBtn = document.createElement('button');
+                insertBtn.id = `p2-insert-btn-${p2TargetDeleteIdx}`;
+                insertBtn.setAttribute('data-target-idx', String(p2TargetDeleteIdx));
+                insertBtn.className = `btn btn-sm rounded-0 font-monospace mt-2 ${
+                    p2UserPlacedInsertIdx === p2TargetDeleteIdx ? 'btn-success text-dark fw-bold' : 'btn-outline-success'
+                }`;
+                insertBtn.style.minHeight = '36px';
+                insertBtn.textContent = p2UserPlacedInsertIdx === p2TargetDeleteIdx ? '✔ Вставка выбрана' : 'Вставить ключ сюда';
+                insertBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    p2UserPlacedInsertIdx = (p2UserPlacedInsertIdx === p2TargetDeleteIdx) ? -1 : p2TargetDeleteIdx;
+                    renderPhase2();
+                };
+                delCard.appendChild(insertBtn);
+            }
+        }
+    }
+
+    // Проверка Фазы 2
+    const p2VerifyBtn = document.getElementById('p2-verify-btn');
+    if (p2VerifyBtn) {
+        p2VerifyBtn.onclick = () => {
+            if (isLocked) return;
+
+            // 1. Проверяем состояние удаления
+            if (p2UserDeletedState === 'occupied') {
+                triggerErrorReset(`Ошибка! Элемент "${p2TargetDeleteKey}" не был удален из ячейки [${p2TargetDeleteIdx}]!`, initPhase2);
+                return;
+            }
+
+            if (p2UserDeletedState === 'empty') {
+                triggerErrorReset(`Критическая ошибка открытой адресации! Очистка ячейки в [EMPTY] разорвала цепочку линейного поиска для последующих коллизий! Требовалось пометить ячейку маркером «Надгробие» [DEL] (Tombstone).`, initPhase2);
+                return;
+            }
+
+            // 2. Проверяем позицию вставки
+            if (p2UserPlacedInsertIdx === -1) {
+                triggerErrorReset(`Ошибка! Вы не выбрали целевую ячейку для вставки входящего ключа "${p2IncomingKey}"!`, initPhase2);
+                return;
+            }
+
+            if (p2UserPlacedInsertIdx !== p2ExpectedInsertIdx) {
+                triggerErrorReset(`Ошибка алгоритма линейного пробирования! Входящий ключ с базовым хэшем ${p2IncomingHash} должен занять первую доступную позицию ([DEL] или [EMPTY]), начиная от индекса ${p2IncomingHash}. Ожидалась ячейка [${p2ExpectedInsertIdx}], а выбрана [${p2UserPlacedInsertIdx}]!`, initPhase2);
+                return;
+            }
+
+            // Успех Фазы 2!
+            window.parent.postMessage({
+                type: 'TELEMETRY_EVENT',
+                mission_name: missionName,
+                action_type: 'in_progress',
+                status: 'phase_complete',
+                phase: 2,
+                attempts_count: attemptsCount
+            }, '*');
+
+            currentPhase = 3;
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-title').textContent = 'Алфавитно-частотный словарь и двухкритериальный порядок';
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            initPhase3();
+        };
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Алфавитно-частотный словарь и двухкритериальный порядок
+    // =========================================================================
+    const p3VocabularyPool = [
+        ["байт", "код", "хэш", "ключ"],
+        ["узел", "граф", "стек", "файл"],
+        ["карта", "срез", "цикл", "шина"],
+        ["баг", "сеть", "порт", "шлюз"]
+    ];
+
+    let p3TokensStream = [];
+    let p3UniqueWords = [];
+    let p3TrueFrequencies = {}; // word -> count
+    let p3UserFrequencies = {}; // word -> count (stepper)
+    let p3ExpectedRanking = []; // array of word strings in order: (-freq, word_alphabetical)
+    let p3RankSlots = []; // array of 4 slots: [word_or_null, ...]
+    let p3SelectedRankWord = null;
+
+    function initPhase3() {
+        p3TokensStream = [];
+        p3TrueFrequencies = {};
+        p3UserFrequencies = {};
+        p3RankSlots = [null, null, null, null];
+        p3SelectedRankWord = null;
+
+        const wordsSet = shuffleArray(p3VocabularyPool[getRandomInt(0, p3VocabularyPool.length - 1)]);
+        p3UniqueWords = [...wordsSet];
+
+        // Генерируем распределение частот с гарантированной ничьей (равными частотами) для проверки алфавитного порядка
+        // Например: 3, 3, 1, 1 (всего 8 токенов)
+        const countsPattern = [3, 3, 1, 1];
+        wordsSet.forEach((w, idx) => {
+            const cnt = countsPattern[idx];
+            p3TrueFrequencies[w] = cnt;
+            p3UserFrequencies[w] = 0;
+            for (let c = 0; c < cnt; c++) {
+                p3TokensStream.push(w);
+            }
+        });
+
+        p3TokensStream = shuffleArray(p3TokensStream);
+
+        // Каноническое ранжирование: по убыванию частоты (-cnt), затем по алфавиту (localeCompare)
+        p3ExpectedRanking = [...wordsSet].sort((a, b) => {
+            const freqDiff = p3TrueFrequencies[b] - p3TrueFrequencies[a];
+            if (freqDiff !== 0) return freqDiff;
+            return a.localeCompare(b, 'ru');
+        });
+
+        renderPhase3();
+    }
+
+    function renderPhase3() {
+        const flow = document.getElementById('p3-tokens-flow');
+        const countersContainer = document.getElementById('p3-counter-cards');
+        const palette = document.getElementById('p3-rank-palette');
+        const slotsGrid = document.getElementById('p3-rank-slots');
+        if (!flow || !countersContainer || !palette || !slotsGrid) return;
+
+        flow.innerHTML = '';
+        countersContainer.innerHTML = '';
+        palette.innerHTML = '';
+        slotsGrid.innerHTML = '';
+
+        // 1. Поток токенов
+        p3TokensStream.forEach(token => {
+            const span = document.createElement('span');
+            span.className = 'badge bg-dark border border-secondary text-light px-2 py-1 font-monospace fs-6';
+            span.textContent = token;
+            flow.appendChild(span);
+        });
+
+        // 2. Интерактивные счетчики частот уникальных слов
+        p3UniqueWords.forEach(word => {
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-3';
+
+            const card = document.createElement('div');
+            card.className = 'card bg-dark border border-secondary rounded-0 p-2 text-center';
+
+            const val = p3UserFrequencies[word] || 0;
+
+            card.innerHTML = `
+                <div class="text-success fw-bold fs-6 mb-1">${word}</div>
+                <div class="display-6 text-light my-1">${val}</div>
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                    <button id="p3-dec-${word}" class="btn btn-outline-danger rounded-0 d-flex align-items-center justify-content-center" style="min-width: 48px; min-height: 48px;">
+                        <span class="fs-4 fw-bold">-</span>
+                    </button>
+                    <button id="p3-inc-${word}" class="btn btn-outline-success rounded-0 d-flex align-items-center justify-content-center" style="min-width: 48px; min-height: 48px;">
+                        <span class="fs-4 fw-bold">+</span>
+                    </button>
+                </div>
+            `;
+            col.appendChild(card);
+            countersContainer.appendChild(col);
+
+            const decBtn = card.querySelector(`#p3-dec-${word}`);
+            const incBtn = card.querySelector(`#p3-inc-${word}`);
+            if (decBtn) {
+                decBtn.onclick = () => {
+                    if (p3UserFrequencies[word] > 0) {
+                        p3UserFrequencies[word]--;
+                        renderPhase3();
+                    }
+                };
+            }
+            if (incBtn) {
+                incBtn.onclick = () => {
+                    p3UserFrequencies[word]++;
+                    renderPhase3();
+                };
+            }
+        });
+
+        // 3. Палитра слов для ранжирования
+        p3UniqueWords.forEach(word => {
+            const isPlaced = p3RankSlots.includes(word);
+            if (isPlaced) return;
+
+            const isSelected = (p3SelectedRankWord === word);
+            const chip = document.createElement('button');
+            chip.className = `btn rounded-0 font-monospace p-2 d-flex align-items-center gap-2 ${
+                isSelected ? 'btn-success text-dark fw-bold border-light shadow' : 'btn-dark text-light border-success'
+            }`;
+            chip.style.minHeight = '48px';
+            chip.setAttribute('data-rank-word', word);
+            chip.id = `p3-chip-${word}`;
+            chip.innerHTML = `
+                <span>${word}</span>
+                <span class="badge ${isSelected ? 'bg-dark text-white' : 'bg-success text-dark'} rounded-0">
+                    cnt: ${p3UserFrequencies[word] || 0}
+                </span>
+            `;
+            chip.onclick = () => {
+                p3SelectedRankWord = (p3SelectedRankWord === word) ? null : word;
+                renderPhase3();
+            };
+            palette.appendChild(chip);
+        });
+
+        if (palette.children.length === 0) {
+            palette.innerHTML = '<span class="text-secondary small fst-italic p-2">Все слова размещены по рангам. Кликните по слоту ранга, чтобы освободить его.</span>';
+        }
+
+        // 4. Слоты ранжированного словаря (Ранги 1..4)
+        for (let r = 0; r < 4; r++) {
+            const col = document.createElement('div');
+            col.className = 'col-12 col-sm-6 col-md-3';
+
+            const card = document.createElement('div');
+            card.className = 'card bg-dark border border-secondary rounded-0 h-100 text-center p-2';
+            card.style.minHeight = '110px';
+            card.setAttribute('data-rank-slot-index', String(r));
+            card.id = `p3-rank-slot-${r}`;
+
+            const assignedWord = p3RankSlots[r];
+
+            if (assignedWord) {
+                card.className = 'card bg-black border border-success rounded-0 h-100 text-center p-2 transition-colors';
+                card.style.cursor = 'pointer';
+                card.title = 'Кликните, чтобы убрать слово из ранга';
+                card.innerHTML = `
+                    <div class="text-secondary small fw-bold">РАНГ #${r + 1}</div>
+                    <div class="text-success fw-bold fs-5 my-1">${assignedWord}</div>
+                    <div class="badge bg-secondary rounded-0 text-white font-monospace">частота: ${p3UserFrequencies[assignedWord] || 0}</div>
+                    <div class="text-danger small mt-2">× Клик: Убрать</div>
+                `;
+                card.onclick = () => {
+                    p3RankSlots[r] = null;
+                    renderPhase3();
+                };
+            } else {
+                card.className = `card bg-dark border ${p3SelectedRankWord ? 'border-warning' : 'border-secondary'} rounded-0 h-100 text-center p-2`;
+                card.style.cursor = p3SelectedRankWord ? 'pointer' : 'default';
+                card.innerHTML = `
+                    <div class="text-secondary small fw-bold">РАНГ #${r + 1}</div>
+                    <div class="text-secondary fst-italic my-2">∅ Слот свободен</div>
+                    <div class="small ${p3SelectedRankWord ? 'text-warning fw-bold' : 'text-secondary'}">
+                        ${p3SelectedRankWord ? '➔ Кликните для вставки' : 'Ожидание выбора'}
+                    </div>
+                `;
+                card.onclick = () => {
+                    if (p3SelectedRankWord) {
+                        p3RankSlots[r] = p3SelectedRankWord;
+                        p3SelectedRankWord = null;
+                        renderPhase3();
+                    }
+                };
+            }
+
+            col.appendChild(card);
+            slotsGrid.appendChild(col);
+        }
+    }
+
+    // Проверка Фазы 3
+    const p3VerifyBtn = document.getElementById('p3-verify-btn');
+    if (p3VerifyBtn) {
+        p3VerifyBtn.onclick = () => {
+            if (isLocked) return;
+
+            // 1. Проверяем правильность подсчета частот
+            for (const word of p3UniqueWords) {
+                const userCnt = p3UserFrequencies[word] || 0;
+                const trueCnt = p3TrueFrequencies[word];
+                if (userCnt !== trueCnt) {
+                    triggerErrorReset(`Ошибка подсчета частоты! Для слова "${word}" указана частота ${userCnt}, а в тексте оно встретилось ровно ${trueCnt} раз(а)!`, initPhase3);
+                    return;
+                }
+            }
+
+            // 2. Проверяем заполнение всех 4 слотов рангов
+            for (let r = 0; r < 4; r++) {
+                if (!p3RankSlots[r]) {
+                    triggerErrorReset(`Ошибка! Не заполнен Ранг #${r + 1} частотного словаря!`, initPhase3);
+                    return;
+                }
+            }
+
+            // 3. Проверяем двухкритериальный порядок (частота по убыванию + алфавит по возрастанию)
+            for (let r = 0; r < 4; r++) {
+                const actualWord = p3RankSlots[r];
+                const expectedWord = p3ExpectedRanking[r];
+                if (actualWord !== expectedWord) {
+                    const actFreq = p3TrueFrequencies[actualWord];
+                    const expFreq = p3TrueFrequencies[expectedWord];
+                    if (actFreq !== expFreq) {
+                        triggerErrorReset(`Ошибка ранжирования в Ранге #${r + 1}! Ожидалось слово с более высокой частотой: "${expectedWord}" (${expFreq}), а установлено "${actualWord}" (${actFreq})!`, initPhase3);
+                    } else {
+                        triggerErrorReset(`Ошибка алфавитной сортировки при равенстве частот (${actFreq})! Слово "${expectedWord}" должно стоять раньше слова "${actualWord}" по алфавиту!`, initPhase3);
+                    }
+                    return;
+                }
+            }
+
+            // Все фазы успешно пройдены!
+            completeLevel();
+        };
+    }
+
+    // Тестовый хук для автоматизированного тестирования
+    window.__DEV_LEVEL1_STATE__ = {
+        getPhase: () => currentPhase,
+        getP1Tokens: () => p1AllTokens,
+        getP1ValidTokens: () => p1ValidItems,
+        getP1Distractors: () => p1DistractorItems,
+        getP2Delete: () => ({ key: p2TargetDeleteKey, idx: p2TargetDeleteIdx, state: p2UserDeletedState }),
+        getP2Incoming: () => ({ key: p2IncomingKey, hash: p2IncomingHash, expectedIdx: p2ExpectedInsertIdx }),
+        getP3Stream: () => p3TokensStream,
+        getP3Words: () => p3UniqueWords,
+        getP3TrueFreq: () => p3TrueFrequencies,
+        getP3UserFreq: () => p3UserFrequencies,
+        getP3ExpectedRanking: () => p3ExpectedRanking
+    };
+
+    // Старт
+    startTimer();
+    initPhase1();
+})();
+</script>

@@ -1,0 +1,720 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-warning mb-0 fw-bold">Тренажер: Аналитические расчеты ассоциативных массивов (Уровень 2)</h1>
+                <div class="text-secondary small">Урок 31 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">
+                Аналитический ввод // Anti-Paste Guard
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик попыток и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет: Полиномиальный хэш-код</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ОШИБКА АНАЛИЗА]</strong> <span id="feedback-text">Неверное расчетное значение!</span> 
+                            Регенерация параметров фазы...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 1: Прямой расчет полиномиального хэша (CCS = 4)      -->
+                <!-- ========================================================= -->
+                <div id="phase1" class="phase-container">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-warning mb-1">ЗАДАЧА 1 (Прямой расчет):</div>
+                        <div>
+                            Для двухсимвольного ключа <code class="text-info fs-5" id="p1-key-display"></code> вычислите индекс в хэш-таблице размера <span class="badge bg-secondary rounded-0 text-white" id="p1-m-badge">M = 17</span> по схеме Горнера:
+                        </div>
+                        <div class="p-2 bg-dark border border-secondary my-2 text-warning font-monospace">
+                            index = (c<sub>1</sub> · p + c<sub>2</sub>) mod M
+                        </div>
+                        <div class="small text-secondary" id="p1-params-desc">
+                            <!-- Описание кодов символов и p -->
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <label for="p1-input" class="form-label text-warning small text-uppercase">
+                            Введите вычисленный индекс ячейки (целое число от 0 до M - 1):
+                        </label>
+                        <div class="input-group" style="max-width: 580px;">
+                            <input 
+                                type="text" 
+                                inputmode="numeric" 
+                                id="p1-input" 
+                                class="form-control bg-dark text-warning border-warning rounded-0 font-monospace fs-5" 
+                                placeholder="Например: 7" 
+                                autocomplete="off" 
+                                onpaste="return false;"
+                            />
+                            <button id="p1-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark text-uppercase" style="min-height: 48px;">
+                                Подтвердить [Enter]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 2: Многошаговый расчет памяти хэш-таблицы (CCS = 6)  -->
+                <!-- ========================================================= -->
+                <div id="phase2" class="phase-container d-none">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-warning mb-1">ЗАДАЧА 2 (Многошаговый расчет структуры памяти):</div>
+                        <div>
+                            В 64-битной вычислительной системе хэш-таблица реализована методом цепочек (Separate Chaining):
+                        </div>
+                        <div class="small text-secondary my-2">
+                            • Базовый массив содержит ровно <span class="text-info fw-bold" id="p2-buckets-count"></span> указателей на корзины (каждый указатель занимает <span class="text-light">8 байт</span>).<br>
+                            • В таблицу успешно записано <span class="text-info fw-bold" id="p2-entries-count"></span> пар «ключ-значение».<br>
+                            • Каждый узел связного списка в цепочке содержит: указатель на ключ (8 байт), указатель на значение (8 байт) и указатель на следующий узел (8 байт) — суммарно <span class="text-light">24 байта</span> на запись.
+                        </div>
+                        <div class="text-light">
+                            Рассчитайте <strong class="text-warning">суммарный объем оперативной памяти в байтах</strong>, занимаемый всей структурой таблицы (массив корзин + все узлы списков).
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <label for="p2-input" class="form-label text-warning small text-uppercase">
+                            Введите суммарный объем служебной памяти (в байтах):
+                        </label>
+                        <div class="input-group" style="max-width: 580px;">
+                            <input 
+                                type="text" 
+                                inputmode="numeric" 
+                                id="p2-input" 
+                                class="form-control bg-dark text-warning border-warning rounded-0 font-monospace fs-5" 
+                                placeholder="Например: 1712" 
+                                autocomplete="off" 
+                                onpaste="return false;"
+                            />
+                            <button id="p2-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark text-uppercase" style="min-height: 48px;">
+                                Подтвердить [Enter]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 3: Пик 1 (Инверсия / Обратная задача) (CCS = 7-8)    -->
+                <!-- ========================================================= -->
+                <div id="phase3" class="phase-container d-none">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-warning mb-1">ЗАДАЧА 3 (Пик 1: Инверсия открытой адресации):</div>
+                        <div>
+                            Хэш-таблица размера <span class="badge bg-secondary rounded-0 text-white" id="p3-m-badge">M = 11</span> использует открытую адресацию с линейным пробированием:
+                            <code class="text-info">idx<sub>i</sub> = (h(k) + i) mod M</code>.
+                        </div>
+                        <div class="small text-secondary my-2">
+                            При вставке ключа возникло ровно <span class="text-danger fw-bold" id="p3-collisions-count"></span> коллизий (первые исследованные ячейки оказались заняты другими элементами). В результате ключ был успешно записан в свободную ячейку с индексом <span class="text-success fw-bold" id="p3-final-idx"></span>.
+                        </div>
+                        <div class="text-light">
+                            Определите <strong class="text-warning">исходный базовый хэш-индекс</strong> данного ключа: <code class="text-warning">h(k) mod M</code> (целое число от 0 до M - 1).
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <label for="p3-input" class="form-label text-warning small text-uppercase">
+                            Введите исходный хэш-индекс h(k) mod M:
+                        </label>
+                        <div class="input-group" style="max-width: 580px;">
+                            <input 
+                                type="text" 
+                                inputmode="numeric" 
+                                id="p3-input" 
+                                class="form-control bg-dark text-warning border-warning rounded-0 font-monospace fs-5" 
+                                placeholder="Например: 4" 
+                                autocomplete="off" 
+                                onpaste="return false;"
+                            />
+                            <button id="p3-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark text-uppercase" style="min-height: 48px;">
+                                Подтвердить [Enter]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 4: Долина консолидации (Инвариант сортировки) (CCS = 5)-->
+                <!-- ========================================================= -->
+                <div id="phase4" class="phase-container d-none">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-warning mb-1">ЗАДАЧА 4 (Долина консолидации: Ранжирование словаря):</div>
+                        <div>
+                            Дан фрагмент неотсортированного частотного словаря, полученного после анализа текста:
+                        </div>
+                        <div id="p4-dict-display" class="p-2 bg-dark border border-secondary my-2 font-monospace text-light">
+                            <!-- Словарь с частотами -->
+                        </div>
+                        <div class="text-light">
+                            По правилу построения алфавитно-частотного словаря записи сортируются:
+                            <br>1) <strong>по убыванию частоты</strong>;
+                            <br>2) при равных частотах — <strong>по возрастанию слова в русском алфавитном порядке</strong>.
+                        </div>
+                        <div class="mt-2 text-warning fw-bold" id="p4-target-rank-question">
+                            <!-- Какое слово займет ранг N? -->
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <label for="p4-input" class="form-label text-warning small text-uppercase">
+                            Введите искомое слово строчными русскими буквами:
+                        </label>
+                        <div class="input-group" style="max-width: 580px;">
+                            <input 
+                                type="text" 
+                                id="p4-input" 
+                                class="form-control bg-dark text-warning border-warning rounded-0 font-monospace fs-5" 
+                                placeholder="Например: код" 
+                                autocomplete="off" 
+                                onpaste="return false;"
+                            />
+                            <button id="p4-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark text-uppercase" style="min-height: 48px;">
+                                Подтвердить [Enter]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ФАЗА 5: Кульминация (Динамическое рехэширование) (CCS = 8-9)-->
+                <!-- ========================================================= -->
+                <div id="phase5" class="phase-container d-none">
+                    <div class="alert alert-dark bg-black border border-secondary text-light rounded-0 mb-3 p-3">
+                        <div class="fw-bold text-warning mb-1">ЗАДАЧА 5 (Кульминация: Динамическое рехэширование потока):</div>
+                        <div>
+                            Инвертированный индекс инициализирует хэш-таблицу с начальной емкостью <span class="badge bg-secondary rounded-0 text-white" id="p5-m0-badge">M<sub>0</sub> = 16</span> ячеек.
+                        </div>
+                        <div class="small text-secondary my-2">
+                            • Таблица использует открытую адресацию.<br>
+                            • Пороговый коэффициент заполнения: <span class="text-warning fw-bold">α<sub>порог</sub> = 0.75</span>.<br>
+                            • Если в момент добавления нового элемента текущий коэффициент заполнения достигает или превышает порог (<code class="text-warning">N / M ≥ 0.75</code>), немедленно выполняется процедура рехэширования: емкость таблицы <strong>удваивается</strong> (<code class="text-info">M<sub>new</sub> = 2 · M<sub>old</sub></code>), после чего элемент добавляется.
+                        </div>
+                        <div class="text-light">
+                            В пустую таблицу последовательно поступило <span class="text-success fw-bold fs-5" id="p5-unique-count"></span> <strong class="text-success">уникальных</strong> слов.
+                            <br>Определите <strong class="text-warning">итоговую физическую емкость (размер M)</strong> хэш-таблицы после завершения всех вставок.
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <label for="p5-input" class="form-label text-warning small text-uppercase">
+                            Введите итоговую емкость хэш-таблицы (число ячеек M):
+                        </label>
+                        <div class="input-group" style="max-width: 580px;">
+                            <input 
+                                type="text" 
+                                inputmode="numeric" 
+                                id="p5-input" 
+                                class="form-control bg-dark text-warning border-warning rounded-0 font-monospace fs-5" 
+                                placeholder="Например: 64" 
+                                autocomplete="off" 
+                                onpaste="return false;"
+                            />
+                            <button id="p5-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark text-uppercase" style="min-height: 48px;">
+                                Подтвердить [Enter]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- ЭКРАН ПОБЕДЫ (Успешное завершение Уровня 2)               -->
+                <!-- ========================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="mb-3">
+                        <span class="display-3 text-warning">★</span>
+                    </div>
+                    <h2 class="h3 text-warning text-uppercase fw-bold mb-2">Аналитический уровень пройден!</h2>
+                    <p class="text-light mb-4">
+                        Вы успешно выполнили расчеты полиномиальных хэшей, структуры памяти, инвертированной адресации и динамического рехэширования.
+                    </p>
+                    <div class="d-inline-flex flex-column gap-2 text-start bg-black border border-warning p-3 rounded-0 mb-4 font-monospace">
+                        <div>Телеметрия аналитики: <span class="text-warning fw-bold">УСПЕХ</span></div>
+                        <div>Затраченное время: <span id="final-time" class="text-info fw-bold">00:00</span></div>
+                        <div>Штрафные сбои (ошибки): <span id="final-attempts" class="text-danger fw-bold">0</span></div>
+                    </div>
+                    <div>
+                        <button onclick="location.reload()" class="btn btn-outline-warning rounded-0 px-4 py-2 text-uppercase fw-bold" style="min-height: 48px;">
+                            Пройти повторно (с новыми параметрами)
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    const missionName = 'Урок 31 :: Словари (ассоциативные массивы, отображения). Хэш-таблицы (Уровень 2)';
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Вспомогательные генераторы
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    // Таймер
+    function startTimer() {
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Обработка ошибок со штрафом и регенерацией текущей фазы
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'hardcore_reset',
+            status: 'failed',
+            attempts_count: attemptsCount
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1500);
+    }
+
+    // Завершение уровня
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        for (let i = 1; i <= 5; i++) {
+            const p = document.getElementById(`phase${i}`);
+            if (p) p.classList.add('d-none');
+        }
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // Блокировка вставки (Anti-Paste)
+    document.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('paste', e => e.preventDefault());
+        inp.addEventListener('drop', e => e.preventDefault());
+    });
+
+    // =========================================================================
+    // ФАЗА 1: Прямой расчет полиномиального хэша (CCS = 4)
+    // =========================================================================
+    let p1ExpectedIndex = 0;
+
+    function initPhase1() {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        const primes = [7, 11, 13];
+        const mods = [17, 19, 23];
+
+        const char1 = letters[getRandomInt(0, letters.length - 1)];
+        const char2 = letters[getRandomInt(0, letters.length - 1)];
+        const code1 = char1.charCodeAt(0);
+        const code2 = char2.charCodeAt(0);
+        const p = primes[getRandomInt(0, primes.length - 1)];
+        const M = mods[getRandomInt(0, mods.length - 1)];
+
+        p1ExpectedIndex = (code1 * p + code2) % M;
+
+        const keyDisp = document.getElementById('p1-key-display');
+        const mBadge = document.getElementById('p1-m-badge');
+        const desc = document.getElementById('p1-params-desc');
+        const inp = document.getElementById('p1-input');
+
+        if (keyDisp) keyDisp.textContent = `"${char1}${char2}"`;
+        if (mBadge) mBadge.textContent = `M = ${M}`;
+        if (desc) {
+            desc.innerHTML = `
+                Параметры: c<sub>1</sub> (код '${char1}') = <strong>${code1}</strong>, 
+                c<sub>2</sub> (код '${char2}') = <strong>${code2}</strong>, 
+                основание p = <strong>${p}</strong>, размер M = <strong>${M}</strong>.
+            `;
+        }
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase1() {
+        const inp = document.getElementById('p1-input');
+        if (!inp) return;
+        const val = parseInt(inp.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerErrorReset('Введите корректное целое число!', initPhase1);
+            return;
+        }
+        if (val !== p1ExpectedIndex) {
+            triggerErrorReset(`Неверный индекс! Ожидалось значение ${p1ExpectedIndex}, а получено ${val}.`, initPhase1);
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'phase_complete',
+            phase: 1,
+            attempts_count: attemptsCount
+        }, '*');
+
+        currentPhase = 2;
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+        document.getElementById('phase-title').textContent = 'Многошаговый расчет структуры памяти (Separate Chaining)';
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.remove('d-none');
+        initPhase2();
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Многошаговый расчет памяти хэш-таблицы (CCS = 6)
+    // =========================================================================
+    let p2ExpectedBytes = 0;
+
+    function initPhase2() {
+        const bucketsOptions = [32, 64, 128];
+        const entriesOptions = [25, 40, 50, 75];
+
+        const M = bucketsOptions[getRandomInt(0, bucketsOptions.length - 1)];
+        const N = entriesOptions[getRandomInt(0, entriesOptions.length - 1)];
+
+        // Память = M * 8 (массив указателей) + N * 24 (узлы: key_ptr + val_ptr + next_ptr)
+        p2ExpectedBytes = (M * 8) + (N * 24);
+
+        const bCount = document.getElementById('p2-buckets-count');
+        const eCount = document.getElementById('p2-entries-count');
+        const inp = document.getElementById('p2-input');
+
+        if (bCount) bCount.textContent = `${M} корзин`;
+        if (eCount) eCount.textContent = `${N}`;
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase2() {
+        const inp = document.getElementById('p2-input');
+        if (!inp) return;
+        const val = parseInt(inp.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerErrorReset('Введите корректное число байт!', initPhase2);
+            return;
+        }
+        if (val !== p2ExpectedBytes) {
+            triggerErrorReset(`Неверный расчет памяти! Ожидалось ${p2ExpectedBytes} байт, а введено ${val}.`, initPhase2);
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'phase_complete',
+            phase: 2,
+            attempts_count: attemptsCount
+        }, '*');
+
+        currentPhase = 3;
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+        document.getElementById('phase-title').textContent = 'Пик 1: Инверсия открытой адресации';
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.remove('d-none');
+        initPhase3();
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Пик 1 (Инверсия / Обратная задача) (CCS = 7-8)
+    // =========================================================================
+    let p3ExpectedBaseHash = 0;
+
+    function initPhase3() {
+        const mods = [11, 13];
+        const M = mods[getRandomInt(0, mods.length - 1)];
+        const baseHash = getRandomInt(0, M - 1);
+        const collisions = getRandomInt(2, 5); // число коллизий (шагов i)
+        const finalIdx = (baseHash + collisions) % M;
+
+        p3ExpectedBaseHash = baseHash;
+
+        const mBadge = document.getElementById('p3-m-badge');
+        const cCount = document.getElementById('p3-collisions-count');
+        const fIdx = document.getElementById('p3-final-idx');
+        const inp = document.getElementById('p3-input');
+
+        if (mBadge) mBadge.textContent = `M = ${M}`;
+        if (cCount) cCount.textContent = `${collisions}`;
+        if (fIdx) fIdx.textContent = `[${finalIdx}]`;
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase3() {
+        const inp = document.getElementById('p3-input');
+        if (!inp) return;
+        const val = parseInt(inp.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerErrorReset('Введите целое число от 0 до M - 1!', initPhase3);
+            return;
+        }
+        if (val !== p3ExpectedBaseHash) {
+            triggerErrorReset(`Неверный исходный хэш! При ${val} + коллизии итоговая ячейка не совпадает. Ожидался хэш ${p3ExpectedBaseHash}.`, initPhase3);
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'phase_complete',
+            phase: 3,
+            attempts_count: attemptsCount
+        }, '*');
+
+        currentPhase = 4;
+        document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+        document.getElementById('phase-title').textContent = 'Долина консолидации: Ранжирование частотного словаря';
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('phase4').classList.remove('d-none');
+        initPhase4();
+    }
+
+    // =========================================================================
+    // ФАЗА 4: Долина консолидации (Инвариант сортировки) (CCS = 5)
+    // =========================================================================
+    let p4ExpectedWord = '';
+
+    function initPhase4() {
+        const wordsPool = [
+            { w: "алгоритм", freq: 14 },
+            { w: "байт",     freq: 8 },
+            { w: "код",      freq: 14 },
+            { w: "массив",   freq: 5 },
+            { w: "хэш",      freq: 8 },
+            { w: "стек",     freq: 5 }
+        ];
+
+        // Перемешиваем пары для отображения
+        const shuffled = shuffleArray(wordsPool);
+
+        // Каноническая сортировка: (-freq, word_alphabetical)
+        const sorted = [...wordsPool].sort((a, b) => {
+            if (b.freq !== a.freq) return b.freq - a.freq;
+            return a.w.localeCompare(b.w, 'ru');
+        });
+
+        // Задаем вопрос про случайный ранг (от 1 до 4)
+        const targetRank = getRandomInt(1, 4);
+        p4ExpectedWord = sorted[targetRank - 1].w;
+
+        const dictDisp = document.getElementById('p4-dict-display');
+        const qText = document.getElementById('p4-target-rank-question');
+        const inp = document.getElementById('p4-input');
+
+        if (dictDisp) {
+            dictDisp.innerHTML = shuffled.map(item => `
+                <span class="badge bg-secondary rounded-0 text-white me-2 mb-1 p-2 font-monospace fs-6">
+                    "${item.w}": ${item.freq}
+                </span>
+            `).join(' ');
+        }
+        if (qText) {
+            qText.textContent = `ВОПРОС: Какое слово займет позицию Ранг #${targetRank} в упорядоченном словаре?`;
+        }
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase4() {
+        const inp = document.getElementById('p4-input');
+        if (!inp) return;
+        const val = inp.value.trim().toLowerCase();
+        if (!val) {
+            triggerErrorReset('Введите слово!', initPhase4);
+            return;
+        }
+        if (val !== p4ExpectedWord) {
+            triggerErrorReset(`Неверное слово! Ожидалось слово "${p4ExpectedWord}", а введено "${val}". Помните: сначала по убыванию частоты, затем по алфавиту!`, initPhase4);
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'phase_complete',
+            phase: 4,
+            attempts_count: attemptsCount
+        }, '*');
+
+        currentPhase = 5;
+        document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+        document.getElementById('phase-title').textContent = 'Кульминация: Динамическое рехэширование потока';
+        document.getElementById('phase4').classList.add('d-none');
+        document.getElementById('phase5').classList.remove('d-none');
+        initPhase5();
+    }
+
+    // =========================================================================
+    // ФАЗА 5: Кульминация (Динамическое рехэширование) (CCS = 8-9)
+    // =========================================================================
+    let p5ExpectedFinalM = 0;
+
+    function initPhase5() {
+        const initialM = 16;
+        const threshold = 0.75;
+
+        // Выбираем количество уникальных слов U так, чтобы потребовалось 1, 2 или 3 рехэширования
+        // M=16 -> рехэш при N >= 12 (16*0.75)
+        // M=32 -> рехэш при N >= 24 (32*0.75)
+        // M=64 -> рехэш при N >= 48 (64*0.75)
+        // M=128 -> рехэш при N >= 96 (128*0.75)
+        const scenarios = [
+            { u: getRandomInt(13, 23), finalM: 32 },
+            { u: getRandomInt(25, 47), finalM: 64 },
+            { u: getRandomInt(49, 90), finalM: 128 },
+            { u: getRandomInt(97, 180), finalM: 256 }
+        ];
+
+        const chosen = scenarios[getRandomInt(0, scenarios.length - 1)];
+        p5ExpectedFinalM = chosen.finalM;
+
+        const m0Badge = document.getElementById('p5-m0-badge');
+        const uCount = document.getElementById('p5-unique-count');
+        const inp = document.getElementById('p5-input');
+
+        if (m0Badge) m0Badge.textContent = `M₀ = ${initialM}`;
+        if (uCount) uCount.textContent = `${chosen.u}`;
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase5() {
+        const inp = document.getElementById('p5-input');
+        if (!inp) return;
+        const val = parseInt(inp.value.trim(), 10);
+        if (isNaN(val)) {
+            triggerErrorReset('Введите целое число — размер таблицы M!', initPhase5);
+            return;
+        }
+        if (val !== p5ExpectedFinalM) {
+            triggerErrorReset(`Неверный итоговый размер таблицы! Ожидалось M = ${p5ExpectedFinalM}, а введено M = ${val}. Проверьте пороги рехэширования N / M >= 0.75!`, initPhase5);
+            return;
+        }
+
+        // Завершение всего Уровня 2!
+        completeLevel();
+    }
+
+    // Обработчики кнопок отправки и клавиши Enter
+    document.getElementById('p1-submit-btn').onclick = verifyPhase1;
+    document.getElementById('p1-input').onkeydown = e => { if (e.key === 'Enter') verifyPhase1(); };
+
+    document.getElementById('p2-submit-btn').onclick = verifyPhase2;
+    document.getElementById('p2-input').onkeydown = e => { if (e.key === 'Enter') verifyPhase2(); };
+
+    document.getElementById('p3-submit-btn').onclick = verifyPhase3;
+    document.getElementById('p3-input').onkeydown = e => { if (e.key === 'Enter') verifyPhase3(); };
+
+    document.getElementById('p4-submit-btn').onclick = verifyPhase4;
+    document.getElementById('p4-input').onkeydown = e => { if (e.key === 'Enter') verifyPhase4(); };
+
+    document.getElementById('p5-submit-btn').onclick = verifyPhase5;
+    document.getElementById('p5-input').onkeydown = e => { if (e.key === 'Enter') verifyPhase5(); };
+
+    // Тестовый хук для автоматизированного тестирования
+    window.__DEV_LEVEL2_STATE__ = {
+        getPhase: () => currentPhase,
+        getP1Expected: () => p1ExpectedIndex,
+        getP2Expected: () => p2ExpectedBytes,
+        getP3Expected: () => p3ExpectedBaseHash,
+        getP4Expected: () => p4ExpectedWord,
+        getP5Expected: () => p5ExpectedFinalM
+    };
+
+    // Старт
+    startTimer();
+    initPhase1();
+})();
+</script>
