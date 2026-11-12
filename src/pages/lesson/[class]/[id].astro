@@ -1206,6 +1206,30 @@ const tasks = [
     } catch (e) {}
   }
 
+  function playTermSuccessSound() {
+    if (!sprintSoundEnabled) return;
+    try {
+      initSprintAudio();
+      if (!sprintAudioCtx) return;
+      const t = sprintAudioCtx.currentTime;
+      const osc = sprintAudioCtx.createOscillator();
+      const gain = sprintAudioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, t);
+      osc.frequency.setValueAtTime(659.25, t + 0.05);
+      osc.frequency.setValueAtTime(783.99, t + 0.10);
+
+      gain.gain.setValueAtTime(0.20, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+      osc.connect(gain);
+      gain.connect(sprintAudioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.23);
+    } catch (e) {}
+  }
+
   if (sprintSoundToggle && sprintSoundIcon) {
     sprintSoundToggle.addEventListener('click', () => {
       initSprintAudio();
@@ -1220,8 +1244,12 @@ const tasks = [
 
   // Engine state
   let sprintActiveTerms = [];
+  let activeTermIndex = 0;
   let currentTargetText = '';
   let currentIndex = 0;
+  let completedCharsCount = 0;
+  let totalCharsAllTerms = 0;
+  let justAdvancedTerm = false;
   let sprintStartTime = null;
   let sprintTimerInterval = null;
   let sprintErrorsCount = 0;
@@ -1262,54 +1290,38 @@ const tasks = [
     return `${term}.`;
   }
 
-  function getActiveTermObj(charIndex) {
-    if (!sprintActiveTerms || sprintActiveTerms.length === 0) return null;
-    let runningLen = 0;
-    for (let i = 0; i < sprintActiveTerms.length; i++) {
-      const item = sprintActiveTerms[i];
-      const sentence = formatTermSentence(item);
-      const nextLen = runningLen + sentence.length + 1; // + 1 space
-      if (charIndex < nextLen || i === sprintActiveTerms.length - 1) {
-        return {
-          term: typeof item === 'string' ? item : item.term,
-          definition: typeof item === 'string' ? '' : (item.definition || ''),
-          sentence: sentence,
-          index: i + 1,
-          total: sprintActiveTerms.length
-        };
-      }
-      runningLen = nextLen;
-    }
-    return null;
-  }
+  function updateActiveDefinition() {
+    if (!sprintActiveTerms || sprintActiveTerms.length === 0) return;
+    const item = sprintActiveTerms[activeTermIndex];
+    if (!item) return;
+    const term = typeof item === 'string' ? item : (item.term || '');
+    const definition = typeof item === 'string' ? '' : (item.definition || '');
 
-  function updateActiveDefinition(charIndex = currentIndex) {
-    const active = getActiveTermObj(charIndex);
-    if (!active) return;
-    if (sprintDefTermEl) sprintDefTermEl.textContent = active.term;
+    if (sprintDefTermEl) sprintDefTermEl.textContent = term;
     if (sprintDefDescEl) {
-      sprintDefDescEl.textContent = active.definition || 'Термин из теории урока';
+      sprintDefDescEl.textContent = definition || 'Термин из теории урока';
     }
     if (sprintDefStepEl) {
-      sprintDefStepEl.textContent = `${active.index} / ${active.total}`;
+      sprintDefStepEl.textContent = `${activeTermIndex + 1} / ${sprintActiveTerms.length}`;
     }
   }
 
   function updateLiveMetrics() {
-    if (sprintCharsProgressEl) sprintCharsProgressEl.textContent = String(currentIndex);
-    if (sprintCharsTotalEl) sprintCharsTotalEl.textContent = String(currentTargetText.length);
+    const totalProgress = completedCharsCount + currentIndex;
+    if (sprintCharsProgressEl) sprintCharsProgressEl.textContent = String(totalProgress);
+    if (sprintCharsTotalEl) sprintCharsTotalEl.textContent = String(totalCharsAllTerms);
     if (sprintErrorsCountEl) sprintErrorsCountEl.textContent = String(sprintErrorsCount);
 
-    const totalTyped = currentIndex + sprintErrorsCount;
+    const totalTyped = totalProgress + sprintErrorsCount;
     const accuracy = totalTyped > 0 
-      ? Math.max(0, Math.min(100, Math.round(((currentIndex) / totalTyped) * 1000) / 10))
+      ? Math.max(0, Math.min(100, Math.round((totalProgress / totalTyped) * 1000) / 10))
       : 100;
     if (sprintLiveAccEl) sprintLiveAccEl.textContent = `${accuracy}%`;
 
     if (isSprintStarted && sprintStartTime) {
       const elapsedMs = performance.now() - sprintStartTime;
       const elapsedMin = elapsedMs / 60000;
-      const cpm = elapsedMin > 0 ? Math.round(currentIndex / elapsedMin) : 0;
+      const cpm = elapsedMin > 0 ? Math.round(totalProgress / elapsedMin) : 0;
       if (sprintLiveCpmEl) sprintLiveCpmEl.textContent = String(cpm);
       if (sprintLiveTimerEl) sprintLiveTimerEl.textContent = formatSprintTimer(elapsedMs);
     } else {
@@ -1371,16 +1383,20 @@ const tasks = [
     sprintStartTime = null;
     sprintErrorsCount = 0;
     currentIndex = 0;
+    completedCharsCount = 0;
+    activeTermIndex = 0;
+    justAdvancedTerm = false;
     lastSprintResult = null;
 
     sprintActiveTerms = shuffle ? shuffleArray(sprintTerms) : [...sprintTerms];
-    currentTargetText = sprintActiveTerms.map(formatTermSentence).join(' ');
+    totalCharsAllTerms = sprintActiveTerms.reduce((sum, item) => sum + formatTermSentence(item).length, 0);
+    currentTargetText = sprintActiveTerms.length > 0 ? formatTermSentence(sprintActiveTerms[0]) : '';
 
     if (sprintTermsCountEl) sprintTermsCountEl.textContent = String(sprintActiveTerms.length);
 
     renderTextDisplay();
     updateLiveMetrics();
-    updateActiveDefinition(0);
+    updateActiveDefinition();
 
     if (sprintPlayArena) sprintPlayArena.classList.remove('hidden');
     if (sprintResultsCard) {
@@ -1402,7 +1418,7 @@ const tasks = [
     clearInterval(sprintTimerInterval);
     const elapsedMs = performance.now() - sprintStartTime;
     const elapsedSec = Math.max(1, Math.round(elapsedMs / 1000));
-    const totalChars = currentTargetText.length;
+    const totalChars = totalCharsAllTerms;
     const cpm = Math.round((totalChars / (elapsedMs / 60000)));
     const wpm = Math.round(cpm / 5);
     const totalTyped = totalChars + sprintErrorsCount;
@@ -1447,6 +1463,13 @@ const tasks = [
   function handleSprintKey(key) {
     if (isSprintFinished || !currentTargetText || currentIndex >= currentTargetText.length) return;
 
+    if (justAdvancedTerm) {
+      justAdvancedTerm = false;
+      if (key === ' ' && currentTargetText[currentIndex] !== ' ') {
+        return; // forgive trailing space from finishing previous term
+      }
+    }
+
     if (!isSprintStarted) {
       isSprintStarted = true;
       sprintStartTime = performance.now();
@@ -1459,17 +1482,34 @@ const tasks = [
     }
 
     const expectedChar = currentTargetText[currentIndex];
+    const isLastChar = (currentIndex === currentTargetText.length - 1);
+    const isMatch = isCharMatch(key, expectedChar) ||
+      (isLastChar && expectedChar === '.' && (key === ' ' || key === 'Enter'));
 
-    if (isCharMatch(key, expectedChar)) {
+    if (isMatch) {
       playKeyClickSound();
       currentIndex++;
-      updateLiveMetrics();
-      updateActiveDefinition(currentIndex);
+
       if (currentIndex >= currentTargetText.length) {
-        renderTextDisplay();
-        finishSprint();
+        completedCharsCount += currentTargetText.length;
+        playTermSuccessSound();
+        activeTermIndex++;
+
+        if (activeTermIndex >= sprintActiveTerms.length) {
+          updateLiveMetrics();
+          renderTextDisplay();
+          finishSprint();
+        } else {
+          justAdvancedTerm = true;
+          currentIndex = 0;
+          currentTargetText = formatTermSentence(sprintActiveTerms[activeTermIndex]);
+          updateActiveDefinition();
+          renderTextDisplay();
+          updateLiveMetrics();
+        }
       } else {
         renderTextDisplay();
+        updateLiveMetrics();
       }
     } else {
       playErrorGlitchSound();

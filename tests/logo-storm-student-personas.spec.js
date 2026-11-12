@@ -113,15 +113,22 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     const overlay = page.locator('#sprint-overlay');
     await expect(overlay).toBeVisible();
 
-    // Read full target text from rendered spans
-    const spansCount = await page.locator('#sprint-text-display span').count();
-    expect(spansCount).toBeGreaterThan(100);
+    // Diligent types terms one by one until sprint finishes
+    const totalTerms = Number(await page.locator('#sprint-terms-count').textContent());
+    expect(totalTerms).toBeGreaterThan(0);
 
-    // Read full text directly from spans preserving whitespace and type sequentially
-    const fullText = await page.evaluate(() => 
-      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
-    );
-    await page.locator('#sprint-hidden-input').pressSequentially(fullText);
+    for (let t = 0; t < totalTerms; t++) {
+      // Verify step counter in HUD updates with each active term
+      await expect(page.locator('#sprint-def-step')).toHaveText(`${t + 1} / ${totalTerms}`);
+
+      // Read current term sentence directly from spans preserving whitespace and type sequentially
+      const termSentence = await page.evaluate(() => 
+        Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+      );
+      expect(termSentence.length).toBeGreaterThan(0);
+
+      await page.locator('#sprint-hidden-input').pressSequentially(termSentence);
+    }
 
     // Results card must appear
     const resultsCard = page.locator('#sprint-results-card');
@@ -141,6 +148,44 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     // Success banner must appear and leaderboard refreshes
     await expect(page.locator('#sprint-telemetry-banner')).toBeVisible();
     await expect(saveBtn).toHaveText('✓ Зафиксировано в журнале');
+
+    sim.assertCleanSession();
+  });
+
+  test('Persona: DILIGENT — Grade 9 Lesson 8: streams terms one by one, verifying didactic definition synchronization', async ({ page }) => {
+    const sim = new StudentSimulator(page, { persona: LearnerPersona.DILIGENT });
+    await page.goto('/lesson/9-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/8');
+
+    await page.locator('#sprint-toggle').click();
+    const overlay = page.locator('#sprint-overlay');
+    await expect(overlay).toBeVisible();
+
+    // Lesson 8 has 12 terms
+    await expect(page.locator('#sprint-terms-count')).toHaveText('12');
+
+    // First term is rendered in arena and HUD
+    await expect(page.locator('#sprint-def-step')).toHaveText('1 / 12');
+    const firstTermHud = await page.locator('#sprint-def-term').textContent();
+    expect(firstTermHud.trim().length).toBeGreaterThan(0);
+
+    // Arena only contains the single active term's text
+    const term1Text = await page.evaluate(() => 
+      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+    );
+    expect(term1Text.toLowerCase()).toContain(firstTermHud.trim().toLowerCase());
+
+    // Type the first term sentence
+    await page.locator('#sprint-hidden-input').pressSequentially(term1Text);
+
+    // Immediately switches to term 2 in HUD and arena
+    await expect(page.locator('#sprint-def-step')).toHaveText('2 / 12');
+    const secondTermHud = await page.locator('#sprint-def-term').textContent();
+    expect(secondTermHud.trim().length).toBeGreaterThan(0);
+
+    const term2Text = await page.evaluate(() => 
+      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+    );
+    expect(term2Text.toLowerCase()).toContain(secondTermHud.trim().toLowerCase());
 
     sim.assertCleanSession();
   });
