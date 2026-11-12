@@ -194,4 +194,33 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
 
     sim.assertCleanSession();
   });
+
+  test('Persona: NOVICE — Grade 11 Basic Lesson 9: launches Logo-Storm, verifies 18 terms and HUD', async ({ page }) => {
+    const sim = new StudentSimulator(page, { persona: LearnerPersona.NOVICE });
+    await page.goto('/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D0%B1%D0%B0%D0%B7%D0%BE%D0%B2%D1%8B%D0%B9/9');
+
+    const sprintBtn = page.locator('#sprint-toggle');
+    await expect(sprintBtn).toBeVisible();
+    await expect(sprintBtn).not.toBeDisabled();
+
+    await sprintBtn.click();
+    const overlay = page.locator('#sprint-overlay');
+    await expect(overlay).toBeVisible();
+
+    // Lesson 9 has 18 terms
+    await expect(page.locator('#sprint-terms-count')).toHaveText('18');
+    await expect(page.locator('#sprint-def-step')).toHaveText('1 / 18');
+
+    // Definition HUD displays term and definition
+    const defTerm = await page.locator('#sprint-def-term').textContent();
+    const defDesc = await page.locator('#sprint-def-desc').textContent();
+    expect(defTerm.trim().length).toBeGreaterThan(0);
+    expect(defDesc.trim().length).toBeGreaterThan(0);
+
+    // Close via Esc
+    await page.keyboard.press('Escape');
+    await expect(overlay).toBeHidden();
+
+    sim.assertCleanSession();
+  });
 });
