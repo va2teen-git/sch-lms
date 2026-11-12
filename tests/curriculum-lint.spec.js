@@ -120,4 +120,21 @@ test.describe('Curriculum & Architecture Linting Suite (Lesson 20)', () => {
     expect(code.includes('<style>')).toBe(false);
     expect(code.includes('<style ')).toBe(false);
   });
+
+  test('YAML frontmatter sprintTerms is stripped and never leaks into rendered theory markdown/HTML', async () => {
+    const rawContent = `---
+sprintTerms:
+  - term: "табличная модель"
+    definition: "информационная модель"
+---
+
+# Заголовок урока
+
+Текст теории с нормальным содержанием.`;
+
+    const cleanMd = rawContent.replace(/^\uFEFF?---[\r\n]+[\s\S]*?[\r\n]+---(?:[\r\n]+|$)/, '');
+    expect(cleanMd).not.toContain('sprintTerms:');
+    expect(cleanMd).not.toContain('табличная модель');
+    expect(cleanMd.startsWith('# Заголовок урока')).toBe(true);
+  });
 });
