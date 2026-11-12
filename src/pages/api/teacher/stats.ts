@@ -151,11 +151,22 @@ export const GET: APIRoute = async ({ request }) => {
 
     let testCondition = '';
     if (excludeTests) {
-      testCondition = ` AND first_name NOT LIKE '%Unknown%' 
-                        AND last_name NOT LIKE '%Unknown%' 
-                        AND first_name NOT LIKE '%Тест%' 
-                        AND last_name NOT LIKE '%Тест%' 
+      testCondition = ` AND LOWER(first_name) NOT LIKE '%unknown%' 
+                        AND LOWER(last_name) NOT LIKE '%unknown%' 
+                        AND LOWER(first_name) NOT LIKE '%тест%' 
+                        AND LOWER(last_name) NOT LIKE '%тест%' 
+                        AND LOWER(first_name) NOT LIKE '%test%' 
+                        AND LOWER(last_name) NOT LIKE '%test%' 
+                        AND LOWER(first_name) NOT LIKE '%спринтер%' 
+                        AND LOWER(last_name) NOT LIKE '%спринтер%' 
+                        AND LOWER(first_name) NOT LIKE '%аттемпт%' 
+                        AND LOWER(last_name) NOT LIKE '%аттемпт%' 
+                        AND LOWER(first_name) NOT LIKE '%симулятор%' 
+                        AND LOWER(last_name) NOT LIKE '%симулятор%' 
+                        AND NOT (LOWER(first_name) = 'алиса' AND LOWER(last_name) = 'спринтер')
                         AND COALESCE(student_class, class_name) NOT LIKE '%Unknown%'
+                        AND COALESCE(student_class, class_name) NOT LIKE '%Test%'
+                        AND COALESCE(student_class, class_name) NOT LIKE '%тест%'
                         AND COALESCE(student_class, class_name) != '11-ИТ'`;
     }
 
@@ -334,6 +345,12 @@ export const GET: APIRoute = async ({ request }) => {
 
         if (logCpm !== null && logWpm === null) {
           logWpm = Math.round(logCpm / 5);
+        }
+
+        // Filter out superhuman bot/script speeds from automated test runs
+        if (excludeTests && logCpm !== null && (logCpm > 1000 || logCpm <= 0)) {
+          logCpm = null;
+          logWpm = null;
         }
 
         const currentBestCpm = s.sprintCpm ?? null;
