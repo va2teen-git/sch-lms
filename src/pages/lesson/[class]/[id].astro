@@ -469,7 +469,7 @@ const tasks = [
           <div class="flex items-center justify-between border-b border-gray-800 pb-2">
             <div class="flex items-center gap-2">
               <span class="text-amber-400 text-base">🏆</span>
-              <span class="text-xs font-black uppercase tracking-wider text-cyan-300">ТОП-10 // ЛИДЕРБОРД</span>
+              <span class="text-xs font-black uppercase tracking-wider text-cyan-300">ТОП-10 ШКОЛЫ // ЛИДЕРБОРД</span>
             </div>
             <button id="sprint-refresh-lb-btn" class="text-[11px] text-gray-400 hover:text-cyan-300 px-1.5 py-0.5 border border-gray-800 hover:border-cyan-800 transition-colors cursor-pointer flex items-center gap-1" title="Обновить таблицу лидеров">
               <span>🔄</span> <span class="text-[10px]">Обновить</span>
@@ -477,20 +477,20 @@ const tasks = [
           </div>
 
           <div class="text-[10px] text-gray-400 flex items-center justify-between px-2 py-1 bg-gray-900/60 border border-gray-800/80 uppercase">
-            <span class="w-6">#</span>
+            <span class="w-6 shrink-0">#</span>
             <span class="flex-1 px-1">УЧЕНИК</span>
-            <span class="w-16 text-right">ВРЕМЯ</span>
-            <span class="w-16 text-right">ЗН/МИН</span>
+            <span class="w-16 text-right shrink-0" title="Скорость: знаков в минуту">ЗН/МИН</span>
+            <span class="w-14 text-right shrink-0" title="Скорость: слов в минуту">СЛ/МИН</span>
           </div>
 
           <div id="sprint-leaderboard-list" class="flex-1 flex flex-col gap-1.5 overflow-y-auto max-h-[35vh] lg:max-h-none pr-1">
             <div class="text-center py-8 text-xs text-gray-500">
-              Загрузка лидеров урока...
+              Загрузка лидеров школы...
             </div>
           </div>
 
           <div class="border-t border-gray-800/80 pt-2 text-[10px] text-gray-500 leading-tight">
-            💡 В топ-10 попадают лучшие результаты спринта текущего урока. Зафиксируйте результат для публикации в таблице!
+            💡 В топ-10 попадают лучшие результаты спринта по всей школе за все время. Зафиксируйте результат для публикации в таблице!
           </div>
         </aside>
       </div>
@@ -1452,7 +1452,7 @@ const tasks = [
     if (!listEl) return;
 
     try {
-      const res = await fetch(`/api/teacher/stats?course=${encodeURIComponent(classSlug)}&lesson=${encodeURIComponent(lessonId)}&date=all&exclude_tests=1`);
+      const res = await fetch('/api/teacher/stats?course=all&lesson=all&date=all&exclude_tests=1');
       if (!res.ok) throw new Error('Stats request failed');
       const data = await res.json();
 
@@ -1462,12 +1462,14 @@ const tasks = [
       }
 
       const runners = data.students
-        .filter(s => typeof s.bestSprintTimeSec === 'number' && s.bestSprintTimeSec > 0)
+        .filter(s => (typeof s.sprintCpm === 'number' && s.sprintCpm > 0) || (typeof s.bestSprintTimeSec === 'number' && s.bestSprintTimeSec > 0))
         .sort((a, b) => {
-          if (a.bestSprintTimeSec !== b.bestSprintTimeSec) {
-            return a.bestSprintTimeSec - b.bestSprintTimeSec;
+          const cpmA = typeof a.sprintCpm === 'number' ? a.sprintCpm : (a.bestSprintTimeSec ? Math.round((60 / a.bestSprintTimeSec) * 20) : 0);
+          const cpmB = typeof b.sprintCpm === 'number' ? b.sprintCpm : (b.bestSprintTimeSec ? Math.round((60 / b.bestSprintTimeSec) * 20) : 0);
+          if (cpmB !== cpmA) {
+            return cpmB - cpmA;
           }
-          return (b.sprintCpm || 0) - (a.sprintCpm || 0);
+          return (a.bestSprintTimeSec || 0) - (b.bestSprintTimeSec || 0);
         })
         .slice(0, 10);
 
@@ -1490,15 +1492,20 @@ const tasks = [
         const rankColor = rank === 1 ? 'text-amber-300 font-black' : rank === 2 ? 'text-slate-300 font-bold' : rank === 3 ? 'text-amber-600 font-bold' : 'text-gray-400';
         const bgHover = rank <= 3 ? 'bg-cyan-950/30 border-cyan-900/40' : 'bg-gray-900/40 border-gray-800/50';
 
-        const timeFormatted = `${s.bestSprintTimeSec} сек`;
-        const cpmFormatted = s.sprintCpm ? `${s.sprintCpm}` : '—';
+        const cpmVal = s.sprintCpm ?? (s.bestSprintTimeSec ? Math.round((60 / s.bestSprintTimeSec) * 20) : '—');
+        const wpmVal = s.sprintWpm ?? (s.sprintCpm ? Math.round(s.sprintCpm / 5) : '—');
+        const timeTooltip = s.bestSprintTimeSec ? `, время: ${s.bestSprintTimeSec} сек` : '';
+        const accTooltip = s.sprintAccuracy ? `, точность: ${s.sprintAccuracy}%` : '';
 
         row.className = `flex items-center justify-between px-2 py-1.5 border text-xs ${bgHover} transition-colors hover:border-cyan-500/50`;
         row.innerHTML = `
-          <span class="w-6 text-center ${rankColor} text-[11px]">${medal}</span>
-          <span class="flex-1 px-1 truncate font-sans text-gray-200 text-[11px]" title="${s.displayName}">${s.displayName}</span>
-          <span class="w-16 text-right font-mono text-cyan-300 font-bold text-[11px]">${timeFormatted}</span>
-          <span class="w-16 text-right font-mono text-amber-300 font-semibold text-[11px]">${cpmFormatted}</span>
+          <span class="w-6 text-center ${rankColor} text-[11px] shrink-0 font-bold">${medal}</span>
+          <div class="flex-1 px-1 min-w-0">
+            <div class="truncate font-sans text-gray-200 text-[11px] font-medium" title="${s.displayName} (${s.className || 'Вся школа'})${timeTooltip}${accTooltip}">${s.displayName}</div>
+            ${s.className ? `<div class="text-[9px] text-gray-500 font-mono truncate">${s.className}</div>` : ''}
+          </div>
+          <span class="w-16 text-right font-mono text-amber-300 font-bold text-[11px] shrink-0">${cpmVal}</span>
+          <span class="w-14 text-right font-mono text-cyan-300 font-semibold text-[11px] shrink-0">${wpmVal}</span>
         `;
         listEl.appendChild(row);
       });

@@ -72,6 +72,7 @@ export interface StudentMetric {
   bestHardcoreTimeSec: number | null;
   bestSprintTimeSec: number | null;
   sprintCpm?: number | null;
+  sprintWpm?: number | null;
   sprintAccuracy?: number | null;
   currentAttempt?: AttemptMetric | null;
   attempts: AttemptMetric[];
@@ -231,6 +232,7 @@ export const GET: APIRoute = async ({ request }) => {
           bestHardcoreTimeSec: null,
           bestSprintTimeSec: null,
           sprintCpm: null,
+          sprintWpm: null,
           sprintAccuracy: null,
           currentAttempt: null,
           attempts: [],
@@ -318,17 +320,48 @@ export const GET: APIRoute = async ({ request }) => {
 
       // Track Logo-Storm (sprint_complete)
       if (r.action_type === 'sprint_complete' && typeof r.time_spent_sec === 'number') {
-        if (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec) {
+        let logCpm: number | null = null;
+        let logWpm: number | null = null;
+        let logAcc: number | null = null;
+        try {
+          const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
+          if (logData) {
+            if (typeof logData.cpm === 'number') logCpm = Math.round(logData.cpm);
+            if (typeof logData.wpm === 'number') logWpm = Math.round(logData.wpm);
+            if (typeof logData.accuracy === 'number') logAcc = Math.round(logData.accuracy * 10) / 10;
+          }
+        } catch (e) {}
+
+        if (logCpm !== null && logWpm === null) {
+          logWpm = Math.round(logCpm / 5);
+        }
+
+        const currentBestCpm = s.sprintCpm ?? null;
+        let isBetter = false;
+
+        if (currentBestCpm === null) {
+          if (s.bestSprintTimeSec === null) {
+            isBetter = true;
+          } else if (logCpm !== null) {
+            isBetter = true;
+          } else if (r.time_spent_sec < s.bestSprintTimeSec) {
+            isBetter = true;
+          }
+        } else if (logCpm !== null) {
+          if (logCpm > currentBestCpm) {
+            isBetter = true;
+          } else if (logCpm === currentBestCpm && (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec)) {
+            isBetter = true;
+          }
+        } else if (s.bestSprintTimeSec !== null && r.time_spent_sec < s.bestSprintTimeSec) {
+          isBetter = true;
+        }
+
+        if (isBetter) {
           s.bestSprintTimeSec = r.time_spent_sec;
-          try {
-            const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
-            if (logData && typeof logData.cpm === 'number') {
-              s.sprintCpm = Math.round(logData.cpm);
-            }
-            if (logData && typeof logData.accuracy === 'number') {
-              s.sprintAccuracy = Math.round(logData.accuracy * 10) / 10;
-            }
-          } catch (e) {}
+          if (logCpm !== null) s.sprintCpm = logCpm;
+          if (logWpm !== null) s.sprintWpm = logWpm;
+          if (logAcc !== null) s.sprintAccuracy = logAcc;
         }
       }
 
