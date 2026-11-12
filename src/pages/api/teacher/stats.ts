@@ -33,6 +33,9 @@ export interface AttemptMetric {
     2: LevelMetric;
     3: LevelMetric;
   };
+  sprintCpm?: number | null;
+  sprintWpm?: number | null;
+  sprintTimeSec?: number | null;
 }
 
 export interface StudentMetric {
@@ -294,7 +297,10 @@ export const GET: APIRoute = async ({ request }) => {
             1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null, lastUpdated: null },
             2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null, lastUpdated: null },
             3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null, lastUpdated: null }
-          }
+          },
+          sprintCpm: null,
+          sprintWpm: null,
+          sprintTimeSec: null
         };
       }
 
@@ -336,49 +342,69 @@ export const GET: APIRoute = async ({ request }) => {
         let logAcc: number | null = null;
         try {
           const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
-          if (logData) {
-            if (typeof logData.cpm === 'number') logCpm = Math.round(logData.cpm);
-            if (typeof logData.wpm === 'number') logWpm = Math.round(logData.wpm);
-            if (typeof logData.accuracy === 'number') logAcc = Math.round(logData.accuracy * 10) / 10;
+          if (logData && typeof logData === 'object') {
+            const rawCpm = logData.cpm ?? logData.CPM ?? logData.speed_cpm;
+            if (rawCpm !== undefined && rawCpm !== null && !isNaN(Number(rawCpm))) {
+              logCpm = Math.round(Number(rawCpm));
+            } else {
+              const chars = logData.charsCount ?? logData.chars_count;
+              if (typeof chars === 'number' && r.time_spent_sec > 0) {
+                logCpm = Math.round((chars / (r.time_spent_sec / 60)));
+              }
+            }
+
+            const rawWpm = logData.wpm ?? logData.WPM ?? logData.speed_wpm;
+            if (rawWpm !== undefined && rawWpm !== null && !isNaN(Number(rawWpm))) {
+              logWpm = Math.round(Number(rawWpm));
+            } else if (logCpm !== null) {
+              logWpm = Math.round(logCpm / 5);
+            }
+
+            const rawAcc = logData.accuracy ?? logData.acc;
+            if (rawAcc !== undefined && rawAcc !== null && !isNaN(Number(rawAcc))) {
+              logAcc = Math.round(Number(rawAcc) * 10) / 10;
+            }
           }
         } catch (e) {}
 
-        if (logCpm !== null && logWpm === null) {
-          logWpm = Math.round(logCpm / 5);
-        }
-
         // Filter out superhuman bot/script speeds from automated test runs
-        if (excludeTests && logCpm !== null && (logCpm > 1000 || logCpm <= 0)) {
+        const isBotSpeed = logCpm !== null && (logCpm > 1000 || logCpm <= 0);
+        if (excludeTests && isBotSpeed) {
           logCpm = null;
           logWpm = null;
         }
 
-        const currentBestCpm = s.sprintCpm ?? null;
-        let isBetter = false;
+        // Only register valid sprint attempts (or all if not excludeTests)
+        if (!excludeTests || !isBotSpeed) {
+          const currentBestCpm = s.sprintCpm ?? null;
+          let isBetter = false;
 
-        if (currentBestCpm === null) {
-          if (s.bestSprintTimeSec === null) {
-            isBetter = true;
+          if (currentBestCpm === null) {
+            if (logCpm !== null) {
+              isBetter = true;
+            } else if (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec) {
+              isBetter = true;
+            }
           } else if (logCpm !== null) {
-            isBetter = true;
-          } else if (r.time_spent_sec < s.bestSprintTimeSec) {
-            isBetter = true;
+            if (logCpm > currentBestCpm) {
+              isBetter = true;
+            } else if (logCpm === currentBestCpm && (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec)) {
+              isBetter = true;
+            }
           }
-        } else if (logCpm !== null) {
-          if (logCpm > currentBestCpm) {
-            isBetter = true;
-          } else if (logCpm === currentBestCpm && (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec)) {
-            isBetter = true;
-          }
-        } else if (s.bestSprintTimeSec !== null && r.time_spent_sec < s.bestSprintTimeSec) {
-          isBetter = true;
-        }
 
-        if (isBetter) {
-          s.bestSprintTimeSec = r.time_spent_sec;
-          if (logCpm !== null) s.sprintCpm = logCpm;
-          if (logWpm !== null) s.sprintWpm = logWpm;
-          if (logAcc !== null) s.sprintAccuracy = logAcc;
+          if (isBetter) {
+            s.bestSprintTimeSec = r.time_spent_sec;
+            if (logCpm !== null) s.sprintCpm = logCpm;
+            if (logWpm !== null) s.sprintWpm = logWpm;
+            if (logAcc !== null) s.sprintAccuracy = logAcc;
+          }
+
+          if (logCpm !== null && (!att.sprintCpm || logCpm > att.sprintCpm)) {
+            att.sprintCpm = logCpm;
+            att.sprintWpm = logWpm;
+            att.sprintTimeSec = r.time_spent_sec;
+          }
         }
       }
 
