@@ -1,0 +1,690 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+        
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ ХАРДКОРА)      -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-3 p-md-4 text-center shadow-lg">
+            <div class="fs-2 fs-md-1 text-danger fw-bold mb-2">⚡ CYBER MATRIX PROTOCOL // BREACH ⚡</div>
+            <h2 class="h4 text-light mb-2">ВЗЛОМ ТАБЛИЧНОГО МАТРИЧНОГО БУФЕРА // АРХЕТИП 1</h2>
+            <p class="text-secondary mb-3 small" style="max-width: 760px; margin: 0 auto;">
+                Вы подключаетесь к ядру распределенной базы данных. Для авторизации необходимо 
+                синтезировать целевые цепочки табличных структур через попеременный обход матрицы в стиле <em>Cyberpunk 2077</em>.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-2 p-md-3 mx-auto mb-3 text-start small" style="max-width: 700px;">
+                <div class="text-danger fw-bold mb-2">[ПРОТОКОЛ ХАРДКОР-ИСПЫТАНИЯ // 10 ВОЛН]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Попеременный обход:</span> Вы начинаете с первой строки. Клик в активной строке фиксирует токен в буфер и активирует соответствующий <strong>столбец</strong>. Следующий клик в столбце активирует новую <strong>строку</strong>.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Целевая цепочка:</span> Соберите требуемую последовательность токенов таблицы до переполнения буфера памяти.</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Динамический таймер:</span> На каждую волну отводится убывающее окно времени (от 14 до 7 секунд).</div>
+                <div class="text-light mb-1">• <span class="text-info fw-bold">Горячие клавиши:</span> Цифры <code>1</code>..<code>6</code> позволяют быстро выбирать ячейку в активной строке/столбце!</div>
+                <div class="text-danger fw-bold mt-2">• ТОТАЛЬНЫЙ СБРОС (Full Wipeout): Любая ошибка, переполнение буфера мусором или тайм-аут вызывают аварийную сирену (#alarm-box) и ПОЛНЫЙ СБРОС НА ВОЛНУ 1!</div>
+            </div>
+
+            <div>
+                <button id="start-btn" @click="startGame" class="btn btn-danger rounded-0 fw-bold px-4 py-3 shadow" style="min-height: 48px;">
+                    ИНИЦИИРОВАТЬ ВЗЛОМ (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (АРКАДНЫЙ ПРОЦЕСС)        -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-2 p-md-3 shadow-lg">
+            
+            <!-- Информационная панель и таймер -->
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР ТАБЛИЧНОЙ МАТРИЦЫ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-5">ВОЛНА <span v-text="currentWave"></span> ИЗ 10</span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border border-danger text-danger bg-dark rounded-0 px-2 px-md-3 py-1">АРХЕТИП 1: CYBER MATRIX</span>
+                    <div class="text-secondary small mt-1">Попытка #<span v-text="attempts + 1"></span></div>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ВРЕМЯ ДО СРЫВА СВЯЗИ:</span>
+                    <span id="timer-display" class="fw-bold fs-5" :class="phaseTimeLeft <= 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар убывающего таймера -->
+            <div class="progress mb-3 bg-dark border border-secondary rounded-0" style="height: 8px;">
+                <div class="progress-bar transition-none"
+                     :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="progressBarStyle">
+                </div>
+            </div>
+
+            <!-- Верхняя панель: Задание волны и Целевая последовательность -->
+            <div class="card bg-dark border-secondary rounded-0 p-2 p-md-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <span class="text-secondary small d-block">АВТОРИЗАЦИОННЫЙ ПРОТОКОЛ:</span>
+                        <div class="fs-6 text-light fw-bold mt-1" v-text="currentWaveData.missionTitle"></div>
+                        <div class="text-secondary small" v-text="currentWaveData.missionDesc"></div>
+                    </div>
+                    <div>
+                        <span class="text-secondary small d-block mb-1">ТРЕБУЕМАЯ ЦЕПОЧКА СТРУКТУРЫ:</span>
+                        <div class="d-flex flex-wrap gap-1 gap-md-2">
+                            <span v-for="(token, idx) in currentWaveData.targetSequence" 
+                                  :key="idx"
+                                  class="badge border rounded-0 px-2 py-1 text-wrap small"
+                                  :class="isTargetTokenMatched(idx) ? 'bg-success text-dark border-success' : 'bg-black text-warning border-warning'">
+                                <span v-text="token"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель буфера памяти игрока -->
+            <div class="card bg-dark border-secondary rounded-0 p-2 p-md-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+                    <span class="text-secondary small">БУФЕР ПАМЯТИ ВЗЛОМА (<span v-text="playerBuffer.length"></span> / <span v-text="currentWaveData.bufferLimit"></span>):</span>
+                    <span class="small" :class="mode === 'row' ? 'text-warning' : 'text-info'">
+                        АКТИВНАЯ НАПРАВЛЯЮЩАЯ: <strong><span v-text="mode === 'row' ? 'СТРОКА ' + (activeRow + 1) : 'СТОЛБЕЦ ' + (activeCol + 1)"></span></strong>
+                    </span>
+                </div>
+                <div class="d-flex gap-1 gap-md-2 w-100 flex-nowrap overflow-hidden">
+                    <div v-for="slotIdx in currentWaveData.bufferLimit" 
+                         :key="slotIdx"
+                         class="border rounded-0 p-1 p-md-2 text-center flex-fill font-monospace fw-bold d-flex align-items-center justify-content-center"
+                         style="min-width: 0; word-break: break-all; font-size: clamp(0.6rem, 1.6vw, 0.8rem); line-height: 1.1; min-height: 48px;"
+                         :class="playerBuffer[slotIdx - 1] ? 'bg-black text-warning border-warning' : 'bg-dark text-secondary border-secondary opacity-50'">
+                        <span v-if="playerBuffer[slotIdx - 1]" v-text="playerBuffer[slotIdx - 1]"></span>
+                        <span v-else class="text-secondary">[_]</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Аварийная сирена хардкор-сброса (#alarm-box) -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 py-3 text-center shadow-lg mb-3">
+                <div class="fs-5 fw-bold mb-1">🚨 КРИТИЧЕСКИЙ СБОЙ СИНХРОНИЗАЦИИ // ХАРДКОР-СБРОС 🚨</div>
+                <div class="small text-light mb-2" v-text="alarmReason"></div>
+                <div class="badge bg-danger text-black rounded-0 fs-6 px-3 py-1 fw-bold">СБРОС НА ВОЛНУ 1 И ПЕРЕГЕНЕРАЦИЯ</div>
+            </div>
+
+            <!-- Сетка Кибер-Матрицы (Cyber Matrix N x N) -->
+            <div class="card bg-black border-danger rounded-0 p-2 p-md-3 mb-3 text-center">
+                <div class="text-secondary small mb-2 text-start d-flex justify-content-between flex-wrap gap-1">
+                    <span>КЛИКАЙТЕ ПО ПОДСВЕЧЕННЫМ ЯЧЕЙКАМ В АКТИВНОЙ НАПРАВЛЯЮЩЕЙ (ИЛИ ЦИФРАМИ 1..<span v-text="currentWaveData.size"></span>):</span>
+                    <span class="text-danger fw-bold">[ПЕРЕПОЛНЕНИЕ = СБРОС НА ВОЛНУ 1]</span>
+                </div>
+
+                <div id="matrix-grid" class="d-flex flex-column gap-1 gap-md-2 mx-auto w-100" style="max-width: 680px;">
+                    <div v-for="(row, rIdx) in matrix" :key="rIdx" class="d-flex gap-1 gap-md-2 w-100">
+                        <button v-for="(cell, cIdx) in row" 
+                                :key="cIdx"
+                                type="button"
+                                class="btn rounded-0 flex-fill p-1 p-sm-2 text-center font-monospace fw-bold d-flex flex-column justify-content-center align-items-center matrix-btn"
+                                style="min-width: 48px; min-height: 48px; overflow: hidden; word-break: break-word;"
+                                :class="getCellClass(rIdx, cIdx)"
+                                :disabled="!isCellClickable(rIdx, cIdx) || alarmActive"
+                                @click="handleCellClick(rIdx, cIdx)">
+                            <div class="lh-1 text-wrap" style="font-size: clamp(0.65rem, 1.7vw, 0.85rem); word-break: break-word;" v-text="cell.token"></div>
+                            <div class="text-secondary mt-1 lh-1" style="font-size: 0.6rem;" v-text="cell.hex"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ (ХАРДКОР ЗАВЕРШЕН)         -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-3 p-md-5 text-center shadow-lg">
+            <div class="display-4 text-success mb-2">✓ PROTOCOL COMPLETED ✓</div>
+            <h2 class="h4 text-light mb-2">МАТРИЦА ТАБЛИЧНЫХ МОДЕЛЕЙ ПОЛНОСТЬЮ ПОДЧИНЕНА</h2>
+            <p class="text-secondary small mb-3" style="max-width: 720px; margin: 0 auto;">
+                Все 10 аркадных волн протокола взлома пройдены без единого переполнения буфера. 
+                Вы продемонстрировали мгновенную реакцию и безупречное владение понятиями матриц смежности, весовых таблиц расстояний и реляционных структур.
+            </p>
+
+            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-3 text-start font-monospace small" style="max-width: 500px;">
+                <div class="text-success fw-bold mb-2">ИТОГИ АРКАДНОГО СЕАНСА:</div>
+                <div class="text-light">СТАТУС: <span class="text-success fw-bold">УРОВЕНЬ 3 (ХАРДКОР) СДАН</span></div>
+                <div class="text-light">ПРОЙДЕНО ВОЛН: <span class="text-warning">10 из 10</span></div>
+                <div class="text-light">СБРОСОВ / ОШИБОК: <span class="text-warning" v-text="attempts"></span></div>
+                <div class="text-light">ОБЩЕЕ ВРЕМЯ: <span class="text-warning" v-text="totalTimeSec"></span> СЕК</div>
+            </div>
+
+            <div>
+                <button @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2" style="min-height: 48px;">
+                    ПРОЙТИ ПОВТОРНО (РЕКОРД СКОРОСТИ) ↺
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Подключение локального Vue 3 -->
+    <script is:inline src="/static/vue.global.js"></script>
+
+    <script is:inline>
+        // --- WEB AUDIO API ЗВУКОВОЙ ДВИЖОК ---
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playSound(type) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+
+                if (type === 'click') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'wave_complete') {
+                    [523.25, 659.25, 783.99].forEach((freq, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + i * 0.07);
+                        gain.gain.setValueAtTime(0.18, now + i * 0.07);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.12);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + i * 0.07);
+                        osc.stop(now + i * 0.07 + 0.12);
+                    });
+                } else if (type === 'alarm') {
+                    const osc1 = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc1.type = 'sawtooth';
+                    osc2.type = 'square';
+                    osc1.frequency.setValueAtTime(240, now);
+                    osc1.frequency.linearRampToValueAtTime(120, now + 0.45);
+                    osc2.frequency.setValueAtTime(246, now);
+                    osc2.frequency.linearRampToValueAtTime(123, now + 0.45);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                    osc1.connect(gain);
+                    osc2.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc1.start(now);
+                    osc2.start(now);
+                    osc1.stop(now + 0.45);
+                    osc2.stop(now + 0.45);
+                }
+            } catch (e) {
+                // Audio autoplay might be suspended
+            }
+        }
+
+        // --- ПУЛ ТОКЕНОВ ТАБЛИЧНЫХ МОДЕЛЕЙ ---
+        const TOKEN_POOL = [
+            { token: 'О-С',  hex: '5A', name: 'Объект-Свойство' },
+            { token: 'О-О',  hex: 'B2', name: 'Объект-Объект' },
+            { token: 'ВЕС',  hex: 'E9', name: 'Вес ребра' },
+            { token: 'ДИАГ', hex: '1C', name: 'Главная диагональ' },
+            { token: 'СИММ', hex: '7F', name: 'Симметричность' },
+            { token: 'ГРАФ', hex: '3D', name: 'Графовая модель' },
+            { token: 'МАТР', hex: '84', name: 'Матрица смежности' },
+            { token: 'ПУТЬ', hex: 'C0', name: 'Кратчайший путь' },
+            { token: 'УЗЕЛ', hex: 'A6', name: 'Вершина/Узел' },
+            { token: 'КЛЮЧ', hex: '4E', name: 'Первичный ключ' }
+        ];
+
+        // --- СПИСОК 10 ВОЛН С ВОЗРАСТАЮЩЕЙ СЛОЖНОСТЬЮ ---
+        const WAVE_CONFIGS = [
+            { wave: 1,  size: 4, bufferLimit: 4, targetLen: 2, timeLimit: 14.0, title: 'Протокол верификации графа', desc: 'Связь между ребрами и зеркальной симметрией' },
+            { wave: 2,  size: 4, bufferLimit: 4, targetLen: 2, timeLimit: 13.0, title: 'Протокол таблицы расстояний', desc: 'Весовая матрица и поиск пути' },
+            { wave: 3,  size: 4, bufferLimit: 4, targetLen: 2, timeLimit: 12.0, title: 'Реляционный протокол базы данных', desc: 'Первичный ключ и таблица Объект-Свойство' },
+            { wave: 4,  size: 5, bufferLimit: 5, targetLen: 3, timeLimit: 11.0, title: 'Протокол смежности сети', desc: 'Матрица смежности, главная диагональ и ребро' },
+            { wave: 5,  size: 5, bufferLimit: 5, targetLen: 3, timeLimit: 10.0, title: 'Сетевой маршрутизатор пакетов', desc: 'Узел сети, весовая нагрузка и кратчайший путь' },
+            { wave: 6,  size: 5, bufferLimit: 5, targetLen: 3, timeLimit: 9.5,  title: 'Протокол симметричной матрицы', desc: 'Симметрия, главная диагональ и модель Объект-Объект' },
+            { wave: 7,  size: 5, bufferLimit: 6, targetLen: 3, timeLimit: 9.0,  title: 'Топологическая декомпозиция', desc: 'Графовая сеть, матрица смежности и веса' },
+            { wave: 8,  size: 5, bufferLimit: 6, targetLen: 4, timeLimit: 8.5,  title: 'Реляционная нормализация схемы', desc: 'Ключ, Объект-Свойство, матрица и симметрия' },
+            { wave: 9,  size: 6, bufferLimit: 6, targetLen: 4, timeLimit: 8.0,  title: 'Оптимизация Дейкстры на графе', desc: 'Узел, весовая матрица, диагональ и путь' },
+            { wave: 10, size: 6, bufferLimit: 6, targetLen: 4, timeLimit: 7.0,  title: 'Финальный шлюз суперкомпьютера', desc: 'Объект-Объект, симметричность, вес и оптимальный путь' }
+        ];
+
+        const { createApp } = Vue;
+
+        const app = createApp({
+            data() {
+                return {
+                    gameState: 'intro', // 'intro', 'playing', 'victory'
+                    currentWave: 1,
+                    totalWaves: 10,
+                    attempts: 0,
+                    startTime: 0,
+                    phaseStartTime: 0,
+                    totalTimeSec: 0,
+
+                    // Таймер
+                    phaseTimeLeft: 14.0,
+                    phaseTimeTotal: 14.0,
+                    timerInterval: null,
+
+                    // Данные активной волны
+                    currentWaveData: {
+                        size: 4,
+                        bufferLimit: 4,
+                        targetSequence: [],
+                        solutionPath: [],
+                        missionTitle: '',
+                        missionDesc: ''
+                    },
+
+                    // Состояние игры
+                    matrix: [], // [r][c] = { token, hex, used }
+                    mode: 'row', // 'row' или 'col'
+                    activeRow: 0,
+                    activeCol: 0,
+                    playerBuffer: [],
+
+                    // Хардкор-сбой
+                    alarmActive: false,
+                    alarmReason: '',
+
+                    // Список процедурно сгенерированных волн
+                    wavesList: []
+                };
+            },
+
+            computed: {
+                progressBarStyle() {
+                    const pct = Math.max(0, Math.min(100, (this.phaseTimeLeft / this.phaseTimeTotal) * 100));
+                    return { width: pct + '%' };
+                }
+            },
+
+            mounted() {
+                window.addEventListener('keydown', this.handleKeydown);
+
+                // Экспорт глобального тестового API
+                const self = this;
+                window.__DEV_LEVEL3_STATE__ = {
+                    get waves() { return self.wavesList; },
+                    get currentWaveIndex() { return self.currentWave - 1; },
+                    get currentWave() { return self.currentWave; },
+                    getCurrentWaveData: () => self.currentWaveData,
+                    getAttempts: () => self.attempts,
+                    solveCurrentWave: () => self.devSolveCurrentWave(),
+                    submitAction: (action, payload) => self.devSubmitAction(action, payload)
+                };
+            },
+
+            beforeUnmount() {
+                window.removeEventListener('keydown', this.handleKeydown);
+                this.stopTimer();
+            },
+
+            methods: {
+                sendTelemetry(actionType, isSuccess = false) {
+                    const timeSpent = Math.max(1, Math.round((Date.now() - (this.startTime || Date.now())) / 1000));
+                    const payload = {
+                        type: 'TELEMETRY_EVENT',
+                        mission_name: 'Урок 8 :: Табличные модели (Уровень 3 / Аркада)',
+                        action_type: actionType,
+                        status: isSuccess ? 'completed' : 'in_progress',
+                        start_time: new Date(this.startTime || Date.now()).toISOString(),
+                        time_spent_sec: timeSpent,
+                        attempts_count: this.attempts,
+                        success: isSuccess,
+                        action_log: [{
+                            time: new Date().toISOString(),
+                            action: actionType,
+                            wave: this.currentWave
+                        }]
+                    };
+                    try {
+                        window.parent.postMessage(payload, '*');
+                    } catch (e) {
+                        console.warn('Telemetry error:', e);
+                    }
+                },
+
+                startGame() {
+                    this.startTime = Date.now();
+                    this.attempts = 0;
+                    this.generateAllWaves();
+                    this.gameState = 'playing';
+                    this.sendTelemetry('in_progress');
+                    this.initWave(1);
+                },
+
+                generateAllWaves() {
+                    // Целевые последовательности под каждую волну
+                    const TARGET_CHAINS = [
+                        ['РЕБРО', 'СИММ'],
+                        ['ВЕС', 'ПУТЬ'],
+                        ['КЛЮЧ', 'О-С'],
+                        ['МАТР', 'ДИАГ', 'РЕБРО'],
+                        ['УЗЕЛ', 'ВЕС', 'ПУТЬ'],
+                        ['СИММ', 'ДИАГ', 'О-О'],
+                        ['ГРАФ', 'МАТР', 'ВЕС'],
+                        ['КЛЮЧ', 'О-С', 'МАТР', 'СИММ'],
+                        ['УЗЕЛ', 'ВЕС', 'ДИАГ', 'ПУТЬ'],
+                        ['О-О', 'СИММ', 'ВЕС', 'ПУТЬ']
+                    ];
+
+                    this.wavesList = WAVE_CONFIGS.map((cfg, idx) => {
+                        const target = TARGET_CHAINS[idx] || ['ВЕС', 'ПУТЬ'];
+                        return {
+                            wave: cfg.wave,
+                            size: cfg.size,
+                            bufferLimit: cfg.bufferLimit,
+                            timeLimit: cfg.timeLimit,
+                            targetSequence: target,
+                            missionTitle: cfg.title,
+                            missionDesc: cfg.desc
+                        };
+                    });
+                },
+
+                initWave(waveNum) {
+                    this.stopTimer();
+                    this.alarmActive = false;
+                    this.alarmReason = '';
+                    this.currentWave = waveNum;
+
+                    const cfg = this.wavesList[waveNum - 1] || this.wavesList[0];
+                    this.currentWaveData = { ...cfg };
+
+                    this.phaseTimeTotal = cfg.timeLimit;
+                    this.phaseTimeLeft = cfg.timeLimit;
+                    this.phaseStartTime = Date.now();
+
+                    this.mode = 'row';
+                    this.activeRow = 0;
+                    this.activeCol = 0;
+                    this.playerBuffer = [];
+
+                    // Генерация матрицы с ГАРАНТИЕЙ РЕШЕНИЯ
+                    this.buildGuaranteedMatrix(cfg);
+
+                    this.startTimer();
+                },
+
+                buildGuaranteedMatrix(cfg) {
+                    const size = cfg.size;
+                    const target = cfg.targetSequence;
+                    const solutionPath = [];
+
+                    // Инициализируем пустую матрицу
+                    const matrix = [];
+                    for (let r = 0; r < size; r++) {
+                        matrix[r] = [];
+                        for (let c = 0; c < size; c++) {
+                            const randTok = TOKEN_POOL[Math.floor(Math.random() * TOKEN_POOL.length)];
+                            matrix[r][c] = {
+                                token: randTok.token,
+                                hex: randTok.hex,
+                                used: false
+                            };
+                        }
+                    }
+
+                    // Встраиваем решение строго по правилу попеременного обхода:
+                    // Шаг 0: row 0 -> col c0
+                    const c0 = Math.floor(Math.random() * size);
+                    matrix[0][c0] = this.findTokenInfo(target[0]);
+                    solutionPath.push([0, c0]);
+
+                    let lastR = 0;
+                    let lastC = c0;
+                    let curMode = 'col'; // следующий выбор в столбце c0
+
+                    for (let step = 1; step < target.length; step++) {
+                        const tokInfo = this.findTokenInfo(target[step]);
+                        if (curMode === 'col') {
+                            // Выбираем строку r != lastR в столбце lastC
+                            let r;
+                            do {
+                                r = Math.floor(Math.random() * size);
+                            } while (r === lastR);
+                            matrix[r][lastC] = tokInfo;
+                            solutionPath.push([r, lastC]);
+                            lastR = r;
+                            curMode = 'row';
+                        } else {
+                            // Выбираем столбец c != lastC в строке lastR
+                            let c;
+                            do {
+                                c = Math.floor(Math.random() * size);
+                            } while (c === lastC);
+                            matrix[lastR][c] = tokInfo;
+                            solutionPath.push([lastR, c]);
+                            lastC = c;
+                            curMode = 'col';
+                        }
+                    }
+
+                    this.matrix = matrix;
+                    this.currentWaveData.solutionPath = solutionPath;
+                },
+
+                findTokenInfo(tokenName) {
+                    const item = TOKEN_POOL.find(t => t.token === tokenName);
+                    return {
+                        token: item ? item.token : tokenName,
+                        hex: item ? item.hex : 'FF',
+                        used: false
+                    };
+                },
+
+                startTimer() {
+                    this.stopTimer();
+                    const intervalMs = 100;
+                    this.timerInterval = setInterval(() => {
+                        this.phaseTimeLeft -= (intervalMs / 1000);
+                        if (this.phaseTimeLeft <= 0) {
+                            this.phaseTimeLeft = 0;
+                            this.triggerHardcoreReset('Время сеанса связи истекло! Протокол прерван.');
+                        }
+                    }, intervalMs);
+                },
+
+                stopTimer() {
+                    if (this.timerInterval) {
+                        clearInterval(this.timerInterval);
+                        this.timerInterval = null;
+                    }
+                },
+
+                isCellClickable(r, c) {
+                    if (this.alarmActive) return false;
+                    const cell = this.matrix[r] && this.matrix[r][c];
+                    if (!cell || cell.used) return false;
+
+                    if (this.mode === 'row') {
+                        return r === this.activeRow;
+                    } else {
+                        return c === this.activeCol;
+                    }
+                },
+
+                getCellClass(r, c) {
+                    const cell = this.matrix[r] && this.matrix[r][c];
+                    if (!cell) return '';
+
+                    if (cell.used) {
+                        return 'btn-dark text-secondary border-secondary opacity-25';
+                    }
+
+                    const isHighlight = (this.mode === 'row' && r === this.activeRow) ||
+                                        (this.mode === 'col' && c === this.activeCol);
+
+                    if (isHighlight) {
+                        return 'btn-outline-warning text-warning border-warning bg-black fw-bold';
+                    }
+                    return 'btn-dark text-secondary border-secondary opacity-75';
+                },
+
+                handleCellClick(r, c) {
+                    if (!this.isCellClickable(r, c)) return;
+
+                    playSound('click');
+                    const cell = this.matrix[r][c];
+                    cell.used = true;
+                    this.playerBuffer.push(cell.token);
+
+                    // Переключение режима обхода
+                    if (this.mode === 'row') {
+                        this.activeCol = c;
+                        this.mode = 'col';
+                    } else {
+                        this.activeRow = r;
+                        this.mode = 'row';
+                    }
+
+                    // Проверка сбора цепочки
+                    if (this.checkTargetMatched()) {
+                        this.completeWave();
+                        return;
+                    }
+
+                    // Проверка переполнения буфера
+                    if (this.playerBuffer.length >= this.currentWaveData.bufferLimit) {
+                        this.triggerHardcoreReset('Буфер памяти переполнен мусорными данными!');
+                    }
+                },
+
+                checkTargetMatched() {
+                    const target = this.currentWaveData.targetSequence;
+                    const buf = this.playerBuffer;
+                    if (buf.length < target.length) return false;
+
+                    for (let start = 0; start <= buf.length - target.length; start++) {
+                        let match = true;
+                        for (let i = 0; i < target.length; i++) {
+                            if (buf[start + i] !== target[i]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) return true;
+                    }
+                    return false;
+                },
+
+                isTargetTokenMatched(tokenIdx) {
+                    const target = this.currentWaveData.targetSequence;
+                    const buf = this.playerBuffer;
+                    // Ищем максимальное частичное совпадение с конца буфера
+                    for (let len = Math.min(buf.length, target.length); len > 0; len--) {
+                        let match = true;
+                        const bufStart = buf.length - len;
+                        for (let i = 0; i < len; i++) {
+                            if (buf[bufStart + i] !== target[i]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            return tokenIdx < len;
+                        }
+                    }
+                    return false;
+                },
+
+                completeWave() {
+                    this.stopTimer();
+                    playSound('wave_complete');
+
+                    if (this.currentWave >= this.totalWaves) {
+                        this.finishLevel();
+                    } else {
+                        setTimeout(() => {
+                            this.initWave(this.currentWave + 1);
+                        }, 500);
+                    }
+                },
+
+                triggerHardcoreReset(reason) {
+                    this.stopTimer();
+                    playSound('alarm');
+                    this.attempts++;
+                    this.alarmActive = true;
+                    this.alarmReason = reason;
+
+                    this.sendTelemetry('hardcore_reset', false);
+
+                    // Перегенерация всех волн для нового забега
+                    this.generateAllWaves();
+
+                    setTimeout(() => {
+                        this.alarmActive = false;
+                        this.initWave(1);
+                    }, 1400);
+                },
+
+                finishLevel() {
+                    this.stopTimer();
+                    this.gameState = 'victory';
+                    this.totalTimeSec = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
+                    this.sendTelemetry('level_complete', true);
+                },
+
+                handleKeydown(e) {
+                    if (this.gameState !== 'playing' || this.alarmActive) return;
+
+                    // Цифры 1..6 для быстрого выбора в строке/столбце
+                    const keyNum = parseInt(e.key, 10);
+                    if (keyNum >= 1 && keyNum <= this.currentWaveData.size) {
+                        const idx = keyNum - 1;
+                        if (this.mode === 'row') {
+                            this.handleCellClick(this.activeRow, idx);
+                        } else {
+                            this.handleCellClick(idx, this.activeCol);
+                        }
+                    }
+                },
+
+                // --- ТЕСТОВЫЕ МЕТОДЫ ДЛЯ PLAYWRIGHT ---
+                devSolveCurrentWave() {
+                    if (this.gameState !== 'playing' || this.alarmActive) return;
+                    const path = this.currentWaveData.solutionPath;
+                    if (path && Array.isArray(path)) {
+                        for (const [r, c] of path) {
+                            this.handleCellClick(r, c);
+                        }
+                    }
+                },
+
+                devSubmitAction(action, payload) {
+                    if (action === 'click_cell' && payload) {
+                        this.handleCellClick(payload.r, payload.c);
+                    } else if (action === 'solve') {
+                        this.devSolveCurrentWave();
+                    } else if (action === 'fail') {
+                        this.triggerHardcoreReset(payload || 'Тестовый принудительный сбой');
+                    }
+                }
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</TaskLayout>
