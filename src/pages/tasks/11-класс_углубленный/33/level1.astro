@@ -1,0 +1,1080 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-success mb-0 fw-bold">Тренажер: Анализ текста, регулярные выражения и конечные автоматы (Уровень 1)</h1>
+                <div class="text-secondary small">Урок 33 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Прямое манипулирование // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик попыток и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Шлюз NLP-фильтрации и очистка корпуса</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках (аварийный глитч) -->
+                <div id="feedback-box" class="alert alert-danger bg-black border border-danger text-danger rounded-0 d-none mb-3 py-2 px-3 small">
+                    <span class="fw-bold">⚠️ СБОЙ СИСТЕМЫ:</span> <span id="feedback-text"></span>
+                </div>
+
+                <!-- Блок успешного шага -->
+                <div id="success-box" class="alert alert-success bg-black border border-success text-success rounded-0 d-none mb-3 py-2 px-3 small">
+                    <span class="fw-bold">✓ УСПЕХ:</span> <span id="success-text"></span>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 1: Шлюз NLP-фильтрации и классификации токенов              -->
+                <!-- ================================================================= -->
+                <div id="phase1" class="phase-view">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА:</span> 
+                        В поисковый индекс поступает поток ненормализованных токенов. 
+                        Распределите все токены из очереди по трем функциональным шлюзам:
+                        <ul class="mb-0 mt-1 ps-3 text-secondary">
+                            <li><strong class="text-success">Информативные лексемы</strong> — значимые предметные термины для частотного словаря.</li>
+                            <li><strong class="text-warning">Стоп-слова</strong> — вспомогательные союзы, предлоги и частицы, подлежащие исключению.</li>
+                            <li><strong class="text-danger">Шум и артефакты</strong> — поврежденные теги, разметка и служебный бинарный мусор.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Палитра токенов очереди -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ОЧЕРЕДЬ ВХОДНЫХ ТОКЕНОВ ДЛЯ РАСПРЕДЕЛЕНИЯ (Кликните токен, затем шлюз):</span>
+                            <span id="p1-queue-count" class="badge bg-secondary rounded-0">6 токенов</span>
+                        </div>
+                        <div id="p1-token-palette" class="card-body p-2 d-flex flex-wrap gap-2 align-items-center" style="min-height: 64px;">
+                            <!-- Генерируется динамически через JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3 функциональных контейнера-шлюза -->
+                    <div class="row g-2 mb-3">
+                        <!-- Шлюз 0: Информативные лексемы -->
+                        <div class="col-12 col-md-4">
+                            <div class="card bg-black border border-success rounded-0 h-100" id="p1-bucket-card-0">
+                                <div class="card-header bg-dark text-success py-2 px-2 d-flex justify-content-between align-items-center small fw-bold">
+                                    <span>📦 Информативные лексемы</span>
+                                    <span id="p1-count-0" class="badge bg-success text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-0" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 140px;">
+                                    <!-- Токены в корзине -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Шлюз 1: Стоп-слова -->
+                        <div class="col-12 col-md-4">
+                            <div class="card bg-black border border-warning rounded-0 h-100" id="p1-bucket-card-1">
+                                <div class="card-header bg-dark text-warning py-2 px-2 d-flex justify-content-between align-items-center small fw-bold">
+                                    <span>🛑 Стоп-слова (Stop-Words)</span>
+                                    <span id="p1-count-1" class="badge bg-warning text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-1" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 140px;">
+                                    <!-- Токены в корзине -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Шлюз 2: Шум и артефакты -->
+                        <div class="col-12 col-md-4">
+                            <div class="card bg-black border border-danger rounded-0 h-100" id="p1-bucket-card-2">
+                                <div class="card-header bg-dark text-danger py-2 px-2 d-flex justify-content-between align-items-center small fw-bold">
+                                    <span>⚠️ Шум и артефакты разметки</span>
+                                    <span id="p1-count-2" class="badge bg-danger text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-2" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 140px;">
+                                    <!-- Токены в корзине -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Кнопка проверки шлюза -->
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-submit-btn" class="btn btn-success rounded-0 px-4 py-2 fw-bold text-dark d-flex align-items-center gap-2" style="min-height: 48px;">
+                            <span>⚙️ Запустить шлюз фильтрации (Проверить)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 2: Синтезатор регулярных выражений (Slot & Snap Builder)     -->
+                <!-- ================================================================= -->
+                <div id="phase2" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА:</span> 
+                        Сконструируйте шаблон регулярного выражения для извлечения идентификаторов транзакций из журнала аудита. 
+                        Шаблон должен точно захватывать все <strong class="text-success">целевые образцы</strong> и строго отвергать <strong class="text-danger">запрещенные записи</strong>.
+                        <div class="mt-1 text-info small" id="p2-task-spec">
+                            <!-- Требования формата генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- Монтажная плата слотов RegEx -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-warning py-2 px-3 small fw-bold">
+                            МОНТАЖНАЯ ПЛАТА ШАБЛОНА (Кликните токен палитры, затем пустой слот; клик по слоту возвращает токен):
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="p2-slots-row" class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
+                                <!-- Слоты генерируются динамически через JS -->
+                            </div>
+                            <div class="text-center mt-2 small text-secondary">
+                                Текущий результирующий паттерн: <code id="p2-regex-preview" class="text-warning fs-6 fw-bold">/^...$/</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Палитра строительных блоков RegEx -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-secondary py-2 px-3 small fw-bold">
+                            ДОСТУПНЫЕ БЛОКИ ШАБЛОНА (Включают токены и дистракторы-ловушки):
+                        </div>
+                        <div id="p2-token-palette" class="card-body p-2 d-flex flex-wrap gap-2 align-items-center" style="min-height: 56px;">
+                            <!-- Токены генерируются динамически -->
+                        </div>
+                    </div>
+
+                    <!-- Интерактивный полигон валидации (Live Match Testbench) -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-light py-2 px-3 small fw-bold">
+                            ЖИВОЙ ТЕСТОВЫЙ ПОЛИГОН (Интерактивная проверка совпадений в реальном времени):
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="row g-2">
+                                <div class="col-12 col-md-6">
+                                    <div class="small fw-bold text-success mb-1">ОБЯЗАНЫ СОВПАДАТЬ (Target Matches):</div>
+                                    <div id="p2-positive-list" class="d-flex flex-column gap-1">
+                                        <!-- Позитивные образцы -->
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <div class="small fw-bold text-danger mb-1">ОБЯЗАНЫ ОТВЕРГАТЬСЯ (Forbidden Non-matches):</div>
+                                    <div id="p2-negative-list" class="d-flex flex-column gap-1">
+                                        <!-- Негативные образцы -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Кнопка проверки фазы 2 -->
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-submit-btn" class="btn btn-warning rounded-0 px-4 py-2 fw-bold text-dark d-flex align-items-center gap-2" style="min-height: 48px;">
+                            <span>⚡ Активировать RegEx-фильтр (Проверить)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 3: Матрица переходов ДКА и устранение катастрофического отката -->
+                <!-- ================================================================= -->
+                <div id="phase3" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-danger fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА:</span> 
+                        Настройте граф переходов детерминированного конечного автомата (ДКА) для распознавания безопасного регулярного языка. 
+                        Устраните неоднозначность переходов, чтобы исключить катастрофический возврат (Catastrophic Backtracking) и обеспечить строго линейную вычислительную сложность O(N).
+                    </div>
+
+                    <!-- Графическая схема автомата -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-danger py-2 px-3 small fw-bold">
+                            АРХИТЕКТУРА СОСТОЯНИЙ И ПЕРЕХОДОВ ДКА:
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 text-center mb-3">
+                                <div class="badge bg-secondary rounded-0 p-2 fs-6">S0: Старт</div>
+                                <div class="text-secondary">──[буква]──►</div>
+                                <div class="badge bg-secondary rounded-0 p-2 fs-6">S1: Префикс</div>
+                                <div class="text-secondary">──[разделитель]──►</div>
+                                <div class="badge bg-secondary rounded-0 p-2 fs-6">S2: Разделитель</div>
+                                <div class="text-secondary">──[цифра]──►</div>
+                                <div class="badge bg-success text-dark rounded-0 p-2 fs-6">S3: Accept (Финал)</div>
+                            </div>
+
+                            <!-- Слоты матрицы переходов delta(q, c) -->
+                            <div id="p3-transitions-table" class="d-flex flex-column gap-2">
+                                <!-- Генерируется через JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Палитра состояний для назначения -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-secondary py-2 px-3 small fw-bold">
+                            ПАЛИТРА ЦЕЛЕВЫХ СОСТОЯНИЙ (Кликните состояние, затем нужный слот перехода):
+                        </div>
+                        <div id="p3-state-palette" class="card-body p-2 d-flex flex-wrap gap-2 align-items-center" style="min-height: 56px;">
+                            <!-- Генерируется через JS -->
+                        </div>
+                    </div>
+
+                    <!-- Симулятор трассировки автомата -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ЭМУЛЯТОР АВТОМАТА (Трассировка линейного времени и защита от ReDoS):</span>
+                            <span id="p3-trace-status" class="badge bg-secondary rounded-0">Ожидание настройки</span>
+                        </div>
+                        <div id="p3-trace-log" class="card-body p-3 small font-monospace text-secondary" style="min-height: 80px; max-height: 180px; overflow-y: auto;">
+                            Сконфигурируйте все переходы и запустите тестовый прогон входной строки.
+                        </div>
+                    </div>
+
+                    <!-- Кнопка проверки фазы 3 -->
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-submit-btn" class="btn btn-danger rounded-0 px-4 py-2 fw-bold text-white d-flex align-items-center gap-2" style="min-height: 48px;">
+                            <span>🚀 Запустить симуляцию автомата (Проверить)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ЭКРАН ПОБЕДЫ (Уровень пройден)                                    -->
+                <!-- ================================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="display-5 text-success fw-bold mb-2">МИССИЯ ВЫПОЛНЕНА!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы успешно освоили конвейер предобработки текстов, синтез регулярных выражений и детерминированные автоматы без катастрофического возврата.
+                    </p>
+                    <div class="d-inline-flex gap-4 p-3 bg-black border border-success rounded-0 mb-4 text-start">
+                        <div>
+                            <span class="text-secondary small d-block">ИТОГОВЫЕ ОШИБКИ:</span>
+                            <span id="final-attempts" class="fs-4 fw-bold text-warning">0</span>
+                        </div>
+                        <div>
+                            <span class="text-secondary small d-block">ВРЕМЯ ПРОХОЖДЕНИЯ:</span>
+                            <span id="final-time" class="fs-4 fw-bold text-info">00:00</span>
+                        </div>
+                    </div>
+                    <div>
+                        <button id="restart-btn" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ↻ Пройти уровень повторно для тренировки
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    'use strict';
+
+    const missionName = 'Урок 33 :: Анализ текста на естественном языке. Регулярные выражения (Уровень 1)';
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Вспомогательные утилиты рандомизации
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // Таймер
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Обработка ошибок с отправкой hardcore_reset и регенерацией текущей фазы
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'hardcore_reset',
+            status: 'failed',
+            attempts_count: attemptsCount
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1500);
+    }
+
+    function showSuccessFeedback(msg, callback) {
+        const sb = document.getElementById('success-box');
+        const st = document.getElementById('success-text');
+        if (sb && st) {
+            st.textContent = msg;
+            sb.classList.remove('d-none');
+        }
+        setTimeout(() => {
+            if (sb) sb.classList.add('d-none');
+            if (callback) callback();
+        }, 1000);
+    }
+
+    // Завершение всего уровня
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Шлюз NLP-фильтрации и классификации токенов
+    // =========================================================================
+    const p1BankTerms = [
+        { text: "алгоритм", type: "term", reason: "Существительное, ключевой термин предметной области." },
+        { text: "сервер", type: "term", reason: "Термин вычислительной инфраструктуры." },
+        { text: "индекс", type: "term", reason: "Информационная структура данных поисковика." },
+        { text: "паттерн", type: "term", reason: "Смысловой шаблон сопоставления." },
+        { text: "массив", type: "term", reason: "Базовая структура хранения последовательностей." },
+        { text: "токен", type: "term", reason: "Единица лексического анализа текста." },
+        { text: "автомат", type: "term", reason: "Математическая модель вычислителя." },
+        { text: "лемма", type: "term", reason: "Каноническая словарная форма слова." }
+    ];
+
+    const p1BankStops = [
+        { text: "однако", type: "stop", reason: "Противительный союз, не несет самостоятельного поиска." },
+        { text: "через", type: "stop", reason: "Пространственный предлог, стоп-слово." },
+        { text: "между", type: "stop", reason: "Предлог взаимного расположения." },
+        { text: "также", type: "stop", reason: "Присоединительный союз, стоп-слово." },
+        { text: "чтобы", type: "stop", reason: "Подчинительный союз цели." },
+        { text: "потому", type: "stop", reason: "Причинное наречие / союзная частица." },
+        { text: "кроме", type: "stop", reason: "Выделительный предлог." },
+        { text: "перед", type: "stop", reason: "Служебный предлог времени/места." }
+    ];
+
+    const p1BankNoise = [
+        { text: "<div_err", type: "noise", reason: "Незамкнутый осколок HTML-тега." },
+        { text: "&#x2F;", type: "noise", reason: "Сырая HTML-сущность спецсимвола." },
+        { text: "???!!", type: "noise", reason: "Многократная пунктуация без лексем." },
+        { text: "-->>", type: "noise", reason: "Служебный маркер комментариев разметки." },
+        { text: "<!--raw", type: "noise", reason: "Осколок комментария веб-страницы." },
+        { text: "\\x00_null", type: "noise", reason: "Бинарный управляющий нуль-байт." },
+        { text: "%20%20", type: "noise", reason: "Сырое URL-кодирование пробелов." },
+        { text: "[#--#]", type: "noise", reason: "Технический разделитель шаблонизатора." }
+    ];
+
+    let p1Tokens = [];
+    let p1SelectedTokenId = null;
+    let p1Buckets = { 0: [], 1: [], 2: [] }; // bucketIndex -> array of token objects
+
+    function initPhase1() {
+        p1SelectedTokenId = null;
+        p1Buckets = { 0: [], 1: [], 2: [] };
+
+        // Выбираем по 2 случайных токена из каждой категории (всего 6)
+        const chosenTerms = shuffleArray(p1BankTerms).slice(0, 2);
+        const chosenStops = shuffleArray(p1BankStops).slice(0, 2);
+        const chosenNoise = shuffleArray(p1BankNoise).slice(0, 2);
+
+        const merged = [
+            ...chosenTerms.map((t, idx) => ({ ...t, id: `term_${idx}`, expectedBucket: 0 })),
+            ...chosenStops.map((t, idx) => ({ ...t, id: `stop_${idx}`, expectedBucket: 1 })),
+            ...chosenNoise.map((t, idx) => ({ ...t, id: `noise_${idx}`, expectedBucket: 2 }))
+        ];
+
+        p1Tokens = shuffleArray(merged);
+        renderPhase1();
+    }
+
+    function renderPhase1() {
+        const palette = document.getElementById('p1-token-palette');
+        const countBadge = document.getElementById('p1-queue-count');
+        if (!palette) return;
+
+        palette.innerHTML = '';
+
+        // Отображение токенов в очереди
+        const placedIds = new Set([
+            ...p1Buckets[0].map(t => t.id),
+            ...p1Buckets[1].map(t => t.id),
+            ...p1Buckets[2].map(t => t.id)
+        ]);
+
+        const unplaced = p1Tokens.filter(t => !placedIds.has(t.id));
+        if (countBadge) countBadge.textContent = `${unplaced.length} токенов в очереди`;
+
+        if (unplaced.length === 0) {
+            palette.innerHTML = '<span class="text-secondary small fst-italic p-2">Все токены распределены по шлюзам. Нажмите «Запустить шлюз фильтрации» или кликните токен в корзине для возврата.</span>';
+        } else {
+            unplaced.forEach(t => {
+                const isSelected = p1SelectedTokenId === t.id;
+                const btn = document.createElement('div');
+                btn.className = `btn rounded-0 text-center font-monospace p-2 border transition-colors d-flex align-items-center justify-content-center ${
+                    isSelected ? 'btn-success text-dark border-light fw-bold shadow' : 'btn-dark text-light border-secondary'
+                }`;
+                btn.style.minHeight = '48px';
+                btn.style.minWidth = '110px';
+                btn.style.cursor = 'pointer';
+                btn.setAttribute('data-token-id', t.id);
+                btn.setAttribute('data-token-text', t.text);
+                btn.textContent = t.text;
+                btn.onclick = () => {
+                    p1SelectedTokenId = (p1SelectedTokenId === t.id) ? null : t.id;
+                    renderPhase1();
+                };
+                palette.appendChild(btn);
+            });
+        }
+
+        // Отрисовка 3 корзин
+        [0, 1, 2].forEach(bIdx => {
+            const container = document.getElementById(`p1-bucket-${bIdx}`);
+            const countEl = document.getElementById(`p1-count-${bIdx}`);
+            const cardEl = document.getElementById(`p1-bucket-card-${bIdx}`);
+            if (!container) return;
+
+            container.innerHTML = '';
+            const items = p1Buckets[bIdx];
+            if (countEl) countEl.textContent = String(items.length);
+
+            // Клик по шапке или пустой области корзины размещает выбранный токен
+            if (cardEl) {
+                cardEl.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
+                cardEl.onclick = (e) => {
+                    if (e.target.closest('[data-in-bucket-token]')) return;
+                    if (p1SelectedTokenId) {
+                        const tokenObj = p1Tokens.find(t => t.id === p1SelectedTokenId);
+                        if (tokenObj) {
+                            p1Buckets[bIdx].push(tokenObj);
+                            p1SelectedTokenId = null;
+                            renderPhase1();
+                        }
+                    }
+                };
+            }
+
+            if (items.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'border border-dashed border-secondary text-secondary p-2 text-center small rounded-0 flex-grow-1 d-flex align-items-center justify-content-center';
+                emptyMsg.style.minHeight = '70px';
+                emptyMsg.textContent = p1SelectedTokenId ? '▼ Кликните сюда для помещения токена' : 'Шлюз пуст';
+                container.appendChild(emptyMsg);
+            } else {
+                items.forEach(t => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'btn btn-dark border border-secondary text-light rounded-0 p-2 d-flex justify-content-between align-items-center small font-monospace';
+                    itemEl.style.minHeight = '48px';
+                    itemEl.style.cursor = 'pointer';
+                    itemEl.setAttribute('data-in-bucket-token', t.id);
+                    itemEl.setAttribute('data-token-id', t.id);
+                    itemEl.setAttribute('data-token-text', t.text);
+                    itemEl.innerHTML = `
+                        <span class="fw-bold text-wrap text-start">${escapeHtml(t.text)}</span>
+                        <span class="badge bg-secondary rounded-0 ms-2">✕ вернуть</span>
+                    `;
+                    itemEl.onclick = (ev) => {
+                        ev.stopPropagation();
+                        // Возврат токена в палитру
+                        p1Buckets[bIdx] = p1Buckets[bIdx].filter(x => x.id !== t.id);
+                        renderPhase1();
+                    };
+                    container.appendChild(itemEl);
+                });
+            }
+        });
+    }
+
+    function checkPhase1() {
+        if (isLocked) return;
+
+        const totalPlaced = p1Buckets[0].length + p1Buckets[1].length + p1Buckets[2].length;
+        if (totalPlaced < p1Tokens.length) {
+            triggerErrorReset('Не все токены распределены! Заполните все шлюзы перед проверкой.', null);
+            return;
+        }
+
+        // Проверка корректности каждого шлюза
+        for (let bIdx = 0; bIdx < 3; bIdx++) {
+            for (const t of p1Buckets[bIdx]) {
+                if (t.expectedBucket !== bIdx) {
+                    const bucketNames = ['Информативные лексемы', 'Стоп-слова', 'Шум и артефакты'];
+                    const correctBucket = bucketNames[t.expectedBucket];
+                    triggerErrorReset(`Ошибка сортировки: токен "${t.text}" помещен неверно! ${t.reason} Правильный шлюз: [${correctBucket}].`, () => {
+                        initPhase1();
+                    });
+                    return;
+                }
+            }
+        }
+
+        // Успех Фазы 1
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'in_progress',
+            attempts_count: attemptsCount,
+            action_log: [{ step: 1, action: 'phase1_complete' }]
+        }, '*');
+
+        showSuccessFeedback('Все токены корректно распределены! Поток очищен. Переход к синтезу регулярных выражений...', () => {
+            currentPhase = 2;
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            document.getElementById('phase-badge').className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
+            document.getElementById('phase-title').textContent = 'Синтез регулярных выражений (Slot & Snap)';
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            initPhase2();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Синтезатор регулярных выражений (Slot & Snap Builder)
+    // =========================================================================
+    // Банк сценариев регулярных выражений
+    const p2Scenarios = [
+        {
+            specDesc: 'Формат: префикс из 3 заглавных букв [A-Z], разделитель "-", и ровно 3 или 4 цифры на границе слова \\b. Пример: "SYS-404" или "NET-8080".',
+            expectedTokens: [
+                { id: 'p2_tok_0', value: '\\b', label: '\\b (граница начала)', type: 'boundary' },
+                { id: 'p2_tok_1', value: '[A-Z]{3}', label: '[A-Z]{3} (3 заглавные)', type: 'prefix' },
+                { id: 'p2_tok_2', value: '-', label: '- (дефис)', type: 'delim' },
+                { id: 'p2_tok_3', value: '\\d{3,4}', label: '\\d{3,4} (3-4 цифры)', type: 'suffix' },
+                { id: 'p2_tok_4', value: '\\b', label: '\\b (граница конца)', type: 'boundary' }
+            ],
+            distractors: [
+                { id: 'p2_dist_0', value: '\\B', label: '\\B (не граница)', type: 'distractor' },
+                { id: 'p2_dist_1', value: '[a-z]{3}', label: '[a-z]{3} (строчные буквы)', type: 'distractor' },
+                { id: 'p2_dist_2', value: '\\d+', label: '\\d+ (любое число цифр)', type: 'distractor' },
+                { id: 'p2_dist_3', value: '.*', label: '.* (жадный захват)', type: 'distractor' }
+            ],
+            positives: ['SYS-404', 'NET-8080', 'API-100'],
+            negatives: ['sys-404', 'SYSTEM-12', 'NET:8080', 'API-99', 'SYS-99999']
+        },
+        {
+            specDesc: 'Формат: строчный идентификатор сервиса из латинских букв [a-z]+, подчеркивание "_", ровно 2 цифры \\d{2} на границе слова \\b. Пример: "node_42", "auth_01".',
+            expectedTokens: [
+                { id: 'p2_tok_0', value: '\\b', label: '\\b (граница слова)', type: 'boundary' },
+                { id: 'p2_tok_1', value: '[a-z]+', label: '[a-z]+ (строчные буквы)', type: 'prefix' },
+                { id: 'p2_tok_2', value: '_', label: '_ (подчеркивание)', type: 'delim' },
+                { id: 'p2_tok_3', value: '\\d{2}', label: '\\d{2} (ровно 2 цифры)', type: 'suffix' },
+                { id: 'p2_tok_4', value: '\\b', label: '\\b (граница слова)', type: 'boundary' }
+            ],
+            distractors: [
+                { id: 'p2_dist_0', value: '\\B', label: '\\B (не граница)', type: 'distractor' },
+                { id: 'p2_dist_1', value: '[A-Z]+', label: '[A-Z]+ (заглавные буквы)', type: 'distractor' },
+                { id: 'p2_dist_2', value: '\\d{3}', label: '\\d{3} (3 цифры)', type: 'distractor' },
+                { id: 'p2_dist_3', value: '\\w*', label: '\\w* (любой токен)', type: 'distractor' }
+            ],
+            positives: ['node_42', 'auth_01', 'proxy_99'],
+            negatives: ['Node_42', 'node42', 'node_999', 'node_7', 'auth-01']
+        }
+    ];
+
+    let p2ActiveScenario = null;
+    let p2Slots = [null, null, null, null, null]; // 5 слотов
+    let p2PaletteTokens = [];
+    let p2SelectedTokenId = null;
+
+    function initPhase2() {
+        p2Slots = [null, null, null, null, null];
+        p2SelectedTokenId = null;
+
+        // Выбираем сценарий
+        const scenIdx = getRandomInt(0, p2Scenarios.length - 1);
+        p2ActiveScenario = p2Scenarios[scenIdx];
+
+        const specEl = document.getElementById('p2-task-spec');
+        if (specEl) specEl.textContent = p2ActiveScenario.specDesc;
+
+        // Формируем все доступные токены
+        p2PaletteTokens = shuffleArray([
+            ...p2ActiveScenario.expectedTokens,
+            ...p2ActiveScenario.distractors
+        ]);
+
+        renderPhase2();
+    }
+
+    function renderPhase2() {
+        const slotsRow = document.getElementById('p2-slots-row');
+        const palette = document.getElementById('p2-token-palette');
+        const previewEl = document.getElementById('p2-regex-preview');
+        if (!slotsRow || !palette) return;
+
+        slotsRow.innerHTML = '';
+        palette.innerHTML = '';
+
+        // Отрисовка 5 слотов
+        p2Slots.forEach((token, sIdx) => {
+            const slotBox = document.createElement('div');
+            slotBox.className = `border rounded-0 p-2 text-center transition-colors d-flex flex-column justify-content-center align-items-center ${
+                token ? 'bg-dark border-warning text-warning shadow' : 'border-dashed border-secondary bg-black text-secondary'
+            }`;
+            slotBox.style.minWidth = '110px';
+            slotBox.style.minHeight = '64px';
+            slotBox.style.cursor = 'pointer';
+            slotBox.setAttribute('data-slot-index', String(sIdx));
+
+            if (token) {
+                slotBox.innerHTML = `
+                    <div class="small text-secondary" style="font-size: 0.7rem;">Слот ${sIdx + 1}</div>
+                    <div class="fw-bold fs-6">${escapeHtml(token.value)}</div>
+                    <div class="small text-muted" style="font-size: 0.65rem;">✕ клик для снятия</div>
+                `;
+                slotBox.onclick = () => {
+                    // Возврат токена из слота в палитру
+                    p2Slots[sIdx] = null;
+                    renderPhase2();
+                };
+            } else {
+                slotBox.innerHTML = `
+                    <div class="small text-secondary" style="font-size: 0.7rem;">Слот ${sIdx + 1}</div>
+                    <div class="small ${p2SelectedTokenId ? 'text-warning fw-bold' : 'text-secondary'}">
+                        ${p2SelectedTokenId ? '▼ Вставить' : '[ Пусто ]'}
+                    </div>
+                `;
+                slotBox.onclick = () => {
+                    if (p2SelectedTokenId) {
+                        const tokObj = p2PaletteTokens.find(t => t.id === p2SelectedTokenId);
+                        if (tokObj) {
+                            p2Slots[sIdx] = tokObj;
+                            p2SelectedTokenId = null;
+                            renderPhase2();
+                        }
+                    }
+                };
+            }
+            slotsRow.appendChild(slotBox);
+        });
+
+        // Формирование текущей строки RegEx
+        const filledValues = p2Slots.map(t => t ? t.value : '...');
+        const currentPatternStr = filledValues.join('');
+        if (previewEl) previewEl.textContent = `/${currentPatternStr}/`;
+
+        // Отрисовка токенов палитры
+        const placedIds = new Set(p2Slots.filter(Boolean).map(t => t.id));
+        const availableTokens = p2PaletteTokens.filter(t => !placedIds.has(t.id));
+
+        if (availableTokens.length === 0) {
+            palette.innerHTML = '<span class="text-secondary small fst-italic p-2">Все слоты заполнены токенами. Нажмите «Активировать RegEx-фильтр» для проверки.</span>';
+        } else {
+            availableTokens.forEach(t => {
+                const isSelected = p2SelectedTokenId === t.id;
+                const btn = document.createElement('div');
+                btn.className = `btn rounded-0 text-center font-monospace p-2 border transition-colors d-flex align-items-center justify-content-center ${
+                    isSelected ? 'btn-warning text-dark border-light fw-bold shadow' : 'btn-dark text-warning border-secondary'
+                }`;
+                btn.style.minHeight = '48px';
+                btn.style.minWidth = '100px';
+                btn.style.cursor = 'pointer';
+                btn.setAttribute('data-token-id', t.id);
+                btn.setAttribute('data-token-val', t.value);
+                btn.innerHTML = `<span class="fw-bold">${escapeHtml(t.label)}</span>`;
+                btn.onclick = () => {
+                    p2SelectedTokenId = (p2SelectedTokenId === t.id) ? null : t.id;
+                    renderPhase2();
+                };
+                palette.appendChild(btn);
+            });
+        }
+
+        // Обновление живого полигона совпадений
+        updatePhase2LiveTestbench();
+    }
+
+    function updatePhase2LiveTestbench() {
+        const posList = document.getElementById('p2-positive-list');
+        const negList = document.getElementById('p2-negative-list');
+        if (!posList || !negList || !p2ActiveScenario) return;
+
+        posList.innerHTML = '';
+        negList.innerHTML = '';
+
+        // Пытаемся скомпилировать текущее регулярное выражение
+        let compiledRegex = null;
+        const allFilled = p2Slots.every(Boolean);
+        if (allFilled) {
+            try {
+                const rawPattern = p2Slots.map(t => t.value).join('');
+                compiledRegex = new RegExp(rawPattern);
+            } catch (e) {
+                compiledRegex = null;
+            }
+        }
+
+        p2ActiveScenario.positives.forEach(sample => {
+            const row = document.createElement('div');
+            row.className = 'd-flex justify-content-between align-items-center bg-black border border-secondary p-1 px-2 small';
+            const doesMatch = compiledRegex ? compiledRegex.test(sample) : false;
+            row.innerHTML = `
+                <code>"${sample}"</code>
+                <span class="badge ${doesMatch ? 'bg-success text-dark' : 'bg-secondary text-light'} rounded-0">
+                    ${doesMatch ? '✓ СОВПАЛО' : 'ОЖИДАЕТСЯ'}
+                </span>
+            `;
+            posList.appendChild(row);
+        });
+
+        p2ActiveScenario.negatives.forEach(sample => {
+            const row = document.createElement('div');
+            row.className = 'd-flex justify-content-between align-items-center bg-black border border-secondary p-1 px-2 small';
+            const doesMatch = compiledRegex ? compiledRegex.test(sample) : false;
+            row.innerHTML = `
+                <code>"${sample}"</code>
+                <span class="badge ${doesMatch ? 'bg-danger text-white' : 'bg-success text-dark'} rounded-0">
+                    ${doesMatch ? '✗ ЛОЖНОЕ СОВПАДЕНИЕ' : '✓ ОТВЕРГНУТО'}
+                </span>
+            `;
+            negList.appendChild(row);
+        });
+    }
+
+    function checkPhase2() {
+        if (isLocked) return;
+
+        if (p2Slots.some(t => t === null)) {
+            triggerErrorReset('Не все слоты монтажной платы заполнены! Соберите полный шаблон.', null);
+            return;
+        }
+
+        const rawPattern = p2Slots.map(t => t.value).join('');
+        let testRegex = null;
+        try {
+            testRegex = new RegExp(rawPattern);
+        } catch (e) {
+            triggerErrorReset(`Синтаксическая ошибка в собранном выражении: ${e.message}`, () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        // Проверяем позитивные образцы
+        for (const posSample of p2ActiveScenario.positives) {
+            if (!testRegex.test(posSample)) {
+                triggerErrorReset(`Ошибка: целевой образец "${posSample}" не распознан шаблоном /${rawPattern}/! Проверьте квантификаторы и классы.`, () => {
+                    initPhase2();
+                });
+                return;
+            }
+        }
+
+        // Проверяем негативные образцы
+        for (const negSample of p2ActiveScenario.negatives) {
+            if (testRegex.test(negSample)) {
+                triggerErrorReset(`Ошибка: ложное срабатывание на запрещенной строке "${negSample}"! Шаблон слишком жадный или не имеет строгих границ.`, () => {
+                    initPhase2();
+                });
+                return;
+            }
+        }
+
+        // Успех Фазы 2
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'in_progress',
+            attempts_count: attemptsCount,
+            action_log: [{ step: 2, action: 'phase2_complete' }]
+        }, '*');
+
+        showSuccessFeedback('RegEx-шаблон валидирован со 100% точностью! Переход к автоматному компилятору и защите от ReDoS...', () => {
+            currentPhase = 3;
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            document.getElementById('phase-badge').className = 'badge bg-danger text-white rounded-0 fs-6 me-2';
+            document.getElementById('phase-title').textContent = 'Матрица переходов ДКА и защита от ReDoS';
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            initPhase3();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Матрица переходов ДКА и защита от катастрофического отката
+    // =========================================================================
+    // Задача: сконфигурировать переходы автомата delta(q, c)
+    // Состояния: S0 (Старт), S1 (Префикс), S2 (Разделитель), S3 (Финал/Accept)
+    const p3Alphabet = [
+        { id: 'trans_0', from: 'S0', symbol: 'буква [a-z]', expected: 'S1', hint: 'Начальный переход по букве переводит в S1 (чтение префикса)' },
+        { id: 'trans_1', from: 'S1', symbol: 'разделитель [_]', expected: 'S2', hint: 'Разделитель переводит автомат в S2' },
+        { id: 'trans_2', from: 'S2', symbol: 'цифра [0-9]', expected: 'S3', hint: 'Первая цифра переводит автомат в допускающее состояние S3' },
+        { id: 'trans_3', from: 'S3', symbol: 'цифра [0-9]', expected: 'S3', hint: 'Последующие цифры замыкаются в цикл допускающего состояния S3' }
+    ];
+
+    const p3AvailableStates = [
+        { id: 'state_s0', label: 'S0 (Старт)' },
+        { id: 'state_s1', label: 'S1 (Префикс)' },
+        { id: 'state_s2', label: 'S2 (Разделитель)' },
+        { id: 'state_s3', label: 'S3 (Accept)' },
+        { id: 'state_trap', label: 'TRAP (Сброс)' },
+        { id: 'state_loop_dist', label: 'S1 (Петля-ловушка ReDoS)' } // дистрактор
+    ];
+
+    let p3Slots = { trans_0: null, trans_1: null, trans_2: null, trans_3: null };
+    let p3SelectedStateId = null;
+
+    function initPhase3() {
+        p3Slots = { trans_0: null, trans_1: null, trans_2: null, trans_3: null };
+        p3SelectedStateId = null;
+
+        const traceLog = document.getElementById('p3-trace-log');
+        const traceStatus = document.getElementById('p3-trace-status');
+        if (traceLog) traceLog.textContent = 'Сконфигурируйте все переходы и запустите тестовый прогон входной строки.';
+        if (traceStatus) {
+            traceStatus.textContent = 'Ожидание настройки';
+            traceStatus.className = 'badge bg-secondary rounded-0';
+        }
+
+        renderPhase3();
+    }
+
+    function renderPhase3() {
+        const table = document.getElementById('p3-transitions-table');
+        const palette = document.getElementById('p3-state-palette');
+        if (!table || !palette) return;
+
+        table.innerHTML = '';
+        palette.innerHTML = '';
+
+        // Отрисовка слотов переходов
+        p3Alphabet.forEach(t => {
+            const assigned = p3Slots[t.id];
+            const row = document.createElement('div');
+            row.className = 'd-flex flex-wrap justify-content-between align-items-center bg-black border border-secondary p-2 small';
+            row.style.minHeight = '48px';
+
+            const left = document.createElement('div');
+            left.className = 'd-flex align-items-center gap-2';
+            left.innerHTML = `
+                <span class="badge bg-dark border border-secondary text-light rounded-0">${t.from}</span>
+                <span class="text-secondary">──(читает символ <strong class="text-warning">${t.symbol}</strong>)──►</span>
+            `;
+
+            const slot = document.createElement('div');
+            slot.className = `btn rounded-0 p-1 px-3 font-monospace d-flex align-items-center justify-content-center transition-colors ${
+                assigned ? 'btn-danger text-white border-light fw-bold shadow' : 'border border-dashed border-secondary text-secondary'
+            }`;
+            slot.style.minHeight = '48px';
+            slot.style.minWidth = '140px';
+            slot.style.cursor = 'pointer';
+            slot.setAttribute('data-transition-id', t.id);
+
+            if (assigned) {
+                slot.innerHTML = `<span>${assigned.label}</span> <span class="small ms-2" style="font-size: 0.65rem;">✕</span>`;
+                slot.onclick = () => {
+                    p3Slots[t.id] = null;
+                    renderPhase3();
+                };
+            } else {
+                slot.textContent = p3SelectedStateId ? '▼ Назначить' : '[ Выбрать состояние ]';
+                slot.onclick = () => {
+                    if (p3SelectedStateId) {
+                        const stObj = p3AvailableStates.find(s => s.id === p3SelectedStateId);
+                        if (stObj) {
+                            p3Slots[t.id] = stObj;
+                            p3SelectedStateId = null;
+                            renderPhase3();
+                        }
+                    }
+                };
+            }
+
+            row.appendChild(left);
+            row.appendChild(slot);
+            table.appendChild(row);
+        });
+
+        // Отрисовка палитры состояний
+        p3AvailableStates.forEach(st => {
+            const isSelected = p3SelectedStateId === st.id;
+            const btn = document.createElement('div');
+            btn.className = `btn rounded-0 text-center font-monospace p-2 border transition-colors d-flex align-items-center justify-content-center ${
+                isSelected ? 'btn-danger text-white border-light fw-bold shadow' : 'btn-dark text-danger border-secondary'
+            }`;
+            btn.style.minHeight = '48px';
+            btn.style.minWidth = '120px';
+            btn.style.cursor = 'pointer';
+            btn.setAttribute('data-state-id', st.id);
+            btn.textContent = st.label;
+            btn.onclick = () => {
+                p3SelectedStateId = (p3SelectedStateId === st.id) ? null : st.id;
+                renderPhase3();
+            };
+            palette.appendChild(btn);
+        });
+    }
+
+    function checkPhase3() {
+        if (isLocked) return;
+
+        const allFilled = Object.values(p3Slots).every(Boolean);
+        if (!allFilled) {
+            triggerErrorReset('Не все переходы конечного автомата настроены! Назначьте состояния для всех слотов.', null);
+            return;
+        }
+
+        const traceLog = document.getElementById('p3-trace-log');
+        const traceStatus = document.getElementById('p3-trace-status');
+
+        // Проверка на наличие дистрактора ReDoS петли
+        const hasReDoSLoop = Object.values(p3Slots).some(s => s.id === 'state_loop_dist');
+        if (hasReDoSLoop) {
+            if (traceLog) {
+                traceLog.innerHTML = `
+                    <div class="text-danger fw-bold">💥 КАТАСТРОФИЧЕСКИЙ ВОЗВРАТ (Catastrophic Backtracking Detected):</div>
+                    <div class="text-warning">В автомате обнаружена неоднозначная петля перехода! На контрольной строке "aaaaa...X" число шагов превысило 1 048 576.</div>
+                    <div class="text-secondary">Движок завис в рекурсивном поиске с возвратом (ReDoS уязвимость). Удалите петлю-ловушку!</div>
+                `;
+            }
+            if (traceStatus) {
+                traceStatus.textContent = 'ReDoS СБОЙ';
+                traceStatus.className = 'badge bg-danger rounded-0';
+            }
+            triggerErrorReset('Обнаружен катастрофический возврат! Наличие неоднозначной петли в состоянии префикса подвешивает сервер.', () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        // Проверка корректности переходов
+        for (const t of p3Alphabet) {
+            const assigned = p3Slots[t.id];
+            if (!assigned.label.startsWith(t.expected)) {
+                triggerErrorReset(`Ошибка в переходе: при чтении "${t.symbol}" из ${t.from} автомат должен переходить в ${t.expected}! ${t.hint}`, () => {
+                    initPhase3();
+                });
+                return;
+            }
+        }
+
+        // Успешная симуляция
+        if (traceLog) {
+            traceLog.innerHTML = `
+                <div class="text-success fw-bold">✓ СИМУЛЯЦИЯ АВТОМАТА УСПЕШНО ЗАВЕРШЕНА:</div>
+                <div class="text-light">Тестовая цепочка: "sys_8080" ➔ Длина N = 8 символов.</div>
+                <div class="text-info">Трассировка состояний: S0 ➔ S1('s') ➔ S1('y') ➔ S1('s') ➔ S2('_') ➔ S3('8') ➔ S3('0') ➔ S3('8') ➔ S3('0') [ACCEPT].</div>
+                <div class="text-success">Количество шагов: ровно 8. Вычислительная сложность O(N) гарантирована.</div>
+            `;
+        }
+        if (traceStatus) {
+            traceStatus.textContent = 'ДКА ВАЛИДИРОВАН';
+            traceStatus.className = 'badge bg-success text-dark rounded-0';
+        }
+
+        isLocked = true;
+        setTimeout(() => {
+            isLocked = false;
+            completeLevel();
+        }, 1200);
+    }
+
+    // Инициализация событий кнопок
+    document.addEventListener('DOMContentLoaded', () => {
+        startTimer();
+
+        // Кнопки проверок фаз
+        const p1Btn = document.getElementById('p1-submit-btn');
+        if (p1Btn) p1Btn.onclick = checkPhase1;
+
+        const p2Btn = document.getElementById('p2-submit-btn');
+        if (p2Btn) p2Btn.onclick = checkPhase2;
+
+        const p3Btn = document.getElementById('p3-submit-btn');
+        if (p3Btn) p3Btn.onclick = checkPhase3;
+
+        // Кнопка перезапуска
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) {
+            restartBtn.onclick = () => {
+                document.getElementById('victory-screen').classList.add('d-none');
+                document.getElementById('phase1').classList.remove('d-none');
+                document.getElementById('phase-badge').textContent = 'Шаг 1 из 3';
+                document.getElementById('phase-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
+                document.getElementById('phase-title').textContent = 'Шлюз NLP-фильтрации и очистка корпуса';
+                currentPhase = 1;
+                attemptsCount = 0;
+                startTime = Date.now();
+                updateAttemptsDisplay();
+                startTimer();
+                initPhase1();
+            };
+        }
+
+        // Запуск Фазы 1
+        initPhase1();
+    });
+})();
+</script>
