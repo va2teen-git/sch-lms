@@ -141,13 +141,12 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     const cpmText = await page.locator('#sprint-res-cpm').textContent();
     expect(cpmText).toContain('зн/мин');
 
-    // Diligent submits telemetry to dashboard
-    const saveBtn = page.locator('#sprint-save-btn');
-    await saveBtn.click();
-
-    // Success banner must appear and leaderboard refreshes
+    // Telemetry is saved automatically upon completion: success banner appears without manual clicks
     await expect(page.locator('#sprint-telemetry-banner')).toBeVisible();
-    await expect(saveBtn).toHaveText('✓ Зафиксировано в журнале');
+    await expect(page.locator('#sprint-telemetry-msg')).toContainText('Результат автоматически зафиксирован');
+
+    // Manual submission button sprint-save-btn is no longer present
+    await expect(page.locator('#sprint-save-btn')).toHaveCount(0);
 
     // Verify test persona is strictly filtered out from Top 10 leaderboard
     await page.waitForTimeout(500);

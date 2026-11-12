@@ -451,16 +451,17 @@ const tasks = [
               </div>
             </div>
 
-            <div id="sprint-telemetry-banner" class="hidden w-full p-2.5 my-2 border border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-xs font-semibold">
-              ⚡ Результат зафиксирован в дашборде учителя!
+            <div id="sprint-telemetry-banner" class="hidden w-full p-2.5 my-2 border border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-2">
+              <span class="text-emerald-400">⚡</span>
+              <span id="sprint-telemetry-msg">Результат автоматически зафиксирован в дашборде учителя!</span>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-3 w-full mt-4 font-mono">
-              <button id="sprint-save-btn" class="flex-1 py-2.5 px-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg">
-                💾 Зафиксировать результат в дашборд
-              </button>
-              <button id="sprint-retry-btn" class="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-cyan-300 border border-cyan-600/60 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+              <button id="sprint-retry-btn" class="flex-1 py-2.5 px-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg">
                 🔄 Попробовать снова
+              </button>
+              <button id="sprint-close-results-btn" class="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+                ✖ Закрыть
               </button>
             </div>
           </div>
@@ -1094,9 +1095,10 @@ const tasks = [
   const sprintTextDisplay = document.getElementById('sprint-text-display');
   const sprintPlayArena = document.getElementById('sprint-play-arena');
   const sprintResultsCard = document.getElementById('sprint-results-card');
-  const sprintSaveBtn = document.getElementById('sprint-save-btn');
+  const sprintCloseResultsBtn = document.getElementById('sprint-close-results-btn');
   const sprintRetryBtn = document.getElementById('sprint-retry-btn');
   const sprintTelemetryBanner = document.getElementById('sprint-telemetry-banner');
+  const sprintTelemetryMsg = document.getElementById('sprint-telemetry-msg');
 
   const sprintTermsCountEl = document.getElementById('sprint-terms-count');
   const sprintCharsProgressEl = document.getElementById('sprint-chars-progress');
@@ -1404,11 +1406,6 @@ const tasks = [
       sprintResultsCard.classList.remove('flex');
     }
     if (sprintTelemetryBanner) sprintTelemetryBanner.classList.add('hidden');
-    if (sprintSaveBtn) {
-      sprintSaveBtn.disabled = false;
-      sprintSaveBtn.textContent = '💾 Зафиксировать результат в дашборд';
-      sprintSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    }
 
     focusSprintInput();
   }
@@ -1446,6 +1443,8 @@ const tasks = [
       sprintResultsCard.classList.remove('hidden');
       sprintResultsCard.classList.add('flex');
     }
+
+    autoSaveSprintTelemetry(lastSprintResult);
   }
 
   function isCharMatch(inputKey, expected) {
@@ -1705,55 +1704,75 @@ const tasks = [
     });
   }
 
-  if (sprintSaveBtn) {
-    sprintSaveBtn.addEventListener('click', async () => {
-      if (!lastSprintResult) return;
-      sprintSaveBtn.disabled = true;
-      sprintSaveBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      sprintSaveBtn.textContent = '⏳ Сохранение...';
-
-      const fName = localStorage.getItem('student_firstName') || 'Unknown';
-      const lName = localStorage.getItem('student_lastName') || 'Unknown';
-      const cName = localStorage.getItem('student_class') || classSlug;
-
-      try {
-        const payload = {
-          student_firstName: fName,
-          student_lastName: lName,
-          student_class: cName,
-          course_slug: classSlug,
-          lesson_id: lessonId,
-          mission_name: `Урок ${lessonId} :: Лого-Шторм`,
-          action_type: 'sprint_complete',
-          level_number: 0,
-          status: 'completed',
-          time_spent_sec: lastSprintResult.timeSpentSec,
-          attempts_count: 1,
-          success: true,
-          action_log: JSON.stringify(lastSprintResult)
-        };
-
-        const res = await fetch('/api/telemetry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          if (sprintTelemetryBanner) sprintTelemetryBanner.classList.remove('hidden');
-          sprintSaveBtn.textContent = '✓ Зафиксировано в журнале';
-          fetchSprintLeaderboard();
-        } else {
-          sprintSaveBtn.disabled = false;
-          sprintSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-          sprintSaveBtn.textContent = '⚠️ Ошибка сохранения, повторить';
-        }
-      } catch (err) {
-        console.error('Logo-Storm Save Error:', err);
-        sprintSaveBtn.disabled = false;
-        sprintSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        sprintSaveBtn.textContent = '⚠️ Ошибка сети, повторить';
-      }
+  if (sprintCloseResultsBtn && sprintOverlay) {
+    sprintCloseResultsBtn.addEventListener('click', () => {
+      sprintOverlay.classList.remove('flex');
+      sprintOverlay.classList.add('hidden');
+      clearInterval(sprintTimerInterval);
     });
+  }
+
+  async function autoSaveSprintTelemetry(result) {
+    if (!result) return;
+    if (sprintTelemetryBanner) {
+      sprintTelemetryBanner.classList.remove('hidden');
+      sprintTelemetryBanner.className = 'w-full p-2.5 my-2 border border-cyan-500/50 bg-cyan-950/60 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-2';
+    }
+    if (sprintTelemetryMsg) {
+      sprintTelemetryMsg.textContent = '⏳ Автоматическая фиксация в дашборде...';
+    }
+
+    const fName = localStorage.getItem('student_firstName') || 'Unknown';
+    const lName = localStorage.getItem('student_lastName') || 'Unknown';
+    const cName = localStorage.getItem('student_class') || classSlug;
+
+    try {
+      const payload = {
+        student_firstName: fName,
+        student_lastName: lName,
+        student_class: cName,
+        course_slug: classSlug,
+        lesson_id: lessonId,
+        mission_name: `Урок ${lessonId} :: Лого-Шторм`,
+        action_type: 'sprint_complete',
+        level_number: 0,
+        status: 'completed',
+        time_spent_sec: result.timeSpentSec,
+        attempts_count: 1,
+        success: true,
+        action_log: JSON.stringify(result)
+      };
+
+      const res = await fetch('/api/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        if (sprintTelemetryBanner) {
+          sprintTelemetryBanner.className = 'w-full p-2.5 my-2 border border-emerald-500/50 bg-emerald-950/60 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-2';
+        }
+        if (sprintTelemetryMsg) {
+          sprintTelemetryMsg.textContent = '✓ Результат автоматически зафиксирован в дашборде учителя!';
+        }
+        fetchSprintLeaderboard();
+      } else {
+        if (sprintTelemetryBanner) {
+          sprintTelemetryBanner.className = 'w-full p-2.5 my-2 border border-amber-500/50 bg-amber-950/60 text-amber-300 text-xs font-semibold flex items-center justify-center gap-2';
+        }
+        if (sprintTelemetryMsg) {
+          sprintTelemetryMsg.textContent = '⚠️ Не удалось синхронизировать с дашбордом';
+        }
+      }
+    } catch (err) {
+      console.error('Logo-Storm Auto-Save Error:', err);
+      if (sprintTelemetryBanner) {
+        sprintTelemetryBanner.className = 'w-full p-2.5 my-2 border border-red-500/50 bg-red-950/60 text-red-300 text-xs font-semibold flex items-center justify-center gap-2';
+      }
+      if (sprintTelemetryMsg) {
+        sprintTelemetryMsg.textContent = '⚠️ Ошибка сети при фиксации результата';
+      }
+    }
   }
 </script>
