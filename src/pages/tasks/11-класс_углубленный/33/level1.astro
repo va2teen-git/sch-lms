@@ -71,7 +71,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         <!-- Шлюз 0: Информативные лексемы -->
                         <div class="col-12 col-md-4">
                             <div class="card bg-black border border-success rounded-0 h-100" id="p1-bucket-card-0">
-                                <div class="card-header bg-dark text-success py-2 px-2 d-flex justify-content-between align-items-center small fw-bold">
+                                <div class="card-header bg-dark text-success py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" id="p1-bucket-header-0">
                                     <span>📦 Информативные лексемы</span>
                                     <span id="p1-count-0" class="badge bg-success text-dark rounded-0">0</span>
                                 </div>
@@ -84,7 +84,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         <!-- Шлюз 1: Стоп-слова -->
                         <div class="col-12 col-md-4">
                             <div class="card bg-black border border-warning rounded-0 h-100" id="p1-bucket-card-1">
-                                <div class="card-header bg-dark text-warning py-2 px-2 d-flex justify-content-between align-items-center small fw-bold">
+                                <div class="card-header bg-dark text-warning py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" id="p1-bucket-header-1">
                                     <span>🛑 Стоп-слова (Stop-Words)</span>
                                     <span id="p1-count-1" class="badge bg-warning text-dark rounded-0">0</span>
                                 </div>
@@ -97,7 +97,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         <!-- Шлюз 2: Шум и артефакты -->
                         <div class="col-12 col-md-4">
                             <div class="card bg-black border border-danger rounded-0 h-100" id="p1-bucket-card-2">
-                                <div class="card-header bg-dark text-danger py-2 px-2 d-flex justify-content-between align-items-center small fw-bold">
+                                <div class="card-header bg-dark text-danger py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" id="p1-bucket-header-2">
                                     <span>⚠️ Шум и артефакты разметки</span>
                                     <span id="p1-count-2" class="badge bg-danger text-dark rounded-0">0</span>
                                 </div>
@@ -508,11 +508,26 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const items = p1Buckets[bIdx];
             if (countEl) countEl.textContent = String(items.length);
 
+            const headerEl = document.getElementById(`p1-bucket-header-${bIdx}`);
+            if (headerEl) {
+                headerEl.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
+                headerEl.onclick = () => {
+                    if (p1SelectedTokenId) {
+                        const tokenObj = p1Tokens.find(t => t.id === p1SelectedTokenId);
+                        if (tokenObj) {
+                            p1Buckets[bIdx].push(tokenObj);
+                            p1SelectedTokenId = null;
+                            renderPhase1();
+                        }
+                    }
+                };
+            }
+
             // Клик по шапке или пустой области корзины размещает выбранный токен
             if (cardEl) {
                 cardEl.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
                 cardEl.onclick = (e) => {
-                    if (e.target.closest('[data-in-bucket-token]')) return;
+                    if (e.target.closest('[data-return-token]')) return;
                     if (p1SelectedTokenId) {
                         const tokenObj = p1Tokens.find(t => t.id === p1SelectedTokenId);
                         if (tokenObj) {
@@ -526,31 +541,65 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             if (items.length === 0) {
                 const emptyMsg = document.createElement('div');
+                emptyMsg.id = `p1-slot-${bIdx}`;
                 emptyMsg.className = 'border border-dashed border-secondary text-secondary p-2 text-center small rounded-0 flex-grow-1 d-flex align-items-center justify-content-center';
                 emptyMsg.style.minHeight = '70px';
+                emptyMsg.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
                 emptyMsg.textContent = p1SelectedTokenId ? '▼ Кликните сюда для помещения токена' : 'Шлюз пуст';
+                emptyMsg.onclick = (e) => {
+                    e.stopPropagation();
+                    if (p1SelectedTokenId) {
+                        const tokenObj = p1Tokens.find(t => t.id === p1SelectedTokenId);
+                        if (tokenObj) {
+                            p1Buckets[bIdx].push(tokenObj);
+                            p1SelectedTokenId = null;
+                            renderPhase1();
+                        }
+                    }
+                };
                 container.appendChild(emptyMsg);
             } else {
                 items.forEach(t => {
                     const itemEl = document.createElement('div');
                     itemEl.className = 'btn btn-dark border border-secondary text-light rounded-0 p-2 d-flex justify-content-between align-items-center small font-monospace';
                     itemEl.style.minHeight = '48px';
-                    itemEl.style.cursor = 'pointer';
                     itemEl.setAttribute('data-in-bucket-token', t.id);
                     itemEl.setAttribute('data-token-id', t.id);
                     itemEl.setAttribute('data-token-text', t.text);
                     itemEl.innerHTML = `
                         <span class="fw-bold text-wrap text-start">${escapeHtml(t.text)}</span>
-                        <span class="badge bg-secondary rounded-0 ms-2">✕ вернуть</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-0 ms-2" data-return-token="${t.id}" style="font-size: 0.65rem;">✕ вернуть</button>
                     `;
-                    itemEl.onclick = (ev) => {
-                        ev.stopPropagation();
-                        // Возврат токена в палитру
-                        p1Buckets[bIdx] = p1Buckets[bIdx].filter(x => x.id !== t.id);
-                        renderPhase1();
-                    };
+                    const retBtn = itemEl.querySelector(`[data-return-token="${t.id}"]`);
+                    if (retBtn) {
+                        retBtn.onclick = (ev) => {
+                            ev.stopPropagation();
+                            p1Buckets[bIdx] = p1Buckets[bIdx].filter(x => x.id !== t.id);
+                            renderPhase1();
+                        };
+                    }
                     container.appendChild(itemEl);
                 });
+
+                // Дополнительная интерактивная зона добавления следующего токена в корзину
+                const appendBtn = document.createElement('div');
+                appendBtn.id = `p1-append-${bIdx}`;
+                appendBtn.className = 'border border-dashed border-secondary text-secondary p-2 text-center small rounded-0 mt-1';
+                appendBtn.style.minHeight = '48px';
+                appendBtn.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
+                appendBtn.textContent = p1SelectedTokenId ? '▼ Добавить токен сюда' : '+ Добавить токен';
+                appendBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (p1SelectedTokenId) {
+                        const tokenObj = p1Tokens.find(t => t.id === p1SelectedTokenId);
+                        if (tokenObj) {
+                            p1Buckets[bIdx].push(tokenObj);
+                            p1SelectedTokenId = null;
+                            renderPhase1();
+                        }
+                    }
+                };
+                container.appendChild(appendBtn);
             }
         });
     }
@@ -1076,5 +1125,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         // Запуск Фазы 1
         initPhase1();
     });
+
+    // Экспорт глобального тестового хука
+    window.__DEV_LEVEL1_STATE__ = {
+        getPhase: () => currentPhase,
+        getP1Tokens: () => p1Tokens,
+        getP1Selected: () => p1SelectedTokenId,
+        getP1Buckets: () => p1Buckets,
+        placeP1Token: (tokenId, bucketIdx) => {
+            const tokenObj = p1Tokens.find(t => t.id === tokenId);
+            if (tokenObj) {
+                p1Buckets[bucketIdx].push(tokenObj);
+                p1SelectedTokenId = null;
+                renderPhase1();
+            }
+        },
+        getP2ExpectedTokens: () => p2ActiveScenario ? p2ActiveScenario.expectedTokens : [],
+        getP3Alphabet: () => p3Alphabet,
+        getP3States: () => p3AvailableStates
+    };
 })();
 </script>
