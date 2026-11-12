@@ -91,18 +91,28 @@ function generatePrompt1(className, classSlug, lessonId, topic, branchName, topi
    Ознакомься с AGENTS.md и открой актуальные инструкции учебного плана и оформления контента.
    Экономия токенов: перед чтением файлов длиннее 100 строк всегда вызывай get_code_outline.
 
-3. СОЗДАНИЕ ТЕОРИИ:
+3. СОЗДАНИЕ ТЕОРИИ И МИКРОРАЗМЕТКА ДЛЯ «ЛОГО-ШТОРМА»:
    Создай файл D:\\school-lms-dev\\src\\content\\lessons\\${classSlug}\\${lessonId}\\theory.md.
    - Материал должен строго соответствовать учебной программе класса и профиля по теме «${topic}».
    - Соблюдай Zero-LaTeX Policy: формулы и обозначения оформляй чистым Unicode и тегами <sub> / <sup> (без синтаксиса $...$).
    - Разбей теорию на понятные дидактические разделы с примерами из реальной практики.
+   - ПЕДАГОГИЧЕСКАЯ МИКРОРАЗМЕТКА ТЕРМИНОВ:
+     Обязательно выдели от 5 до 12 ключевых понятий темы вместе с краткими определениями для тренажера «Лого-Шторм» через теги:
+     <span data-term="Термин" data-definition="Краткое понятное определение термина...">Термин</span>
+     или через YAML Frontmatter:
+     ---
+     sprintTerms:
+       - term: "Термин"
+         definition: "Краткое понятное определение термина..."
+     ---
+     Это активирует дидактический HUD-виджет и тренировку терминологической грамотности учащихся.
    - ВАЖНО: Раздел «Дополнительная информация» на данном этапе НЕ СОЗДАВАТЬ (он наполняется на этапе 5 под фактические механики тренажеров).
 
 4. ВАЛИДАЦИЯ И КОММИТ:
    - Проверь файл линтером: quick_lint(file_path="D:/school-lms-dev/src/content/lessons/${classSlug}/${lessonId}/theory.md").
    - Зафиксируй изменения атомарным коммитом и отправь ветку:
      git -C "D:\\school-lms-dev" add "src/content/lessons/${classSlug}/${lessonId}/theory.md"
-     git -C "D:\\school-lms-dev" commit -m "content(${classSlug}-${lessonId}): add comprehensive theory on ${topicSlug}"
+     git -C "D:\\school-lms-dev" commit -m "content(${classSlug}-${lessonId}): add comprehensive theory on ${topicSlug} with logo-storm markup"
      git -C "D:\\school-lms-dev" push -u origin ${branchName}`;
 }
 

@@ -22,6 +22,11 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     await expect(overlay).toBeVisible();
     await expect(page.locator('#sprint-terms-count')).toHaveText('7');
 
+    // Novice verifies definition HUD and Top-10 leaderboard are present
+    await expect(page.locator('#sprint-def-card')).toBeVisible();
+    await expect(page.locator('#sprint-leaderboard-sidebar')).toBeVisible();
+    await expect(page.locator('#sprint-def-term')).not.toBeEmpty();
+
     // Novice tests sound toggle
     const soundToggle = page.locator('#sprint-sound-toggle');
     await soundToggle.click();
@@ -123,17 +128,17 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     await expect(resultsCard).toBeVisible();
     await expect(page.locator('#sprint-play-arena')).toBeHidden();
 
-    // Verify victory metrics
+    // Verify victory metrics in Russian
     await expect(page.locator('#sprint-res-acc')).toHaveText('100%');
     await expect(page.locator('#sprint-res-errors')).toHaveText('0');
     const cpmText = await page.locator('#sprint-res-cpm').textContent();
-    expect(cpmText).toContain('CPM');
+    expect(cpmText).toContain('зн/мин');
 
     // Diligent submits telemetry to dashboard
     const saveBtn = page.locator('#sprint-save-btn');
     await saveBtn.click();
 
-    // Success banner must appear
+    // Success banner must appear and leaderboard refreshes
     await expect(page.locator('#sprint-telemetry-banner')).toBeVisible();
     await expect(saveBtn).toHaveText('✓ Зафиксировано в журнале');
 
