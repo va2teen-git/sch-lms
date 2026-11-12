@@ -115,13 +115,13 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
 
     // Read full target text from rendered spans
     const spansCount = await page.locator('#sprint-text-display span').count();
-    expect(spansCount).toBeGreaterThan(20);
+    expect(spansCount).toBeGreaterThan(100);
 
-    // Diligent types all characters accurately
-    for (let i = 0; i < spansCount; i++) {
-      const char = await page.locator(`#sprint-text-display span[data-idx="${i}"]`).textContent();
-      await page.locator('#sprint-hidden-input').pressSequentially(char);
-    }
+    // Read full text directly from spans preserving whitespace and type sequentially
+    const fullText = await page.evaluate(() => 
+      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+    );
+    await page.locator('#sprint-hidden-input').pressSequentially(fullText);
 
     // Results card must appear
     const resultsCard = page.locator('#sprint-results-card');

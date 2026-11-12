@@ -347,7 +347,7 @@ const tasks = [
             <div class="text-sm sm:text-base font-bold text-cyan-300 tracking-wider flex items-center gap-2">
               ЛОГО-ШТОРМ <span class="text-[10px] bg-cyan-950 border border-cyan-500/50 text-cyan-400 px-1.5 py-0.5 uppercase tracking-widest font-mono">v1.0</span>
             </div>
-            <div class="text-xs text-gray-400">СКОРОСТНОЙ КЛАВИАТУРНЫЙ ТРЕНАЖЕР ПО ТЕРМИНАМ ТЕОРИИ</div>
+            <div class="text-xs text-gray-400">СКОРОСТНОЙ КЛАВИАТУРНЫЙ ТРЕНАЖЕР ПО ТЕРМИНАМ И ОПРЕДЕЛЕНИЯМ</div>
           </div>
         </div>
 
@@ -415,12 +415,12 @@ const tasks = [
             </div>
 
             <!-- Rendered Text Box with Caret -->
-            <div id="sprint-text-display" class="font-mono text-xl sm:text-2xl leading-relaxed tracking-wider select-none min-h-[140px] flex flex-wrap content-start items-center gap-y-2 break-words">
+            <div id="sprint-text-display" class="font-mono text-xl sm:text-2xl leading-relaxed tracking-wider select-none min-h-[140px] max-h-[45vh] overflow-y-auto pr-2 flex flex-wrap content-start items-center gap-y-2 break-words">
               <!-- Spans populated by JS -->
             </div>
 
             <div class="text-xs text-gray-500 border-t border-gray-800/80 pt-3 flex flex-wrap justify-between items-center gap-2">
-              <span>Правило: При неверном нажатии ввод блокируется до нажатия правильной буквы.</span>
+              <span>Правило: Вводите термин и его определение. Вместо длинного тире можно нажимать обычный дефис [-].</span>
               <span class="text-gray-400 font-semibold">[Shift / CapsLock поддерживаются]</span>
             </div>
           </div>
@@ -1244,18 +1244,34 @@ const tasks = [
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${tenths}`;
   }
 
+  function formatTermSentence(item) {
+    let term = (typeof item === 'string' ? item : (item.term || '')).trim();
+    if (term.length > 0) {
+      term = term.charAt(0).toUpperCase() + term.slice(1);
+    }
+    let def = (typeof item === 'string' ? '' : (item.definition || '')).trim();
+    if (def) {
+      def = def.replace(/[.;]+$/, '').trim();
+      if (def.length > 1 && !/^[A-ZА-ЯЁ]{2,}/.test(def)) {
+        def = def.charAt(0).toLowerCase() + def.slice(1);
+      }
+      return `${term} — ${def}.`;
+    }
+    return `${term}.`;
+  }
+
   function getActiveTermObj(charIndex) {
     if (!sprintActiveTerms || sprintActiveTerms.length === 0) return null;
     let runningLen = 0;
     for (let i = 0; i < sprintActiveTerms.length; i++) {
       const item = sprintActiveTerms[i];
-      const termStr = typeof item === 'string' ? item : item.term;
-      const termDef = typeof item === 'string' ? '' : (item.definition || '');
-      const nextLen = runningLen + termStr.length + 1; // + 1 space
+      const sentence = formatTermSentence(item);
+      const nextLen = runningLen + sentence.length + 1; // + 1 space
       if (charIndex < nextLen || i === sprintActiveTerms.length - 1) {
         return {
-          term: termStr,
-          definition: termDef,
+          term: typeof item === 'string' ? item : item.term,
+          definition: typeof item === 'string' ? '' : (item.definition || ''),
+          sentence: sentence,
           index: i + 1,
           total: sprintActiveTerms.length
         };
@@ -1328,6 +1344,13 @@ const tasks = [
 
       sprintTextDisplay.appendChild(span);
     }
+
+    if (currentIndex < currentTargetText.length) {
+      const activeSpan = sprintTextDisplay.querySelector(`span[data-idx="${currentIndex}"]`);
+      if (activeSpan && typeof activeSpan.scrollIntoView === 'function') {
+        activeSpan.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+    }
   }
 
   function focusSprintInput() {
@@ -1349,7 +1372,7 @@ const tasks = [
     lastSprintResult = null;
 
     sprintActiveTerms = shuffle ? shuffleArray(sprintTerms) : [...sprintTerms];
-    currentTargetText = sprintActiveTerms.map(t => typeof t === 'string' ? t : t.term).join(' ');
+    currentTargetText = sprintActiveTerms.map(formatTermSentence).join(' ');
 
     if (sprintTermsCountEl) sprintTermsCountEl.textContent = String(sprintActiveTerms.length);
 
@@ -1407,6 +1430,18 @@ const tasks = [
     }
   }
 
+  function isCharMatch(inputKey, expected) {
+    if (inputKey === expected) return true;
+    // Allow standard keyboard minus/hyphen for typographic dashes (em-dash, en-dash, minus)
+    if ((expected === '—' || expected === '–' || expected === '−' || expected === '-') && (inputKey === '-' || inputKey === '—' || inputKey === '–' || inputKey === '−')) return true;
+    // Allow standard straight quotes for typographic quotes
+    if ((expected === '«' || expected === '»' || expected === '“' || expected === '”' || expected === '"') && (inputKey === '"' || inputKey === '«' || inputKey === '»')) return true;
+    // Allow 'е' for 'ё'
+    if (expected.toLowerCase() === 'ё' && inputKey.toLowerCase() === 'е') return true;
+    if (expected.toLowerCase() === 'е' && inputKey.toLowerCase() === 'ё') return true;
+    return false;
+  }
+
   function handleSprintKey(key) {
     if (isSprintFinished || !currentTargetText || currentIndex >= currentTargetText.length) return;
 
@@ -1423,7 +1458,7 @@ const tasks = [
 
     const expectedChar = currentTargetText[currentIndex];
 
-    if (key === expectedChar) {
+    if (isCharMatch(key, expectedChar)) {
       playKeyClickSound();
       currentIndex++;
       updateLiveMetrics();
