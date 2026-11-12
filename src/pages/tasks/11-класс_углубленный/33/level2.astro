@@ -1,0 +1,780 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-warning mb-0 fw-bold">Тренажер: Аналитические расчеты NLP и алгоритмы регулярных выражений (Уровень 2)</h1>
+                <div class="text-secondary small">Урок 33 // 11 класс (технологический профиль)</div>
+            </div>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">
+                Аналитический ввод // Anti-Paste Guard
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик попыток и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет: Закон Ципфа и ранг частоты</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | 
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки / сбоя -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span>
+                            <strong>[ОШИБКА АНАЛИЗА]</strong> <span id="feedback-text">Неверное расчетное значение!</span> 
+                            Регенерация параметров фазы...
+                        </span>
+                        <div class="spinner-border spinner-border-sm text-danger" role="status"></div>
+                    </div>
+                </div>
+
+                <!-- Системный баннер успеха текущего шага -->
+                <div id="success-box" class="alert alert-success bg-black text-success border border-success rounded-0 d-none mb-3 py-2" role="alert">
+                    <strong>[ВЕРИФИЦИРОВАНО]</strong> <span id="success-text">Расчет выполнен безупречно!</span>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 1: Прямой расчет по Закону Ципфа (CCS = 4)                   -->
+                <!-- ================================================================= -->
+                <div id="phase1" class="phase-view">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА:</span>
+                        Лингвистическая лаборатория исследует частотный спектр художественного корпуса текстов. 
+                        Согласно эмпирическому <strong class="text-warning">закону Ципфа</strong>, частота слова <code>f(r)</code> обратно пропорциональна его рангу <code>r</code>:
+                        <div class="my-2 p-2 bg-dark border border-secondary text-center text-info fs-6">
+                            f(r) · r ≈ C &nbsp; &nbsp; ➔ &nbsp; &nbsp; f(r) = F<sub>1</sub> / r
+                        </div>
+                        где <code>F<sub>1</sub></code> — абсолютная частота самого частого слова в тексте (ранг <code>r = 1</code>).
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ИСХОДНЫЕ ДАННЫЕ АНАЛИЗА:</div>
+                        <div class="row g-2 text-light">
+                            <div class="col-12 col-sm-6">
+                                <div>Частота самого частого слова (ранг r = 1): <strong id="p1-f1-val" class="text-warning fs-5">2400</strong> вхождений</div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Целевой ранг исследуемого термина: <strong id="p1-rank-val" class="text-info fs-5">r = 4</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p1-input" class="form-label small text-secondary">
+                            Рассчитайте теоретическую частоту встречаемости f(r) для заданного ранга:
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p1-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число" autocomplete="off" />
+                            <button id="p1-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark d-flex align-items-center" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 2: Двухшаговый расчет метрики TF-IDF (CCS = 6)               -->
+                <!-- ================================================================= -->
+                <div id="phase2" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА:</span>
+                        Поисковый робот индексирует научную библиотеку. Вычислите значение нормализованной метрики <strong class="text-warning">TF-IDF</strong> для ключевого термина:
+                        <div class="my-2 p-2 bg-dark border border-secondary text-center text-info fs-6">
+                            TF-IDF(t, d, D) = TF(t, d) × IDF(t, D)
+                        </div>
+                        <div class="text-secondary">
+                            где <code>TF(t, d) = f<sub>t,d</sub> / |d|</code> (доля слова в документе), 
+                            а <code>IDF(t, D) = log<sub>2</sub>(|D| / DocFreq)</code> (информационная специфичность термина по логарифму основания 2).
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПАРАМЕТРЫ ИНДЕКСАЦИИ КОРПУСА:</div>
+                        <div class="row g-2 text-light">
+                            <div class="col-12 col-sm-6">
+                                <div>Длина документа (|d|): <strong id="p2-doc-len" class="text-info">500</strong> слов</div>
+                                <div>Вхождений термина в документе (f): <strong id="p2-term-freq" class="text-warning">20</strong> раз</div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Общее число документов в коллекции (|D|): <strong id="p2-corpus-size" class="text-info">1024</strong></div>
+                                <div>Документов, содержащих данный термин (DocFreq): <strong id="p2-doc-freq" class="text-warning">32</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p2-input" class="form-label small text-secondary">
+                            Вычислите значение [TF-IDF × 1000] и запишите результат в виде целого числа:
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p2-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число" autocomplete="off" />
+                            <button id="p2-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark d-flex align-items-center" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                        <div class="form-text text-secondary small">
+                            Подсказка: сначала найдите TF (в долях единицы), затем степень двойки для IDF = log<sub>2</sub>(коллекция / DocFreq), перемножьте и умножьте на 1000.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 3: ПИК 1 — Инверсия: Восстановление объема корпуса (CCS = 7-8) -->
+                <!-- ================================================================= -->
+                <div id="phase3" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (ОБРАТНАЯ ЗАДАЧА):</span>
+                        Аналитик информационной безопасности получил лог аудита поисковой базы. 
+                        Значение метрики обратной документной частоты <code>IDF</code> для редкого вредоносного сигнатурного токена и число содержащих его документов известны. 
+                        Требуется восстановить <strong class="text-warning">полный объем библиотеки документов |D|</strong>:
+                        <div class="my-2 p-2 bg-dark border border-secondary text-center text-info fs-6">
+                            IDF = log<sub>2</sub>( |D| / DocFreq ) &nbsp; &nbsp; ➔ &nbsp; &nbsp; |D| = DocFreq × 2<sup>IDF</sup>
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ЗАРЕГИСТРИРОВАННЫЕ ДАННЫЕ СИГНАТУРЫ:</div>
+                        <div class="row g-2 text-light">
+                            <div class="col-12 col-sm-6">
+                                <div>Значение метрики IDF сигнатуры: <strong id="p3-idf-val" class="text-warning fs-5">6</strong></div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Число зараженных документов (DocFreq): <strong id="p3-docfreq-val" class="text-info fs-5">16</strong> шт.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p3-input" class="form-label small text-secondary">
+                            Вычислите общий объем коллекции документов |D|:
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p3-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число" autocomplete="off" />
+                            <button id="p3-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark d-flex align-items-center" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 4: Долина консолидации — Трассировка квантификаторов (CCS = 5-6) -->
+                <!-- ================================================================= -->
+                <div id="phase4" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА:</span>
+                        Инженер тестирует функцию <code>re.findall(pattern, text)</code> в модуле синтаксического анализатора. 
+                        Определите точное количество неперекрывающихся совпадений, которые будут извлечены из тестовой строки с учетом строгости границ слов <code>\b</code> и диапазона квантификатора:
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">КОНФИГУРАЦИЯ СИНТАКСИЧЕСКОГО ПАРСЕРА:</div>
+                        <div class="mb-2">
+                            Шаблон поиска: <code id="p4-pattern-display" class="text-warning fs-5 fw-bold">\b\d{2,3}\b</code>
+                        </div>
+                        <div class="text-secondary small mb-1">ТЕСТОВАЯ ВХОДНАЯ СТРОКА:</div>
+                        <div id="p4-text-display" class="p-2 bg-dark border border-secondary text-info text-break">
+                            <!-- Генерируется динамически -->
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p4-input" class="form-label small text-secondary">
+                            Сколько токенов вернет функция re.findall() для этой строки?
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p4-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите число совпадений" autocomplete="off" />
+                            <button id="p4-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark d-flex align-items-center" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                        <div class="form-text text-secondary small">
+                            Внимание: токены, длина которых строго меньше минимума или строго больше максимума, либо примыкающие к буквам без границы слова, не должны учитываться.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 5: Кульминационный пик — Сложность ReDoS (CCS = 8-9)          -->
+                <!-- ================================================================= -->
+                <div id="phase5" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-danger fw-bold">КУЛЬМИНАЦИОННАЯ ЗАДАЧА (ИНФОРМАЦИОННАЯ БЕЗОПАСНОСТЬ И ReDoS):</span>
+                        При аудите бэкенда обнаружено опасное регулярное выражение с вложенными квантификаторами над перекрывающимся множеством:
+                        <div class="my-2 p-2 bg-dark border border-danger text-center text-danger fs-6 fw-bold">
+                            ^(a+)+$
+                        </div>
+                        На вход подается строка из <code>N</code> повторяющихся символов <code>'a'</code>, завершающаяся символом <code>'!'</code>.
+                        Движок с поиском с возвратом (NFA Backtracking) при неудаче проверяет все возможные комбинаторные разбиения цепочки длины <code>N</code> на непустые подгруппы, совершая в худшем случае <strong class="text-danger">2<sup>N</sup></strong> шагов ветвления.
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПАРАМЕТРЫ СТРЕСС-ТЕСТА СЕРВЕРА:</div>
+                        <div class="row g-2 text-light">
+                            <div class="col-12 col-sm-6">
+                                <div>Длина цепочки символов 'a' (N): <strong id="p5-n-val" class="text-warning fs-5">13</strong> символов</div>
+                                <div>Входная строка: <code id="p5-str-preview" class="text-info">"aaaaaaaaaaaaa!"</code></div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Теоретическая сложность отката: <strong class="text-danger">O(2<sup>N</sup>) шагов</strong></div>
+                                <div>Сложность линейного ДКА (RE2): <strong class="text-success">O(N + 1) = 14 шагов</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p5-input" class="form-label small text-secondary">
+                            Рассчитайте точное количество шагов ветвления (2<sup>N</sup>) движка с возвратом:
+                        </label>
+                        <div class="input-group">
+                            <input type="number" id="p5-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число" autocomplete="off" />
+                            <button id="p5-submit-btn" class="btn btn-warning rounded-0 px-4 fw-bold text-dark d-flex align-items-center" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                        <div class="form-text text-secondary small">
+                            Подсказка: вычислите точное значение степени двойки 2<sup>N</sup>. Это демонстрирует катастрофическую уязвимость ReDoS.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ЭКРАН ПОБЕДЫ (Уровень пройден)                                    -->
+                <!-- ================================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="display-5 text-warning fw-bold mb-2">УРОВЕНЬ 2 ВЫПОЛНЕН!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы успешно справились со всеми аналитическими расчетами частотного анализа, формулами TF-IDF, трассировкой шаблонов и оценкой уязвимостей ReDoS.
+                    </p>
+                    <div class="d-inline-flex gap-4 p-3 bg-black border border-warning rounded-0 mb-4 text-start">
+                        <div>
+                            <span class="text-secondary small d-block">ИТОГОВЫЕ ОШИБКИ:</span>
+                            <span id="final-attempts" class="fs-4 fw-bold text-warning">0</span>
+                        </div>
+                        <div>
+                            <span class="text-secondary small d-block">ВРЕМЯ ПРОХОЖДЕНИЯ:</span>
+                            <span id="final-time" class="fs-4 fw-bold text-info">00:00</span>
+                        </div>
+                    </div>
+                    <div>
+                        <button id="restart-btn" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ↻ Пройти уровень повторно для тренировки
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(() => {
+    'use strict';
+
+    const missionName = 'Урок 33 :: Анализ текста на естественном языке. Регулярные выражения (Уровень 2)';
+    let currentPhase = 1;
+    let attemptsCount = 0;
+    let startTime = Date.now();
+    let timerInterval = null;
+    let isLocked = false;
+
+    // Вспомогательные генераторы
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // Таймер
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(attemptsCount);
+    }
+
+    // Защита от вставки (Anti-Paste)
+    function setupAntiPaste() {
+        document.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('paste', e => e.preventDefault());
+            inp.addEventListener('drop', e => e.preventDefault());
+        });
+    }
+
+    // Обработка ошибок со штрафом и регенерацией текущей фазы
+    function triggerErrorReset(msg, callback) {
+        if (isLocked) return;
+        isLocked = true;
+        attemptsCount++;
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'hardcore_reset',
+            status: 'failed',
+            attempts_count: attemptsCount
+        }, '*');
+
+        setTimeout(() => {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (callback) callback();
+        }, 1500);
+    }
+
+    function showSuccessFeedback(msg, callback) {
+        const sb = document.getElementById('success-box');
+        const st = document.getElementById('success-text');
+        if (sb && st) {
+            st.textContent = msg;
+            sb.classList.remove('d-none');
+        }
+        setTimeout(() => {
+            if (sb) sb.classList.add('d-none');
+            if (callback) callback();
+        }, 1000);
+    }
+
+    // Завершение уровня
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        for (let i = 1; i <= 5; i++) {
+            const p = document.getElementById(`phase${i}`);
+            if (p) p.classList.add('d-none');
+        }
+        document.getElementById('victory-screen').classList.remove('d-none');
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attemptsCount);
+        if (ft) ft.textContent = `${mins}:${secs}`;
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'level_complete',
+            status: 'completed',
+            success: true,
+            attempts_count: attemptsCount,
+            time_spent_sec: elapsed
+        }, '*');
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Закон Ципфа — Прямой расчет частоты f(r) (CCS = 4)
+    // =========================================================================
+    let p1ExpectedAnswer = 0;
+
+    function initPhase1() {
+        // Подбираем F_1 и r так, чтобы f(r) = F_1 / r делилось без остатка
+        const possiblePairs = [
+            { f1: 1200, r: 3 },
+            { f1: 1200, r: 4 },
+            { f1: 1800, r: 3 },
+            { f1: 1800, r: 6 },
+            { f1: 2400, r: 4 },
+            { f1: 2400, r: 8 },
+            { f1: 3000, r: 5 },
+            { f1: 3600, r: 6 },
+            { f1: 4800, r: 8 }
+        ];
+
+        const pair = possiblePairs[getRandomInt(0, possiblePairs.length - 1)];
+        p1ExpectedAnswer = Math.round(pair.f1 / pair.r);
+
+        const f1El = document.getElementById('p1-f1-val');
+        const rankEl = document.getElementById('p1-rank-val');
+        const inp = document.getElementById('p1-input');
+
+        if (f1El) f1El.textContent = String(pair.f1);
+        if (rankEl) rankEl.textContent = `r = ${pair.r}`;
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase1() {
+        if (isLocked) return;
+        const inp = document.getElementById('p1-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите числовой ответ!', null);
+            return;
+        }
+
+        if (val !== p1ExpectedAnswer) {
+            triggerErrorReset(`Неверная частота! По закону Ципфа f(r) = F_1 / r. Ожидалось ${p1ExpectedAnswer}.`, () => {
+                initPhase1();
+            });
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'in_progress',
+            attempts_count: attemptsCount,
+            action_log: [{ step: 1, action: 'phase1_complete' }]
+        }, '*');
+
+        showSuccessFeedback('Частота слова по закону Ципфа вычислена верно! Переход к фазе 2...', () => {
+            currentPhase = 2;
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+            document.getElementById('phase-title').textContent = 'Многошаговый расчет: Метрика TF-IDF';
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            initPhase2();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Двухшаговый расчет TF-IDF (CCS = 6)
+    // =========================================================================
+    let p2ExpectedAnswer = 0;
+
+    function initPhase2() {
+        // Подбираем красивые параметры со степенями двойки для log2
+        // |D| / DocFreq = 2^k, где k in [4, 5, 6, 7]
+        // TF = f / docLen
+        const configs = [
+            { docLen: 500, f: 20, corpus: 1024, docFreq: 32 }, // TF=0.04, IDF=log2(32)=5 -> 0.04*5 = 0.2 -> *1000 = 200
+            { docLen: 500, f: 25, corpus: 1024, docFreq: 16 }, // TF=0.05, IDF=log2(64)=6 -> 0.05*6 = 0.3 -> *1000 = 300
+            { docLen: 400, f: 16, corpus: 2048, docFreq: 32 }, // TF=0.04, IDF=log2(64)=6 -> 0.04*6 = 0.24 -> *1000 = 240
+            { docLen: 1000, f: 50, corpus: 4096, docFreq: 64 }, // TF=0.05, IDF=log2(64)=6 -> 0.05*6 = 0.3 -> *1000 = 300
+            { docLen: 1000, f: 40, corpus: 2048, docFreq: 16 }  // TF=0.04, IDF=log2(128)=7 -> 0.04*7 = 0.28 -> *1000 = 280
+        ];
+
+        const cfg = configs[getRandomInt(0, configs.length - 1)];
+        const tf = cfg.f / cfg.docLen;
+        const idf = Math.round(Math.log2(cfg.corpus / cfg.docFreq));
+        p2ExpectedAnswer = Math.round(tf * idf * 1000);
+
+        document.getElementById('p2-doc-len').textContent = String(cfg.docLen);
+        document.getElementById('p2-term-freq').textContent = String(cfg.f);
+        document.getElementById('p2-corpus-size').textContent = String(cfg.corpus);
+        document.getElementById('p2-doc-freq').textContent = String(cfg.docFreq);
+
+        const inp = document.getElementById('p2-input');
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase2() {
+        if (isLocked) return;
+        const inp = document.getElementById('p2-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите целое число!', null);
+            return;
+        }
+
+        if (val !== p2ExpectedAnswer) {
+            triggerErrorReset(`Неверный расчет TF-IDF! Проверьте: TF = f / |d|, IDF = log2(|D| / DocFreq). Ожидалось ${p2ExpectedAnswer}.`, () => {
+                initPhase2();
+            });
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'in_progress',
+            attempts_count: attemptsCount,
+            action_log: [{ step: 2, action: 'phase2_complete' }]
+        }, '*');
+
+        showSuccessFeedback('Метрика TF-IDF рассчитана абсолютно точно! Переход к пику инверсии...', () => {
+            currentPhase = 3;
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+            document.getElementById('phase-title').textContent = 'Пик 1 (Инверсия): Восстановление объема корпуса';
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            initPhase3();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 3: ПИК 1 — Инверсия: Восстановление объема корпуса |D| (CCS = 7-8)
+    // =========================================================================
+    let p3ExpectedAnswer = 0;
+
+    function initPhase3() {
+        // IDF = log2(|D| / docFreq)  ==>  |D| = docFreq * 2^IDF
+        const configs = [
+            { idf: 5, docFreq: 16 },  // |D| = 16 * 32 = 512
+            { idf: 6, docFreq: 16 },  // |D| = 16 * 64 = 1024
+            { idf: 6, docFreq: 32 },  // |D| = 32 * 64 = 2048
+            { idf: 7, docFreq: 16 },  // |D| = 16 * 128 = 2048
+            { idf: 5, docFreq: 64 },  // |D| = 64 * 32 = 2048
+            { idf: 6, docFreq: 64 }   // |D| = 64 * 64 = 4096
+        ];
+
+        const cfg = configs[getRandomInt(0, configs.length - 1)];
+        p3ExpectedAnswer = cfg.docFreq * Math.pow(2, cfg.idf);
+
+        document.getElementById('p3-idf-val').textContent = String(cfg.idf);
+        document.getElementById('p3-docfreq-val').textContent = String(cfg.docFreq);
+
+        const inp = document.getElementById('p3-input');
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase3() {
+        if (isLocked) return;
+        const inp = document.getElementById('p3-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите целое число!', null);
+            return;
+        }
+
+        if (val !== p3ExpectedAnswer) {
+            triggerErrorReset(`Неверный объем корпуса! Формула инверсии: |D| = DocFreq × 2^IDF. Ожидалось ${p3ExpectedAnswer}.`, () => {
+                initPhase3();
+            });
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'in_progress',
+            attempts_count: attemptsCount,
+            action_log: [{ step: 3, action: 'phase3_complete' }]
+        }, '*');
+
+        showSuccessFeedback('Инверсия логарифмической модели выполнена верно! Переход к фазе консолидации...', () => {
+            currentPhase = 4;
+            document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+            document.getElementById('phase-title').textContent = 'Долина консолидации: Трассировка квантификаторов RegEx';
+            document.getElementById('phase3').classList.add('d-none');
+            document.getElementById('phase4').classList.remove('d-none');
+            initPhase4();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 4: Долина консолидации — Трассировка квантификаторов re.findall (CCS = 5-6)
+    // =========================================================================
+    let p4ExpectedAnswer = 0;
+
+    function initPhase4() {
+        // Задача: определить количество совпадений \b\d{min,max}\b
+        const scenarios = [
+            {
+                patternStr: '\\b\\d{2,3}\\b',
+                regex: /\b\d{2,3}\b/g,
+                // Токены: 5 (нет), 42 (да), 999 (да), 1024 (нет), 77 (да), ABC12 (нет), 8080 (нет), 123 (да)
+                text: 'Port 42 test 5 code 999 max 1024 line 77 sys ABC12 host 8080 end 123'
+            },
+            {
+                patternStr: '\\b\\d{3,4}\\b',
+                regex: /\b\d{3,4}\b/g,
+                // Токены: 12 (нет), 404 (да), 8080 (да), 9 (нет), 500 (да), 12345 (нет), 200 (да)
+                text: 'Status 12 error 404 port 8080 id 9 code 500 len 12345 ok 200'
+            },
+            {
+                patternStr: '\\b[a-z]{3,4}\\b',
+                regex: /\b[a-z]{3,4}\b/g,
+                // Токены: to (нет), get (да), post (да), delete (нет), put (да), head (да), a (нет), patch (нет)
+                text: 'Methods to get and post but delete or put with head not a patch'
+            }
+        ];
+
+        const scen = scenarios[getRandomInt(0, scenarios.length - 1)];
+        const matches = scen.text.match(scen.regex) || [];
+        p4ExpectedAnswer = matches.length;
+
+        document.getElementById('p4-pattern-display').textContent = scen.patternStr;
+        document.getElementById('p4-text-display').textContent = `"${scen.text}"`;
+
+        const inp = document.getElementById('p4-input');
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase4() {
+        if (isLocked) return;
+        const inp = document.getElementById('p4-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите число совпадений!', null);
+            return;
+        }
+
+        if (val !== p4ExpectedAnswer) {
+            triggerErrorReset(`Неверное число совпадений! Обратите внимание на строгие границы \\b и длину токенов. Ожидалось ${p4ExpectedAnswer}.`, () => {
+                initPhase4();
+            });
+            return;
+        }
+
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: 'in_progress',
+            status: 'in_progress',
+            attempts_count: attemptsCount,
+            action_log: [{ step: 4, action: 'phase4_complete' }]
+        }, '*');
+
+        showSuccessFeedback('Трассировка регулярного выражения выполнена точно! Переход к кульминационной фазе...', () => {
+            currentPhase = 5;
+            document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+            document.getElementById('phase-title').textContent = 'Кульминация: Экспоненциальный взрыв ReDoS';
+            document.getElementById('phase4').classList.add('d-none');
+            document.getElementById('phase5').classList.remove('d-none');
+            initPhase5();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 5: Кульминационный пик — Сложность катастрофического отката ReDoS (CCS = 8-9)
+    // =========================================================================
+    let p5ExpectedAnswer = 0;
+
+    function initPhase5() {
+        // Подбираем N в диапазоне [10, 14] для точного вычисления 2^N
+        // 2^10 = 1024, 2^11 = 2048, 2^12 = 4096, 2^13 = 8192, 2^14 = 16384
+        const nList = [10, 11, 12, 13, 14];
+        const n = nList[getRandomInt(0, nList.length - 1)];
+        p5ExpectedAnswer = Math.pow(2, n);
+
+        const aStr = 'a'.repeat(n) + '!';
+
+        document.getElementById('p5-n-val').textContent = String(n);
+        document.getElementById('p5-str-preview').textContent = `"${aStr}"`;
+
+        const inp = document.getElementById('p5-input');
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+
+    function verifyPhase5() {
+        if (isLocked) return;
+        const inp = document.getElementById('p5-input');
+        const val = parseInt(inp.value.trim(), 10);
+
+        if (isNaN(val)) {
+            triggerErrorReset('Введите число шагов!', null);
+            return;
+        }
+
+        if (val !== p5ExpectedAnswer) {
+            triggerErrorReset(`Неверное число операций! Для вложенного шаблона ^(a+)+$ число шагов ветвления составляет ровно 2^N. Ожидалось ${p5ExpectedAnswer}.`, () => {
+                initPhase5();
+            });
+            return;
+        }
+
+        isLocked = true;
+        completeLevel();
+    }
+
+    // Привязка обработчиков
+    document.addEventListener('DOMContentLoaded', () => {
+        startTimer();
+        setupAntiPaste();
+
+        // Кнопки проверок
+        const b1 = document.getElementById('p1-submit-btn');
+        if (b1) b1.onclick = verifyPhase1;
+
+        const b2 = document.getElementById('p2-submit-btn');
+        if (b2) b2.onclick = verifyPhase2;
+
+        const b3 = document.getElementById('p3-submit-btn');
+        if (b3) b3.onclick = verifyPhase3;
+
+        const b4 = document.getElementById('p4-submit-btn');
+        if (b4) b4.onclick = verifyPhase4;
+
+        const b5 = document.getElementById('p5-submit-btn');
+        if (b5) b5.onclick = verifyPhase5;
+
+        // Нажатие клавиши Enter в полях ввода
+        ['p1-input', 'p2-input', 'p3-input', 'p4-input', 'p5-input'].forEach((id, idx) => {
+            const inp = document.getElementById(id);
+            if (inp) {
+                inp.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const verifiers = [verifyPhase1, verifyPhase2, verifyPhase3, verifyPhase4, verifyPhase5];
+                        verifiers[idx]();
+                    }
+                });
+            }
+        });
+
+        // Кнопка перезапуска
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) {
+            restartBtn.onclick = () => {
+                document.getElementById('victory-screen').classList.add('d-none');
+                document.getElementById('phase1').classList.remove('d-none');
+                document.getElementById('phase-badge').textContent = 'Шаг 1 из 5';
+                document.getElementById('phase-title').textContent = 'Прямой расчет: Закон Ципфа и ранг частоты';
+                currentPhase = 1;
+                attemptsCount = 0;
+                startTime = Date.now();
+                updateAttemptsDisplay();
+                startTimer();
+                initPhase1();
+            };
+        }
+
+        // Запуск Фазы 1
+        initPhase1();
+    });
+})();
+</script>
