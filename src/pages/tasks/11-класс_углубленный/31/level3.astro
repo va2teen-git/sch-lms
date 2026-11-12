@@ -22,9 +22,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <div class="text-danger fw-bold fs-6 mb-2">[ПРОТОКОЛ ДИСПЕТЧЕРИЗАЦИИ ТРАНЗАКЦИЙ]:</div>
                 <div class="text-light mb-1">• <span class="text-warning fw-bold">Динамический таймер:</span> От 11.0 до 6.0 секунд на волну с нарастающим временным давлением!</div>
                 <div class="text-light mb-1">• <span class="text-danger fw-bold">ТОТАЛЬНЫЙ СБРОС (Zero-Tolerance):</span> Любая ошибка, неверный протокол или тайм-аут полностью сбрасывают весь прогресс на Волну 1!</div>
-                <div class="text-light mb-1">• <span class="text-success fw-bold">[1] DIRECT_INSERT:</span> Ячейка <code>h(k) mod M</code> свободна, и $\alpha < 0.75$. Прямая вставка ключа за O(1).</div>
+                <div class="text-light mb-1">• <span class="text-success fw-bold">[1] DIRECT_INSERT:</span> Ячейка <code>h(k) mod M</code> свободна, и α &lt; 0.75. Прямая вставка ключа за O(1).</div>
                 <div class="text-light mb-1">• <span class="text-warning fw-bold">[2] COLLISION:</span> В ячейке <code>h(k) mod M</code> уже находится другой ключ. Активация цепочки коллизий / пробирования.</div>
-                <div class="text-light mb-1">• <span class="text-danger fw-bold">[3] REHASH:</span> Коэффициент заполнения $\alpha \ge 0.75$. Экстренное удвоение емкости таблицы для предотвращения $O(N)$.</div>
+                <div class="text-light mb-1">• <span class="text-danger fw-bold">[3] REHASH:</span> Коэффициент заполнения α ≥ 0.75. Экстренное удвоение емкости таблицы для предотвращения O(N).</div>
                 <div class="text-light mb-1">• <span class="text-info fw-bold">[4] INC_FREQ:</span> Ключ уже присутствует в словаре. Инкремент частотного счетчика <code>dict[key] += 1</code> без создания дубликата!</div>
                 <div class="text-secondary mt-2 border-top border-secondary pt-2">
                     💡 <em>Поддерживаются горячие клавиши управления: <strong>1</strong> (Direct), <strong>2</strong> (Collision), <strong>3</strong> (Rehash), <strong>4</strong> (Inc Freq).</em>
@@ -45,15 +45,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <!-- Хедер волны, таймер и системные метрики -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
                     <div>
-                        <span class="badge bg-danger rounded-0 fs-6 me-2">ВОЛНА {{ currentWave }} / 10</span>
-                        <span class="text-light fw-bold fs-6">{{ currentWaveData.title }}</span>
+                        <span id="phase-counter" class="badge bg-danger rounded-0 fs-6 me-2">
+                            ВОЛНА <span v-text="currentWave"></span> ИЗ 10
+                        </span>
+                        <span class="text-light fw-bold fs-6" v-text="currentWaveData.title"></span>
                     </div>
                     <div class="d-flex align-items-center gap-3">
                         <div class="text-secondary small">
-                            Вайпы (сбросы): <span class="text-danger fw-bold">{{ failCount }}</span>
+                            Вайпы (сбросы): <span class="text-danger fw-bold" v-text="failCount"></span>
                         </div>
                         <div class="badge rounded-0 px-3 py-2 fs-6 font-monospace" :class="timerClass">
-                            ⏳ ТАЙМЕР: {{ timeLeft.toFixed(1) }}s
+                            ⏳ ТАЙМЕР: <span v-text="timeLeft.toFixed(1)"></span>s
                         </div>
                     </div>
                 </div>
@@ -63,7 +65,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <span class="fs-4 me-2">🚨</span>
-                            <strong>[КРИТИЧЕСКИЙ СБОЙ ЯДРА]:</strong> {{ alarmMessage }}
+                            <strong>[КРИТИЧЕСКИЙ СБОЙ ХЭШ-ТАБЛИЦЫ!]:</strong> <span v-text="alarmMessage"></span>
                             <div class="small text-danger mt-1">ТОТАЛЬНЫЙ СБРОС СИСТЕМЫ НА ВОЛНУ 1...</div>
                         </div>
                         <div class="spinner-border text-danger" role="status"></div>
@@ -75,16 +77,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-md-3">
                             <div class="text-secondary small text-uppercase">Емкость таблицы (M):</div>
-                            <div class="text-light fw-bold fs-5 font-monospace">M = {{ currentWaveData.tableM }}</div>
+                            <div class="text-light fw-bold fs-5 font-monospace">M = <span v-text="currentWaveData.tableM"></span></div>
                         </div>
                         <div class="col-12 col-md-3">
                             <div class="text-secondary small text-uppercase">Занято ячеек (N):</div>
-                            <div class="text-light fw-bold fs-5 font-monospace">N = {{ currentWaveData.tableN }}</div>
+                            <div class="text-light fw-bold fs-5 font-monospace">N = <span v-text="currentWaveData.tableN"></span></div>
                         </div>
                         <div class="col-12 col-md-3">
                             <div class="text-secondary small text-uppercase">Коэффициент заполнения (α):</div>
                             <div class="fw-bold fs-5 font-monospace" :class="loadFactorClass">
-                                α = {{ currentWaveData.loadFactor.toFixed(3) }}
+                                α = <span v-text="currentWaveData.loadFactor.toFixed(3)"></span>
                                 <span v-if="currentWaveData.loadFactor >= 0.75" class="badge bg-danger rounded-0 ms-1">КРИТИЧЕСКИЙ</span>
                             </div>
                         </div>
@@ -100,14 +102,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="text-secondary small text-uppercase mb-1">Входящая транзакция ядра:</div>
                     <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 my-2">
                         <div class="p-2 bg-dark border border-secondary rounded-0 font-monospace">
-                            Ключ: <span class="text-warning fw-bold fs-5">"{{ currentWaveData.incomingKey }}"</span>
+                            Ключ: <span class="text-warning fw-bold fs-5">"<span v-text="currentWaveData.incomingKey"></span>"</span>
                         </div>
                         <div class="p-2 bg-dark border border-secondary rounded-0 font-monospace">
-                            Хэш-код: <span class="text-info fw-bold fs-5">{{ currentWaveData.incomingHash }}</span>
+                            Хэш-код: <span class="text-info fw-bold fs-5" v-text="currentWaveData.incomingHash"></span>
                         </div>
                         <div class="p-2 bg-dark border border-secondary rounded-0 font-monospace">
-                            Целевая ячейка: <span class="text-success fw-bold fs-5">[{{ currentWaveData.targetCellIndex }}]</span>
-                            <span class="text-secondary small">({{ currentWaveData.incomingHash }} mod {{ currentWaveData.tableM }})</span>
+                            Целевая ячейка: <span class="text-success fw-bold fs-5">[<span v-text="currentWaveData.targetCellIndex"></span>]</span>
+                            <span class="text-secondary small">(<span v-text="currentWaveData.incomingHash"></span> mod <span v-text="currentWaveData.tableM"></span>)</span>
                         </div>
                     </div>
 
@@ -115,10 +117,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <div class="p-2 bg-dark border rounded-0 font-monospace text-start mx-auto mt-2" style="max-width: 680px;" :class="cellBorderClass">
                         <div class="d-flex justify-content-between align-items-center">
                             <span>
-                                <strong>Статус ячейки [{{ currentWaveData.targetCellIndex }}]:</strong> 
-                                <span :class="cellStatusTextClass">{{ currentWaveData.cellStatusDescription }}</span>
+                                <strong>Статус ячейки [<span v-text="currentWaveData.targetCellIndex"></span>]:</strong> 
+                                <span :class="cellStatusTextClass" v-text="currentWaveData.cellStatusDescription"></span>
                             </span>
-                            <span class="badge rounded-0" :class="cellBadgeClass">{{ currentWaveData.cellBadgeText }}</span>
+                            <span class="badge rounded-0" :class="cellBadgeClass" v-text="currentWaveData.cellBadgeText"></span>
                         </div>
                     </div>
                 </div>
@@ -184,7 +186,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         <!-- Экран победы (Финальный триумф) -->
         <div v-else-if="gameState === 'victory'" class="card bg-black border-danger rounded-0 p-4 p-md-5 text-center shadow">
             <div class="display-3 text-danger mb-3">★ СИСТЕМА ЗАЩИЩЕНА: РЕЖИМ БОССА ПРЕОДОЛЁН ★</div>
-            <h2 class="text-light mb-3">СЕРВЕР ИНДЕКСАЦИИ ВЫДЕРЖАЛ ПИКОВУЮ НАГРУЗКУ!</h2>
+            <h2 class="text-light mb-3">ХАРДКОР-РЕЖИМ УСПЕШНО ПРЕОДОЛЕН!</h2>
             <p class="fs-5 text-secondary mx-auto mb-4" style="max-width: 720px;">
                 Вы безупречно парировали 10 экстремальных волн транзакций, предотвратили коллизии, деградацию времени доступа и переполнение хэш-таблицы!
             </p>
@@ -193,8 +195,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <div class="text-danger fw-bold fs-6 mb-2">[ТЕЛЕМЕТРИЯ АРКАДНОЙ МИССИИ]:</div>
                 <div class="text-light">Статус: <span class="text-success fw-bold">ПОЛНЫЙ УСПЕХ</span></div>
                 <div class="text-light">Пройдено волн: <span class="text-info fw-bold">10 / 10</span></div>
-                <div class="text-light">Количество полных сбросов ядра: <span class="text-warning fw-bold">{{ failCount }}</span></div>
-                <div class="text-light">Суммарное время сессии: <span class="text-info fw-bold">{{ sessionTimeFormatted }}</span></div>
+                <div class="text-light">Количество полных сбросов ядра: <span class="text-warning fw-bold" v-text="failCount"></span></div>
+                <div class="text-light">Суммарное время сессии: <span class="text-info fw-bold" v-text="sessionTimeFormatted"></span></div>
             </div>
 
             <div>

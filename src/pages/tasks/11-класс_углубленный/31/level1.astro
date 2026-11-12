@@ -399,6 +399,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }`;
             btn.style.minHeight = '48px';
             btn.style.cursor = 'pointer';
+            btn.setAttribute('data-token-id', t.id);
+            btn.setAttribute('data-key', t.key);
+            btn.setAttribute('data-is-distractor', String(t.isDistractor));
+            btn.setAttribute('data-expected-bucket', String(t.expectedBucket));
             btn.innerHTML = `
                 <div class="fw-bold fs-6">${t.key} ➔ "${t.val}"</div>
                 <div class="small ${isSelected ? 'text-dark' : 'text-info'}">hash: ${t.hash} (mod 5 = ${t.hash % 5})</div>
@@ -421,6 +425,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             const card = document.createElement('div');
             card.className = 'card bg-black border border-secondary rounded-0 h-100';
+            card.setAttribute('data-bucket-index', String(b));
+            card.id = `p1-bucket-${b}`;
 
             const head = document.createElement('div');
             head.className = 'card-header bg-dark text-success border-bottom border-secondary d-flex justify-content-between align-items-center py-2 px-2';
@@ -441,6 +447,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 emptySlot.className = 'border border-dashed border-secondary text-secondary p-2 text-center small rounded-0 flex-grow-1 d-flex align-items-center justify-content-center';
                 emptySlot.style.minHeight = '48px';
                 emptySlot.style.cursor = p1SelectedTokenId ? 'pointer' : 'default';
+                emptySlot.setAttribute('data-bucket-slot', String(b));
+                emptySlot.id = `p1-slot-${b}`;
                 emptySlot.textContent = p1SelectedTokenId ? '➔ Кликните сюда для вставки' : '∅ (Список пуст)';
                 emptySlot.onclick = () => {
                     if (p1SelectedTokenId) {
@@ -477,6 +485,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     const appendBtn = document.createElement('button');
                     appendBtn.className = 'btn btn-outline-info rounded-0 btn-sm text-uppercase font-monospace py-1';
                     appendBtn.style.minHeight = '40px';
+                    appendBtn.setAttribute('data-bucket-append', String(b));
+                    appendBtn.id = `p1-append-${b}`;
                     appendBtn.textContent = '+ Добавить в цепочку';
                     appendBtn.onclick = () => {
                         p1PlacedTokens[p1SelectedTokenId] = b;
@@ -622,6 +632,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             card.className = 'card bg-dark border font-monospace text-center p-2 transition-colors';
             card.style.width = '125px';
             card.style.minHeight = '140px';
+            card.setAttribute('data-cell-index', String(idx));
+            card.id = `p2-cell-${idx}`;
 
             let cellContent = '';
             let borderClass = 'border-secondary';
@@ -712,6 +724,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const delCard = strip.children[p2TargetDeleteIdx];
             if (delCard) {
                 const insertBtn = document.createElement('button');
+                insertBtn.id = `p2-insert-btn-${p2TargetDeleteIdx}`;
+                insertBtn.setAttribute('data-target-idx', String(p2TargetDeleteIdx));
                 insertBtn.className = `btn btn-sm rounded-0 font-monospace mt-2 ${
                     p2UserPlacedInsertIdx === p2TargetDeleteIdx ? 'btn-success text-dark fw-bold' : 'btn-outline-success'
                 }`;
@@ -868,6 +882,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     </button>
                 </div>
             `;
+            col.appendChild(card);
             countersContainer.appendChild(col);
 
             const decBtn = card.querySelector(`#p3-dec-${word}`);
@@ -899,6 +914,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 isSelected ? 'btn-success text-dark fw-bold border-light shadow' : 'btn-dark text-light border-success'
             }`;
             chip.style.minHeight = '48px';
+            chip.setAttribute('data-rank-word', word);
+            chip.id = `p3-chip-${word}`;
             chip.innerHTML = `
                 <span>${word}</span>
                 <span class="badge ${isSelected ? 'bg-dark text-white' : 'bg-success text-dark'} rounded-0">
@@ -924,6 +941,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const card = document.createElement('div');
             card.className = 'card bg-dark border border-secondary rounded-0 h-100 text-center p-2';
             card.style.minHeight = '110px';
+            card.setAttribute('data-rank-slot-index', String(r));
+            card.id = `p3-rank-slot-${r}`;
 
             const assignedWord = p3RankSlots[r];
 
@@ -1009,6 +1028,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             completeLevel();
         };
     }
+
+    // Тестовый хук для автоматизированного тестирования
+    window.__DEV_LEVEL1_STATE__ = {
+        getPhase: () => currentPhase,
+        getP1Tokens: () => p1AllTokens,
+        getP1ValidTokens: () => p1ValidItems,
+        getP1Distractors: () => p1DistractorItems,
+        getP2Delete: () => ({ key: p2TargetDeleteKey, idx: p2TargetDeleteIdx, state: p2UserDeletedState }),
+        getP2Incoming: () => ({ key: p2IncomingKey, hash: p2IncomingHash, expectedIdx: p2ExpectedInsertIdx }),
+        getP3Stream: () => p3TokensStream,
+        getP3Words: () => p3UniqueWords,
+        getP3TrueFreq: () => p3TrueFrequencies,
+        getP3UserFreq: () => p3UserFrequencies,
+        getP3ExpectedRanking: () => p3ExpectedRanking
+    };
 
     // Старт
     startTimer();
