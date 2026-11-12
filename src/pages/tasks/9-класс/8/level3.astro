@@ -110,7 +110,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 py-3 text-center shadow-lg mb-3">
                 <div class="fs-5 fw-bold mb-1">🚨 КРИТИЧЕСКИЙ СБОЙ СИНХРОНИЗАЦИИ // ХАРДКОР-СБРОС 🚨</div>
                 <div class="small text-light mb-2" v-text="alarmReason"></div>
-                <div class="badge bg-danger text-black rounded-0 fs-6 px-3 py-1 fw-bold">СБРОС НА ВОЛНУ 1 И ПЕРЕГЕНЕРАЦИЯ</div>
+                <div class="badge bg-danger text-black rounded-0 fs-6 px-3 py-1 fw-bold">СБРОС НА ВОЛНУ 1 И ПЕРЕГЕНЕРАЦИЯ (Сбой #<span id="alarm-count" v-text="attempts"></span>)</div>
             </div>
 
             <!-- Сетка Кибер-Матрицы (Cyber Matrix N x N) -->
@@ -125,7 +125,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         <button v-for="(cell, cIdx) in row" 
                                 :key="cIdx"
                                 type="button"
-                                class="btn rounded-0 flex-fill p-1 p-sm-2 text-center font-monospace fw-bold d-flex flex-column justify-content-center align-items-center matrix-btn"
+                                class="btn rounded-0 flex-fill p-1 p-sm-2 text-center font-monospace fw-bold d-flex flex-column justify-content-center align-items-center matrix-btn matrix-cell"
                                 style="min-width: 48px; min-height: 48px; overflow: hidden; word-break: break-word;"
                                 :class="getCellClass(rIdx, cIdx)"
                                 :disabled="!isCellClickable(rIdx, cIdx) || alarmActive"
@@ -142,8 +142,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         <!-- ========================================== -->
         <!-- 3. ЭКРАН ПОБЕДЫ (ХАРДКОР ЗАВЕРШЕН)         -->
         <!-- ========================================== -->
-        <div v-else-if="gameState === 'victory'" class="card bg-black border-success rounded-0 p-3 p-md-5 text-center shadow-lg">
-            <div class="display-4 text-success mb-2">✓ PROTOCOL COMPLETED ✓</div>
+        <div v-else-if="gameState === 'victory'" id="victory-screen" class="card bg-black border-success rounded-0 p-3 p-md-5 text-center shadow-lg">
+            <div class="display-5 text-success mb-2 fw-bold">КИБЕРПРОСТРАНСТВО ЗАЩИЩЕНО!</div>
+            <div class="h5 text-success mb-2">✓ PROTOCOL COMPLETED ✓</div>
             <h2 class="h4 text-light mb-2">МАТРИЦА ТАБЛИЧНЫХ МОДЕЛЕЙ ПОЛНОСТЬЮ ПОДЧИНЕНА</h2>
             <p class="text-secondary small mb-3" style="max-width: 720px; margin: 0 auto;">
                 Все 10 аркадных волн протокола взлома пройдены без единого переполнения буфера. 
@@ -377,10 +378,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 generateAllWaves() {
                     // Целевые последовательности под каждую волну
                     const TARGET_CHAINS = [
-                        ['РЕБРО', 'СИММ'],
+                        ['ГРАФ', 'СИММ'],
                         ['ВЕС', 'ПУТЬ'],
                         ['КЛЮЧ', 'О-С'],
-                        ['МАТР', 'ДИАГ', 'РЕБРО'],
+                        ['МАТР', 'ДИАГ', 'УЗЕЛ'],
                         ['УЗЕЛ', 'ВЕС', 'ПУТЬ'],
                         ['СИММ', 'ДИАГ', 'О-О'],
                         ['ГРАФ', 'МАТР', 'ВЕС'],
@@ -668,7 +669,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     const path = this.currentWaveData.solutionPath;
                     if (path && Array.isArray(path)) {
                         for (const [r, c] of path) {
+                            if (this.alarmActive || this.gameState !== 'playing') break;
                             this.handleCellClick(r, c);
+                            if (this.checkTargetMatched()) break;
                         }
                     }
                 },

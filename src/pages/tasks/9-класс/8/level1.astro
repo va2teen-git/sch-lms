@@ -374,6 +374,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Клик для выбора без перетаскивания
             cardEl.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (selectedElement && selectedElement !== cardEl && selectedElement.parentElement && selectedElement.parentElement.id === 'cards-pool') {
+                    const targetBinId = cardEl.parentElement.id === 'items-os' ? 'os' : (cardEl.parentElement.id === 'items-oo' ? 'oo' : null);
+                    if (targetBinId) {
+                        const targetItems = targetBinId === 'os' ? document.getElementById('items-os') : document.getElementById('items-oo');
+                        moveCardToBin(selectedElement.dataset.cardId, targetBinId, targetItems);
+                        selectedElement.classList.remove('border-warning');
+                        selectedElement.classList.add('border-secondary');
+                        selectedElement = null;
+                        return;
+                    }
+                }
                 if (selectedElement === cardEl) {
                     cardEl.classList.remove('border-warning');
                     cardEl.classList.add('border-secondary');
@@ -419,14 +430,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             });
 
             // Клик для переноса выбранного элемента
-            el.addEventListener('click', () => {
+            const clickHandler = () => {
                 if (selectedElement && selectedElement.dataset.cardId) {
                     moveCardToBin(selectedElement.dataset.cardId, binId, targetItems);
                     selectedElement.classList.remove('border-warning');
                     selectedElement.classList.add('border-secondary');
                     selectedElement = null;
                 }
-            });
+            };
+            el.addEventListener('click', clickHandler);
+            targetItems.addEventListener('click', clickHandler);
         });
 
         // Возможность вернуть карточку обратно в пул
