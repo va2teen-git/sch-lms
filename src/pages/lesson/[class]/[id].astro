@@ -32,7 +32,9 @@ const seenTerms = new Set<string>();
 
 if (fs.existsSync(theoryPath)) {
   const mdContent = fs.readFileSync(theoryPath, 'utf-8');
-  theoryHtml = marked.parse(mdContent);
+  // Strip YAML Frontmatter (---\n...\n---) so it doesn't leak into the rendered theory HTML body
+  const cleanMd = mdContent.replace(/^\uFEFF?---[\r\n]+[\s\S]*?[\r\n]+---(?:[\r\n]+|$)/, '');
+  theoryHtml = marked.parse(cleanMd);
 
   // 1. Поиск инлайн тегов <span ...data-term...>
   const spanRegex = /<span\s+([^>]*data-term[^>]*)>(.*?)<\/span>/gis;
