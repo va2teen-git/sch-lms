@@ -100,52 +100,53 @@ node scripts/migrate_telemetry.js
 
 ## 🛡️ Изоляция Продакшна и Разработка через Git Worktree
 
-Боевой сервер запущен непосредственно из директории `D:\school-lms` (порт `8080`) и обслуживает учащихся. Во избежание блокировок файлов сборки в Windows и загрязнения боевой базы `telemetry.db`, **любая разработка и тестирование ведутся в изолированном дереве `git worktree`**:
+Боевой сервер запущен на ALT Linux как `systemd`-сервис `school-lms.service` из директории `~/Projects/school-lms` (порт `3000`, `http://192.168.100.135:3000`; порт `8080` в системе занят службой `ahttpd`) и обслуживает учащихся. Во избежание сбоев сервиса и загрязнения боевой базы `telemetry.db`, **любая разработка и тестирование ведутся в изолированном дереве `git worktree` на локальном диске `ext4`**:
 
 ### 1. Создание изолированного рабочего места:
-```powershell
-# Из основной директории D:\school-lms:
-git worktree add -b type/feature-name D:\school-lms-dev
-cmd /c mklink /J "D:\school-lms-dev\node_modules" "D:\school-lms\node_modules"
+```bash
+# Из основной директории ~/Projects/school-lms:
+git worktree add -b type/feature-name ../school-lms-dev
+ln -s "$PWD/node_modules" ../school-lms-dev/node_modules
 ```
+*(Если ветка в `school-lms-dev` ещё в работе и не очищена, создаётся `../school-lms-dev-2`, `-3` и т.д. — удобно автоматизировать через MCP `manage_worktree`.)*
 
 ### 2. Разработка и тестирование:
-Внутри каталога `D:\school-lms-dev`:
-* Запуск сервера разработки: `npm run dev` (порт `4321`, не конфликтует с продакшном).
-* База данных изолирована (`D:\school-lms-dev\telemetry.db`).
-* Прогон тестов: `npm run test:contracts` и `npm test`.
+Внутри каталога `~/Projects/school-lms-dev`:
+* Запуск сервера разработки: `npm run dev` (порт `4321`, не конфликтует с продакшном на `3000`).
+* База данных изолирована (`~/Projects/school-lms-dev/telemetry.db`).
+* Прогон тестов: `npm run test:contracts` и `npm test` (при запуске из портативного `agy` с флешки: `PLAYWRIGHT_BROWSERS_PATH="$REAL_HOME/.cache/ms-playwright"`).
 
 ### 3. Очистка после сдачи задачи (PR / слияние):
-```powershell
-# Из основной директории D:\school-lms:
-git worktree remove D:\school-lms-dev --force
+```bash
+# Из основной директории ~/Projects/school-lms:
+rm -f ../school-lms-dev/node_modules
+git worktree remove ../school-lms-dev --force
 ```
 
 ### 4. Регламент обновления боевого сервера после слияния в `main`:
-```powershell
-# В основной директории D:\school-lms:
+```bash
+# В основной директории ~/Projects/school-lms:
 git checkout main
 git pull origin main
-npm install                        # При изменении package.json
-node scripts/migrate_telemetry.js   # При миграциях схемы БД
+npm install                        # При изменении package.json (в agy-portable с HOME="$REAL_HOME")
+node scripts/migrate_telemetry.js  # При миграциях схемы БД
 npm run build                      # Компиляция новой сборки
-# Мягкий перезапуск: сторож start_server.ps1 автоматически поднимет новый билд за 2 сек:
-Get-Process -Name node | Where-Object { $_.Path -like '*node.exe*' } | Stop-Process
+run-as-root "systemctl restart school-lms.service" "<пароль_root>"
 ```
 
 ### 5. Параллельная работа нескольких ИИ-агентов:
-При одновременной работе нескольких агентов каждому выделяется собственное изолированное дерево (`D:\school-lms-dev`, `D:\school-lms-dev-2`, `D:\school-lms-dev-3`) с выделенными портами (4321, 4322, 4323). Подробно: [docs/ai-workflow.md](docs/ai-workflow.md).
+При одновременной работе нескольких агентов (или незавершённой ветке в первом worktree) каждому выделяется собственное изолированное дерево (`~/Projects/school-lms-dev`, `~/Projects/school-lms-dev-2`, `~/Projects/school-lms-dev-3`) с выделенными портами (`4321`, `4322`, `4323`). Подробно: [docs/ai-workflow.md](docs/ai-workflow.md).
 
 ---
 
 ## 📚 Документация
 
-Подробная документация разделена по направлениям в папке [`docs/`](file:///D:/school-lms/docs/):
-* [docs/difficulty-curve.md](file:///D:/school-lms/docs/difficulty-curve.md) — Методический аппарат калибровки сложности, шкала CCS (1–10) и кривая обучения.
-* [docs/ai-workflow.md](file:///D:/school-lms/docs/ai-workflow.md) — Регламент работы ИИ-агентов, изоляция Worktree, оформление багов и деплой.
-* [docs/telemetry-api.md](file:///D:/school-lms/docs/telemetry-api.md) — Спецификация телеметрии, SQLite схемы и дашборда учителя.
-* [docs/testing.md](file:///D:/school-lms/docs/testing.md) — Руководство по автоматическому тестированию и CI/CD.
-* [docs/curriculum.md](file:///D:/school-lms/docs/curriculum.md) — Учебный план и правила оформления формул.
-* [docs/design-levels-1-2.md](file:///D:/school-lms/docs/design-levels-1-2.md) — Геймдизайн уровней 1 и 2.
-* [docs/design-level-3.md](file:///D:/school-lms/docs/design-level-3.md) — Геймдизайн уровня 3 (аркада).
-* [AGENTS.md](file:///D:/school-lms/AGENTS.md) — Диспетчер правил для автономных ИИ-ассистентов.
+Подробная документация разделена по направлениям в папке [`docs/`](docs/):
+* [docs/difficulty-curve.md](docs/difficulty-curve.md) — Методический аппарат калибровки сложности, шкала CCS (1–10) и кривая обучения.
+* [docs/ai-workflow.md](docs/ai-workflow.md) — Регламент работы ИИ-агентов, изоляция Worktree, работа с портативным `agy` на ALT Linux, оформление багов и деплой.
+* [docs/telemetry-api.md](docs/telemetry-api.md) — Спецификация телеметрии, SQLite схемы и дашборда учителя.
+* [docs/testing.md](docs/testing.md) — Руководство по автоматическому тестированию и CI/CD.
+* [docs/curriculum.md](docs/curriculum.md) — Учебный план и правила оформления формул.
+* [docs/design-levels-1-2.md](docs/design-levels-1-2.md) — Геймдизайн уровней 1 и 2.
+* [docs/design-level-3.md](docs/design-level-3.md) — Геймдизайн уровня 3 (аркада).
+* [AGENTS.md](AGENTS.md) — Диспетчер правил для автономных ИИ-ассистентов.
