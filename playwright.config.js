@@ -13,8 +13,8 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:4321',
-    // In CI (GitHub Actions), use default Chromium. Locally on Windows, use system Edge.
-    channel: process.env.CI ? undefined : 'msedge',
+    // In CI or on Linux, use Playwright Chromium. Locally on Windows, use system Edge.
+    channel: (!process.env.CI && process.platform === 'win32') ? 'msedge' : undefined,
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
