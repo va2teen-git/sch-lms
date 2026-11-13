@@ -1,0 +1,1073 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 1 (Базовый)
+// Тема: Информационные процессы (7 класс, Урок 10)
+---
+
+<TaskLayout level={1} title="Урок 10 :: Информационные процессы (Уровень 1)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-success pb-2 mb-3 gap-2">
+            <div>
+                <h2 class="h5 text-success mb-0 fw-bold text-uppercase">ЛАБОРАТОРИЯ ИНФОРМАЦИОННЫХ ПРОЦЕССОВ</h2>
+                <div class="small text-secondary">7 КЛАСС // УРОК 10: ИНФОРМАЦИОННЫЕ ПРОЦЕССЫ (УРОВЕНЬ 1)</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span id="phase-badge" class="badge bg-success text-dark border border-success rounded-0 px-3 py-2">Шаг 1 из 3</span>
+                <span class="badge bg-black text-warning border border-secondary rounded-0 px-3 py-2">
+                    Ошибок: <span id="attempts-display">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Блок оповещений об ошибке -->
+        <div id="error-box" class="alert alert-danger bg-black border border-danger text-danger rounded-0 d-none mb-3 py-2" role="alert">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <div class="small">
+                    <strong>[СБОЙ КОНВЕЙЕРА]</strong> <span id="error-message">Обнаружена ошибка классификации.</span> Перегенерация задания...
+                </div>
+                <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+            </div>
+        </div>
+
+        <!-- Экран успешного прохождения -->
+        <div id="success-screen" class="card bg-black border border-success rounded-0 p-4 text-center d-none my-4">
+            <div class="badge bg-success text-dark rounded-0 px-4 py-2 mb-3 fs-6">
+                МИССИЯ УСПЕШНО ВЫПОЛНЕНА // УРОВЕНЬ 1 ПРОЙДЕН
+            </div>
+            <h3 class="h4 text-success text-uppercase mb-2 fw-bold">Конвейер информационных процессов настроен!</h3>
+            <p class="text-light small mb-4 mx-auto" style="max-width: 580px;">
+                Вы верно распределили жизненные и технические ситуации по четырём процессам, собрали схему передачи данных по Клоду Шеннону и разделили операции обработки и защиты информации.
+            </p>
+            <div class="d-inline-flex flex-wrap justify-content-center gap-4 border border-secondary bg-dark p-3 rounded-0 mx-auto">
+                <div>
+                    <div class="text-secondary small">Затрачено времени</div>
+                    <div id="stat-time" class="text-success fs-5 fw-bold">0 с</div>
+                </div>
+                <div class="border-end border-secondary d-none d-sm-block"></div>
+                <div>
+                    <div class="text-secondary small">Ошибок</div>
+                    <div id="stat-attempts" class="text-warning fs-5 fw-bold">0</div>
+                </div>
+                <div class="border-end border-secondary d-none d-sm-block"></div>
+                <div>
+                    <div class="text-secondary small">Статус</div>
+                    <div class="text-info fs-5 fw-bold">100% ЗАЧЁТ</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ФАЗА 1: СОРТИРОВКА ПО КОНТЕЙНЕРАМ ==================== -->
+        <div id="phase-1-container">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-secondary text-dark rounded-0">ФАЗА 1: КЛАССИФИКАЦИЯ ПРОЦЕССОВ</span>
+                    <span class="text-secondary small">МЕХАНИКА: ПЕРЕТАСКИВАНИЕ / КЛИК</span>
+                </div>
+                <p class="text-light small mb-2">
+                    Распределите 6 реальных ситуаций из природы, быта и вычислительной техники по четырём базовым информационным процессам. Перетащите карточку в нужный сектор или нажмите на карточку, а затем на контейнер.
+                </p>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span id="p1-counter" class="small text-warning fw-bold">Осталось в потоке: 6</span>
+                    <button id="p1-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 text-uppercase" style="min-height: 48px;">
+                        Вернуть карточки в пул
+                    </button>
+                </div>
+            </div>
+
+            <!-- Входящий пул карточек -->
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="small text-secondary mb-2 text-uppercase">Входящий поток ситуаций:</div>
+                <div id="p1-cards-pool" class="d-flex flex-wrap gap-2" style="min-height: 76px;"></div>
+            </div>
+
+            <!-- 4 целевых контейнера (сетка 2x2 для удобства в сплит-экране) -->
+            <div class="row g-2 mb-3">
+                <div class="col-12 col-sm-6">
+                    <div class="card bg-black border border-success rounded-0 h-100 p1-dropzone" data-bucket="collect" style="min-height: 150px; cursor: pointer;">
+                        <div class="card-header bg-dark border-bottom border-success rounded-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-success small">1. СБОР ИНФОРМАЦИИ</span>
+                            <span class="badge bg-black text-success border border-success rounded-0 p1-bucket-count">В блоке: 0</span>
+                        </div>
+                        <div class="px-2 pt-2 text-secondary" style="font-size: 0.72rem;">Получение сведений органами чувств, приборами, датчиками или сканерами</div>
+                        <div class="card-body p-2 p1-slots d-flex flex-column gap-2" style="min-height: 96px;"></div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card bg-black border border-info rounded-0 h-100 p1-dropzone" data-bucket="store" style="min-height: 150px; cursor: pointer;">
+                        <div class="card-header bg-dark border-bottom border-info rounded-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-info small">2. ХРАНЕНИЕ ИНФОРМАЦИИ</span>
+                            <span class="badge bg-black text-info border border-info rounded-0 p1-bucket-count">В блоке: 0</span>
+                        </div>
+                        <div class="px-2 pt-2 text-secondary" style="font-size: 0.72rem;">Фиксация на материальном носителе для использования во времени</div>
+                        <div class="card-body p-2 p1-slots d-flex flex-column gap-2" style="min-height: 96px;"></div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card bg-black border border-warning rounded-0 h-100 p1-dropzone" data-bucket="transmit" style="min-height: 150px; cursor: pointer;">
+                        <div class="card-header bg-dark border-bottom border-warning rounded-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-warning small">3. ПЕРЕДАЧА ИНФОРМАЦИИ</span>
+                            <span class="badge bg-black text-warning border border-warning rounded-0 p1-bucket-count">В блоке: 0</span>
+                        </div>
+                        <div class="px-2 pt-2 text-secondary" style="font-size: 0.72rem;">Перемещение сообщений в пространстве от источника к приёмнику</div>
+                        <div class="card-body p-2 p1-slots d-flex flex-column gap-2" style="min-height: 96px;"></div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card bg-black border border-light rounded-0 h-100 p1-dropzone" data-bucket="process" style="min-height: 150px; cursor: pointer;">
+                        <div class="card-header bg-dark border-bottom border-secondary rounded-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-light small">4. ОБРАБОТКА ИНФОРМАЦИИ</span>
+                            <span class="badge bg-black text-light border border-secondary rounded-0 p1-bucket-count">В блоке: 0</span>
+                        </div>
+                        <div class="px-2 pt-2 text-secondary" style="font-size: 0.72rem;">Вычисления, перевод, сортировка, сжатие или логический вывод</div>
+                        <div class="card-body p-2 p1-slots d-flex flex-column gap-2" style="min-height: 96px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+                <button id="p1-verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 fw-bold text-uppercase text-wrap" style="min-height: 48px;" disabled>
+                    Подтвердить сортировку [Шаг 1]
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== ФАЗА 2: СЛОТ-ПАЗЛ (СХЕМА ШЕННОНА) ==================== -->
+        <div id="phase-2-container" class="d-none">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-secondary text-dark rounded-0">ФАЗА 2: СБОРКА КАНАЛА СВЯЗИ (МОДЕЛЬ ШЕННОНА)</span>
+                    <span class="text-secondary small">МЕХАНИКА: СЛОТ-ПАЗЛ</span>
+                </div>
+                <p class="text-light small mb-2">
+                    Сценарий: <strong id="p2-scenario-title" class="text-info"></strong>.
+                    Соберите все 5 звеньев цепи передачи информации. В палитре присутствуют 2 лишних блока из других процессов — не используйте их!
+                </p>
+                <div class="small text-secondary">
+                    Перетащите токен в нужный слот или нажмите на токен, затем на целевой слот. Клик по заполненному слоту возвращает блок в палитру.
+                </div>
+            </div>
+
+            <!-- Целевые слоты цепи передачи -->
+            <div class="card bg-black border border-secondary rounded-0 mb-3">
+                <div class="card-header bg-dark border-bottom border-secondary rounded-0 py-2 d-flex justify-content-between align-items-center">
+                    <span class="text-success small fw-bold">СХЕМА ПЕРЕДАЧИ ИНФОРМАЦИИ</span>
+                    <span id="p2-progress-badge" class="badge bg-black text-warning border border-secondary rounded-0">Заполнено: 0 / 5</span>
+                </div>
+                <div class="card-body p-2 d-flex flex-column gap-2">
+                    <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 border border-secondary bg-dark p-2">
+                        <div class="text-success fw-bold small" style="min-width: 175px;">1. ИСТОЧНИК:</div>
+                        <div class="p2-slot flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center text-center" data-slot="source" style="min-height: 52px; cursor: pointer;">
+                            <span class="text-secondary">[Поместите источник сообщения]</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 border border-secondary bg-dark p-2">
+                        <div class="text-info fw-bold small" style="min-width: 175px;">2. КОДЕР:</div>
+                        <div class="p2-slot flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center text-center" data-slot="encoder" style="min-height: 52px; cursor: pointer;">
+                            <span class="text-secondary">[Поместите кодирующее устройство]</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 border border-secondary bg-dark p-2">
+                        <div class="text-warning fw-bold small" style="min-width: 175px;">3. КАНАЛ СВЯЗИ:</div>
+                        <div class="p2-slot flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center text-center" data-slot="channel" style="min-height: 52px; cursor: pointer;">
+                            <span class="text-secondary">[Поместите среду передачи сигнала]</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 border border-danger bg-dark p-2">
+                        <div class="text-danger fw-bold small" style="min-width: 175px;">4. ПОМЕХИ (ШУМ):</div>
+                        <div class="p2-slot flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center text-center" data-slot="noise" style="min-height: 52px; cursor: pointer;">
+                            <span class="text-secondary">[Поместите источник искажений]</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 border border-secondary bg-dark p-2">
+                        <div class="text-light fw-bold small" style="min-width: 175px;">5. ПРИЁМНИК И ДЕКОДЕР:</div>
+                        <div class="p2-slot flex-fill border border-secondary bg-black p-2 rounded-0 text-secondary small d-flex align-items-center justify-content-center text-center" data-slot="receiver" style="min-height: 52px; cursor: pointer;">
+                            <span class="text-secondary">[Поместите получателя сигнала]</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Палитра блоков -->
+            <div class="card bg-black border border-secondary rounded-0 mb-3">
+                <div class="card-header bg-dark border-bottom border-secondary rounded-0 py-2 d-flex justify-content-between align-items-center">
+                    <span class="small text-secondary text-uppercase">Палитра блоков (содержит 2 дистрактора)</span>
+                    <span id="p2-selected-hint" class="small text-warning"></span>
+                </div>
+                <div class="card-body p-2">
+                    <div id="p2-tokens-pool" class="d-flex flex-wrap gap-2" style="min-height: 70px;"></div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+                <button id="p2-verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 fw-bold text-uppercase text-wrap" style="min-height: 48px;" disabled>
+                    Запустить канал связи [Шаг 2]
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== ФАЗА 3: КОММУТАЦИЯ УЗЛОВ (ОБРАБОТКА И ЗАЩИТА) ==================== -->
+        <div id="phase-3-container" class="d-none">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-secondary text-dark rounded-0">ФАЗА 3: АУДИТ ОБРАБОТКИ И ЗАЩИТЫ ДАННЫХ</span>
+                    <span class="text-secondary small">МЕХАНИКА: КОММУТАЦИЯ СВЯЗЕЙ</span>
+                </div>
+                <p class="text-light small mb-1">
+                    Соедините каждую операцию слева с её <strong>точным классом обработки или защиты</strong> справа. Будьте внимательны: среди портов справа присутствуют 3 ложных модуля-ловушки!
+                </p>
+                <div class="small text-secondary">
+                    Кликните по операции слева, затем по целевому порту справа (или перетащите провод). Повторный клик по занятому порту снимает связь.
+                </div>
+            </div>
+
+            <!-- Коммутационная панель с SVG-проводами -->
+            <div id="p3-board" class="position-relative border border-secondary bg-black p-2 p-sm-3 mb-3">
+                <svg id="p3-wires-svg" class="position-absolute top-0 start-0 w-100 h-100" style="pointer-events: none; z-index: 2;"></svg>
+                <div class="row g-3 position-relative" style="z-index: 3;">
+                    <div class="col-6">
+                        <div class="small text-secondary text-uppercase mb-2">Операции (4 кейса):</div>
+                        <div id="p3-cases-col" class="d-flex flex-column gap-3"></div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-secondary text-uppercase mb-2">Целевые модули (с ловушками):</div>
+                        <div id="p3-ports-col" class="d-flex flex-column gap-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span id="p3-status" class="small text-warning fw-bold">Скоммутировано линий: 0 из 4</span>
+                <button id="p3-verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 fw-bold text-uppercase text-wrap" style="min-height: 48px;" disabled>
+                    Подтвердить коммутацию [Завершить]
+                </button>
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const missionName = 'Урок 10 :: Информационные процессы (Уровень 1)';
+    const startTime = new Date();
+    let attempts = 0;
+    let isLocked = false;
+
+    function sendTelemetry(actionType, status, success, extraLog) {
+        window.parent.postMessage({
+            type: 'TELEMETRY_EVENT',
+            mission_name: missionName,
+            action_type: actionType,
+            status: status,
+            start_time: startTime.toISOString(),
+            time_spent_sec: Math.floor((Date.now() - startTime.getTime()) / 1000),
+            attempts_count: attempts,
+            success: success,
+            action_log: extraLog || []
+        }, '*');
+    }
+
+    sendTelemetry('in_progress', 'in_progress', false, [{ action: 'level_start' }]);
+
+    function triggerError(message, retryCallback) {
+        if (isLocked) return;
+        isLocked = true;
+        attempts++;
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+        if (attemptsDisplay) attemptsDisplay.textContent = String(attempts);
+
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) errorMessage.textContent = message;
+        if (errorBox) errorBox.classList.remove('d-none');
+
+        sendTelemetry('hardcore_reset', 'in_progress', false, [{ action: 'error', detail: message }]);
+
+        setTimeout(() => {
+            if (errorBox) errorBox.classList.add('d-none');
+            isLocked = false;
+            if (retryCallback) retryCallback();
+        }, 1300);
+    }
+
+    function shuffle(array) {
+        const copy = [...array];
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    // =========================================================================
+    // ФАЗА 1: КЛАССИФИКАЦИЯ СИТУАЦИЙ ПО 4 ПРОЦЕССАМ
+    // =========================================================================
+    const P1_POOL = {
+        collect: [
+            { id: 'c1', sphere: 'ТЕХНИКА', text: 'Электронный датчик теплицы измеряет влажность почвы', type: 'collect' },
+            { id: 'c2', sphere: 'ТОРГОВЛЯ', text: 'Лазерный сканер на кассе считывает штрихкод товара', type: 'collect' },
+            { id: 'c3', sphere: 'НАУКА', text: 'Метеозонд регистрирует атмосферное давление на высоте 10 км', type: 'collect' },
+            { id: 'c4', sphere: 'ОБЩЕСТВО', text: 'Пешеход осматривает дорожный знак перед переходом улицы', type: 'collect' },
+            { id: 'c5', sphere: 'БЕЗОПАСНОСТЬ', text: 'Видеокамера фиксирует поток автомобилей на перекрёстке', type: 'collect' },
+            { id: 'c6', sphere: 'ПРИРОДА', text: 'Медоносная пчела обнаруживает цветущий луг по аромату нектара', type: 'collect' }
+        ],
+        store: [
+            { id: 's1', sphere: 'ШКОЛА', text: 'Ученик записывает домашние задания в бумажный дневник', type: 'store' },
+            { id: 's2', sphere: 'ИТ-ПРАКТИКА', text: 'Сохранение готового проекта презентации на USB-флешку', type: 'store' },
+            { id: 's3', sphere: 'БЭКАП', text: 'Копирование семейных фотографий в облачный архив на годы', type: 'store' },
+            { id: 's4', sphere: 'ОБЩЕСТВО', text: 'Библиотечный каталог сберегает сведения о книжном фонде', type: 'store' },
+            { id: 's5', sphere: 'ТЕХНИКА', text: 'Карта памяти фотоаппарата удерживает кадры без питания', type: 'store' },
+            { id: 's6', sphere: 'ЧЕЛОВЕК', text: 'Мозг удерживает в памяти выученное наизусть стихотворение', type: 'store' }
+        ],
+        transmit: [
+            { id: 't1', sphere: 'ТРАНСПОРТ', text: 'Светофор подаёт зелёный сигнал водителям на перекрёстке', type: 'transmit' },
+            { id: 't2', sphere: 'СВЯЗЬ', text: 'Радиовышка транслирует прогноз погоды в эфир на 100 км', type: 'transmit' },
+            { id: 't3', sphere: 'СЕТЬ', text: 'Отправка сообщения другу через Wi-Fi и сеть провайдера', type: 'transmit' },
+            { id: 't4', sphere: 'ШКОЛА', text: 'Звонок оповещает все этажи здания об окончании урока', type: 'transmit' },
+            { id: 't5', sphere: 'КОСМОС', text: 'Спутник направляет навигационный радиосигнал к приёмнику в авто', type: 'transmit' },
+            { id: 't6', sphere: 'СЕТИ', text: 'Кабель витая пара доставляет сетевые пакеты от роутера к ПК', type: 'transmit' }
+        ],
+        process: [
+            { id: 'p1', sphere: 'РАСЧЁТ', text: 'Вычисление площади комнаты по известным длине и ширине', type: 'process' },
+            { id: 'p2', sphere: 'ЛИНГВИСТИКА', text: 'Перевод текста инструкции с английского языка на русский', type: 'process' },
+            { id: 'p3', sphere: 'ТАБЛИЦЫ', text: 'Упорядочивание списка учеников класса по алфавиту', type: 'process' },
+            { id: 'p4', sphere: 'ИТ-ПРАКТИКА', text: 'Упаковка папки с отчётами в сжатый архив формата ZIP', type: 'process' },
+            { id: 'p5', sphere: 'КОДИРОВАНИЕ', text: 'Перевод фразы в последовательность точек и тире азбуки Морзе', type: 'process' },
+            { id: 'p6', sphere: 'АНАЛИЗ', text: 'Составление прогноза погоды по замерам ветра и давления', type: 'process' }
+        ]
+    };
+
+    let p1SelectedCard = null;
+
+    function createP1Card(item) {
+        const card = document.createElement('div');
+        card.className = 'p1-card card bg-dark border border-secondary rounded-0 p-2 text-start user-select-none';
+        card.style.cursor = 'grab';
+        card.style.minHeight = '48px';
+        card.style.minWidth = '180px';
+        card.style.maxWidth = '100%';
+        card.draggable = true;
+        card.dataset.id = item.id;
+        card.dataset.type = item.type;
+
+        card.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                <span class="badge bg-black border border-secondary text-secondary rounded-0" style="font-size: 0.65rem;">${item.sphere}</span>
+                <span class="p1-return-hint text-warning d-none" style="font-size: 0.65rem;">[в пул ↩]</span>
+            </div>
+            <div class="text-light small lh-sm">${item.text}</div>
+        `;
+
+        card.addEventListener('dragstart', (e) => {
+            if (isLocked) return;
+            e.dataTransfer.setData('text/plain', item.id);
+            card.classList.add('opacity-50');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('opacity-50');
+        });
+
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isLocked) return;
+            const pool = document.getElementById('p1-cards-pool');
+            if (card.parentElement !== pool) {
+                // Клик по размещенной карточке возвращает её в пул
+                card.querySelector('.p1-return-hint').classList.add('d-none');
+                card.classList.remove('border-warning', 'border-2');
+                card.classList.add('border-secondary');
+                pool.appendChild(card);
+                updateP1UI();
+                return;
+            }
+
+            if (p1SelectedCard === card) {
+                card.classList.remove('border-warning', 'border-2');
+                card.classList.add('border-secondary');
+                p1SelectedCard = null;
+            } else {
+                if (p1SelectedCard) {
+                    p1SelectedCard.classList.remove('border-warning', 'border-2');
+                    p1SelectedCard.classList.add('border-secondary');
+                }
+                p1SelectedCard = card;
+                card.classList.remove('border-secondary');
+                card.classList.add('border-warning', 'border-2');
+            }
+        });
+
+        return card;
+    }
+
+    function placeP1Card(card, zone) {
+        const slots = zone.querySelector('.p1-slots');
+        if (!slots) return;
+        card.classList.remove('border-warning', 'border-2');
+        card.classList.add('border-secondary');
+        card.querySelector('.p1-return-hint').classList.remove('d-none');
+        slots.appendChild(card);
+        if (p1SelectedCard === card) p1SelectedCard = null;
+        updateP1UI();
+    }
+
+    function updateP1UI() {
+        const pool = document.getElementById('p1-cards-pool');
+        const remaining = pool.querySelectorAll('.p1-card').length;
+        document.getElementById('p1-counter').textContent = `Осталось в потоке: ${remaining}`;
+
+        document.querySelectorAll('.p1-dropzone').forEach(zone => {
+            const count = zone.querySelectorAll('.p1-card').length;
+            const badge = zone.querySelector('.p1-bucket-count');
+            if (badge) badge.textContent = `В блоке: ${count}`;
+        });
+
+        document.getElementById('p1-verify-btn').disabled = remaining > 0;
+    }
+
+    function initPhase1() {
+        p1SelectedCard = null;
+        const pool = document.getElementById('p1-cards-pool');
+        pool.innerHTML = '';
+        document.querySelectorAll('.p1-slots').forEach(s => { s.innerHTML = ''; });
+
+        // Гарантируем присутствие всех 4 процессов + 2 случайные карточки из остатка (неравномерное заполнение!)
+        const chosen = [];
+        const rest = [];
+        ['collect', 'store', 'transmit', 'process'].forEach(cat => {
+            const shuffled = shuffle(P1_POOL[cat]);
+            chosen.push(shuffled[0]);
+            rest.push(...shuffled.slice(1));
+        });
+        const extra = shuffle(rest).slice(0, 2);
+        const allCards = shuffle([...chosen, ...extra]);
+
+        allCards.forEach(item => pool.appendChild(createP1Card(item)));
+        updateP1UI();
+    }
+
+    // Привязка обработчиков Фазы 1 (единоразово)
+    document.querySelectorAll('.p1-dropzone').forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.classList.add('bg-dark');
+        });
+        zone.addEventListener('dragleave', () => {
+            zone.classList.remove('bg-dark');
+        });
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.classList.remove('bg-dark');
+            if (isLocked) return;
+            const id = e.dataTransfer.getData('text/plain');
+            const card = document.querySelector(`.p1-card[data-id="${id}"]`);
+            if (card) placeP1Card(card, zone);
+        });
+        zone.addEventListener('click', () => {
+            if (isLocked || !p1SelectedCard) return;
+            placeP1Card(p1SelectedCard, zone);
+        });
+    });
+
+    document.getElementById('p1-reset-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        const pool = document.getElementById('p1-cards-pool');
+        document.querySelectorAll('.p1-card').forEach(card => {
+            card.querySelector('.p1-return-hint').classList.add('d-none');
+            card.classList.remove('border-warning', 'border-2');
+            card.classList.add('border-secondary');
+            pool.appendChild(card);
+        });
+        p1SelectedCard = null;
+        updateP1UI();
+    });
+
+    document.getElementById('p1-verify-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        let allCorrect = true;
+        document.querySelectorAll('.p1-dropzone').forEach(zone => {
+            const expectedType = zone.dataset.bucket;
+            zone.querySelectorAll('.p1-card').forEach(card => {
+                if (card.dataset.type !== expectedType) {
+                    allCorrect = false;
+                }
+            });
+        });
+
+        if (!allCorrect) {
+            triggerError('Часть ситуаций отнесена не к тому информационному процессу (различайте получение, фиксацию во времени, передачу и преобразование).', initPhase1);
+            return;
+        }
+
+        sendTelemetry('in_progress', 'in_progress', false, [{ action: 'phase1_complete' }]);
+        document.getElementById('phase-1-container').classList.add('d-none');
+        document.getElementById('phase-2-container').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+        initPhase2();
+    });
+
+    // =========================================================================
+    // ФАЗА 2: СЛОТ-ПАЗЛ — СХЕМА ПЕРЕДАЧИ ИНФОРМАЦИИ (МОДЕЛЬ ШЕННОНА)
+    // =========================================================================
+    const P2_SCENARIOS = [
+        {
+            id: 'messenger',
+            title: 'Отправка голосового сообщения другу в мессенджере',
+            tokens: [
+                { slot: 'source', text: 'Ученик, наговаривающий голосовую заметку' },
+                { slot: 'encoder', text: 'Микрофон и приложение, переводящие речь в цифровой код' },
+                { slot: 'channel', text: 'Радиоволны Wi-Fi и оптоволокно провайдера' },
+                { slot: 'noise', text: 'Гул проезжающих машин и слабый сигнал сети' },
+                { slot: 'receiver', text: 'Смартфон друга, воспроизводящий речь из динамика' }
+            ],
+            distractors: [
+                { slot: 'distractor', text: 'Резервная копия на внешнем жёстком диске HDD' },
+                { slot: 'distractor', text: 'Сортировка списка контактов по алфавиту' },
+                { slot: 'distractor', text: 'Бумажная тетрадь для записей в рюкзаке' }
+            ]
+        },
+        {
+            id: 'mars',
+            title: 'Передача научного отчёта с марсохода в Центр управления полётами',
+            tokens: [
+                { slot: 'source', text: 'Бортовой компьютер марсохода с отчётом о грунте' },
+                { slot: 'encoder', text: 'Передатчик, формирующий модулированные радиоимпульсы' },
+                { slot: 'channel', text: 'Космическое пространство между планетами' },
+                { slot: 'noise', text: 'Солнечные вспышки и космическое радиоизлучение' },
+                { slot: 'receiver', text: 'Наземная антенна ЦУП и монитор инженера' }
+            ],
+            distractors: [
+                { slot: 'distractor', text: 'Архивация таблиц на сервере в формат ZIP' },
+                { slot: 'distractor', text: 'Механическая клавиатура на столе оператора' },
+                { slot: 'distractor', text: 'Уличный ртутный термометр в лаборатории' }
+            ]
+        },
+        {
+            id: 'hallway',
+            title: 'Живой разговор двух одноклассников в школьном коридоре',
+            tokens: [
+                { slot: 'source', text: 'Первый ученик, формулирующий устную мысль' },
+                { slot: 'encoder', text: 'Голосовые связки, создающие звуковые колебания' },
+                { slot: 'channel', text: 'Воздушная среда между собеседниками' },
+                { slot: 'noise', text: 'Громкие разговоры вокруг и звонок на перемену' },
+                { slot: 'receiver', text: 'Орган слуха и мозг второго ученика' }
+            ],
+            distractors: [
+                { slot: 'distractor', text: 'Сетевая карта проводного Интернета' },
+                { slot: 'distractor', text: 'USB-флешка с презентацией в пенале' },
+                { slot: 'distractor', text: 'Подводный оптоволоконный кабель связи' }
+            ]
+        },
+        {
+            id: 'greenhouse',
+            title: 'Передача замеров датчика температуры в контроллер умной теплицы',
+            tokens: [
+                { slot: 'source', text: 'Чувствительный элемент термодатчика теплицы' },
+                { slot: 'encoder', text: 'Микросхема, переводящая температуру в электрический код' },
+                { slot: 'channel', text: 'Экранированный медный кабель к блоку управления' },
+                { slot: 'noise', text: 'Электромагнитные наводки от силового насоса' },
+                { slot: 'receiver', text: 'Управляющий контроллер системы вентиляции' }
+            ],
+            distractors: [
+                { slot: 'distractor', text: 'Перевод инструкции с французского языка на русский' },
+                { slot: 'distractor', text: 'Бумажный каталог книг в школьной библиотеке' },
+                { slot: 'distractor', text: 'Лазерный кассовый сканер в магазине' }
+            ]
+        },
+        {
+            id: 'lighthouse',
+            title: 'Предупреждение корабля светом маяка в ночном море',
+            tokens: [
+                { slot: 'source', text: 'Автоматика маяка, предупреждающая об отмели' },
+                { slot: 'encoder', text: 'Мощный прожектор, задающий ритм световых вспышек' },
+                { slot: 'channel', text: 'Атмосферный воздух над морской поверхностью' },
+                { slot: 'noise', text: 'Густой морской туман и водяные брызги' },
+                { slot: 'receiver', text: 'Глаза и мозг штурмана на капитанском мостике' }
+            ],
+            distractors: [
+                { slot: 'distractor', text: 'Калькулятор для расчёта площади паруса' },
+                { slot: 'distractor', text: 'Твердотельный накопитель SSD в каюте' },
+                { slot: 'distractor', text: 'Магнитный компас в кармане моряка' }
+            ]
+        }
+    ];
+
+    let p2SelectedToken = null;
+    let p2LastScenarioId = null;
+
+    function updateP2UI() {
+        const slots = document.querySelectorAll('.p2-slot');
+        let filled = 0;
+        slots.forEach(s => {
+            if (s.querySelector('.p2-token')) filled++;
+        });
+        document.getElementById('p2-progress-badge').textContent = `Заполнено: ${filled} / 5`;
+        document.getElementById('p2-verify-btn').disabled = filled < 5;
+        const hint = document.getElementById('p2-selected-hint');
+        if (hint) {
+            hint.textContent = p2SelectedToken ? 'Выбран блок → кликните по слоту' : '';
+        }
+    }
+
+    const P2_PLACEHOLDERS = {
+        source: '[Поместите источник сообщения]',
+        encoder: '[Поместите кодирующее устройство]',
+        channel: '[Поместите среду передачи сигнала]',
+        noise: '[Поместите источник искажений]',
+        receiver: '[Поместите получателя сигнала]'
+    };
+
+    function resetP2SlotPlaceholder(slot) {
+        const key = slot.dataset.slot;
+        slot.innerHTML = `<span class="text-secondary">${P2_PLACEHOLDERS[key] || '[Перетащите блок]'}</span>`;
+        slot.removeAttribute('data-placed-slot');
+    }
+
+    function placeP2Token(token, slot) {
+        const pool = document.getElementById('p2-tokens-pool');
+        const oldParent = token.parentElement;
+        if (oldParent === slot) return;
+
+        const existing = slot.querySelector('.p2-token');
+        if (existing && existing !== token) {
+            existing.classList.remove('border-success', 'border-warning', 'border-2');
+            existing.classList.add('border-secondary');
+            pool.appendChild(existing);
+        }
+
+        slot.innerHTML = '';
+        token.classList.remove('border-secondary', 'border-warning', 'border-2');
+        token.classList.add('border-success');
+        slot.appendChild(token);
+        slot.dataset.placedSlot = token.dataset.expectedSlot;
+
+        if (oldParent && oldParent.classList.contains('p2-slot')) {
+            resetP2SlotPlaceholder(oldParent);
+        }
+
+        if (p2SelectedToken === token) p2SelectedToken = null;
+        updateP2UI();
+    }
+
+    function initPhase2() {
+        p2SelectedToken = null;
+        const pool = document.getElementById('p2-tokens-pool');
+        pool.innerHTML = '';
+
+        document.querySelectorAll('.p2-slot').forEach(slot => {
+            resetP2SlotPlaceholder(slot);
+        });
+
+        // Выбираем сценарий, отличный от предыдущего при ошибке
+        const candidates = P2_SCENARIOS.filter(s => s.id !== p2LastScenarioId);
+        const scenario = candidates[Math.floor(Math.random() * candidates.length)] || P2_SCENARIOS[0];
+        p2LastScenarioId = scenario.id;
+
+        document.getElementById('p2-scenario-title').textContent = `«${scenario.title}»`;
+
+        const selectedDistractors = shuffle(scenario.distractors).slice(0, 2);
+        const allTokens = shuffle([...scenario.tokens, ...selectedDistractors]);
+
+        allTokens.forEach((tok, idx) => {
+            const el = document.createElement('div');
+            el.className = 'p2-token card bg-dark border border-secondary rounded-0 p-2 text-light small user-select-none';
+            el.style.cursor = 'grab';
+            el.style.minHeight = '48px';
+            el.style.maxWidth = '100%';
+            el.draggable = true;
+            el.dataset.tokenId = 'p2_tok_' + idx;
+            el.dataset.expectedSlot = tok.slot;
+            el.textContent = tok.text;
+
+            el.addEventListener('dragstart', (e) => {
+                if (isLocked) return;
+                e.dataTransfer.setData('text/plain', el.dataset.tokenId);
+                el.classList.add('opacity-50');
+            });
+
+            el.addEventListener('dragend', () => {
+                el.classList.remove('opacity-50');
+            });
+
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isLocked) return;
+                if (el.parentElement !== pool) {
+                    const parentSlot = el.parentElement;
+                    resetP2SlotPlaceholder(parentSlot);
+                    el.classList.remove('border-success', 'border-warning', 'border-2');
+                    el.classList.add('border-secondary');
+                    pool.appendChild(el);
+                    updateP2UI();
+                    return;
+                }
+
+                if (p2SelectedToken === el) {
+                    el.classList.remove('border-warning', 'border-2');
+                    el.classList.add('border-secondary');
+                    p2SelectedToken = null;
+                } else {
+                    if (p2SelectedToken) {
+                        p2SelectedToken.classList.remove('border-warning', 'border-2');
+                        p2SelectedToken.classList.add('border-secondary');
+                    }
+                    p2SelectedToken = el;
+                    el.classList.remove('border-secondary');
+                    el.classList.add('border-warning', 'border-2');
+                }
+                updateP2UI();
+            });
+
+            pool.appendChild(el);
+        });
+
+        updateP2UI();
+    }
+
+    document.querySelectorAll('.p2-slot').forEach(slot => {
+        slot.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            slot.classList.add('border-success');
+        });
+        slot.addEventListener('dragleave', () => {
+            slot.classList.remove('border-success');
+        });
+        slot.addEventListener('drop', (e) => {
+            e.preventDefault();
+            slot.classList.remove('border-success');
+            if (isLocked) return;
+            const tokId = e.dataTransfer.getData('text/plain');
+            const tok = document.querySelector(`.p2-token[data-token-id="${tokId}"]`);
+            if (tok) placeP2Token(tok, slot);
+        });
+        slot.addEventListener('click', () => {
+            if (isLocked || !p2SelectedToken) return;
+            placeP2Token(p2SelectedToken, slot);
+        });
+    });
+
+    document.getElementById('p2-verify-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        let allCorrect = true;
+        document.querySelectorAll('.p2-slot').forEach(slot => {
+            if (slot.dataset.placedSlot !== slot.dataset.slot) {
+                allCorrect = false;
+            }
+        });
+
+        if (!allCorrect) {
+            triggerError('Звенья цепи передачи спутаны или вставлен лишний блок (проверьте роли кодера, канала связи и помех).', initPhase2);
+            return;
+        }
+
+        sendTelemetry('in_progress', 'in_progress', false, [{ action: 'phase2_complete' }]);
+        document.getElementById('phase-2-container').classList.add('d-none');
+        document.getElementById('phase-3-container').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+        initPhase3();
+    });
+
+    // =========================================================================
+    // ФАЗА 3: КОММУТАЦИЯ УЗЛОВ (АУДИТ ОБРАБОТКИ И ЗАЩИТЫ ДАННЫХ)
+    // =========================================================================
+    const P3_CLUSTERS = [
+        {
+            targetId: 'new_content',
+            portTitle: 'НОВОЕ СОДЕРЖАНИЕ',
+            portDesc: 'Вычисления, анализ, прогноз (порождается новый вывод)',
+            cases: [
+                'Расчёт площади участка по известным длине и ширине',
+                'Анализ симптомов и пульса пациента для постановки диагноза',
+                'Расчёт прогноза погоды по данным давления и скорости ветра'
+            ]
+        },
+        {
+            targetId: 'change_form',
+            portTitle: 'ИЗМЕНЕНИЕ ФОРМЫ',
+            portDesc: 'Перевод, сортировка, сжатие или кодирование (смысл прежний)',
+            cases: [
+                'Перевод текста новости с английского языка на русский',
+                'Запись известного слова точками и тире азбуки Морзе',
+                'Упорядочивание списка учеников класса в алфавитном порядке'
+            ]
+        },
+        {
+            targetId: 'backup',
+            portTitle: 'ЗАЩИТА ОТ УТРАТЫ',
+            portDesc: 'Резервное копирование (бэкап) на случай поломки диска',
+            cases: [
+                'Копирование выпускного проекта на внешний SSD и в облако',
+                'Автоматическое ежедневное сохранение копии базы оценок',
+                'Дублирование важных чертежей на второй независимый диск'
+            ]
+        },
+        {
+            targetId: 'access_control',
+            portTitle: 'ЗАЩИТА ДОСТУПА',
+            portDesc: 'Надёжные пароли и права доступа от посторонних лиц',
+            cases: [
+                'Установка сложного пароля и двухфакторного входа в профиль',
+                'Разграничение прав чтения и редактирования в электронном журнале',
+                'Блокировка входа в личный кабинет посторонним пользователям'
+            ]
+        }
+    ];
+
+    const P3_DISTRACTORS = [
+        { id: 'trap_collect', portTitle: 'СБОР СИГНАЛОВ', portDesc: 'Первичное снятие показаний датчиками среды' },
+        { id: 'trap_channel', portTitle: 'ПЕРЕДАЧА ПО КАНАЛУ', portDesc: 'Доставка пакета данных через радиоволны или кабель' },
+        { id: 'trap_ram', portTitle: 'ОПЕРАТИВНАЯ ПАМЯТЬ', portDesc: 'Временное удержание программ в ОЗУ до выключения ПК' },
+        { id: 'trap_antivirus', portTitle: 'АНТИВИРУСНЫЙ КАРАНТИН', portDesc: 'Изоляция заражённых программ в системе' },
+        { id: 'trap_ampl', portTitle: 'УСИЛЕНИЕ В КАНАЛЕ', portDesc: 'Повышение мощности сигнала при затухании в линии' }
+    ];
+
+    let p3Connections = {}; // caseId -> portId
+    let p3SelectedCaseId = null;
+
+    function drawPhase3Wires() {
+        const svg = document.getElementById('p3-wires-svg');
+        const board = document.getElementById('p3-board');
+        if (!svg || !board) return;
+        svg.innerHTML = '';
+
+        const boardRect = board.getBoundingClientRect();
+        if (boardRect.width === 0 || boardRect.height === 0) return;
+
+        Object.entries(p3Connections).forEach(([caseId, portId]) => {
+            const leftCard = document.querySelector(`.p3-case-card[data-case-id="${caseId}"]`);
+            const rightCard = document.querySelector(`.p3-port-card[data-port-id="${portId}"]`);
+            if (!leftCard || !rightCard) return;
+
+            const lRect = leftCard.getBoundingClientRect();
+            const rRect = rightCard.getBoundingClientRect();
+
+            const x1 = lRect.right - boardRect.left;
+            const y1 = lRect.top + lRect.height / 2 - boardRect.top;
+            const x2 = rRect.left - boardRect.left;
+            const y2 = rRect.top + rRect.height / 2 - boardRect.top;
+            const dx = Math.max(24, (x2 - x1) * 0.5);
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', '#198754');
+            path.setAttribute('stroke-width', '2.5');
+            svg.appendChild(path);
+
+            [ [x1, y1], [x2, y2] ].forEach(([cx, cy]) => {
+                const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                dot.setAttribute('cx', String(cx));
+                dot.setAttribute('cy', String(cy));
+                dot.setAttribute('r', '4');
+                dot.setAttribute('fill', '#20c997');
+                svg.appendChild(dot);
+            });
+        });
+    }
+
+    function updatePhase3UI() {
+        const count = Object.keys(p3Connections).length;
+        document.getElementById('p3-status').textContent = `Скоммутировано линий: ${count} из 4`;
+        document.getElementById('p3-verify-btn').disabled = count < 4;
+
+        document.querySelectorAll('.p3-case-card').forEach(card => {
+            const id = card.dataset.caseId;
+            const badge = card.querySelector('.p3-case-badge');
+            const isSelected = p3SelectedCaseId === id;
+            const linkedPortId = p3Connections[id];
+
+            card.classList.remove('border-secondary', 'border-warning', 'border-success', 'border-2');
+            if (isSelected) {
+                card.classList.add('border-warning', 'border-2');
+            } else if (linkedPortId) {
+                card.classList.add('border-success');
+            } else {
+                card.classList.add('border-secondary');
+            }
+
+            if (badge) {
+                if (linkedPortId) {
+                    const portEl = document.querySelector(`.p3-port-card[data-port-id="${linkedPortId}"]`);
+                    const title = portEl ? portEl.dataset.portTitle : linkedPortId;
+                    badge.className = 'p3-case-badge badge bg-success text-dark rounded-0 text-wrap text-start';
+                    badge.textContent = `→ ${title}`;
+                } else {
+                    badge.className = 'p3-case-badge badge bg-dark border border-secondary text-secondary rounded-0';
+                    badge.textContent = isSelected ? 'ВЫБЕРИТЕ ПОРТ →' : 'НЕ СВЯЗАНО';
+                }
+            }
+        });
+
+        document.querySelectorAll('.p3-port-card').forEach(port => {
+            const pid = port.dataset.portId;
+            const used = Object.values(p3Connections).includes(pid);
+            const stateEl = port.querySelector('.p3-port-state');
+            port.classList.remove('border-secondary', 'border-success');
+            port.classList.add(used ? 'border-success' : 'border-secondary');
+            if (stateEl) {
+                stateEl.className = used ? 'p3-port-state text-success fw-bold' : 'p3-port-state text-secondary';
+                stateEl.textContent = used ? '[ПОДКЛЮЧЁН ×]' : '[СВОБОДЕН]';
+            }
+        });
+
+        requestAnimationFrame(drawPhase3Wires);
+    }
+
+    function connectCaseToPort(caseId, portId) {
+        // Один порт можно подключить только к одному кейсу (переключение)
+        Object.keys(p3Connections).forEach(existingCase => {
+            if (p3Connections[existingCase] === portId) {
+                delete p3Connections[existingCase];
+            }
+        });
+        p3Connections[caseId] = portId;
+        p3SelectedCaseId = null;
+        updatePhase3UI();
+    }
+
+    function initPhase3() {
+        p3Connections = {};
+        p3SelectedCaseId = null;
+
+        const casesCol = document.getElementById('p3-cases-col');
+        const portsCol = document.getElementById('p3-ports-col');
+        casesCol.innerHTML = '';
+        portsCol.innerHTML = '';
+
+        // Генерируем 4 кейса (по 1 из каждого кластера)
+        const chosenCases = shuffle(P3_CLUSTERS.map((cluster, idx) => {
+            const text = cluster.cases[Math.floor(Math.random() * cluster.cases.length)];
+            return {
+                caseId: 'case_' + idx,
+                targetId: cluster.targetId,
+                text: text
+            };
+        }));
+
+        chosenCases.forEach(c => {
+            const card = document.createElement('div');
+            card.className = 'p3-case-card card bg-dark border border-secondary rounded-0 p-2 user-select-none';
+            card.style.cursor = 'pointer';
+            card.style.minHeight = '64px';
+            card.draggable = true;
+            card.dataset.caseId = c.caseId;
+            card.dataset.targetId = c.targetId;
+            card.innerHTML = `
+                <div class="text-light small lh-sm mb-2">${c.text}</div>
+                <div class="d-flex justify-content-between align-items-center gap-1">
+                    <span class="p3-case-badge badge bg-dark border border-secondary text-secondary rounded-0">НЕ СВЯЗАНО</span>
+                    <span class="text-success fw-bold small">●</span>
+                </div>
+            `;
+
+            card.addEventListener('dragstart', (e) => {
+                if (isLocked) return;
+                e.dataTransfer.setData('text/plain', c.caseId);
+            });
+
+            card.addEventListener('click', () => {
+                if (isLocked) return;
+                p3SelectedCaseId = (p3SelectedCaseId === c.caseId) ? null : c.caseId;
+                updatePhase3UI();
+            });
+
+            casesCol.appendChild(card);
+        });
+
+        // Сборка 4 верных портов + 3 случайных ловушек
+        const rightPorts = [
+            ...P3_CLUSTERS.map(cl => ({ id: cl.targetId, portTitle: cl.portTitle, portDesc: cl.portDesc })),
+            ...shuffle(P3_DISTRACTORS).slice(0, 3)
+        ];
+
+        shuffle(rightPorts).forEach(port => {
+            const pCard = document.createElement('div');
+            pCard.className = 'p3-port-card card bg-dark border border-secondary rounded-0 p-2 user-select-none';
+            pCard.style.cursor = 'pointer';
+            pCard.style.minHeight = '52px';
+            pCard.dataset.portId = port.id;
+            pCard.dataset.portTitle = port.portTitle;
+            pCard.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-1">
+                    <span class="text-success fw-bold small" style="font-size: 0.78rem;">○ ${port.portTitle}</span>
+                    <span class="p3-port-state text-secondary" style="font-size: 0.68rem;">[СВОБОДЕН]</span>
+                </div>
+                <div class="text-secondary lh-sm" style="font-size: 0.7rem;">${port.portDesc}</div>
+            `;
+
+            pCard.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                pCard.classList.add('bg-black');
+            });
+            pCard.addEventListener('dragleave', () => {
+                pCard.classList.remove('bg-black');
+            });
+            pCard.addEventListener('drop', (e) => {
+                e.preventDefault();
+                pCard.classList.remove('bg-black');
+                if (isLocked) return;
+                const caseId = e.dataTransfer.getData('text/plain');
+                if (caseId && caseId.startsWith('case_')) {
+                    connectCaseToPort(caseId, port.id);
+                }
+            });
+
+            pCard.addEventListener('click', () => {
+                if (isLocked) return;
+                if (p3SelectedCaseId) {
+                    connectCaseToPort(p3SelectedCaseId, port.id);
+                } else {
+                    // Снять связь при клике на уже подключенный порт
+                    let changed = false;
+                    Object.keys(p3Connections).forEach(cId => {
+                        if (p3Connections[cId] === port.id) {
+                            delete p3Connections[cId];
+                            changed = true;
+                        }
+                    });
+                    if (changed) updatePhase3UI();
+                }
+            });
+
+            portsCol.appendChild(pCard);
+        });
+
+        updatePhase3UI();
+    }
+
+    window.addEventListener('resize', drawPhase3Wires);
+
+    document.getElementById('p3-verify-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        let allCorrect = true;
+        document.querySelectorAll('.p3-case-card').forEach(card => {
+            const cId = card.dataset.caseId;
+            const targetId = card.dataset.targetId;
+            if (p3Connections[cId] !== targetId) {
+                allCorrect = false;
+            }
+        });
+
+        if (!allCorrect) {
+            triggerError('Найдена ошибка коммутации или выбран модуль-ловушка (различайте получение нового смысла и изменение формы представления).', initPhase3);
+            return;
+        }
+
+        const totalSec = Math.floor((Date.now() - startTime.getTime()) / 1000);
+        document.getElementById('stat-time').textContent = `${totalSec} с`;
+        document.getElementById('stat-attempts').textContent = String(attempts);
+
+        document.getElementById('phase-3-container').classList.add('d-none');
+        document.getElementById('success-screen').classList.remove('d-none');
+        const badge = document.getElementById('phase-badge');
+        badge.className = 'badge bg-success text-dark border border-success rounded-0 px-3 py-2';
+        badge.textContent = 'Уровень пройден!';
+
+        sendTelemetry('level_complete', 'completed', true, [{ action: 'phase3_complete' }]);
+    });
+
+    // Запуск уровня с Фазы 1
+    initPhase1();
+})();
+</script>
