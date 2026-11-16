@@ -213,25 +213,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script is:inline>
         (function() {
             const missionName = 'Урок 7 :: Логические высказывания (Уровень 3)';
-            const sessionStartTime = Date.now();
-            let attempts = 0;
-
-            function sendTelemetry(actionType, success = false) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: actionType,
-                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                    start_time: new Date(sessionStartTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: attempts,
-                    success: success
-                }, '*');
-            }
-
-            // Старт сессии
-            sendTelemetry('in_progress', false);
+            let telemetry = null;
 
             const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
@@ -243,12 +225,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     const maxPhaseTime = ref(7.0);
                     const failReason = ref('');
                     const totalTimeSpent = ref(0);
+                    const attempts = ref(0);
 
                     // Состояние роутеров (Коммутаторы)
                     const node1Route = ref('statement'); // 'statement' или 'quarantine'
                     const node2Polarity = ref('true');   // 'true' или 'false'
 
                     let timerInterval = null;
+                    let resetTimeout = null;
 
                     const formattedTime = computed(() => {
                         return Math.max(0, phaseTimeLeft.value).toFixed(1);
@@ -348,12 +332,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                             phaseTimeLeft.value -= 0.1;
                             if (phaseTimeLeft.value <= 0) {
                                 clearInterval(timerInterval);
-                                triggerFailure('Истекло допустимое время такта маршрутизации! Буфер переполнен.');
+                                triggerFailure('Истекло допустимое время такта маршрутизации! Буфер переполнен.', true);
                             }
                         }, intervalMs);
                     }
 
                     function launchPacket() {
+                        if (gameState.value !== 'playing' || (telemetry && telemetry.getState().isAfkPaused)) return;
+                        if (telemetry) telemetry.markActivity();
                         clearInterval(timerInterval);
                         const chosen = activeTargetTerminal.value;
                         const expected = currentPacket.value.target;
@@ -361,41 +347,73 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         if (chosen === expected) {
                             // Успешно доставлен
                             if (currentWave.value < 8) {
+                                if (telemetry) telemetry.advanceWave(currentWave.value + 1);
                                 loadWave(currentWave.value + 1);
                             } else {
                                 // Победа над боссом
+                                if (gameState.value === 'success') return;
                                 gameState.value = 'success';
-                                totalTimeSpent.value = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
-                                sendTelemetry('level_complete', true);
+                                if (telemetry) {
+                                    telemetry.complete({ wave: 8 });
+                                    totalTimeSpent.value = Math.max(1, telemetry.getTimeSpentSec());
+                                }
                             }
                         } else {
                             // Коллизия
-                            triggerFailure(`Пакет направлен в терминал [${chosen}], но требовался терминал [${expected}]!`);
+                            triggerFailure(`Пакет направлен в терминал [${chosen}], но требовался терминал [${expected}]!`, false);
                         }
                     }
 
-                    function triggerFailure(reason) {
+                    function triggerFailure(reason, isTimeout = false) {
                         clearInterval(timerInterval);
-                        attempts++;
+                        clearTimeout(resetTimeout);
+
+                        if (telemetry) {
+                            const sent = telemetry.hardcoreReset({
+                                wave: currentWave.value,
+                                isTimeout: Boolean(isTimeout)
+                            });
+                            attempts.value = telemetry.getState().attemptsCount;
+                            if (sent === false) {
+                                return;
+                            }
+                        }
+
                         failReason.value = reason;
                         gameState.value = 'failed';
-                        sendTelemetry('hardcore_reset', false);
 
-                        setTimeout(() => {
+                        resetTimeout = setTimeout(() => {
+                            if (telemetry && telemetry.getState().isAfkPaused) return;
                             // Автоматический рестарт на волну 1
                             gameState.value = 'playing';
                             node1Route.value = 'statement';
                             node2Polarity.value = 'true';
+                            if (telemetry) telemetry.setWave(1, 8);
                             loadWave(1);
                         }, 1800);
                     }
 
                     function startGame() {
+                        clearTimeout(resetTimeout);
                         gameState.value = 'playing';
                         node1Route.value = 'statement';
                         node2Polarity.value = 'true';
+                        if (telemetry) {
+                            telemetry.start();
+                            telemetry.setWave(1, 8);
+                            telemetry.progress({ wave: 1, total_waves: 8, stage: 1, total_stages: 8 });
+                        }
                         loadWave(1);
                     }
+
+                    telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: 8,
+                        onAfkRetry: () => {
+                            startGame();
+                        }
+                    });
 
                     // Обработка горячих клавиш: 1 (узел 1), 2 (узел 2), Пробел / Enter (форсаж)
                     function handleKeyDown(e) {
@@ -419,6 +437,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     onUnmounted(() => {
                         clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
                         window.removeEventListener('keydown', handleKeyDown);
                     });
 

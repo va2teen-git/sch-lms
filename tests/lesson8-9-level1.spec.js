@@ -15,9 +15,9 @@ test.describe('8 класс — Урок 9: Определение истинн�
     expect(code).toContain('id="phase1"');
     expect(code).toContain('id="phase2"');
     expect(code).toContain('id="phase3"');
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 9');
 
     expect(code.includes('<style>')).toBe(false);

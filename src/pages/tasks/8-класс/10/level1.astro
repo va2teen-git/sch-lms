@@ -243,25 +243,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     <script is:inline>
         const missionName = 'Урок 10 :: Таблицы истинности (Уровень 1)';
-        const startTime = Date.now();
-        let attempts = 0;
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 1,
+            totalStages: 3
+        });
         let isLocked = false;
         let currentPhase = 1;
-
-        // Отправка сообщений в родительское окно LMS
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        let levelCompleted = false;
 
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -280,9 +269,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         function triggerErrorAndRegenerate(message, regenerateFn) {
             if (isLocked) return;
             isLocked = true;
-            attempts++;
-            document.getElementById('attempts-display').textContent = String(attempts);
-            sendTelemetry('hardcore_reset', false);
+            telemetry.hardcoreReset({ stage: currentPhase });
+            document.getElementById('attempts-display').textContent = String(telemetry.getState().attemptsCount);
 
             const feedbackBox = document.getElementById('feedback-box');
             const feedbackText = document.getElementById('feedback-text');
@@ -509,7 +497,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Переход к Фазе 2
             currentPhase = 2;
-            sendTelemetry('in_progress', false);
+            telemetry.advanceStage(2);
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
             document.getElementById('phase-title').textContent = 'Дешифровка скрытых переменных (Slot & Snap токенами)';
             document.getElementById('phase1').classList.add('d-none');
@@ -758,7 +746,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Переход к Фазе 3
             currentPhase = 3;
-            sendTelemetry('in_progress', false);
+            telemetry.advanceStage(3);
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
             document.getElementById('phase-title').textContent = 'Классификация выражений по свойствам таблиц истинности (Drag-to-Bucket)';
             document.getElementById('phase2').classList.add('d-none');
@@ -983,23 +971,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             // Успешное завершение Уровня 1!
-            const finalTimeSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-            document.getElementById('final-attempts').textContent = String(attempts);
-            document.getElementById('final-time').textContent = String(finalTimeSec);
+            if (levelCompleted) return;
+            levelCompleted = true;
+            document.getElementById('p3-verify-btn').disabled = true;
+            telemetry.complete({ stage: 3 });
+            const state = telemetry.getState();
+            document.getElementById('final-attempts').textContent = String(state.attemptsCount);
+            document.getElementById('final-time').textContent = String(Math.max(1, state.timeSpentSec));
 
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('victory-screen').classList.remove('d-none');
             document.getElementById('phase-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
             document.getElementById('phase-badge').textContent = 'Успешно завершено';
             document.getElementById('phase-title').textContent = 'Все 3 этапа манипуляционного тренажера пройдены!';
-
-            sendTelemetry('level_complete', true);
         });
 
         // Экспорт DEV-состояния для Playwright автотестов и симулятора персон
         window.__DEV_LEVEL1_STATE__ = {
             getPhase: () => currentPhase,
-            getAttempts: () => attempts,
+            getAttempts: () => telemetry.getState().attemptsCount,
             getP1Template: () => p1CurrentTemplate,
             getP2Scenario: () => p2CurrentScenario,
             solvePhase1: () => {
@@ -1047,9 +1037,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         };
 
         // =========================================================================
-        // ИНИЦИАЛИЗАЦИЯ ТРЕНАЖЕРА
+        // ИНИЦИАЛИЗАЦИЯ ТРЕНАЖЕРА (телеметрия стартует отложенно по первому действию)
         // =========================================================================
         initPhase1();
-        sendTelemetry('in_progress', false);
     </script>
 </TaskLayout>

@@ -161,30 +161,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script is:inline>
         (function() {
             const missionName = 'Урок 7 :: Логические высказывания (Уровень 2)';
-            const startTime = Date.now();
-            let attempts = 0;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: 5
+            });
             let currentPhase = 1;
-
-            // Телеметрия
-            function sendTelemetry(actionType, isSuccess = false) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: actionType,
-                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                    start_time: new Date(startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: attempts,
-                    success: isSuccess
-                }, '*');
-            }
-
-            // Старт миссии
-            sendTelemetry('in_progress', false);
+            let levelCompleted = false;
 
             function showPhase(phaseNum) {
                 currentPhase = phaseNum;
+                if (phaseNum > 1) {
+                    telemetry.advanceStage(phaseNum);
+                }
                 document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
                 const active = document.getElementById(`phase${phaseNum}`);
                 if (active) active.classList.remove('d-none');
@@ -201,9 +190,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function triggerError(feedbackId, retryCallback) {
-                attempts++;
-                document.getElementById('attempts-display').textContent = attempts;
-                sendTelemetry('hardcore_reset', false);
+                telemetry.hardcoreReset({ stage: currentPhase });
+                document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
 
                 const fb = document.getElementById(feedbackId);
                 fb.classList.remove('d-none');
@@ -456,15 +444,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Финал миссии
             // ==========================================
             function finishMission() {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                sendTelemetry('level_complete', true);
+                if (levelCompleted) return;
+                levelCompleted = true;
+                telemetry.complete({ stage: 5 });
+                const state = telemetry.getState();
 
                 document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
                 document.getElementById('level-badge').textContent = 'УСПЕХ';
                 document.getElementById('level-title').textContent = 'Все 5 фаз пройдены';
 
-                document.getElementById('final-time').textContent = timeSpent;
-                document.getElementById('final-attempts').textContent = attempts;
+                document.getElementById('final-time').textContent = Math.max(1, state.timeSpentSec);
+                document.getElementById('final-attempts').textContent = state.attemptsCount;
                 document.getElementById('success-screen').classList.remove('d-none');
             }
 

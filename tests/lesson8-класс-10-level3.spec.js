@@ -25,10 +25,11 @@ test.describe('Grade 8 Lesson 10: Level 3 Arcade Task Suite (Logic Core Pulse)',
     expect(code).toContain('btn-boost');
     expect(code).toContain('handleKeyDown');
 
-    // Hardcore reset & Alarm Box
+    // Hardcore reset & Alarm Box (LMSTelemetry)
     expect(code).toContain('alarm-box');
-    expect(code).toContain('hardcore_reset');
-    expect(code).toContain('level_complete');
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.hardcoreReset(');
+    expect(code).toContain('.complete(');
     expect(code).toContain('Урок 10');
 
     // Dev test hook

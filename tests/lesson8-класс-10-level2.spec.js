@@ -36,10 +36,10 @@ test.describe('Grade 8 Lesson 10: Level 2 Task Suite (Analytical Truth Tables)',
     expect(code.includes('<style>')).toBe(false);
     expect(code.includes('<style ')).toBe(false);
 
-    // Telemetry contracts
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry contracts (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 10');
   });
 

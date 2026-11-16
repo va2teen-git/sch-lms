@@ -172,25 +172,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
     (function() {
         const missionName = 'Урок 8 :: Логические операции «и», «или», «не» (Уровень 3)';
-        const sessionStartTime = Date.now();
-        let attempts = 0;
-
-        function sendTelemetry(actionType, success = false) {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: actionType,
-                status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(sessionStartTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
-
-        // Старт сессии
-        sendTelemetry('in_progress', false);
+        let telemetry = null;
 
         // Синтезатор звуковых сигналов (Web Audio API)
         let audioCtx = null;
@@ -263,7 +245,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 const waveTimeLimit = ref(14.0);
                 const timeLeft = ref(14.0);
                 const totalTimeSpent = ref(0);
+                const attempts = ref(0);
                 let timerInterval = null;
+                let resetTimeout = null;
 
                 const formattedTime = computed(() => {
                     return Math.max(0, timeLeft.value).toFixed(1);
@@ -649,13 +633,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         timeLeft.value -= 0.1;
                         if (timeLeft.value <= 0) {
                             clearInterval(timerInterval);
-                            triggerHardcoreFail('ТАЙМ-АУТ ШЛЮЗА: Время реакции истекло! Буфер WAF переполнен необработанным трафиком.');
+                            triggerHardcoreFail('ТАЙМ-АУТ ШЛЮЗА: Время реакции истекло! Буфер WAF переполнен необработанным трафиком.', true);
                         }
                     }, 100);
                 }
 
                 function submitAction(action) {
-                    if (!started.value || completed.value || alarmActive.value) return;
+                    if (!started.value || completed.value || alarmActive.value || (telemetry && telemetry.getState().isAfkPaused)) return;
+                    if (telemetry) telemetry.markActivity();
 
                     clearInterval(timerInterval);
                     const expected = currentWave.value.target;
@@ -664,6 +649,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         // Успешный перехват
                         playSound('success');
                         if (currentWaveIndex.value < 9) {
+                            if (telemetry) telemetry.advanceWave(currentWaveIndex.value + 2);
                             startWave(currentWaveIndex.value + 1);
                         } else {
                             // Финальная победа
@@ -674,46 +660,77 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         const actionName = action === 'allow' ? '«ПРОПУСТИТЬ [ALLOW] (1)»' : '«СБРОСИТЬ [DROP] (0)»';
                         const expectedName = expected === 'allow' ? '«ПРОПУСТИТЬ [ALLOW] (1)»' : '«СБРОСИТЬ [DROP] (0)»';
                         const reason = `ОШИБКА АУДИТА: Вы выбрали ${actionName}, а требовалось ${expectedName}. ${currentWave.value.errorExplanation || ''}`;
-                        triggerHardcoreFail(reason);
+                        triggerHardcoreFail(reason, false);
                     }
                 }
 
-                function triggerHardcoreFail(reason) {
+                function triggerHardcoreFail(reason, isTimeout = false) {
                     clearInterval(timerInterval);
-                    attempts++;
-                    sendTelemetry('hardcore_reset', false);
+                    clearTimeout(resetTimeout);
+
+                    if (telemetry) {
+                        const sent = telemetry.hardcoreReset({
+                            wave: currentWaveIndex.value + 1,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        attempts.value = telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            alarmActive.value = false;
+                            return;
+                        }
+                    }
                     playSound('alarm');
 
                     alarmMessage.value = reason;
                     alarmActive.value = true;
 
                     // Через 2 секунды сброс на Волну 1 с новой процедурной генерацией!
-                    setTimeout(() => {
+                    resetTimeout = setTimeout(() => {
+                        if (!started.value || completed.value || (telemetry && telemetry.getState().isAfkPaused)) return;
                         alarmActive.value = false;
                         initAllWaves();
+                        if (telemetry) telemetry.setWave(1, 10);
                         startWave(0);
                     }, 2200);
                 }
 
                 function startGame() {
-                    attempts = 0;
+                    clearTimeout(resetTimeout);
                     completed.value = false;
                     alarmActive.value = false;
                     started.value = true;
                     initAllWaves();
-                    sendTelemetry('in_progress', false);
+                    if (telemetry) {
+                        telemetry.start();
+                        telemetry.setWave(1, 10);
+                        telemetry.progress({ wave: 1, total_waves: 10, stage: 1, total_stages: 10 });
+                    }
                     startWave(0);
                 }
 
+                telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: 10,
+                    onAfkRetry: () => {
+                        startGame();
+                    }
+                });
+
                 function finishGame() {
+                    if (completed.value) return;
                     clearInterval(timerInterval);
+                    clearTimeout(resetTimeout);
                     completed.value = true;
-                    totalTimeSpent.value = Math.max(1, Math.floor((Date.now() - sessionStartTime) / 1000));
-                    sendTelemetry('level_complete', true);
+                    if (telemetry) {
+                        telemetry.complete({ wave: 10 });
+                        totalTimeSpent.value = Math.max(1, telemetry.getTimeSpentSec());
+                    }
                     playSound('victory');
                 }
 
                 function handleKeyDown(e) {
+                    if (telemetry && telemetry.getState().isAfkPaused) return;
                     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
                     if (!started.value || completed.value) {
@@ -738,6 +755,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 onUnmounted(() => {
                     clearInterval(timerInterval);
+                    clearTimeout(resetTimeout);
                     window.removeEventListener('keydown', handleKeyDown);
                 });
 
