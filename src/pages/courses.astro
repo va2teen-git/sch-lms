@@ -1,99 +1,142 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import coursesData from '../data/courses.json';
+import fs from 'fs';
+import path from 'path';
+
+const COURSE_META: Record<string, { order: number; short: string }> = {
+  '7-класс': { order: 1, short: '7 кл' },
+  '8-класс': { order: 2, short: '8 кл' },
+  '9-класс': { order: 3, short: '9 кл' },
+  '10-класс_базовый': { order: 4, short: '10 баз' },
+  '10-класс_углубленный': { order: 5, short: '10 угл' },
+  '11-класс_базовый': { order: 6, short: '11 баз' },
+  '11-класс_углубленный': { order: 7, short: '11 угл' },
+};
+
+const hasLessonContent = (slug: string, id: string): boolean => {
+  const cwd = process.cwd();
+  return (
+    fs.existsSync(path.join(cwd, 'src', 'pages', 'tasks', slug, id, 'level1.astro')) ||
+    fs.existsSync(path.join(cwd, 'public', 'tasks', slug, id, 'level1.html')) ||
+    fs.existsSync(path.join(cwd, 'public', 'tasks', slug, id, 'task.html')) ||
+    fs.existsSync(path.join(cwd, 'src', 'content', 'lessons', slug, id, 'theory.md'))
+  );
+};
+
+const matrixCourses = [...coursesData]
+  .sort((a, b) => (COURSE_META[a.slug]?.order ?? 99) - (COURSE_META[b.slug]?.order ?? 99))
+  .map((c) => {
+    const shortLabel = COURSE_META[c.slug]?.short ?? c.name;
+    return {
+      slug: c.slug,
+      name: c.name,
+      shortLabel,
+      lessons: c.lessons.map((l) => ({
+        id: l.id,
+        topic: l.topic,
+        ready: hasLessonContent(c.slug, String(l.id)),
+      })),
+    };
+  });
 ---
 
-<Layout title="Курсы | Школьная Платформа">
-  <div class="max-w-4xl mx-auto py-8 px-4">
-    <div class="flex justify-between items-center mb-8 border-b border-gray-300 pb-4">
-      <h1 class="text-3xl font-bold">Список уроков</h1>
-      <div class="text-right flex items-center gap-4">
-        <div>
-          <p id="student-name" class="font-semibold text-lg"></p>
-          <p id="class-name" class="text-sm text-gray-600"></p>
-        </div>
-        <button id="logout-btn" class="border border-red-500 text-red-600 px-3 py-1 hover:bg-red-50 transition-colors text-sm font-semibold">Выйти</button>
+<Layout title="Матрица уроков | Школьная Платформа">
+  <div class="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <header class="bg-white border-b border-gray-300 px-3 sm:px-4 py-2 flex items-center justify-between gap-3 shrink-0">
+      <div class="flex items-baseline gap-2 min-w-0">
+        <h1 class="text-base sm:text-lg font-bold tracking-tight text-gray-900 truncate">Матрица уроков</h1>
+        <span class="hidden md:inline text-xs text-gray-500">выберите класс и номер урока</span>
       </div>
-    </div>
-    
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-gray-50 p-3 border border-gray-300">
-      <label for="course-select" class="text-xs font-bold text-gray-700 uppercase tracking-wider">Курс для прохождения:</label>
-      <select id="course-select" class="border border-gray-300 px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-600 cursor-pointer">
-      </select>
-    </div>
 
-    <div id="lessons-container" class="space-y-4">
-      <!-- Lessons will be rendered here via client-side script -->
-    </div>
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <span id="student-name" class="font-semibold text-xs sm:text-sm text-gray-900"></span>
+        <span id="class-name" class="text-xs text-gray-600 bg-gray-100 border border-gray-300 px-2 py-0.5"></span>
+        <button id="logout-btn" class="border border-red-500 text-red-600 px-2.5 py-0.5 hover:bg-red-50 transition-colors text-xs font-semibold cursor-pointer">
+          Выйти
+        </button>
+      </div>
+    </header>
+
+    <main id="lessons-matrix" class="flex-1 min-h-0 overflow-auto p-2 bg-gray-100">
+      <div class="inline-flex flex-col gap-1 min-w-max">
+        {matrixCourses.map((course) => (
+          <section class="flex items-stretch gap-1" data-course-row={course.slug}>
+            <div
+              class="w-16 sm:w-20 shrink-0 sticky left-0 z-10 bg-gray-900 text-white px-2 py-1 flex flex-col justify-center border border-gray-900 select-none"
+              title={course.name}
+            >
+              <span class="text-[11px] font-bold leading-tight truncate">{course.shortLabel}</span>
+              <span class="text-[9px] text-gray-400 font-mono leading-tight">{course.lessons.length} ур.</span>
+            </div>
+
+            <div class="flex flex-nowrap gap-1">
+              {course.lessons.map((lesson) => (
+                <a
+                  href={`/lesson/${course.slug}/${lesson.id}`}
+                  data-course={course.slug}
+                  data-lesson={lesson.id}
+                  title={`${course.name} • Урок ${lesson.id}: ${lesson.topic}`}
+                  class={
+                    lesson.ready
+                      ? 'w-[132px] h-[58px] p-1.5 flex flex-col justify-between bg-white border border-gray-300 text-gray-900 hover:border-blue-600 hover:bg-blue-50/40 transition-colors shrink-0'
+                      : 'w-[132px] h-[58px] p-1.5 flex flex-col justify-between bg-gray-50 border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-700 hover:bg-white transition-colors shrink-0'
+                  }
+                >
+                  <div class="flex items-center justify-between gap-1 text-[10px] leading-none">
+                    <span class={lesson.ready ? 'font-semibold text-gray-500 uppercase truncate' : 'font-medium text-gray-400 uppercase truncate'}>
+                      {course.shortLabel}
+                    </span>
+                    <span class={lesson.ready ? 'font-mono font-bold text-blue-700 shrink-0' : 'font-mono font-semibold text-gray-400 shrink-0'}>
+                      №{lesson.id}
+                    </span>
+                  </div>
+                  <div class="text-[11px] leading-[1.2] font-medium line-clamp-2 overflow-hidden">
+                    {lesson.topic}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </main>
   </div>
 </Layout>
 
 <script>
   import coursesData from '../data/courses.json';
-  
+
   const firstName = localStorage.getItem('student_firstName');
   const lastName = localStorage.getItem('student_lastName');
   const studentClass = localStorage.getItem('student_class');
-  
+
   if (!firstName || !lastName || !studentClass) {
     window.location.href = '/';
   } else {
     const studentNameEl = document.getElementById('student-name');
     const classNameEl = document.getElementById('class-name');
-    const courseSelectEl = document.getElementById('course-select') as HTMLSelectElement;
-    const container = document.getElementById('lessons-container');
-    
+
     if (studentNameEl) studentNameEl.textContent = `${lastName} ${firstName}`;
-    
-    const homeCourse = coursesData.find(c => c.slug === studentClass);
+
+    const homeCourse = coursesData.find((c) => c.slug === studentClass);
     if (classNameEl) {
       classNameEl.textContent = homeCourse ? `Мой класс: ${homeCourse.name}` : studentClass;
     }
 
-    // Populate course switcher
-    if (courseSelectEl) {
-      coursesData.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.slug;
-        opt.textContent = c.slug === studentClass ? `${c.name} (Основной)` : c.name;
-        if (c.slug === studentClass) opt.selected = true;
-        courseSelectEl.appendChild(opt);
-      });
-
-      courseSelectEl.addEventListener('change', () => {
-        renderLessons(courseSelectEl.value);
-      });
+    const matrixEl = document.getElementById('lessons-matrix');
+    if (matrixEl) {
+      matrixEl.addEventListener(
+        'wheel',
+        (e) => {
+          if (e.deltaY !== 0 && e.deltaX === 0 && matrixEl.scrollHeight <= matrixEl.clientHeight) {
+            e.preventDefault();
+            matrixEl.scrollLeft += e.deltaY;
+          }
+        },
+        { passive: false }
+      );
     }
-
-    function renderLessons(courseSlug: string) {
-      if (!container) return;
-      container.innerHTML = '';
-
-      const course = coursesData.find(c => c.slug === courseSlug);
-      if (course && course.lessons.length > 0) {
-        course.lessons.forEach(lesson => {
-          const lessonCard = document.createElement('a');
-          lessonCard.href = `/lesson/${course.slug}/${lesson.id}`;
-          lessonCard.className = "block bg-white border border-gray-300 p-4 hover:shadow-lg hover:border-blue-500 transition-all cursor-pointer flex items-center";
-          
-          const numBadge = document.createElement('div');
-          numBadge.className = "w-10 h-10 bg-blue-100 text-blue-800 font-bold flex items-center justify-center mr-4 border border-blue-200";
-          numBadge.textContent = lesson.id;
-          
-          const topic = document.createElement('h2');
-          topic.className = "text-lg font-semibold flex-1";
-          topic.textContent = lesson.topic;
-          
-          lessonCard.appendChild(numBadge);
-          lessonCard.appendChild(topic);
-          container.appendChild(lessonCard);
-        });
-      } else {
-        container.innerHTML = `<p class="text-gray-500 p-4 bg-white border border-gray-300">В данном курсе пока нет доступных уроков.</p>`;
-      }
-    }
-
-    renderLessons(studentClass);
 
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {

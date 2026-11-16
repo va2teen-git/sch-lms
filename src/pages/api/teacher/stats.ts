@@ -23,6 +23,8 @@ export interface AttemptMetric {
   attemptNumber: number;
   mode: 'normal' | 'hardcore';
   status: 'completed' | 'in_progress' | 'failed';
+  courseSlug?: string | null;
+  lessonId?: string | null;
   startedAt: string | null;
   lastActiveAt: string | null;
   totalTimeSec: number;
@@ -79,10 +81,15 @@ export interface StudentMetric {
   sprintAccuracy?: number | null;
   currentAttempt?: AttemptMetric | null;
   attempts: AttemptMetric[];
+  lastCourseSlug?: string | null;
+  lastLessonId?: string | null;
+  workedLessons?: Array<{ courseSlug: string; lessonId: string }>;
 
   recentEvents: Array<{
     id: number;
     mission: string;
+    course_slug?: string | null;
+    lesson_id?: string | null;
     action_type: string;
     timestamp: string;
     time_spent: number;
@@ -143,8 +150,8 @@ export const GET: APIRoute = async ({ request }) => {
       const match = lessonFilter.match(/\d+/);
       const lId = match ? match[0] : null;
       if (lId) {
-        lessonCondition = ' AND (lesson_id = ? OR mission_name LIKE ?)';
-        params.push(lId, `%Урок ${lId}%`);
+        lessonCondition = " AND (lesson_id = ? OR ((lesson_id IS NULL OR lesson_id = '') AND (mission_name = ? OR mission_name LIKE ? OR mission_name LIKE ? OR mission_name LIKE ?)))";
+        params.push(lId, `Урок ${lId}`, `%Урок ${lId} %`, `%Урок ${lId}:%`, `%Урок ${lId}`);
       } else {
         const prefix = lessonFilter.startsWith('Урок ') ? lessonFilter : `Урок ${lessonFilter}`;
         lessonCondition = ' AND mission_name LIKE ?';
@@ -190,6 +197,7 @@ export const GET: APIRoute = async ({ request }) => {
       _attemptOrder: string[];
       _legacyIdx: number;
       _lastHc: number | null;
+      _workedLessonsMap: Record<string, { courseSlug: string; lessonId: string }>;
     }
 
     // Grouping by student
@@ -250,17 +258,30 @@ export const GET: APIRoute = async ({ request }) => {
           sprintAccuracy: null,
           currentAttempt: null,
           attempts: [],
+          lastCourseSlug: null,
+          lastLessonId: null,
+          workedLessons: [],
           recentEvents: [],
           _attemptsMap: {},
           _attemptOrder: [],
           _legacyIdx: 1,
-          _lastHc: null
+          _lastHc: null,
+          _workedLessonsMap: {}
         };
       }
 
       const s = studentsMap[canonicalKey];
       s.lastSeen = r.timestamp;
       s.latestIsHardcore = r.is_hardcore;
+      const rowCourse = r.course_slug ? String(r.course_slug).trim() : null;
+      const rowLesson = r.lesson_id ? String(r.lesson_id).trim() : null;
+      if (rowCourse) s.lastCourseSlug = rowCourse;
+      if (rowLesson) s.lastLessonId = rowLesson;
+      if (rowCourse && rowLesson) {
+        const wlKey = `${rowCourse}::${rowLesson}`;
+        if (s._workedLessonsMap[wlKey]) delete s._workedLessonsMap[wlKey];
+        s._workedLessonsMap[wlKey] = { courseSlug: rowCourse, lessonId: rowLesson };
+      }
       const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
       const rStart = r.start_time ? new Date(r.start_time) : null;
       const validStart = rStart && !isNaN(rStart.getTime()) ? rStart : null;
@@ -288,6 +309,8 @@ export const GET: APIRoute = async ({ request }) => {
           attemptNumber: attNum || s._attemptOrder.length,
           mode: attMode,
           status: 'in_progress',
+          courseSlug: rowCourse,
+          lessonId: rowLesson,
           startedAt: r.timestamp,
           lastActiveAt: r.timestamp,
           totalTimeSec: 0,
@@ -306,6 +329,8 @@ export const GET: APIRoute = async ({ request }) => {
 
       const att = s._attemptsMap[attId];
       att.lastActiveAt = r.timestamp;
+      if (!att.courseSlug && rowCourse) att.courseSlug = rowCourse;
+      if (!att.lessonId && rowLesson) att.lessonId = rowLesson;
 
       // Extract Level Number
       let lvlNum: 1 | 2 | 3 | null = null;
@@ -483,6 +508,8 @@ export const GET: APIRoute = async ({ request }) => {
       s.recentEvents.push({
         id: r.id,
         mission: r.mission_name,
+        course_slug: rowCourse,
+        lesson_id: rowLesson,
         action_type: r.action_type,
         timestamp: r.timestamp,
         time_spent: r.time_spent_sec,
@@ -687,10 +714,13 @@ export const GET: APIRoute = async ({ request }) => {
       // Reverse recent events so newest is first
       s.recentEvents.reverse();
 
+      s.workedLessons = Object.values(s._workedLessonsMap).reverse();
+
       delete (s as any)._attemptsMap;
       delete (s as any)._attemptOrder;
       delete (s as any)._legacyIdx;
       delete (s as any)._lastHc;
+      delete (s as any)._workedLessonsMap;
 
       return s;
     });

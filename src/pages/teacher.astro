@@ -99,17 +99,30 @@ try {
         sprintAccuracy: null,
         currentAttempt: null,
         attempts: [],
+        lastCourseSlug: null,
+        lastLessonId: null,
+        workedLessons: [],
         recentEvents: [],
         _attemptsMap: {},
         _attemptOrder: [],
         _legacyIdx: 1,
-        _lastHc: null
+        _lastHc: null,
+        _workedLessonsMap: {}
       };
     }
 
     const s = studentsMap[canonicalKey];
     s.lastSeen = r.timestamp;
     s.latestIsHardcore = r.is_hardcore;
+    const rowCourse = r.course_slug ? String(r.course_slug).trim() : null;
+    const rowLesson = r.lesson_id ? String(r.lesson_id).trim() : null;
+    if (rowCourse) s.lastCourseSlug = rowCourse;
+    if (rowLesson) s.lastLessonId = rowLesson;
+    if (rowCourse && rowLesson) {
+      const wlKey = `${rowCourse}::${rowLesson}`;
+      if (s._workedLessonsMap[wlKey]) delete s._workedLessonsMap[wlKey];
+      s._workedLessonsMap[wlKey] = { courseSlug: rowCourse, lessonId: rowLesson };
+    }
     const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
     const rStart = r.start_time ? new Date(r.start_time) : null;
     const validStart = rStart && !isNaN(rStart.getTime()) ? rStart : null;
@@ -136,6 +149,8 @@ try {
         attemptNumber: attNum || s._attemptOrder.length,
         mode: attMode,
         status: 'in_progress',
+        courseSlug: rowCourse,
+        lessonId: rowLesson,
         startedAt: r.timestamp,
         lastActiveAt: r.timestamp,
         totalTimeSec: 0,
@@ -154,6 +169,8 @@ try {
 
     const att = s._attemptsMap[attId];
     att.lastActiveAt = r.timestamp;
+    if (!att.courseSlug && rowCourse) att.courseSlug = rowCourse;
+    if (!att.lessonId && rowLesson) att.lessonId = rowLesson;
 
     let lvlNum: 1 | 2 | 3 | null = null;
     if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) lvlNum = r.level_number as 1 | 2 | 3;
@@ -309,6 +326,8 @@ try {
     s.recentEvents.push({
       id: r.id,
       mission: r.mission_name,
+      course_slug: rowCourse,
+      lesson_id: rowLesson,
       action_type: r.action_type,
       timestamp: r.timestamp,
       time_spent: r.time_spent_sec,
@@ -510,10 +529,13 @@ try {
     s.allHardcoreCompletedLevels = Array.from(s.allHardcoreCompletedLevels);
     s.hardcoreStreakLevels = Array.from(s.hardcoreStreakLevels);
 
+    s.workedLessons = Object.values(s._workedLessonsMap).reverse();
+
     delete s._attemptsMap;
     delete s._attemptOrder;
     delete s._legacyIdx;
     delete s._lastHc;
+    delete s._workedLessonsMap;
 
     return s;
   });
@@ -953,7 +975,13 @@ function getAttemptsWord(count: number): string {
                             )}
                           </div>
                         </td>
-                        <td class="p-2.5 text-center text-[11px] text-gray-400 font-mono">—</td>
+                        <td class="p-2.5 text-center text-[11px] text-gray-500 font-mono">
+                          {(att.courseSlug || att.lessonId) ? (
+                            <span class={att.courseSlug && att.courseSlug !== s.className ? 'text-indigo-700 font-semibold' : 'text-gray-600'}>
+                              {[att.courseSlug, att.lessonId ? `Ур. ${att.lessonId}` : ''].filter(Boolean).join(' • ')}
+                            </span>
+                          ) : '—'}
+                        </td>
                         <td class="p-2.5 text-center">
                           {att.status === 'completed' ? (
                             isHc ? (
@@ -1207,7 +1235,7 @@ function getAttemptsWord(count: number): string {
           group.label = `★ Выбранный класс: ${c.name}`;
           c.lessons.forEach(l => {
             const opt = document.createElement('option');
-            opt.value = `Урок ${l.id}`;
+            opt.value = `${c.slug}::Урок ${l.id}`;
             opt.textContent = `Урок ${l.id}: ${l.topic.substring(0, 48)}${l.topic.length > 48 ? '...' : ''}`;
             group.appendChild(opt);
           });
@@ -1221,7 +1249,7 @@ function getAttemptsWord(count: number): string {
           group.label = `Другой курс: ${c.name}`;
           c.lessons.forEach(l => {
             const opt = document.createElement('option');
-            opt.value = `Урок ${l.id}`;
+            opt.value = `${c.slug}::Урок ${l.id}`;
             opt.textContent = `${c.name.split('_')[0]} • Урок ${l.id}: ${l.topic.substring(0, 42)}${l.topic.length > 42 ? '...' : ''}`;
             group.appendChild(opt);
           });
@@ -1234,7 +1262,7 @@ function getAttemptsWord(count: number): string {
           group.label = `Курс: ${c.name}`;
           c.lessons.forEach(l => {
             const opt = document.createElement('option');
-            opt.value = `Урок ${l.id}`;
+            opt.value = `${c.slug}::Урок ${l.id}`;
             opt.textContent = `${c.name.split('_')[0]} • Урок ${l.id}: ${l.topic.substring(0, 42)}${l.topic.length > 42 ? '...' : ''}`;
             group.appendChild(opt);
           });
@@ -1276,11 +1304,53 @@ function getAttemptsWord(count: number): string {
     return 'забегов';
   }
 
+  const COURSE_SHORT_LABELS = {
+    '7-класс': '7 кл',
+    '8-класс': '8 кл',
+    '9-класс': '9 кл',
+    '10-класс_базовый': '10 баз',
+    '10-класс_углубленный': '10 угл',
+    '11-класс_базовый': '11 баз',
+    '11-класс_углубленный': '11 угл'
+  };
+
+  function getCourseShortLabel(slug) {
+    if (!slug) return '';
+    return COURSE_SHORT_LABELS[slug] || slug;
+  }
+
+  function getLessonTopicTitle(courseSlug, lessonId) {
+    if (!courseSlug || !lessonId) return '';
+    const c = coursesData.find(x => x.slug === courseSlug);
+    const l = c?.lessons?.find(x => String(x.id) === String(lessonId));
+    return l ? `${c.name} • Урок ${lessonId}: ${l.topic}` : `${courseSlug} • Урок ${lessonId}`;
+  }
+
+  function renderCourseLessonPill(courseSlug, lessonId, studentClass) {
+    if (!courseSlug && !lessonId) return '';
+    const shortCourse = getCourseShortLabel(courseSlug);
+    const lessonPart = lessonId ? `Ур. ${lessonId}` : '';
+    const text = [shortCourse, lessonPart].filter(Boolean).join(' • ');
+    const isCrossCourse = !!(courseSlug && studentClass && courseSlug !== studentClass);
+    const title = getLessonTopicTitle(courseSlug, lessonId);
+    if (isCrossCourse) {
+      return `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-300" title="Урок другого класса: ${title}">🔀 ${text}</span>`;
+    }
+    return `<span class="inline-flex items-center px-1.5 py-0.2 text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200" title="${title}">${text}</span>`;
+  }
+
   // Fetch telemetry from server API
   async function fetchTelemetry() {
     const cls = getSelectedClassesParam();
-    const crs = courseSelect ? courseSelect.value : 'all';
-    const lsn = lessonSelect.value;
+    let crs = courseSelect ? courseSelect.value : 'all';
+    let lsn = lessonSelect.value;
+    if (lsn && lsn.includes('::')) {
+      const [optCourse, optLesson] = lsn.split('::');
+      if (crs === 'all' && optCourse) {
+        crs = optCourse;
+      }
+      lsn = optLesson || 'all';
+    }
     const dt = dateSelect.value;
     const exc = excludeTestsCheckbox.checked ? '1' : '0';
     const q = encodeURIComponent(searchInput.value.trim());
@@ -1447,6 +1517,13 @@ function getAttemptsWord(count: number): string {
         statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">— Не начат</span>';
       }
 
+      const workedList = Array.isArray(s.workedLessons) && s.workedLessons.length > 0
+        ? s.workedLessons
+        : (s.lastCourseSlug && s.lastLessonId ? [{ courseSlug: s.lastCourseSlug, lessonId: s.lastLessonId }] : []);
+      const workedPillsHtml = workedList.length > 0
+        ? `<div class="flex flex-wrap items-center justify-center gap-1 mt-0.5">${workedList.slice(0, 3).map(wl => renderCourseLessonPill(wl.courseSlug, wl.lessonId, s.className)).join('')}${workedList.length > 3 ? `<span class="text-[10px] text-gray-400">+${workedList.length - 3}</span>` : ''}</div>`
+        : '';
+
       const isExpanded = expandedStudentKeys.has(s.key);
       const toggleIcon = isExpanded ? '▼' : '▶';
 
@@ -1517,7 +1594,7 @@ function getAttemptsWord(count: number): string {
             </div>
           </td>
           <td class="p-3 text-xs text-gray-600">${s.className}</td>
-          <td class="p-3 text-center">${statusBadge}</td>
+          <td class="p-3 text-center"><div class="inline-flex flex-col items-center gap-0.5">${statusBadge}${workedPillsHtml}</div></td>
           <td class="p-3 text-center">${attemptsBadge}</td>
           <td class="p-3 text-center">${levelBadge(s.levels[1])}</td>
           <td class="p-3 text-center">${levelBadge(s.levels[2])}</td>
@@ -1581,7 +1658,7 @@ function getAttemptsWord(count: number): string {
                   ${isHc ? '<span class="px-1.5 py-0.2 text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">💀 Хардкор</span>' : '<span class="px-1.5 py-0.2 text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Обычный</span>'}
                 </div>
               </td>
-              <td class="p-2.5 text-center text-[11px] text-gray-400 font-mono">—</td>
+              <td class="p-2.5 text-center text-[11px] text-gray-500">${(att.courseSlug || att.lessonId) ? renderCourseLessonPill(att.courseSlug, att.lessonId, s.className) : '<span class="text-gray-400 font-mono">—</span>'}</td>
               <td class="p-2.5 text-center">${attStatusBadge}</td>
               <td class="p-2.5 text-center text-[11px] text-gray-600 font-mono font-medium">${att.completedLevelsCount}/3 ур.</td>
               <td class="p-2.5 text-center">${subLevelBadge(att.levels[1])}</td>
@@ -1698,10 +1775,11 @@ function getAttemptsWord(count: number): string {
           attHtml += `
             <div class="p-3 bg-gray-50 border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div class="space-y-1">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="font-bold text-gray-900">Забег #${att.attemptNumber || (idx + 1)}</span>
                   ${modeBadge}
                   ${stBadge}
+                  ${(att.courseSlug || att.lessonId) ? renderCourseLessonPill(att.courseSlug, att.lessonId, student.className) : ''}
                 </div>
                 <div class="flex items-center gap-2 text-gray-500 text-[11px]">
                   <span>Время: <strong class="text-gray-800 font-mono">${formatTime(att.totalTimeSec)}</strong></span>
@@ -1783,11 +1861,12 @@ function getAttemptsWord(count: number): string {
       return;
     }
 
-    const headers = ['#', 'Ученик', 'Класс', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Лого-Шторм (зн/мин)', 'Лого-Шторм (сл/мин)', 'Лого-Шторм (время)', 'Время решения (сек)', 'Время решения', 'Всего ошибок', 'Хардкор', 'Был на уроке', 'Детали забегов'];
+    const headers = ['#', 'Ученик', 'Класс', 'Курс / Урок', 'Статус урока', 'Забеги (всего)', 'Забеги (хардкор)', 'Уровень 1 (время/ошибки)', 'Уровень 2 (время/ошибки)', 'Уровень 3 (время/ошибки)', 'Лого-Шторм (зн/мин)', 'Лого-Шторм (сл/мин)', 'Лого-Шторм (время)', 'Время решения (сек)', 'Время решения', 'Всего ошибок', 'Хардкор', 'Был на уроке', 'Детали забегов'];
     const rows = currentStudents.map((s, idx) => [
       idx + 1,
       `"${s.displayName}"`,
       `"${s.className}"`,
+      `"${(s.workedLessons && s.workedLessons.length > 0 ? s.workedLessons.map(w => `${w.courseSlug} Урок ${w.lessonId}`).join(', ') : (s.lastCourseSlug ? `${s.lastCourseSlug} Урок ${s.lastLessonId || ''}` : ''))}"`,
       `"${s.lessonStatus}"`,
       s.attemptsCount || 1,
       s.hardcoreAttemptsCount || 0,
