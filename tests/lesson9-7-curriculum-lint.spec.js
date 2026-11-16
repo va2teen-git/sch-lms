@@ -57,10 +57,10 @@ test.describe('Curriculum & Architecture Linting Suite (9th Grade - Lesson 7: Mo
     // TaskLayout component usage
     expect(code).toContain('import TaskLayout');
     expect(code).toContain('<TaskLayout');
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 7');
     // No forbidden style tags (must use Tailwind CSS / Bootstrap utility classes)
     expect(code.includes('<style>')).toBe(false);
@@ -88,10 +88,10 @@ test.describe('Curriculum & Architecture Linting Suite (9th Grade - Lesson 7: Mo
     expect(code).toContain('id="phase3"');
     expect(code).toContain('id="phase4"');
     expect(code).toContain('id="phase5"');
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 7');
     // No forbidden style tags
     expect(code.includes('<style>')).toBe(false);
@@ -118,10 +118,10 @@ test.describe('Curriculum & Architecture Linting Suite (9th Grade - Lesson 7: Mo
     // Archetype 1 Cyber Matrix indicator
     expect(code).toContain('АРХЕТИП 1');
     expect(code).toContain('CYBER MATRIX');
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 7');
     // No forbidden style tags
     expect(code.includes('<style>')).toBe(false);

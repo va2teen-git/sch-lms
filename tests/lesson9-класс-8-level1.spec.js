@@ -19,10 +19,10 @@ test.describe('9th Grade Lesson 8: Level 1 Task Suite (Direct Manipulation)', ()
     expect(code).toContain('id="phase-2-workspace"');
     expect(code).toContain('id="phase-3-workspace"');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 8 :: Табличные модели (Уровень 1)');
 
     // Zero-Style policy

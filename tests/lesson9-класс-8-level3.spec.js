@@ -25,8 +25,9 @@ test.describe('9th Grade Lesson 8: Level 3 Task Suite (Cyber Matrix Arcade)', ()
     // Audio & Alarm Box
     expect(code).toContain('AudioContext');
     expect(code).toContain('id="alarm-box"');
-    expect(code).toContain('hardcore_reset');
-    expect(code).toContain('level_complete');
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.hardcoreReset(');
+    expect(code).toContain('.complete(');
     expect(code).toContain('Урок 8 :: Табличные модели (Уровень 3 / Аркада)');
 
     // Dev test hook

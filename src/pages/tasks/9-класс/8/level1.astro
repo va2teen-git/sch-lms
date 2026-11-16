@@ -208,10 +208,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (function() {
     // --- СОСТОЯНИЕ ТРЕНАЖЕРА ---
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 8 :: Табличные модели (Уровень 1)',
+        level: 1,
+        totalStages: 3
+    });
     let currentPhase = 1;
-    let attemptsCount = 0;
-    const startTime = Date.now();
     let isTransitioning = false;
+    let isLevelCompleted = false;
+    let phase1DropZonesBound = false;
+    let appInitialized = false;
 
     // Данные активной фазы
     let phase1Data = null;
@@ -244,31 +250,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         { id: 'oo-8', title: 'Таблица торговых пошлин', desc: 'Размер взаимных таможенных тарифов между странами-партнерами', type: 'oo' }
     ];
 
-    // --- ТЕЛЕМЕТРИЯ ---
-    function sendTelemetry(actionType, isSuccess = false) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 8 :: Табличные модели (Уровень 1)',
-            action_type: actionType,
-            status: isSuccess ? 'completed' : 'in_progress',
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: isSuccess,
-            action_log: [{
-                time: new Date().toISOString(),
-                action: actionType,
-                phase: currentPhase
-            }]
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch (e) {
-            console.warn('Telemetry postMessage error:', e);
-        }
-    }
-
     // --- СЛУЖЕБНЫЕ УТИЛИТЫ ---
     function shuffle(arr) {
         const a = arr.slice();
@@ -297,9 +278,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function triggerFailure(message) {
-        attemptsCount++;
-        document.getElementById('attempts-display').textContent = attemptsCount;
-        sendTelemetry('hardcore_reset');
+        if (isTransitioning || isLevelCompleted) return;
+        isTransitioning = true;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
         showStatus('ОШИБКА СИНХРОНИЗАЦИИ: ' + message + ' Генерация нового варианта...', true);
 
         const verifyBtn = document.getElementById('verify-btn');
@@ -307,6 +289,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         setTimeout(() => {
             hideStatus();
+            isTransitioning = false;
             initPhase(currentPhase);
             if (verifyBtn) verifyBtn.disabled = false;
         }, 1300);
@@ -402,11 +385,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             poolEl.appendChild(cardEl);
         });
-
-        setupPhase1DropZones();
     }
 
     function setupPhase1DropZones() {
+        if (phase1DropZonesBound) return;
+        phase1DropZonesBound = true;
         const binOS = document.getElementById('bin-os');
         const binOO = document.getElementById('bin-oo');
         const poolEl = document.getElementById('cards-pool');
@@ -527,11 +510,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (hasError) {
             triggerFailure('Обнаружено ошибочное распределение модели. Проверьте различие между свойствами объектов и взаимными отношениями.');
         } else {
+            isTransitioning = true;
+            const verifyBtn = document.getElementById('verify-btn');
+            if (verifyBtn) verifyBtn.disabled = true;
             showStatus('ШАГ 1 ВЫПОЛНЕН! Классификация структур таблиц проведена безупречно.', false);
             setTimeout(() => {
                 hideStatus();
+                isTransitioning = false;
+                if (verifyBtn) verifyBtn.disabled = false;
                 currentPhase = 2;
-                sendTelemetry('in_progress');
+                telemetry.advanceStage(2);
                 initPhase(2);
             }, 1000);
         }
@@ -749,11 +737,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
+        isTransitioning = true;
+        const verifyBtn = document.getElementById('verify-btn');
+        if (verifyBtn) verifyBtn.disabled = true;
         showStatus('ШАГ 2 ВЫПОЛНЕН! Двоичная матрица смежности настроена безошибочно.', false);
         setTimeout(() => {
             hideStatus();
+            isTransitioning = false;
+            if (verifyBtn) verifyBtn.disabled = false;
             currentPhase = 3;
-            sendTelemetry('in_progress');
+            telemetry.advanceStage(3);
             initPhase(3);
         }, 1000);
     }
@@ -1028,15 +1021,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             palette.appendChild(btn);
         });
-
-        // Кнопка сброса всех слотов
-        const resetBtn = document.getElementById('reset-slots-btn');
-        if (resetBtn) {
-            resetBtn.onclick = () => {
-                phase3Data.slotsState = {};
-                renderPhase3Matrix();
-            };
-        }
     }
 
     function placeTokenInSlot(slotKey, tokenVal, tokenId) {
@@ -1095,6 +1079,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // ФИНАЛ УРОВНЯ
     // ==========================================
     function finishLevel() {
+        if (isLevelCompleted) return;
+        isLevelCompleted = true;
+
         document.getElementById('phase-1-workspace').classList.add('d-none');
         document.getElementById('phase-2-workspace').classList.add('d-none');
         document.getElementById('phase-3-workspace').classList.add('d-none');
@@ -1107,14 +1094,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         document.getElementById('victory-screen').classList.remove('d-none');
 
-        sendTelemetry('level_complete', true);
-
-        const continueBtn = document.getElementById('continue-btn');
-        if (continueBtn) {
-            continueBtn.addEventListener('click', () => {
-                window.location.href = '/tasks/9-класс/8/level2';
-            });
-        }
+        telemetry.complete({ stage: 3 });
     }
 
     // ==========================================
@@ -1139,26 +1119,52 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
     }
 
-    // Главная кнопка проверки
-    document.getElementById('verify-btn').addEventListener('click', () => {
-        if (currentPhase === 1) {
-            verifyPhase1();
-        } else if (currentPhase === 2) {
-            verifyPhase2();
-        } else if (currentPhase === 3) {
-            verifyPhase3();
+    function initApp() {
+        if (appInitialized) return;
+        appInitialized = true;
+
+        setupPhase1DropZones();
+
+        const verifyBtn = document.getElementById('verify-btn');
+        if (verifyBtn) {
+            verifyBtn.addEventListener('click', () => {
+                if (isTransitioning || isLevelCompleted) return;
+                telemetry.markActivity();
+                if (currentPhase === 1) {
+                    verifyPhase1();
+                } else if (currentPhase === 2) {
+                    verifyPhase2();
+                } else if (currentPhase === 3) {
+                    verifyPhase3();
+                }
+            });
         }
-    });
 
-    // Инициализация при загрузке страницы
-    document.addEventListener('DOMContentLoaded', () => {
-        sendTelemetry('in_progress');
-        initPhase(1);
-    });
+        const resetSlotsBtn = document.getElementById('reset-slots-btn');
+        if (resetSlotsBtn) {
+            resetSlotsBtn.addEventListener('click', () => {
+                if (phase3Data) {
+                    phase3Data.slotsState = {};
+                    renderPhase3Matrix();
+                }
+            });
+        }
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        sendTelemetry('in_progress');
+        const continueBtn = document.getElementById('continue-btn');
+        if (continueBtn) {
+            continueBtn.addEventListener('click', () => {
+                window.location.href = '/tasks/9-класс/8/level2';
+            });
+        }
+
         initPhase(1);
+    }
+
+    // Однократная инициализация при загрузке страницы
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp, { once: true });
+    } else {
+        initApp();
     }
 })();
 </script>

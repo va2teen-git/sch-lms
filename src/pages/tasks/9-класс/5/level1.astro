@@ -1,12 +1,12 @@
 ---
-import Layout from '../../../../layouts/Layout.astro';
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
 import WriterEmulator from '../../../../components/WriterEmulator.astro';
 
-const missionName = "9 класс :: Урок 5 :: Уровень 1";
+const missionName = "Урок 5 :: Навыки форматирования документов (Уровень 1)";
 ---
 
-<Layout title="Практика: Онлайн-офис">
-    <div class="container-fluid h-100 d-flex flex-column p-0 bg-black overflow-auto">
+<TaskLayout title="Практика: Онлайн-офис" level={1} bodyClass="d-flex flex-column min-vh-100">
+    <div class="container-fluid flex-grow-1 d-flex flex-column p-0 bg-black overflow-auto">
         <!-- Инструкция -->
         <div class="bg-dark text-white p-3 border-bottom border-success flex-shrink-0">
             <h4 class="text-success fw-bold">Миссия: Навыки форматирования документов</h4>
@@ -19,114 +19,149 @@ const missionName = "9 класс :: Урок 5 :: Уровень 1";
         </div>
 
         <!-- Рабочая область -->
-        <div class="flex-grow-1 position-relative p-3" style="min-height: 500px;">
+        <div class="flex-grow-1 position-relative p-3 d-flex flex-column" style="min-height: 500px;">
             <WriterEmulator 
                 missionName={missionName} 
                 initialHTML="" 
                 checkOgeFormat={false}
                 hardcoreReset={false}
+                disableAutoTelemetry={true}
             />
         </div>
     </div>
-</Layout>
+</TaskLayout>
 
-<script>
-    // Процедурная генерация фраз для заданий (ГЛАВНЫЙ ПРИНЦИП из ТЗ)
-    const subjects = ['Процессор', 'Монитор', 'Сервер', 'Маршрутизатор', 'Алгоритм', 'Облако', 'Шифратор'];
-    const actions = ['обрабатывает', 'передает', 'сохраняет', 'вычисляет', 'защищает', 'кодирует'];
-    const objects = ['информацию', 'пакеты', 'файлы', 'сигналы', 'команды', 'запросы'];
+<script is:inline>
+    (function() {
+        const missionName = 'Урок 5 :: Навыки форматирования документов (Уровень 1)';
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 1,
+            totalStages: 3
+        });
 
-    let currentPhase = 1;
-    let targetWord = '';
-    let targetFormat = null;
-    let currentSentence = '';
+        // Процедурная генерация фраз для заданий (ГЛАВНЫЙ ПРИНЦИП из ТЗ)
+        const subjects = ['Процессор', 'Монитор', 'Сервер', 'Маршрутизатор', 'Алгоритм', 'Облако', 'Шифратор'];
+        const actions = ['обрабатывает', 'передает', 'сохраняет', 'вычисляет', 'защищает', 'кодирует'];
+        const objects = ['информацию', 'пакеты', 'файлы', 'сигналы', 'команды', 'запросы'];
 
-    const instructionEl = document.getElementById('instruction-panel');
-    const phaseEl = document.getElementById('phase-counter');
+        let currentPhase = 1;
+        let targetWord = '';
+        let targetFormat = null;
+        let currentSentence = '';
+        let isCompleted = false;
+        let isTransitioning = false;
+        let phaseTimer = null;
+        let initialized = false;
 
-    function getRandom(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
-    }
+        const instructionEl = document.getElementById('instruction-panel');
+        const phaseEl = document.getElementById('phase-counter');
 
-    function generatePhase() {
-        const subject = getRandom(subjects);
-        const action = getRandom(actions);
-        const object = getRandom(objects);
-        currentSentence = `${subject} ${action} ${object}.`;
-
-        const words = [subject, action, object];
-        targetWord = getRandom(words);
-        
-        const formats = [
-            { id: 'bold', label: 'ЖИРНЫМ', tag: 'strong', tag2: 'b' },
-            { id: 'italic', label: 'КУРСИВОМ', tag: 'em', tag2: 'i' },
-            { id: 'underline', label: 'ПОДЧЕРКНУТЫМ', tag: 'u', tag2: 'u' }
-        ];
-        
-        targetFormat = getRandom(formats);
-
-        instructionEl.innerHTML = `
-            Наберите следующее предложение в редакторе (без кавычек):<br>
-            <span class="text-info font-monospace d-inline-block mt-2 mb-2 p-2 border border-info">"${currentSentence}"</span><br>
-            Затем сделайте слово <span class="text-warning fw-bold">«${targetWord}»</span> <span class="text-danger fw-bold">${targetFormat.label}</span> шрифтом и нажмите кнопку отправки.
-        `;
-        phaseEl.innerText = currentPhase;
-    }
-
-    // Ждем загрузки DOM перед генерацией
-    document.addEventListener('DOMContentLoaded', () => {
-        generatePhase();
-    });
-
-    document.addEventListener('writer-check', (e) => {
-        // @ts-ignore
-        const wysiwyg = e.detail.wysiwyg || document.querySelector('.jodit-wysiwyg');
-        // @ts-ignore
-        const rawText = e.detail.text || (wysiwyg ? (wysiwyg.innerText || wysiwyg.textContent || '') : '');
-        // @ts-ignore
-        const V = window.WriterValidator;
-
-        // 1. Проверка полного текста предложения через модуль валидации
-        const hasFullSentence = V ? V.hasText(rawText, currentSentence) : rawText.includes(currentSentence);
-
-        if (!hasFullSentence) {
-            // @ts-ignore
-            e.detail.resolve(false, 'Предложение набрано не полностью или содержит опечатки!');
-            // При ошибке генерируем новую задачу (правило 1-2 уровней)
-            setTimeout(generatePhase, 1500);
-            return;
+        function getRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
         }
 
-        // 2. Проверка форматирования целевого слова через DOM-методы WriterValidator
-        let success = false;
-        if (V) {
-            if (targetFormat.id === 'bold') {
-                success = V.hasBoldWord(wysiwyg, targetWord);
-            } else if (targetFormat.id === 'italic') {
-                success = V.hasItalicWord(wysiwyg, targetWord);
-            } else if (targetFormat.id === 'underline') {
-                success = V.hasUnderlineWord(wysiwyg, targetWord);
+        function generatePhase() {
+            if (isCompleted) return;
+            const subject = getRandom(subjects);
+            const action = getRandom(actions);
+            const object = getRandom(objects);
+            currentSentence = `${subject} ${action} ${object}.`;
+
+            const words = [subject, action, object];
+            targetWord = getRandom(words);
+
+            const formats = [
+                { id: 'bold', label: 'ЖИРНЫМ', tag: 'strong', tag2: 'b' },
+                { id: 'italic', label: 'КУРСИВОМ', tag: 'em', tag2: 'i' },
+                { id: 'underline', label: 'ПОДЧЕРКНУТЫМ', tag: 'u', tag2: 'u' }
+            ];
+
+            targetFormat = getRandom(formats);
+
+            if (instructionEl) {
+                instructionEl.innerHTML = `
+                    Наберите следующее предложение в редакторе (без кавычек):<br>
+                    <span class="text-info font-monospace d-inline-block mt-2 mb-2 p-2 border border-info">"${currentSentence}"</span><br>
+                    Затем сделайте слово <span class="text-warning fw-bold">«${targetWord}»</span> <span class="text-danger fw-bold">${targetFormat.label}</span> шрифтом и нажмите кнопку отправки.
+                `;
             }
+            if (phaseEl) phaseEl.innerText = String(currentPhase);
         }
 
-        if (success) {
-            if (currentPhase < 3) {
-                // @ts-ignore
-                e.detail.resolve(true, `Фаза ${currentPhase} пройдена!`);
-                currentPhase++;
-                if (phaseEl) phaseEl.innerText = currentPhase;
-                setTimeout(generatePhase, 1500);
-            } else {
-                // @ts-ignore
-                e.detail.resolve(true, 'МИССИЯ ВЫПОЛНЕНА УСПЕШНО!');
-                instructionEl.innerHTML = '<span class="text-success fw-bold fs-4">ЗАДАНИЕ УСПЕШНО ВЫПОЛНЕНО!</span><br>Вы научились базовому форматированию документов.';
-                const checkBtn = document.getElementById('check-btn');
-                if (checkBtn) checkBtn.style.display = 'none'; // Прячем кнопку
-            }
+        function scheduleNextPhase() {
+            clearTimeout(phaseTimer);
+            isTransitioning = true;
+            phaseTimer = setTimeout(() => {
+                isTransitioning = false;
+                generatePhase();
+            }, 1500);
+        }
+
+        function initApp() {
+            if (initialized) return;
+            initialized = true;
+            generatePhase();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp, { once: true });
         } else {
-            // @ts-ignore
-            e.detail.resolve(false, `Слово "${targetWord}" не отформатировано правильно (${targetFormat.label})!`);
-            setTimeout(generatePhase, 1500);
+            initApp();
         }
-    });
+
+        document.addEventListener('writer-check', (e) => {
+            if (isCompleted || isTransitioning) return;
+            telemetry.markActivity();
+
+            const wysiwyg = e.detail.wysiwyg || document.querySelector('.jodit-wysiwyg');
+            const rawText = e.detail.text || (wysiwyg ? (wysiwyg.innerText || wysiwyg.textContent || '') : '');
+            const V = window.WriterValidator;
+
+            // 1. Проверка полного текста предложения через модуль валидации
+            const hasFullSentence = V ? V.hasText(rawText, currentSentence) : rawText.includes(currentSentence);
+
+            if (!hasFullSentence) {
+                telemetry.hardcoreReset({ stage: currentPhase });
+                e.detail.resolve(false, 'Предложение набрано не полностью или содержит опечатки!', false);
+                scheduleNextPhase();
+                return;
+            }
+
+            // 2. Проверка форматирования целевого слова через DOM-методы WriterValidator
+            let success = false;
+            if (V) {
+                if (targetFormat.id === 'bold') {
+                    success = V.hasBoldWord(wysiwyg, targetWord);
+                } else if (targetFormat.id === 'italic') {
+                    success = V.hasItalicWord(wysiwyg, targetWord);
+                } else if (targetFormat.id === 'underline') {
+                    success = V.hasUnderlineWord(wysiwyg, targetWord);
+                }
+            }
+
+            if (success) {
+                if (currentPhase < 3) {
+                    e.detail.resolve(true, `Фаза ${currentPhase} пройдена!`, false);
+                    currentPhase++;
+                    if (phaseEl) phaseEl.innerText = String(currentPhase);
+                    telemetry.advanceStage(currentPhase);
+                    scheduleNextPhase();
+                } else {
+                    isCompleted = true;
+                    e.detail.resolve(true, 'МИССИЯ ВЫПОЛНЕНА УСПЕШНО!', true);
+                    telemetry.complete({ stage: 3 });
+                    if (instructionEl) {
+                        instructionEl.innerHTML = '<span class="text-success fw-bold fs-4">ЗАДАНИЕ УСПЕШНО ВЫПОЛНЕНО!</span><br>Вы научились базовому форматированию документов.';
+                    }
+                    const checkBtn = document.getElementById('check-btn');
+                    if (checkBtn) checkBtn.style.display = 'none';
+                }
+            } else {
+                telemetry.hardcoreReset({ stage: currentPhase });
+                e.detail.resolve(false, `Слово "${targetWord}" не отформатировано правильно (${targetFormat.label})!`, false);
+                scheduleNextPhase();
+            }
+        });
+    })();
 </script>

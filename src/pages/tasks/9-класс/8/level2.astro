@@ -282,9 +282,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 8 :: Табличные модели (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
     let currentPhase = 1;
-    let attemptsCount = 0;
-    const startTime = Date.now();
+    let isTransitioning = false;
+    let isLevelCompleted = false;
+    let appInitialized = false;
 
     // Данные активных фаз
     let p1Answer = 0;
@@ -292,31 +298,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     let p3Answer = 0;
     let p4Answer = 0;
     let p5Answer = 0;
-
-    // --- ТЕЛЕМЕТРИЯ ---
-    function sendTelemetry(actionType, isSuccess = false) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 8 :: Табличные модели (Уровень 2)',
-            action_type: actionType,
-            status: isSuccess ? 'completed' : 'in_progress',
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: isSuccess,
-            action_log: [{
-                time: new Date().toISOString(),
-                action: actionType,
-                phase: currentPhase
-            }]
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch (e) {
-            console.warn('Telemetry postMessage error:', e);
-        }
-    }
 
     // --- УТИЛИТЫ ---
     function showStatus(text, isError = false) {
@@ -335,9 +316,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function triggerFailure(phaseNum, initFunc, message) {
-        attemptsCount++;
-        document.getElementById('attempts-display').textContent = attemptsCount;
-        sendTelemetry('hardcore_reset');
+        if (isTransitioning || isLevelCompleted) return;
+        isTransitioning = true;
+        telemetry.hardcoreReset({ stage: phaseNum });
+        document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
         showStatus('ОШИБКА РАСЧЕТА: ' + message + ' Генерация нового варианта...', true);
 
         const btn = document.getElementById(`p${phaseNum}-btn`);
@@ -347,6 +329,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         setTimeout(() => {
             hideStatus();
+            isTransitioning = false;
             if (btn) btn.disabled = false;
             if (input) {
                 input.disabled = false;
@@ -355,6 +338,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
             initFunc();
         }, 1200);
+    }
+
+    function advanceToPhase(currentNum, nextNum, message) {
+        isTransitioning = true;
+        const btn = document.getElementById(`p${currentNum}-btn`);
+        const input = document.getElementById(`p${currentNum}-input`);
+        if (btn) btn.disabled = true;
+        if (input) input.disabled = true;
+        showStatus(message, false);
+        setTimeout(() => {
+            hideStatus();
+            if (btn) btn.disabled = false;
+            if (input) input.disabled = false;
+            isTransitioning = false;
+            telemetry.advanceStage(nextNum);
+            showPhase(nextNum);
+        }, 900);
     }
 
     function showPhase(phaseNum) {
@@ -448,6 +448,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function checkPhase1() {
+        if (isTransitioning || isLevelCompleted) return;
+        telemetry.markActivity();
         const input = document.getElementById('p1-input');
         const val = parseInt(input.value.trim(), 10);
         if (isNaN(val)) {
@@ -455,12 +457,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
         if (val === p1Answer) {
-            showStatus('ШАГ 1 ВЫПОЛНЕН ВЕРНО! Количество ребер определено безошибочно.', false);
-            setTimeout(() => {
-                hideStatus();
-                sendTelemetry('in_progress');
-                showPhase(2);
-            }, 900);
+            advanceToPhase(1, 2, 'ШАГ 1 ВЫПОЛНЕН ВЕРНО! Количество ребер определено безошибочно.');
         } else {
             triggerFailure(1, initPhase1, `Неверный ответ (${val}). Сумму единиц таблицы нужно разделить на 2.`);
         }
@@ -524,6 +521,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function checkPhase2() {
+        if (isTransitioning || isLevelCompleted) return;
+        telemetry.markActivity();
         const input = document.getElementById('p2-input');
         const val = parseInt(input.value.trim(), 10);
         if (isNaN(val)) {
@@ -531,12 +530,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
         if (val === p2Answer) {
-            showStatus('ШАГ 2 ВЫПОЛНЕН ВЕРНО! Кратчайший маршрут A → D вычислен корректно.', false);
-            setTimeout(() => {
-                hideStatus();
-                sendTelemetry('in_progress');
-                showPhase(3);
-            }, 900);
+            advanceToPhase(2, 3, 'ШАГ 2 ВЫПОЛНЕН ВЕРНО! Кратчайший маршрут A → D вычислен корректно.');
         } else {
             triggerFailure(2, initPhase2, `Неверный расчет (${val} км). Проверьте альтернативные маршруты A-B-C-D и A-B-D.`);
         }
@@ -619,6 +613,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function checkPhase3() {
+        if (isTransitioning || isLevelCompleted) return;
+        telemetry.markActivity();
         const input = document.getElementById('p3-input');
         const val = parseInt(input.value.trim(), 10);
         if (isNaN(val)) {
@@ -626,12 +622,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
         if (val === p3Answer) {
-            showStatus('ШАГ 3 ВЫПОЛНЕН ВЕРНО! Неизвестный параметр X успешно восстановлен.', false);
-            setTimeout(() => {
-                hideStatus();
-                sendTelemetry('in_progress');
-                showPhase(4);
-            }, 900);
+            advanceToPhase(3, 4, 'ШАГ 3 ВЫПОЛНЕН ВЕРНО! Неизвестный параметр X успешно восстановлен.');
         } else {
             triggerFailure(3, initPhase3, `Неверное значение X (${val}). Сопоставьте длину кратчайшего пути с цепочкой A-B-D.`);
         }
@@ -691,6 +682,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function checkPhase4() {
+        if (isTransitioning || isLevelCompleted) return;
+        telemetry.markActivity();
         const input = document.getElementById('p4-input');
         const val = parseInt(input.value.trim(), 10);
         if (isNaN(val)) {
@@ -698,12 +691,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
         if (val === p4Answer) {
-            showStatus('ШАГ 4 ВЫПОЛНЕН ВЕРНО! Реляционный запрос выполнен безупречно.', false);
-            setTimeout(() => {
-                hideStatus();
-                sendTelemetry('in_progress');
-                showPhase(5);
-            }, 900);
+            advanceToPhase(4, 5, 'ШАГ 4 ВЫПОЛНЕН ВЕРНО! Реляционный запрос выполнен безупречно.');
         } else {
             triggerFailure(4, initPhase4, `Неверное число строк (${val}). Внимательно проверьте выполнение условий И и НЕ для каждого сервера.`);
         }
@@ -779,6 +767,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function checkPhase5() {
+        if (isTransitioning || isLevelCompleted) return;
+        telemetry.markActivity();
         const input = document.getElementById('p5-input');
         const val = parseInt(input.value.trim(), 10);
         if (isNaN(val)) {
@@ -796,6 +786,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // ФИНАЛ УРОВНЯ 2
     // ========================================================
     function finishLevel() {
+        if (isLevelCompleted) return;
+        isLevelCompleted = true;
+
         document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
         hideStatus();
 
@@ -808,7 +801,30 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         document.getElementById('victory-screen').classList.remove('d-none');
 
-        sendTelemetry('level_complete', true);
+        telemetry.complete({ stage: 5 });
+    }
+
+    function initApp() {
+        if (appInitialized) return;
+        appInitialized = true;
+
+        // ========================================================
+        // ОБРАБОТЧИКИ СОБЫТИЙ (строго 1 раз)
+        // ========================================================
+        document.getElementById('p1-btn').addEventListener('click', checkPhase1);
+        document.getElementById('p1-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase1(); });
+
+        document.getElementById('p2-btn').addEventListener('click', checkPhase2);
+        document.getElementById('p2-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase2(); });
+
+        document.getElementById('p3-btn').addEventListener('click', checkPhase3);
+        document.getElementById('p3-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase3(); });
+
+        document.getElementById('p4-btn').addEventListener('click', checkPhase4);
+        document.getElementById('p4-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase4(); });
+
+        document.getElementById('p5-btn').addEventListener('click', checkPhase5);
+        document.getElementById('p5-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase5(); });
 
         const continueBtn = document.getElementById('continue-btn');
         if (continueBtn) {
@@ -816,35 +832,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 window.location.href = '/tasks/9-класс/8/level3';
             });
         }
+
+        showPhase(1);
     }
 
-    // ========================================================
-    // ОБРАБОТЧИКИ СОБЫТИЙ
-    // ========================================================
-    document.getElementById('p1-btn').addEventListener('click', checkPhase1);
-    document.getElementById('p1-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase1(); });
-
-    document.getElementById('p2-btn').addEventListener('click', checkPhase2);
-    document.getElementById('p2-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase2(); });
-
-    document.getElementById('p3-btn').addEventListener('click', checkPhase3);
-    document.getElementById('p3-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase3(); });
-
-    document.getElementById('p4-btn').addEventListener('click', checkPhase4);
-    document.getElementById('p4-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase4(); });
-
-    document.getElementById('p5-btn').addEventListener('click', checkPhase5);
-    document.getElementById('p5-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase5(); });
-
-    // Инициализация при старте
-    document.addEventListener('DOMContentLoaded', () => {
-        sendTelemetry('in_progress');
-        showPhase(1);
-    });
-
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        sendTelemetry('in_progress');
-        showPhase(1);
+    // Однократная инициализация при старте
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp, { once: true });
+    } else {
+        initApp();
     }
 })();
 </script>

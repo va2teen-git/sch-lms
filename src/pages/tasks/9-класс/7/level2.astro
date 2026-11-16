@@ -174,25 +174,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script is:inline>
         (function() {
             const missionName = 'Урок 7 :: Модели и моделирование. Классификации моделей (Уровень 2)';
-            const startTime = Date.now();
-            let attempts = 0;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: 5
+            });
             let currentPhase = 1;
-
-            // Телеметрия
-            function sendTelemetry(actionType, isSuccess = false) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: actionType,
-                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                    start_time: new Date(startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: attempts,
-                    success: isSuccess,
-                    action_log: [{ phase: currentPhase, action: actionType, time: timeSpent }]
-                }, '*');
-            }
+            let isTransitioning = false;
+            let isCompleted = false;
 
             // Утилиты генерации
             function getRandomInt(min, max) {
@@ -220,11 +209,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase1() {
+                if (isTransitioning || isCompleted) return;
+                telemetry.markActivity();
                 const raw = document.getElementById('p1-input').value.trim().replace(',', '.');
                 const val = parseFloat(raw);
                 if (!isNaN(val) && Math.abs(val - p1CorrectDelta) < 0.001) {
                     currentPhase = 2;
-                    sendTelemetry('in_progress');
+                    telemetry.advanceStage(2);
                     showPhase(2);
                 } else {
                     handleError(1, initPhase1);
@@ -261,11 +252,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase2() {
+                if (isTransitioning || isCompleted) return;
+                telemetry.markActivity();
                 const raw = document.getElementById('p2-input').value.trim().replace('%', '').replace(',', '.').trim();
                 const val = parseFloat(raw);
                 if (!isNaN(val) && Math.abs(val - p2CorrectDeltaPct) < 0.01) {
                     currentPhase = 3;
-                    sendTelemetry('in_progress');
+                    telemetry.advanceStage(3);
                     showPhase(3);
                 } else {
                     handleError(2, initPhase2);
@@ -301,6 +294,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase3() {
+                if (isTransitioning || isCompleted) return;
+                telemetry.markActivity();
                 const val = normalizeTerm(document.getElementById('p3-input').value);
                 const isStatic = val.startsWith('статич') || val === 'статика';
                 const isDynamic = val.startsWith('динамич') || val === 'динамика';
@@ -308,7 +303,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                   (p3CorrectAnswer === 'ДИНАМИЧЕСКАЯ' && isDynamic);
                 if (isCorrect) {
                     currentPhase = 4;
-                    sendTelemetry('in_progress');
+                    telemetry.advanceStage(4);
                     showPhase(4);
                 } else {
                     handleError(3, initPhase3);
@@ -354,6 +349,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase4() {
+                if (isTransitioning || isCompleted) return;
+                telemetry.markActivity();
                 const val = normalizeTerm(document.getElementById('p4-input').value);
                 const isDeterministic = val.startsWith('детермин');
                 const isStochastic = val.startsWith('стохаст') || val.startsWith('вероятност');
@@ -361,7 +358,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                   (p4CorrectAnswer === 'СТОХАСТИЧЕСКАЯ' && isStochastic);
                 if (isCorrect) {
                     currentPhase = 5;
-                    sendTelemetry('in_progress');
+                    telemetry.advanceStage(5);
                     showPhase(5);
                 } else {
                     handleError(4, initPhase4);
@@ -395,6 +392,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function checkPhase5() {
+                if (isTransitioning || isCompleted) return;
+                telemetry.markActivity();
                 const val = normalizeTerm(document.getElementById('p5-input').value);
                 const isObraz = val.startsWith('образ');
                 const isZnak = val.startsWith('знак');
@@ -411,9 +410,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Обработка ошибок (анимация сбоя, телеметрия hardcore_reset, перегенерация текущего шага)
             function handleError(phaseNum, initFunc) {
-                attempts++;
-                document.getElementById('attempts-display').textContent = attempts;
-                sendTelemetry('hardcore_reset');
+                if (isTransitioning || isCompleted) return;
+                isTransitioning = true;
+                telemetry.hardcoreReset({ stage: phaseNum });
+                document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
 
                 const feedback = document.getElementById(`p${phaseNum}-feedback`);
                 const btn = document.getElementById(`p${phaseNum}-btn`);
@@ -427,6 +427,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     feedback.classList.add('d-none');
                     btn.disabled = false;
                     input.disabled = false;
+                    isTransitioning = false;
                     initFunc();
                 }, 1200);
             }
@@ -458,13 +459,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Финал уровня 2
             function finishLevel() {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                sendTelemetry('level_complete', true);
+                if (isCompleted) return;
+                isCompleted = true;
+                const evt = telemetry.complete({ stage: 5 });
+                const st = telemetry.getState();
+                const timeSpent = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
 
                 document.querySelectorAll('.phase-container').forEach(el => el.classList.add('d-none'));
                 document.getElementById('success-screen').classList.remove('d-none');
                 document.getElementById('final-time').textContent = timeSpent;
-                document.getElementById('final-attempts').textContent = attempts;
+                document.getElementById('final-attempts').textContent = st.attemptsCount;
             }
 
             // Навешивание обработчиков событий
@@ -485,7 +489,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Старт
             showPhase(1);
-            sendTelemetry('in_progress');
         })();
     </script>
 </TaskLayout>
