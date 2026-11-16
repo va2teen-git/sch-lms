@@ -1,0 +1,189 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 6 :: Законодательство РФ :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Терминал доступа" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase" id="phaseTitle">Этап 1 из 5</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-warning mb-3" style="height: 12px;">
+            <div class="progress-bar bg-warning" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="pasteNotice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите ответ вручную.
+        </div>
+
+        <div class="card bg-dark border-warning rounded-0" id="gameArea">
+            <div class="card-header border-warning text-warning fw-bold text-uppercase">
+                Уровень 2: Аутентификация знаний
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <div class="fs-5 text-white mb-4 bg-black border border-secondary p-3" id="questionText" style="min-height: 90px;">
+                    Инициализация...
+                </div>
+
+                <div class="input-group w-100" style="max-width: 580px;">
+                    <input type="text" id="answerInput" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="Введите статью УК или термин..." autocomplete="off" spellcheck="false" />
+                    <button type="button" id="checkBtn" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5" style="min-height: 48px;">ВВОД</button>
+                </div>
+
+                <div id="feedbackMsg" class="alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="successArea" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">ДОСТУП РАЗРЕШЁН</h3>
+            <p class="fs-5 mb-0 fw-semibold">БАЗА ДАННЫХ УСПЕШНО ОБНОВЛЕНА. Вы можете переходить к следующему уровню.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            const questionsBank = [
+                { q: 'Взлом пароля от чужой страницы ВКонтакте и копирование личных переписок. Номер статьи УК РФ:', a: '272' },
+                { q: 'Студент подобрал пароль к серверу университета и стёр базу данных абитуриентов. Номер статьи УК РФ:', a: '272' },
+                { q: 'Неправомерный доступ к компьютерной информации, повлекший её модификацию. Номер статьи УК РФ:', a: '272' },
+                { q: 'Разработка программы-шифровальщика, которая блокирует файлы и требует выкуп. Номер статьи УК РФ:', a: '273' },
+                { q: 'Распространение заражённых флешек с вирусом у здания конкурентов. Номер статьи УК РФ:', a: '273' },
+                { q: 'Создание компьютерных программ, заведомо предназначенных для несанкционированного уничтожения данных. Статья УК РФ:', a: '273' },
+                { q: 'Системный администратор нарушил правила эксплуатации сервера, из-за чего была удалена база пациентов клиники. Статья УК РФ:', a: '274' },
+                { q: 'Несоблюдение правил безопасности сотрудником, приведшее к блокировке корпоративной сети по неосторожности. Статья УК РФ:', a: '274' },
+                { q: 'Хакерская атака на базу данных системы городского водоканала (объект критической инфраструктуры). Статья УК РФ:', a: '274.1' },
+                { q: 'Атака на сервер государственного банка, повлекшая сбой в его работе. Статья УК РФ:', a: '274.1' },
+                { q: 'Использование нелицензионного ПО на сумму свыше 100 тысяч рублей (крупный ущерб). Статья УК РФ:', a: '146' },
+                { q: 'Установка пиратской версии 3ds Max в студии дизайна, ущерб правообладателю 2 млн рублей. Статья УК РФ:', a: '146' },
+                { q: 'Бесплатное ПО с закрытым исходным кодом. Разработчик не берёт денег, но код скрыт. (Термин на англ.)', a: 'freeware' },
+                { q: 'Программа, за которую не нужно платить, код закрыт. Нельзя продавать от своего имени. (Термин на англ.)', a: 'freeware' },
+                { q: 'Условно-бесплатное ПО. Есть пробный период 30 дней. (Термин на англ.)', a: 'shareware' },
+                { q: 'Программа, которая постоянно просит купить лицензию после окончания trial-периода. (Термин на англ.)', a: 'shareware' },
+                { q: 'Свободное ПО с открытым исходным кодом, которое можно менять. (Термин на англ., без пробелов)', a: 'opensource' },
+                { q: 'ПО, которое разрабатывается сообществом программистов по всему миру и доступно бесплатно вместе с кодом. (Термин на англ., без пробелов)', a: 'opensource' },
+                { q: 'Коммерческое ПО, исходный код которого является собственностью компании. Копирование запрещено. (Термин на англ.)', a: 'proprietary' },
+                { q: 'Программа продаётся за деньги, исходный код закрыт. Например, Microsoft Office. (Термин на англ.)', a: 'proprietary' },
+                { q: 'Договор между пользователем и разработчиком, определяющий права на использование программы. (Одно слово на русском)', a: 'лицензия' }
+            ];
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let currentQuestion = null;
+            let availableQuestions = shuffle(questionsBank);
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const questionTextEl = document.getElementById('questionText');
+            const inputEl = document.getElementById('answerInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const feedbackEl = document.getElementById('feedbackMsg');
+            const pasteNoticeEl = document.getElementById('pasteNotice');
+            const gameAreaEl = document.getElementById('gameArea');
+            const successAreaEl = document.getElementById('successArea');
+
+            function initPhase() {
+                locked = false;
+                if (availableQuestions.length === 0) {
+                    availableQuestions = shuffle(questionsBank);
+                }
+                currentQuestion = availableQuestions.pop();
+
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}`;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+                questionTextEl.textContent = currentQuestion.q;
+
+                inputEl.value = '';
+                inputEl.disabled = false;
+                checkBtn.disabled = false;
+                inputEl.classList.remove('border-danger', 'bg-danger', 'text-white');
+                inputEl.classList.add('border-warning', 'bg-black', 'text-warning');
+                feedbackEl.classList.add('d-none');
+                feedbackEl.textContent = '';
+
+                inputEl.focus();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function checkAnswer() {
+                if (locked || !currentQuestion) return;
+                const raw = inputEl.value.trim().toLowerCase().replace(',', '.').replace(/\s+/g, '');
+                if (!raw) return;
+
+                const expected = currentQuestion.a.toLowerCase().replace(/\s+/g, '');
+
+                if (raw === expected) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        initPhase();
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'ДОСТУП РАЗРЕШЁН';
+                        gameAreaEl.classList.add('d-none');
+                        successAreaEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_error_${raw}` });
+
+                    inputEl.classList.remove('border-warning', 'bg-black', 'text-warning');
+                    inputEl.classList.add('border-danger', 'bg-danger', 'text-white');
+                    inputEl.disabled = true;
+                    checkBtn.disabled = true;
+                    feedbackEl.textContent = 'ОШИБКА: Неверный идентификатор. Генерация нового запроса...';
+                    feedbackEl.classList.remove('d-none');
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => initPhase(), 1100);
+                }
+            }
+
+            // Anti-Paste & single-bound listeners
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+            });
+            checkBtn.addEventListener('click', checkAnswer);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>

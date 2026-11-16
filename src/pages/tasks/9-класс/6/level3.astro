@@ -3,93 +3,85 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 const missionName = 'Урок 6 :: Обобщение: Безопасность в сети :: Уровень 3';
 ---
 
-<TaskLayout level={3} bodyClass="m-0 p-0 overflow-hidden font-monospace">
+<TaskLayout title="Уровень 3 — База данных логов" level={3} bodyClass="font-monospace">
   <Fragment slot="head">
     <script src="/static/vue.global.js" is:inline></script>
     <script src="/static/sql-wasm.js" is:inline></script>
   </Fragment>
 
-<div id="app" class="min-vh-100 d-flex flex-column justify-content-center py-4">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-12 col-lg-10 col-xl-8">
-                <div class="border border-danger border-2 p-4 rounded-0 shadow-lg" style="background-color: #110000;">
-                    
-                    <h1 class="text-center text-uppercase fw-bold mb-4 border-bottom border-danger pb-2">
-                        === DATABASE ACCESS TERMINAL ===
-                    </h1>
-                    
-                    <!-- Loading DB Screen -->
-                    <div v-if="!dbLoaded" class="text-center py-5">
-                        <p class="fs-4">Инициализация SQL-движка...</p>
-                        <div class="spinner-border text-danger" role="status">
-                            <span class="visually-hidden">Загрузка...</span>
-                        </div>
+<div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+    <div class="border border-danger border-2 p-3 p-md-4 rounded-0 bg-black shadow-lg">
+        <h1 class="h3 text-center text-uppercase fw-bold mb-4 border-bottom border-danger pb-2 text-danger">
+            === DATABASE ACCESS TERMINAL ===
+        </h1>
+
+        <!-- Loading DB Screen -->
+        <div v-if="!dbLoaded" class="text-center py-5">
+            <p class="fs-4 text-light">Инициализация SQL-движка...</p>
+            <div class="spinner-border text-danger" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div v-else-if="phaseIndex === -1" class="text-center mx-auto" style="max-width: 680px;">
+            <p class="fs-4 fw-bold text-white">ВНИМАНИЕ: Обнаружена подозрительная активность в сети.</p>
+            <p class="fs-5 text-light">Вам предоставлен доступ к логам сервера. Вы должны отфильтровать данные с помощью SQL-запросов (блок WHERE), используя логические операторы (AND, OR, NOT).</p>
+            <p class="fs-5 text-uppercase fw-bold mt-4 border border-danger p-2 bg-dark text-white">ЛЮБАЯ ОШИБКА ПРИВЕДЕТ К СБРОСУ ДОСТУПА!</p>
+            <button type="button" @click="startGame" class="btn btn-outline-danger btn-lg rounded-0 fw-bold mt-4 px-5 py-3 w-100 text-uppercase" style="min-height: 54px;">
+                Инициализировать соединение
+            </button>
+        </div>
+
+        <!-- Active Phase Screen -->
+        <div v-else-if="phaseIndex >= 0 && phaseIndex < PHASES.length" class="w-100">
+            <div class="d-flex justify-content-between align-items-center mb-3 border border-danger p-2 rounded-0 bg-dark flex-wrap gap-2">
+                <div class="fw-bold fs-5 text-white">УГРОЗА: <span v-text="phaseIndex + 1"></span> / <span v-text="PHASES.length"></span></div>
+                <div class="fw-bold fs-5 px-2" :class="timer <= 10 ? 'text-white bg-danger' : 'text-warning'">ТАЙМЕР: <span v-text="timer"></span> сек</div>
+            </div>
+
+            <div class="mb-3">
+                <p class="fs-5 fw-bold text-white mb-1" v-text="PHASES[phaseIndex].instruction"></p>
+                <p class="small text-light opacity-75 mb-0">Таблица: logs (id INTEGER, protocol TEXT, status INTEGER, domain TEXT, suspicious INTEGER)</p>
+            </div>
+
+            <div class="input-group mb-3 border border-danger p-2 bg-dark rounded-0 align-items-center">
+                <span class="text-danger font-monospace pe-2 fw-bold fs-6">SELECT * FROM logs WHERE</span>
+                <input v-model="queryInput" @keyup.enter="executeQuery" type="text" class="form-control bg-black text-white border border-secondary rounded-0 font-monospace shadow-none fs-5 py-1" placeholder="..." autofocus>
+            </div>
+
+            <button type="button" @click="executeQuery" class="btn btn-danger w-100 rounded-0 fw-bold fs-5 py-2 mb-4 text-uppercase text-white" style="min-height: 48px;">
+                Выполнить запрос [Enter]
+            </button>
+
+            <div class="border border-danger p-2 bg-dark">
+                <p class="fw-bold mb-1 border-bottom border-danger pb-1 text-warning">ДОСТУПНЫЕ ДАННЫЕ (первые 5 строк):</p>
+                <div class="small mt-2" style="max-height: 180px; overflow-y: auto;">
+                    <div v-for="row in data.slice(0,5)" :key="row.id" class="text-light opacity-75">
+                        &gt; id: <span class="text-white" v-text="row.id"></span> | protocol: '<span class="text-white" v-text="row.protocol"></span>' | status: <span class="text-white" v-text="row.status"></span> | domain: '<span class="text-white" v-text="row.domain"></span>' | suspicious: <span class="text-white" v-text="row.suspicious"></span>
                     </div>
-
-                    <!-- Start Screen -->
-                    <div v-else-if="phaseIndex === -1" class="text-center">
-                        <p class="fs-4 fw-bold">ВНИМАНИЕ: Обнаружена подозрительная активность в сети.</p>
-                        <p class="fs-5">Вам предоставлен доступ к логам сервера. Вы должны отфильтровать данные с помощью SQL-запросов (блок WHERE), используя логические операторы (AND, OR, NOT).</p>
-                        <p class="fs-5 text-uppercase fw-bold mt-4 border border-danger p-2 bg-dark text-white">ЛЮБАЯ ОШИБКА ПРИВЕДЕТ К СБРОСУ ДОСТУПА!</p>
-                        <button @click="startGame" class="btn btn-outline-danger btn-lg rounded-0 fw-bold mt-4 px-5 py-3 w-100 text-uppercase">
-                            Инициализировать соединение
-                        </button>
-                    </div>
-
-                    <!-- Active Phase Screen -->
-                    <div v-else-if="phaseIndex >= 0 && phaseIndex < PHASES.length" class="w-100">
-                        <div class="d-flex justify-content-between align-items-center mb-3 border border-danger p-2 rounded-0 bg-dark">
-                            <div class="fw-bold fs-5">УГРОЗА: <span v-text="phaseIndex + 1"></span> / <span v-text="PHASES.length"></span></div>
-                            <div class="fw-bold fs-5" :class="{'text-white bg-danger px-2': timer <= 10}">ТАЙМЕР: <span v-text="timer"></span> сек</div>
-                        </div>
-
-                        <div class="mb-4">
-                            <p class="fs-5 fw-bold" v-text="PHASES[phaseIndex].instruction"></p>
-                            <p class="small text-muted mb-0">Таблица: logs (id INTEGER, protocol TEXT, status INTEGER, domain TEXT, suspicious INTEGER)</p>
-                        </div>
-
-                        <div class="input-group mb-3 border border-danger p-2 bg-black rounded-0 align-items-center">
-                            <span class="text-danger font-monospace pe-2 fw-bold fs-5">SELECT * FROM logs WHERE</span>
-                            <input v-model="queryInput" @keyup.enter="executeQuery" type="text" class="form-control bg-transparent text-white border-0 rounded-0 font-monospace shadow-none fs-5 py-0" placeholder="..." autofocus>
-                        </div>
-
-                        <button @click="executeQuery" class="btn btn-danger w-100 rounded-0 fw-bold fs-5 py-2 mb-4 text-uppercase">
-                            Выполнить запрос [Enter]
-                        </button>
-
-                        <div class="border border-danger p-2 bg-dark">
-                            <p class="fw-bold mb-1 border-bottom border-danger pb-1">ДОСТУПНЫЕ ДАННЫЕ (первые 5 строк):</p>
-                            <div class="small mt-2" style="max-height: 180px; overflow-y: auto;">
-                                <div v-for="row in data.slice(0,5)" :key="row.id" class="text-muted">
-                                    > id: <span class="text-white" v-text="row.id"></span> | protocol: '<span class="text-white" v-text="row.protocol"></span>' | status: <span class="text-white" v-text="row.status"></span> | domain: '<span class="text-white" v-text="row.domain"></span>' | suspicious: <span class="text-white" v-text="row.suspicious"></span>
-                                </div>
-                                <div class="text-muted mt-1">... еще <span v-text="data.length - 5"></span> записей ...</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Error Screen -->
-                    <div v-else-if="phaseIndex === -2" class="text-center py-5">
-                        <h1 class="display-3 fw-bold text-uppercase">ACCESS DENIED</h1>
-                        <p class="fs-4 mt-3 bg-danger text-white p-2" v-text="errorMessage"></p>
-                        <p class="mt-4 fs-5">Протокол безопасности инициировал перезагрузку терминала...</p>
-                    </div>
-
-                    <!-- Success Screen -->
-                    <div v-else-if="phaseIndex === PHASES.length" class="text-center py-5">
-                        <h1 class="display-4 fw-bold text-uppercase">УГРОЗА УСТРАНЕНА</h1>
-                        <p class="fs-4 mt-3">Вы успешно отфильтровали все логи и предотвратили утечку данных.</p>
-                        <p class="mt-4 text-white bg-success p-2 fw-bold fs-4">ЗАДАНИЕ ВЫПОЛНЕНО</p>
-                    </div>
-
+                    <div class="text-light opacity-75 mt-1">... еще <span v-text="data.length - 5"></span> записей ...</div>
                 </div>
             </div>
+        </div>
+
+        <!-- Error Screen -->
+        <div v-else-if="phaseIndex === -2" class="text-center py-5">
+            <h1 class="display-4 fw-bold text-uppercase text-danger">ACCESS DENIED</h1>
+            <p class="fs-4 mt-3 bg-danger text-white p-2" v-text="errorMessage"></p>
+            <p class="mt-4 fs-5 text-light">Протокол безопасности инициировал перезагрузку терминала...</p>
+        </div>
+
+        <!-- Success Screen -->
+        <div v-else-if="phaseIndex === PHASES.length" class="text-center py-5">
+            <h1 class="display-4 fw-bold text-uppercase text-success">УГРОЗА УСТРАНЕНА</h1>
+            <p class="fs-4 mt-3 text-light">Вы успешно отфильтровали все логи и предотвратили утечку данных.</p>
+            <p class="mt-4 text-white bg-success p-2 fw-bold fs-4">ЗАДАНИЕ ВЫПОЛНЕНО</p>
         </div>
     </div>
 </div>
 
-<script is:inline>
+<script is:inline define:vars={{ missionName }}>
 const { createApp, ref, onMounted, onUnmounted } = Vue;
 
 const PHASES = [
@@ -140,9 +132,8 @@ function generateData() {
     const protocols = ['HTTP', 'HTTPS', 'FTP'];
     const statuses = [200, 403, 404, 500];
     const domains = ['vk.com', 'ya.ru', 'mail.ru', 'gosuslugi.ru'];
-    
-    // Generate 30 random rows
-    for(let i = 1; i <= 30; i++) {
+
+    for (let i = 1; i <= 30; i++) {
         data.push({
             id: i,
             protocol: protocols[Math.floor(Math.random() * protocols.length)],
@@ -151,15 +142,14 @@ function generateData() {
             suspicious: Math.random() > 0.7 ? 1 : 0
         });
     }
-    
-    // Guarantee some specific rows to ensure phases are never empty
-    data.push({id: 31, protocol: 'FTP', status: 200, domain: 'ya.ru', suspicious: 1});
-    data.push({id: 32, protocol: 'HTTPS', status: 403, domain: 'vk.com', suspicious: 0});
-    data.push({id: 33, protocol: 'HTTP', status: 404, domain: 'vk.com', suspicious: 1});
-    data.push({id: 34, protocol: 'HTTP', status: 200, domain: 'mail.ru', suspicious: 1});
-    data.push({id: 35, protocol: 'FTP', status: 404, domain: 'ya.ru', suspicious: 1});
-    data.push({id: 36, protocol: 'HTTP', status: 500, domain: 'gosuslugi.ru', suspicious: 1});
-    
+
+    data.push({ id: 31, protocol: 'FTP', status: 200, domain: 'ya.ru', suspicious: 1 });
+    data.push({ id: 32, protocol: 'HTTPS', status: 403, domain: 'vk.com', suspicious: 0 });
+    data.push({ id: 33, protocol: 'HTTP', status: 404, domain: 'vk.com', suspicious: 1 });
+    data.push({ id: 34, protocol: 'HTTP', status: 200, domain: 'mail.ru', suspicious: 1 });
+    data.push({ id: 35, protocol: 'FTP', status: 404, domain: 'ya.ru', suspicious: 1 });
+    data.push({ id: 36, protocol: 'HTTP', status: 500, domain: 'gosuslugi.ru', suspicious: 1 });
+
     return data;
 }
 
@@ -167,24 +157,41 @@ createApp({
     setup() {
         const dbLoaded = ref(false);
         const data = ref([]);
-        const phaseIndex = ref(-1); 
+        const phaseIndex = ref(-1);
         const queryInput = ref('');
         const timer = ref(0);
         const errorMessage = ref('');
-        
+
         let timerInterval = null;
-        let startTime = 0;
+        let restartTimeout = null;
         let dbInstance = null;
+        const actionLog = [];
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 3,
+            totalWaves: PHASES.length,
+            showAfkOverlay: true,
+            onAfkStop: () => {
+                clearInterval(timerInterval);
+                clearTimeout(restartTimeout);
+                timerInterval = null;
+            },
+            onAfkRetry: () => {
+                errorMessage.value = '';
+                startGame();
+            }
+        });
 
         const initDB = async () => {
             try {
                 const SQL = await initSqlJs({ locateFile: file => `/static/${file}` });
                 dbInstance = new SQL.Database();
                 dbInstance.run(`CREATE TABLE logs (id INTEGER, protocol TEXT, status INTEGER, domain TEXT, suspicious INTEGER)`);
-                
+
                 const generatedData = generateData();
                 data.value = generatedData;
-                
+
                 const insertStmt = dbInstance.prepare(`INSERT INTO logs VALUES (?, ?, ?, ?, ?)`);
                 generatedData.forEach(row => {
                     insertStmt.run([row.id, row.protocol, row.status, row.domain, row.suspicious]);
@@ -199,9 +206,11 @@ createApp({
         };
 
         const startGame = () => {
+            clearTimeout(restartTimeout);
             phaseIndex.value = 0;
-            startTime = Date.now();
-            sendTelemetry('in_progress');
+            telemetry.start();
+            telemetry.setWave(1, PHASES.length);
+            telemetry.progress({ wave: 1, total_waves: PHASES.length, stage: 1, total_stages: PHASES.length });
             startPhase();
         };
 
@@ -212,66 +221,71 @@ createApp({
             timerInterval = setInterval(() => {
                 timer.value--;
                 if (timer.value <= 0) {
-                    failPhase("ВРЕМЯ ИСТЕКЛО!");
+                    failPhase("ВРЕМЯ ИСТЕКЛО!", true);
                 }
             }, 1000);
         };
 
         const executeQuery = () => {
-            if (!queryInput.value.trim()) return;
+            if (!queryInput.value.trim() || telemetry.getState().isAfkPaused) return;
+            telemetry.markActivity();
+            actionLog.push({ time: new Date().toISOString(), action: `wave_${phaseIndex.value + 1}_query` });
+
             try {
                 const result = dbInstance.exec(`SELECT id FROM logs WHERE ${queryInput.value}`);
                 let userIds = [];
                 if (result.length > 0) {
-                    userIds = result[0].values.map(r => r[0]).sort((a,b)=>a-b);
+                    userIds = result[0].values.map(r => r[0]).sort((a, b) => a - b);
                 }
-                
-                const expectedIds = data.value.filter(PHASES[phaseIndex.value].check).map(r => r.id).sort((a,b)=>a-b);
-                
+
+                const expectedIds = data.value.filter(PHASES[phaseIndex.value].check).map(r => r.id).sort((a, b) => a - b);
+
                 if (JSON.stringify(userIds) === JSON.stringify(expectedIds)) {
                     phaseIndex.value++;
                     if (phaseIndex.value >= PHASES.length) {
                         completeLevel();
                     } else {
+                        telemetry.advanceWave(phaseIndex.value + 1, { action_log: actionLog });
                         startPhase();
                     }
                 } else {
-                    failPhase("Неверный результат. Данные не совпадают с ожидаемыми!");
+                    failPhase("Неверный результат. Данные не совпадают с ожидаемыми!", false);
                 }
             } catch (err) {
-                failPhase(`Синтаксическая ошибка SQL: ${err.message}`);
+                failPhase(`Синтаксическая ошибка SQL: ${err.message}`, false);
             }
         };
 
-        const failPhase = (reason) => {
+        const failPhase = (reason, isTimeout) => {
             clearInterval(timerInterval);
+            clearTimeout(restartTimeout);
+            const failedWave = Math.max(1, phaseIndex.value + 1);
             errorMessage.value = reason;
             phaseIndex.value = -2;
-            sendTelemetry('hardcore_reset');
-            
-            setTimeout(() => {
-                errorMessage.value = "";
-                startGame();
+            actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+            const sent = telemetry.fail({
+                wave: failedWave,
+                isTimeout: Boolean(isTimeout),
+                action_log: actionLog
+            });
+
+            if (sent === false) {
+                return;
+            }
+
+            restartTimeout = setTimeout(() => {
+                if (!telemetry.getState().isAfkPaused) {
+                    errorMessage.value = "";
+                    startGame();
+                }
             }, 3000);
         };
 
         const completeLevel = () => {
             clearInterval(timerInterval);
-            sendTelemetry('level_complete');
-        };
-
-        const sendTelemetry = (actionType) => {
-            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: 'Урок 6 :: Обобщение: Безопасность в сети :: Уровень 3',
-                action_type: actionType,
-                status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime || Date.now()).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: 1,
-                success: actionType === 'level_complete'
-            }, '*');
+            clearTimeout(restartTimeout);
+            telemetry.complete({ wave: PHASES.length, action_log: actionLog });
         };
 
         onMounted(() => {
@@ -280,6 +294,7 @@ createApp({
 
         onUnmounted(() => {
             clearInterval(timerInterval);
+            clearTimeout(restartTimeout);
             if (dbInstance) {
                 dbInstance.close();
             }

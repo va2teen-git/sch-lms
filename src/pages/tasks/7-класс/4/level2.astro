@@ -1,0 +1,235 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 4 :: Файлы и папки :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Файлы и папки" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h4 m-0 fw-bold text-warning">ТЕРМИНАЛ // УРОВЕНЬ 2 (ПРОДВИНУТЫЙ)</h2>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-black border border-warning text-warning rounded-0 fs-6 px-3 py-2" id="phase-title">ФАЗА 1 / 5</span>
+                <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">Ошибки: <span id="errors-count">0</span></span>
+            </div>
+        </div>
+
+        <div id="paste-notice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите ответ вручную.
+        </div>
+
+        <div id="status-banner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <div id="task-card" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+                <h3 class="h5 text-uppercase text-warning fw-bold mb-3" id="task-heading">&gt;&gt; Загрузка...</h3>
+                <div class="text-light fs-5 mb-3" id="task-prompt"></div>
+                <div id="code-box" class="bg-black border border-warning p-3 mb-3 text-white fs-5 font-monospace d-none" style="word-break: break-all;"></div>
+                <p class="text-light opacity-75 small mb-3" id="task-hint"></p>
+
+                <div class="input-group w-100" style="max-width: 580px;">
+                    <span id="input-prefix" class="input-group-text bg-black text-warning border-warning rounded-0 fw-bold d-none">.</span>
+                    <input type="text" id="ans-input" class="form-control rounded-0 bg-black text-warning border-warning fs-5 font-monospace" autocomplete="off" spellcheck="false" placeholder="Введите ответ..." />
+                    <button type="button" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5" id="check-btn" style="min-height: 48px;">ВВОД</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="victory-box" class="alert alert-warning bg-warning text-dark rounded-0 border-0 fw-bold fs-4 text-center py-5 mt-3 d-none">
+            СИСТЕМА ЗАХВАЧЕНА.<br>ПРОДВИНУТЫЙ УРОВЕНЬ ПРОЙДЕН.
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let validator = null;
+            let expectedHint = '';
+            let actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phase-title');
+            const errorsCountEl = document.getElementById('errors-count');
+            const headingEl = document.getElementById('task-heading');
+            const promptEl = document.getElementById('task-prompt');
+            const codeBoxEl = document.getElementById('code-box');
+            const hintEl = document.getElementById('task-hint');
+            const prefixEl = document.getElementById('input-prefix');
+            const inputEl = document.getElementById('ans-input');
+            const checkBtn = document.getElementById('check-btn');
+            const statusBannerEl = document.getElementById('status-banner');
+            const pasteNoticeEl = document.getElementById('paste-notice');
+            const taskCardEl = document.getElementById('task-card');
+            const victoryBoxEl = document.getElementById('victory-box');
+
+            function pick(arr) {
+                return arr[Math.floor(Math.random() * arr.length)];
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.className = 'alert rounded-0 border-0 fw-bold d-none mb-3';
+                statusBannerEl.textContent = '';
+            }
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-warning bg-warning text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function generatePhase(phase) {
+                currentPhase = phase;
+                locked = false;
+                hideBanner();
+                phaseTitleEl.textContent = `ФАЗА ${phase} / ${TOTAL_PHASES}`;
+                codeBoxEl.classList.add('d-none');
+                prefixEl.classList.add('d-none');
+                inputEl.value = '';
+                inputEl.disabled = false;
+                checkBtn.disabled = false;
+
+                if (phase === 1) {
+                    const types = [
+                        { name: 'Текстовый документ', ext: ['txt', 'doc', 'docx', 'rtf'] },
+                        { name: 'Графический файл', ext: ['bmp', 'jpg', 'jpeg', 'png', 'gif'] },
+                        { name: 'Звуковой файл', ext: ['wav', 'mp3'] },
+                        { name: 'Видеофайл', ext: ['avi', 'mp4'] },
+                        { name: 'Исполняемая программа', ext: ['exe'] }
+                    ];
+                    const target = pick(types);
+                    headingEl.textContent = '>> Ручной ввод формата';
+                    promptEl.innerHTML = `Файл содержит данные типа: <span class="text-white fw-bold">«${target.name}»</span>.`;
+                    hintEl.textContent = 'Напишите любое одно подходящее расширение без точки (только латинские буквы).';
+                    prefixEl.classList.remove('d-none');
+                    expectedHint = `Один из правильных ответов: ${target.ext[0]}`;
+                    validator = (val) => target.ext.includes(val.toLowerCase().replace(/^\./, ''));
+                } else if (phase === 2) {
+                    const disks = ['C', 'D', 'E', 'F'];
+                    const dirs = ['Windows', 'Games', 'School', 'Users', 'Media'];
+                    const subs = ['System32', 'Steam', 'Projects', 'Downloads', 'Archive'];
+                    const files = ['cmd.exe', 'egypt_report.docx', 'setup.exe', 'beach.jpg', 'playlist.mp3'];
+                    const fileName = pick(files);
+                    const fullPath = `${pick(disks)}:\\${pick(dirs)}\\${pick(subs)}\\${fileName}`;
+
+                    headingEl.textContent = '>> Извлечение имени файла';
+                    promptEl.textContent = 'Система получила абсолютный путь:';
+                    codeBoxEl.textContent = fullPath;
+                    codeBoxEl.classList.remove('d-none');
+                    hintEl.textContent = 'Извлеките и напишите только имя файла вместе с расширением.';
+                    expectedHint = `Ожидалось: ${fileName}`;
+                    validator = (val) => val.toLowerCase() === fileName.toLowerCase();
+                } else if (phase === 3) {
+                    const disk = pick(['C', 'D', 'E', 'F']);
+                    const middle = pick(['Documents', 'Downloads', 'Media', 'Backup', 'Work']);
+                    const last = pick(['Secret', 'Private', 'Archive', 'Temp', 'Important']);
+                    const file = pick(['passwords.txt', 'data.dat', 'log.txt', 'key.bin']);
+                    const fullPath = `${disk}:\\${middle}\\${last}\\${file}`;
+
+                    headingEl.textContent = '>> Анализ родительского каталога';
+                    promptEl.textContent = 'Перехвачен путь к файлу:';
+                    codeBoxEl.textContent = fullPath;
+                    codeBoxEl.classList.remove('d-none');
+                    hintEl.textContent = 'Как называется папка, в которой непосредственно лежит этот файл?';
+                    expectedHint = `Ожидалось: ${last}`;
+                    validator = (val) => val.toLowerCase() === last.toLowerCase();
+                } else if (phase === 4) {
+                    const disk = pick(['C', 'D']);
+                    const rootDir = pick(['School', 'University', 'Office']);
+                    const subdirs = ['Math', 'Physics', 'History', 'Biology'].sort(() => Math.random() - 0.5);
+                    const oldSub = subdirs[0];
+                    const newSub = subdirs[1];
+                    const file = pick(['homework.docx', 'report.pdf', 'notes.txt']);
+                    const oldPath = `${disk}:\\${rootDir}\\${oldSub}\\${file}`;
+                    const correctPath = `${disk}:\\${rootDir}\\${newSub}\\${file}`;
+
+                    headingEl.textContent = '>> Модификация маршрута';
+                    promptEl.innerHTML = `Требуется переместить файл из папки <b>${oldSub}</b> в параллельную папку <b>${newSub}</b> внутри каталога <b>${rootDir}</b>.`;
+                    codeBoxEl.textContent = oldPath;
+                    codeBoxEl.classList.remove('d-none');
+                    hintEl.textContent = 'Напишите НОВЫЙ полный абсолютный путь к файлу (с обратными слэшами \\).';
+                    expectedHint = `Ожидалось: ${correctPath}`;
+                    validator = (val) => val.toLowerCase() === correctPath.toLowerCase();
+                } else if (phase === 5) {
+                    const questions = [
+                        { q: 'В результате какой операции файл появляется в новой папке, но ИСЧЕЗАЕТ из старой (оригинал не сохраняется)?', a: 'перемещение' },
+                        { q: 'В результате какой операции создаётся точная копия файла, а оригинал ОСТАЁТСЯ на старом месте?', a: 'копирование' },
+                        { q: 'Как называется операция изменения имени файла без изменения его местоположения на диске?', a: 'переименование' },
+                        { q: 'Какая операция приводит к отправке файла в системную папку «Корзина»?', a: 'удаление' }
+                    ];
+                    const target = pick(questions);
+                    headingEl.textContent = '>> Терминологический контроль';
+                    promptEl.textContent = target.q;
+                    hintEl.textContent = 'Введите одно слово в именительном падеже (например: создание).';
+                    expectedHint = `Правильный ответ: ${target.a}`;
+                    validator = (val) => val.toLowerCase() === target.a;
+                }
+
+                inputEl.focus();
+            }
+
+            function handleSubmit() {
+                if (locked || !validator) return;
+                const val = inputEl.value.trim();
+                if (!val) return;
+
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_input_${val}` });
+
+                if (validator(val)) {
+                    if (currentPhase < TOTAL_PHASES) {
+                        const nextPhase = currentPhase + 1;
+                        telemetry.advanceStage(nextPhase, { action_log: actionLog });
+                        showBanner('Верно! Переход к следующей фазе...', false);
+                        locked = true;
+                        inputEl.disabled = true;
+                        checkBtn.disabled = true;
+                        setTimeout(() => generatePhase(nextPhase), 500);
+                    } else {
+                        locked = true;
+                        taskCardEl.classList.add('d-none');
+                        victoryBoxEl.classList.remove('d-none');
+                        hideBanner();
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    showBanner(`[!] ОШИБКА АНАЛИЗА. ${expectedHint}. Генерация новой задачи...`, true);
+                    locked = true;
+                    inputEl.disabled = true;
+                    checkBtn.disabled = true;
+                    setTimeout(() => generatePhase(currentPhase), 1300);
+                }
+            }
+
+            // Anti-Paste + single-bound event listeners
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+            });
+            checkBtn.addEventListener('click', handleSubmit);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            });
+
+            generatePhase(1);
+        })();
+    </script>
+</TaskLayout>

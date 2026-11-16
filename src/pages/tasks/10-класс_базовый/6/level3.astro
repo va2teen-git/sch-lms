@@ -1,0 +1,300 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 6 :: Законодательство РФ :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Кибер-Судья" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="card bg-black border border-danger border-2 rounded-0 p-3 p-md-4">
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" id="startScreen" class="text-center mx-auto py-3" style="max-width: 640px;">
+                <h1 class="h2 text-white fw-bold mb-3 text-uppercase">СИСТЕМА «КИБЕР-СУДЬЯ v2.0»</h1>
+                <div class="text-start text-light lh-base mb-4 fs-6">
+                    <p>Вы назначены дежурным арбитром по делам о преступлениях в сфере компьютерной информации и нарушению авторских прав.</p>
+                    <p>Вам предстоит оперативно рассмотреть <strong class="text-white">10 протоколов</strong> от следователей и вынести вердикт: нарушение закона (ВИНОВЕН) или правомерное действие (ОПРАВДАН).</p>
+                    <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 mb-0">
+                        <strong class="text-danger">ВНИМАНИЕ:</strong> На каждый протокол отводится динамический таймер (от 12 до 8 секунд). Любая ошибка или промедление сбрасывает прогресс на Дело 1.
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-danger text-white rounded-0 fs-5 fw-bold px-4 py-3 w-100 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    [ АВТОРИЗОВАТЬСЯ И НАЧАТЬ СМЕНУ ]
+                </button>
+            </div>
+
+            <!-- Active game -->
+            <div v-if="started && !gameWon">
+                <div class="d-flex gap-1 mb-3">
+                    <div
+                        v-for="idx in totalWaves"
+                        :key="idx"
+                        class="flex-fill"
+                        style="height: 6px;"
+                        :class="idx < wave ? 'bg-success' : (idx === wave ? 'bg-danger' : 'bg-secondary')"
+                    ></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 flex-wrap gap-2">
+                    <span class="text-light small fw-bold text-uppercase" v-text="protocolId"></span>
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ДЕЛО <span v-text="wave"></span> ИЗ <span v-text="totalWaves"></span>
+                    </span>
+                </div>
+
+                <div class="text-danger fw-bold text-uppercase mb-2">МАТЕРИАЛЫ СЛЕДСТВИЯ:</div>
+
+                <div class="bg-dark border border-secondary text-white p-3 mb-3 fs-5 lh-base" style="min-height: 120px;" v-text="currentCase.text"></div>
+
+                <div class="progress rounded-0 bg-dark border border-secondary mb-4" style="height: 14px;">
+                    <div
+                        class="progress-bar"
+                        role="progressbar"
+                        :class="timerPercent < 30 ? 'bg-danger' : (timerPercent < 60 ? 'bg-warning' : 'bg-info')"
+                        :style="{ width: timerPercent + '%' }"
+                    ></div>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-12 col-sm-6">
+                        <button type="button" class="btn btn-outline-danger rounded-0 fw-bold fs-5 w-100 py-3 text-uppercase" style="min-height: 54px;" @click="judge(true)">
+                            [1] ВИНОВЕН (Нарушение)
+                        </button>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <button type="button" class="btn btn-outline-success rounded-0 fw-bold fs-5 w-100 py-3 text-uppercase" style="min-height: 54px;" @click="judge(false)">
+                            [2] ОПРАВДАН (Законно)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" id="successArea" class="text-center py-5">
+                <div class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold py-5">
+                    <h2 class="h2 fw-bold text-uppercase mb-3">ЗАСЕДАНИЕ ЗАКРЫТО</h2>
+                    <p class="fs-5 mb-0">Все вердикты вынесены верно. Судебная система благодарит за службу.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure overlay -->
+        <div v-if="failVisible" id="failOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-danger text-white text-center p-4" style="z-index: 1050;">
+            <h1 class="display-5 fw-bold text-uppercase mb-2">КРИТИЧЕСКАЯ СУДЕБНАЯ ОШИБКА</h1>
+            <p class="fs-4 mb-0" v-text="failReason"></p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+            const TOTAL_WAVES = 10;
+
+            const bankGuilty = [
+                'Обвиняемый скачал с торрент-трекера взломанную версию программы 1С:Предприятие и установил на рабочие ПК.',
+                'Гражданин передал другу флешку, содержащую троян для кражи паролей от криптокошельков.',
+                'Обвиняемый подобрал пароль администратора школьного портала и изменил оценки в электронном журнале.',
+                'Сисадмин больницы забыл обновить антивирусные базы, из-за чего вирус зашифровал картотеку пациентов.',
+                'Обвиняемая скачала бесплатную программу с закрытым кодом (freeware) и начала продавать её от своего имени.',
+                'Сотрудник IT-отдела тайно установил программу-кейлоггер на компьютеры коллег для сбора их паролей.',
+                'Студент установил Shareware-версию WinRAR, по истечении 40 дней взломал её активатором.',
+                'Группа лиц осуществила DDoS-атаку на сервер государственного портала Госуслуги (объект КИИ).',
+                'Гражданин купил лицензионный диск с игрой и выложил его образ в открытый доступ на форуме.',
+                'Программист создал скрипт для автоматического взлома Wi-Fi сетей и продал его в интернете.',
+                'Обвиняемый распространил программу, которая без ведома пользователя удаляет системные файлы Windows.'
+            ];
+
+            const bankInnocent = [
+                'Обвиняемый установил ОС Linux Ubuntu на 50 компьютеров в офисе компании, не заплатив ни рубля.',
+                'Гражданин скачал бесплатный браузер Google Chrome и установил его на все компьютеры в компьютерном классе.',
+                'Программист скачал исходный код программы под лицензией GNU GPL, добавил новые функции и выложил в интернет бесплатно.',
+                'Студент пользовался Shareware-программой 30 дней бесплатно, а когда она заблокировалась — удалил её.',
+                'Обвиняемый купил лицензионную версию Microsoft Office и установил её на свой единственный домашний ПК.',
+                'Программист создал свою собственную программу и раздаёт её всем желающим бесплатно, не открывая исходный код.',
+                'Системный администратор настроил резервное копирование, и при сбое оборудования успешно восстановил данные.',
+                'Обвиняемый нашёл уязвимость на сайте банка, ничего не стал взламывать, а написал отчёт в службу безопасности банка.',
+                'Компания закупила 10 лицензий антивируса и установила их ровно на 10 рабочих станций.',
+                'Студент написал скрипт для удаления пустых папок на своём личном компьютере.',
+                'Гражданин модифицировал исходный код Open Source программы исключительно для личного использования.'
+            ];
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const totalWaves = TOTAL_WAVES;
+                    const protocolId = ref('ПРОТОКОЛ #0000');
+                    const currentCase = ref({ text: '', isGuilty: false });
+                    const timeRemainingMs = ref(12000);
+                    const waveDurationMs = ref(12000);
+                    const failVisible = ref(false);
+                    const failReason = ref('');
+
+                    const timerPercent = computed(() => {
+                        if (waveDurationMs.value <= 0) return 0;
+                        return Math.max(0, Math.min(100, (timeRemainingMs.value / waveDurationMs.value) * 100));
+                    });
+
+                    let queue = [];
+                    let timerInterval = null;
+                    let resetTimeout = null;
+                    let lastTick = 0;
+                    const actionLog = [];
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(timerInterval);
+                            clearTimeout(resetTimeout);
+                            timerInterval = null;
+                            failVisible.value = false;
+                        },
+                        onAfkRetry: () => {
+                            failVisible.value = false;
+                            restartFromWave1();
+                        }
+                    });
+
+                    function generateQueue() {
+                        const g = shuffle(bankGuilty).slice(0, 5).map(text => ({ text, isGuilty: true }));
+                        const inn = shuffle(bankInnocent).slice(0, 5).map(text => ({ text, isGuilty: false }));
+                        queue = shuffle([...g, ...inn]);
+                    }
+
+                    function getWaveDurationMs(w) {
+                        return Math.max(8000, 12500 - Math.floor((w - 1) / 2) * 1000);
+                    }
+
+                    function startWave(w) {
+                        clearInterval(timerInterval);
+                        wave.value = w;
+                        telemetry.setWave(w, TOTAL_WAVES);
+                        currentCase.value = queue[w - 1];
+                        protocolId.value = `ПРОТОКОЛ #${Math.floor(Math.random() * 9000) + 1000}-КБ`;
+
+                        const dur = getWaveDurationMs(w);
+                        waveDurationMs.value = dur;
+                        timeRemainingMs.value = dur;
+                        lastTick = Date.now();
+
+                        timerInterval = setInterval(() => {
+                            const now = Date.now();
+                            const delta = now - lastTick;
+                            lastTick = now;
+                            timeRemainingMs.value -= delta;
+                            if (timeRemainingMs.value <= 0) {
+                                failLevel('ВРЕМЯ ИСТЕКЛО', true);
+                            }
+                        }, 50);
+                    }
+
+                    function restartFromWave1() {
+                        generateQueue();
+                        startWave(1);
+                    }
+
+                    function startGame() {
+                        clearTimeout(resetTimeout);
+                        started.value = true;
+                        gameWon.value = false;
+                        failVisible.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: TOTAL_WAVES, stage: 1, total_stages: TOTAL_WAVES });
+                        restartFromWave1();
+                    }
+
+                    function failLevel(reason, isTimeout) {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        const failedWave = wave.value;
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+                        const sent = telemetry.fail({
+                            wave: failedWave,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            return;
+                        }
+
+                        failReason.value = `${reason}. Сброс на Дело 1...`;
+                        failVisible.value = true;
+                        resetTimeout = setTimeout(() => {
+                            failVisible.value = false;
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                restartFromWave1();
+                            }
+                        }, 1500);
+                    }
+
+                    function judge(userChoiceGuilty) {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        clearInterval(timerInterval);
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_verdict_${userChoiceGuilty}` });
+
+                        if (userChoiceGuilty === currentCase.value.isGuilty) {
+                            if (wave.value >= TOTAL_WAVES) {
+                                gameWon.value = true;
+                                telemetry.complete({ wave: TOTAL_WAVES, action_log: actionLog });
+                            } else {
+                                const nextWave = wave.value + 1;
+                                telemetry.advanceWave(nextWave, { action_log: actionLog });
+                                startWave(nextWave);
+                            }
+                        } else {
+                            failLevel('НЕВЕРНЫЙ ВЕРДИКТ', false);
+                        }
+                    }
+
+                    function onKeyDown(e) {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        if (e.key === '1') judge(true);
+                        else if (e.key === '2') judge(false);
+                    }
+
+                    onMounted(() => {
+                        window.addEventListener('keydown', onKeyDown);
+                    });
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        window.removeEventListener('keydown', onKeyDown);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        totalWaves,
+                        protocolId,
+                        currentCase,
+                        timerPercent,
+                        failVisible,
+                        failReason,
+                        startGame,
+                        judge
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>

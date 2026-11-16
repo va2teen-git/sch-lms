@@ -1,0 +1,256 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 6 :: Контрольная работа: Глобальная сеть :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Конструктор URL" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase">Терминал // Уровень 2: Конструктор URL</h2>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-black border border-warning text-warning rounded-0 fs-6 px-3 py-2">Шаг: <span id="phase-indicator">1 / 5</span></span>
+                <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">Ошибки: <span id="errors-indicator">0</span></span>
+            </div>
+        </div>
+
+        <div id="paste-notice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите URL вручную.
+        </div>
+
+        <div id="task-card" class="card bg-dark border-warning rounded-0">
+            <div class="card-header border-warning text-warning fw-bold">
+                Синтез URL-адресов
+            </div>
+            <div class="card-body p-3 p-md-4 d-flex flex-column">
+                <p class="text-light mb-3 fs-6 lh-base">
+                    Составьте полный и корректный URL-адрес из заданных компонентов. Общий формат:
+                    <code class="text-warning">протокол://домен:порт/путь?параметры</code>
+                </p>
+
+                <div class="border border-warning p-3 mb-4 bg-black">
+                    <h6 class="text-warning mb-3 border-bottom border-secondary pb-2 text-uppercase small">Параметры адреса:</h6>
+                    <ul id="task-text" class="text-light fs-6 list-unstyled mb-0"></ul>
+                </div>
+
+                <div>
+                    <label for="answer-input" class="text-warning mb-2 d-block">Ввод URL:</label>
+                    <div class="input-group w-100" style="max-width: 580px;">
+                        <span class="input-group-text bg-black border-warning text-warning rounded-0">URL:</span>
+                        <input type="text" id="answer-input" class="form-control bg-black text-warning border-warning rounded-0 shadow-none fs-5 py-2 font-monospace" placeholder="scheme://..." autocomplete="off" spellcheck="false" />
+                        <button type="button" class="btn btn-warning rounded-0 text-dark px-4 fw-bold fs-5" id="submit-btn" style="min-height: 48px;">ВВОД</button>
+                    </div>
+                    <div id="error-msg" class="alert alert-danger bg-danger text-white rounded-0 border-0 mt-3 d-none fw-bold">
+                        Ошибка: введён неверный URL. Загрузка нового варианта...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="victory-box" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold mb-2 text-uppercase">Задание выполнено</h3>
+            <p class="fs-5 mb-0 fw-semibold">Все URL-адреса составлены верно.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            const tlds = ['ru', 'com', 'org', 'net', 'edu', 'gov', 'su'];
+            const domains = ['portal', 'school', 'shop', 'bank', 'forum', 'news', 'games', 'cloud'];
+            const subdomains = ['lk', 'mail', 'admin', 'test', 'api', 'cdn', 'vpn'];
+            const dirs = ['assets', 'users', 'docs', 'media', 'files', 'catalog', 'bin'];
+            const files = ['index.html', 'login.php', 'data.json', 'style.css', 'script.js'];
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function pick(arr) {
+                return arr[Math.floor(Math.random() * arr.length)];
+            }
+
+            const generators = [
+                () => {
+                    const d = pick(domains);
+                    const t = pick(tlds);
+                    const isSecure = Math.random() > 0.5;
+                    const protoReq = isSecure ? 'защищённый веб-протокол' : 'базовый веб-протокол (без шифрования)';
+                    const protoAns = isSecure ? 'https' : 'http';
+                    const reqs = [
+                        `<span class="text-warning">-</span> Домен 2-го уровня: <span class="text-white fw-bold">${d}</span>`,
+                        `<span class="text-warning">-</span> Домен верхнего уровня (зона): <span class="text-white fw-bold">${t}</span>`,
+                        `<span class="text-warning">-</span> Протокол: <span class="text-white fw-bold">${protoReq}</span>`
+                    ];
+                    return {
+                        text: shuffle(reqs).map(r => `<li class="mb-2">${r}</li>`).join(''),
+                        answer: `${protoAns}://${d}.${t}`
+                    };
+                },
+                () => {
+                    const d = pick(domains);
+                    const t = pick(tlds);
+                    const sub = pick(subdomains);
+                    const isSecure = Math.random() > 0.5;
+                    const protoReq = isSecure ? 'защищённый веб-протокол' : 'базовый веб-протокол (без шифрования)';
+                    const protoAns = isSecure ? 'https' : 'http';
+                    const reqs = [
+                        `<span class="text-warning">-</span> Основной домен: <span class="text-white fw-bold">${d}.${t}</span>`,
+                        `<span class="text-warning">-</span> Домен 3-го уровня (имя хоста): <span class="text-white fw-bold">${sub}</span>`,
+                        `<span class="text-warning">-</span> Протокол: <span class="text-white fw-bold">${protoReq}</span>`
+                    ];
+                    return {
+                        text: shuffle(reqs).map(r => `<li class="mb-2">${r}</li>`).join(''),
+                        answer: `${protoAns}://${sub}.${d}.${t}`
+                    };
+                },
+                () => {
+                    const d = pick(domains);
+                    const t = pick(tlds);
+                    const port = Math.floor(Math.random() * 5000 + 8000);
+                    const dir = pick(dirs);
+                    const reqs = [
+                        `<span class="text-warning">-</span> Сервер: <span class="text-white fw-bold">${d}.${t}</span>`,
+                        `<span class="text-warning">-</span> Нестандартный порт: <span class="text-white fw-bold">${port}</span>`,
+                        `<span class="text-warning">-</span> Вложенный каталог: <span class="text-white fw-bold">${dir}</span>`,
+                        `<span class="text-warning">-</span> Протокол: <span class="text-white fw-bold">базовый веб-протокол</span>`
+                    ];
+                    return {
+                        text: shuffle(reqs).map(r => `<li class="mb-2">${r}</li>`).join(''),
+                        answer: `http://${d}.${t}:${port}/${dir}`
+                    };
+                },
+                () => {
+                    const d = pick(domains);
+                    const t = pick(tlds);
+                    const file = pick(files);
+                    const paramId = Math.floor(Math.random() * 990 + 10);
+                    const reqs = [
+                        `<span class="text-warning">-</span> Хост: <span class="text-white fw-bold">${d}.${t}</span>`,
+                        `<span class="text-warning">-</span> Запрашиваемый файл: <span class="text-white fw-bold">${file}</span>`,
+                        `<span class="text-warning">-</span> GET-параметр: переменная <span class="text-white text-decoration-underline">id</span> со значением <span class="text-white fw-bold">${paramId}</span>`,
+                        `<span class="text-warning">-</span> Протокол: <span class="text-white fw-bold">защищённый веб-протокол</span>`
+                    ];
+                    return {
+                        text: shuffle(reqs).map(r => `<li class="mb-2">${r}</li>`).join(''),
+                        answer: `https://${d}.${t}/${file}?id=${paramId}`
+                    };
+                },
+                () => {
+                    const d = pick(domains);
+                    const t = pick(tlds);
+                    const dir1 = pick(dirs);
+                    let dir2 = pick(dirs);
+                    while (dir2 === dir1) dir2 = pick(dirs);
+                    const reqs = [
+                        `<span class="text-warning">-</span> Доменное имя: <span class="text-white fw-bold">${d}.${t}</span>`,
+                        `<span class="text-warning">-</span> Родительский каталог: <span class="text-white fw-bold">${dir1}</span>`,
+                        `<span class="text-warning">-</span> Вложенный подкаталог: <span class="text-white fw-bold">${dir2}</span>`,
+                        `<span class="text-warning">-</span> Протокол: <span class="text-white fw-bold">протокол передачи файлов (FTP)</span>`
+                    ];
+                    return {
+                        text: shuffle(reqs).map(r => `<li class="mb-2">${r}</li>`).join(''),
+                        answer: `ftp://${d}.${t}/${dir1}/${dir2}`
+                    };
+                }
+            ];
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let currentAnswer = '';
+            let locked = false;
+            const actionLog = [];
+
+            const inputEl = document.getElementById('answer-input');
+            const submitBtn = document.getElementById('submit-btn');
+            const errorMsgEl = document.getElementById('error-msg');
+            const phaseIndicatorEl = document.getElementById('phase-indicator');
+            const errorsIndicatorEl = document.getElementById('errors-indicator');
+            const taskTextEl = document.getElementById('task-text');
+            const taskCardEl = document.getElementById('task-card');
+            const victoryBoxEl = document.getElementById('victory-box');
+            const pasteNoticeEl = document.getElementById('paste-notice');
+
+            function generatePhase() {
+                locked = false;
+                errorMsgEl.classList.add('d-none');
+                inputEl.value = '';
+                inputEl.classList.remove('border-danger', 'text-white', 'bg-danger');
+                inputEl.classList.add('border-warning', 'text-warning', 'bg-black');
+                inputEl.disabled = false;
+                submitBtn.disabled = false;
+
+                phaseIndicatorEl.textContent = `${currentPhase} / ${TOTAL_PHASES}`;
+                const taskData = generators[currentPhase - 1]();
+                taskTextEl.innerHTML = taskData.text;
+                currentAnswer = taskData.answer.toLowerCase();
+                inputEl.focus();
+            }
+
+            function checkAnswer() {
+                if (locked) return;
+                const userAns = inputEl.value.trim().toLowerCase().replace(/\/+$/, '');
+                const correctAns = currentAnswer.replace(/\/+$/, '');
+                if (!userAns) return;
+
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_input_${userAns}` });
+
+                if (userAns === correctAns) {
+                    if (currentPhase >= TOTAL_PHASES) {
+                        locked = true;
+                        taskCardEl.classList.add('d-none');
+                        victoryBoxEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    } else {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        generatePhase();
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsIndicatorEl.textContent = String(errorsCount);
+                    errorMsgEl.classList.remove('d-none');
+                    inputEl.classList.remove('border-warning', 'text-warning', 'bg-black');
+                    inputEl.classList.add('border-danger', 'text-white', 'bg-danger');
+                    inputEl.disabled = true;
+                    submitBtn.disabled = true;
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => {
+                        generatePhase();
+                    }, 1300);
+                }
+            }
+
+            // Anti-Paste & single-bound listeners
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+            });
+            submitBtn.addEventListener('click', checkAnswer);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            generatePhase();
+        })();
+    </script>
+</TaskLayout>
