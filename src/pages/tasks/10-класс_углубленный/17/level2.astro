@@ -1,0 +1,193 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 17 :: Сетевое администрирование :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Консоль файрвола" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase" id="phaseTitle">Этап 1 из 5: Настройка файрвола</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-warning mb-3" style="height: 12px;">
+            <div class="progress-bar bg-warning" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="pasteNotice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите правило вручную.
+        </div>
+
+        <div class="card bg-dark border-warning rounded-0" id="gameArea">
+            <div class="card-header border-warning text-warning fw-bold text-uppercase">
+                Межсетевой экран (ACL Rule Builder)
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <p class="small text-secondary mb-2">
+                    Формат правила: <code>ACTION PROTOCOL PORT</code> (например: <code>ALLOW TCP 80</code>) или <code>DENY ALL</code>.
+                </p>
+                <div class="fs-5 text-white mb-4 bg-black border border-secondary p-3" id="questionText" style="min-height: 90px;">
+                    Инициализация...
+                </div>
+
+                <div class="input-group w-100" style="max-width: 580px;">
+                    <input type="text" id="answerInput" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="ALLOW TCP 80" autocomplete="off" spellcheck="false" />
+                    <button type="button" id="checkBtn" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5" style="min-height: 48px;">ПРИМЕНИТЬ</button>
+                </div>
+
+                <div id="feedbackMsg" class="alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="successArea" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">БРАНДМАУЭР НАСТРОЕН</h3>
+            <p class="fs-5 mb-0 fw-semibold">УРОВЕНЬ 2 ПРОЙДЕН. Все правила фильтрации применены без ошибок.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            const ruleTemplates = [
+                { makeQ: (ip) => `Разрешить незащищённый веб-трафик (HTTP) к серверу ${ip}.`, ans: 'ALLOW TCP 80' },
+                { makeQ: (ip) => `Разрешить защищённый веб-трафик (HTTPS) на веб-сервере ${ip}.`, ans: 'ALLOW TCP 443' },
+                { makeQ: (ip) => `Запретить удалённое управление сервером ${ip} по защищённому терминалу (SSH).`, ans: 'DENY TCP 22' },
+                { makeQ: (ip) => `Разрешить запросы к системе доменных имён (DNS) на сервер ${ip}.`, ans: 'ALLOW UDP 53' },
+                { makeQ: (ip) => `Запретить передачу файлов по классическому протоколу (FTP) с узла ${ip}.`, ans: 'DENY TCP 21' },
+                { makeQ: (ip) => `Запретить устаревший небезопасный доступ к терминалу (Telnet) на узле ${ip}.`, ans: 'DENY TCP 23' },
+                { makeQ: (ip) => `Разрешить подключение к удалённому рабочему столу Windows (RDP) для ${ip}.`, ans: 'ALLOW TCP 3389' },
+                { makeQ: (ip) => `Запретить отправку исходящей электронной почты сервером (SMTP) с узла ${ip}.`, ans: 'DENY TCP 25' },
+                { makeQ: (ip) => `Разрешить получение почты клиентом по протоколу POP3 с сервера ${ip}.`, ans: 'ALLOW TCP 110' },
+                { makeQ: (ip) => `Разрешить защищённое получение почты с синхронизацией (IMAP) на узле ${ip}.`, ans: 'ALLOW TCP 143' },
+                { makeQ: (ip) => `Разрешить синхронизацию сетевого времени (NTP) с сервером ${ip}.`, ans: 'ALLOW UDP 123' },
+                { makeQ: (ip) => `Разрешить подключение к базе данных MySQL на сервере ${ip}.`, ans: 'ALLOW TCP 3306' },
+                { makeQ: (ip) => `Запретить внешнее подключение к базе данных PostgreSQL на узле ${ip}.`, ans: 'DENY TCP 5432' },
+                { makeQ: (ip) => `Разрешить упрощённую передачу загрузочных файлов (TFTP) с сервера ${ip}.`, ans: 'ALLOW UDP 69' },
+                { makeQ: () => 'Закрыть таблицу правил политикой по умолчанию: блокировать абсолютно весь остальной трафик.', ans: 'DENY ALL' }
+            ];
+
+            let availableIndices = shuffle(ruleTemplates.map((_, i) => i));
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let currentCase = null;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const questionTextEl = document.getElementById('questionText');
+            const inputEl = document.getElementById('answerInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const feedbackEl = document.getElementById('feedbackMsg');
+            const pasteNoticeEl = document.getElementById('pasteNotice');
+            const gameAreaEl = document.getElementById('gameArea');
+            const successAreaEl = document.getElementById('successArea');
+
+            function initPhase() {
+                locked = false;
+                if (availableIndices.length === 0) {
+                    availableIndices = shuffle(ruleTemplates.map((_, i) => i));
+                }
+                const tpl = ruleTemplates[availableIndices.pop()];
+                const randIp = `192.168.${rnd(1, 200)}.${rnd(10, 250)}`;
+                currentCase = {
+                    q: tpl.makeQ(randIp),
+                    ans: tpl.ans
+                };
+
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}: Настройка файрвола`;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+                questionTextEl.textContent = currentCase.q;
+
+                inputEl.value = '';
+                inputEl.disabled = false;
+                checkBtn.disabled = false;
+                inputEl.classList.remove('border-danger', 'bg-danger', 'text-white');
+                inputEl.classList.add('border-warning', 'bg-black', 'text-warning');
+                feedbackEl.classList.add('d-none');
+                feedbackEl.textContent = '';
+
+                inputEl.focus();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function checkAnswer() {
+                if (locked || !currentCase) return;
+                const raw = inputEl.value.trim().toUpperCase().replace(/\s+/g, ' ');
+                if (!raw) return;
+
+                if (raw === currentCase.ans) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        initPhase();
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'БРАНДМАУЭР НАСТРОЕН';
+                        gameAreaEl.classList.add('d-none');
+                        successAreaEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_error_${raw}` });
+
+                    inputEl.classList.remove('border-warning', 'bg-black', 'text-warning');
+                    inputEl.classList.add('border-danger', 'bg-danger', 'text-white');
+                    inputEl.disabled = true;
+                    checkBtn.disabled = true;
+                    feedbackEl.textContent = 'ОШИБКА СИНТАКСИСА ИЛИ ПОРТА! Генерация нового инцидента...';
+                    feedbackEl.classList.remove('d-none');
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => initPhase(), 1100);
+                }
+            }
+
+            // Anti-Paste & single-bound listeners
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+            });
+            checkBtn.addEventListener('click', checkAnswer);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>

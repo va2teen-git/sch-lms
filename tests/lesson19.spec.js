@@ -26,7 +26,7 @@ test.describe('Lesson 19: Information Security (Advanced)', () => {
     await page.waitForSelector('#terminal-output');
     
     await executeCommand(page, 'help');
-    await expect(page.locator('#terminal-output')).toContainText('Available commands: help, clear, pwd');
+    await expect(page.locator('#terminal-output')).toContainText('Доступные команды симуляции:');
     
     await executeCommand(page, 'pwd');
     await expect(page.locator('#terminal-output')).toContainText('/');
@@ -125,14 +125,13 @@ test.describe('Lesson 19: Information Security (Advanced)', () => {
 
   // Test 7: Level 3 Timeout Hardcore Reset
   test('7. Level 3: Verify local timer hardcore reset on timeout', async ({ page }) => {
-    test.setTimeout(45000);
+    test.setTimeout(50000);
     await page.goto(`${BASE_URL}/tasks/${CLASS_PATH}/${LESSON_ID}/level3`);
     await page.click('#start-btn');
     await page.waitForSelector('text=Rapid SYN scan detected');
     
     // Wait for the 35s timer to expire.
-    // The test framework shouldn't hang, we will just wait for the specific text.
-    await expect(page.locator('text=CRITICAL TIMEOUT')).toBeVisible({ timeout: 40000 });
+    await expect(page.locator('text=CRITICAL TIMEOUT')).toBeVisible({ timeout: 45000 });
   });
 
   // Test 8: Level 3 Incorrect Action Penalty

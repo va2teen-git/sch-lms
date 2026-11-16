@@ -1,0 +1,312 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 17 :: Сетевое администрирование :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Консоль экстренного реагирования" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="card bg-black border border-danger border-2 rounded-0 p-3 p-md-4">
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" id="startScreen" class="text-center mx-auto py-3" style="max-width: 640px;">
+                <h1 class="h2 text-danger fw-bold mb-3 text-uppercase">ТЕРМИНАЛ ЭКСТРЕННОГО РЕАГИРОВАНИЯ</h1>
+                <div class="text-start text-light lh-base mb-4 fs-6">
+                    <p>На сетевом сегменте зафиксирована серия инцидентов. Вам предстоит выполнить <strong class="text-white">10 диагностических команд</strong> подряд в условиях нарастающего дефицита времени.</p>
+                    <p>Вводите точные команды сетевой диагностики (<code>ping</code>, <code>tracert</code>, <code>traceroute</code>, <code>nslookup</code>, <code>ipconfig</code>, <code>ifconfig</code>, <code>netstat</code>, <code>route</code>, <code>arp</code>) и нажимайте <kbd class="bg-dark border border-secondary">Enter</kbd>.</p>
+                    <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 mb-0">
+                        <strong class="text-danger">ХАРДКОР-СБРОС:</strong> Неверная команда или истечение таймера сбрасывает прогресс на Волну 1.
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-danger text-white rounded-0 fs-5 fw-bold px-4 py-3 w-100 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    [ НАЧАТЬ СИМУЛЯЦИЮ ]
+                </button>
+            </div>
+
+            <!-- Active game -->
+            <div v-if="started && !gameWon">
+                <div class="d-flex gap-1 mb-3">
+                    <div
+                        v-for="idx in totalWaves"
+                        :key="idx"
+                        class="flex-fill"
+                        style="height: 6px;"
+                        :class="idx < wave ? 'bg-success' : (idx === wave ? 'bg-danger' : 'bg-secondary')"
+                    ></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 flex-wrap gap-2">
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ВОЛНА <span v-text="wave"></span> / <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="badge rounded-0 fs-6 px-3 py-2" :class="timerSec <= 5 ? 'bg-danger text-white' : 'bg-dark border border-warning text-warning'">
+                        TTL: <span v-text="timerSec"></span> с
+                    </span>
+                </div>
+
+                <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 12px;">
+                    <div
+                        class="progress-bar"
+                        role="progressbar"
+                        :class="timerPercent < 30 ? 'bg-danger' : (timerPercent < 60 ? 'bg-warning' : 'bg-success')"
+                        :style="{ width: timerPercent + '%' }"
+                    ></div>
+                </div>
+
+                <div class="bg-dark border border-danger p-3 mb-3">
+                    <div class="text-danger small fw-bold text-uppercase mb-1">[СИСТЕМА] ТРЕБУЕТСЯ КОМАНДА ДИАГНОСТИКИ:</div>
+                    <div class="fs-5 text-white fw-bold" v-text="currentTask.desc"></div>
+                </div>
+
+                <div class="input-group border border-success bg-black p-2">
+                    <span class="input-group-text bg-black text-success border-0 rounded-0 fw-bold font-monospace">root@server:~#</span>
+                    <input
+                        ref="cmdInput"
+                        v-model="commandText"
+                        type="text"
+                        id="cmdInput"
+                        class="form-control bg-black text-success border-0 rounded-0 shadow-none font-monospace fs-5"
+                        placeholder="Введите команду..."
+                        autocomplete="off"
+                        spellcheck="false"
+                        @keydown.enter.prevent="submitCommand"
+                    />
+                    <button type="button" id="execBtn" class="btn btn-danger text-white rounded-0 fw-bold px-3 text-uppercase" style="min-height: 48px;" @click="submitCommand">
+                        ВЫПОЛНИТЬ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" id="successArea" class="text-center py-5">
+                <div class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold py-5">
+                    <h2 class="h2 fw-bold text-uppercase mb-3">СЕРВЕР СТАБИЛИЗИРОВАН</h2>
+                    <p class="fs-5 mb-0">Все 10 диагностических волн пройдены. Сетевые угрозы устранены.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure overlay -->
+        <div v-if="failVisible" id="failOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-danger text-white text-center p-4" style="z-index: 1050;">
+            <h1 class="display-5 fw-bold text-uppercase mb-2">СБОЙ ДИАГНОСТИКИ</h1>
+            <p class="fs-4 mb-0" v-text="failReason"></p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, nextTick, onUnmounted } = Vue;
+            const TOTAL_WAVES = 10;
+            const DOMAINS = ['vk.com', 'yandex.ru', 'google.com', 'github.com', 'habr.com', 'server.local'];
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            const TASK_GENERATORS = [
+                (ip) => ({ desc: `Проверьте доступность узла (ping) по IP: ${ip}`, ans: [`ping ${ip}`] }),
+                (_, dom) => ({ desc: `Проверьте доступность домена: ${dom}`, ans: [`ping ${dom}`] }),
+                (_, dom) => ({ desc: `Сделайте трассировку маршрута до домена: ${dom} (Windows)`, ans: [`tracert ${dom}`] }),
+                (ip) => ({ desc: `Сделайте трассировку маршрута до IP: ${ip} (Linux)`, ans: [`traceroute ${ip}`] }),
+                (_, dom) => ({ desc: `Узнайте IP-адрес по доменному имени: ${dom}`, ans: [`nslookup ${dom}`] }),
+                () => ({ desc: 'Выведите список всех активных сетевых соединений и портов (с ключом -an)', ans: ['netstat -an'] }),
+                () => ({ desc: 'Посмотрите текущие сетевые настройки (Windows)', ans: ['ipconfig'] }),
+                () => ({ desc: 'Посмотрите текущие сетевые настройки (Linux)', ans: ['ifconfig', 'ip a', 'ip addr'] }),
+                (ip) => ({ desc: `Сделайте трассировку до IP: ${ip} (Windows)`, ans: [`tracert ${ip}`] }),
+                (_, dom) => ({ desc: `Сделайте трассировку до домена: ${dom} (Linux)`, ans: [`traceroute ${dom}`] }),
+                () => ({ desc: 'Очистите кэш DNS (Windows)', ans: ['ipconfig /flushdns'] }),
+                (_, dom) => ({ desc: `Запустите бесконечный пинг (с ключом -t) до домена: ${dom}`, ans: [`ping -t ${dom}`] }),
+                (ip) => ({ desc: `Отправьте ровно 5 пакетов (с ключом -n 5) до IP: ${ip}`, ans: [`ping -n 5 ${ip}`] }),
+                () => ({ desc: 'Покажите таблицу маршрутизации (Windows: команда route print)', ans: ['route print'] }),
+                () => ({ desc: 'Покажите таблицу маршрутизации (Linux: команда route -n)', ans: ['route -n'] }),
+                (_, dom) => ({ desc: `Сделайте запрос к DNS-серверу для домена ${dom} с типом записи MX (-type=mx)`, ans: [`nslookup -type=mx ${dom}`] }),
+                () => ({ desc: 'Покажите ARP-кэш (ключ -a)', ans: ['arp -a'] }),
+                (ip) => ({ desc: `Сделайте трассировку маршрута до ${ip} без резолва доменных имён (с ключом -d, Windows)`, ans: [`tracert -d ${ip}`] }),
+                () => ({ desc: 'Покажите детальную сетевую конфигурацию со всеми адаптерами (Windows: ключ /all)', ans: ['ipconfig /all'] }),
+                (ip) => ({ desc: `Запустите ping до узла ${ip} с размером пакета 1500 байт (ключ -l 1500)`, ans: [`ping -l 1500 ${ip}`] })
+            ];
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const totalWaves = TOTAL_WAVES;
+                    const commandText = ref('');
+                    const currentTask = ref({ desc: '', ans: [] });
+                    const timeRemainingMs = ref(22000);
+                    const waveDurationMs = ref(22000);
+                    const failVisible = ref(false);
+                    const failReason = ref('');
+                    const cmdInput = ref(null);
+
+                    const timerPercent = computed(() => {
+                        if (waveDurationMs.value <= 0) return 0;
+                        return Math.max(0, Math.min(100, (timeRemainingMs.value / waveDurationMs.value) * 100));
+                    });
+                    const timerSec = computed(() => Math.max(0, Math.ceil(timeRemainingMs.value / 1000)));
+
+                    let queue = [];
+                    let timerInterval = null;
+                    let resetTimeout = null;
+                    let lastTick = 0;
+                    const actionLog = [];
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(timerInterval);
+                            clearTimeout(resetTimeout);
+                            timerInterval = null;
+                            failVisible.value = false;
+                        },
+                        onAfkRetry: () => {
+                            failVisible.value = false;
+                            restartFromWave1();
+                        }
+                    });
+
+                    function generateQueue() {
+                        const picked = shuffle(TASK_GENERATORS).slice(0, TOTAL_WAVES);
+                        queue = picked.map((gen) => {
+                            const ip = `${rnd(10, 220)}.${rnd(0, 255)}.${rnd(0, 255)}.${rnd(1, 254)}`;
+                            const dom = DOMAINS[rnd(0, DOMAINS.length - 1)];
+                            return gen(ip, dom);
+                        });
+                    }
+
+                    function getWaveDurationMs(w) {
+                        return Math.max(10000, 22000 - (w - 1) * 1200);
+                    }
+
+                    function startWave(w) {
+                        clearInterval(timerInterval);
+                        wave.value = w;
+                        telemetry.setWave(w, TOTAL_WAVES);
+                        currentTask.value = queue[w - 1];
+                        commandText.value = '';
+
+                        const dur = getWaveDurationMs(w);
+                        waveDurationMs.value = dur;
+                        timeRemainingMs.value = dur;
+                        lastTick = Date.now();
+
+                        nextTick(() => {
+                            if (cmdInput.value) cmdInput.value.focus();
+                        });
+
+                        timerInterval = setInterval(() => {
+                            const now = Date.now();
+                            const delta = now - lastTick;
+                            lastTick = now;
+                            timeRemainingMs.value -= delta;
+                            if (timeRemainingMs.value <= 0) {
+                                failLevel('ВРЕМЯ ИСТЕКЛО', true);
+                            }
+                        }, 100);
+                    }
+
+                    function restartFromWave1() {
+                        generateQueue();
+                        startWave(1);
+                    }
+
+                    function startGame() {
+                        clearTimeout(resetTimeout);
+                        started.value = true;
+                        gameWon.value = false;
+                        failVisible.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: TOTAL_WAVES, stage: 1, total_stages: TOTAL_WAVES });
+                        restartFromWave1();
+                    }
+
+                    function failLevel(reason, isTimeout) {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        const failedWave = wave.value;
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+                        const sent = telemetry.fail({
+                            wave: failedWave,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            return;
+                        }
+
+                        failReason.value = `${reason}. Сброс на Волну 1...`;
+                        failVisible.value = true;
+                        resetTimeout = setTimeout(() => {
+                            failVisible.value = false;
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                restartFromWave1();
+                            }
+                        }, 1500);
+                    }
+
+                    function submitCommand() {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        const norm = commandText.value.trim().toLowerCase().replace(/\s+/g, ' ');
+                        if (!norm) return;
+
+                        clearInterval(timerInterval);
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_cmd_${norm}` });
+
+                        const isCorrect = currentTask.value.ans.some((a) => a.toLowerCase() === norm);
+                        if (isCorrect) {
+                            if (wave.value >= TOTAL_WAVES) {
+                                gameWon.value = true;
+                                telemetry.complete({ wave: TOTAL_WAVES, action_log: actionLog });
+                            } else {
+                                const nextWave = wave.value + 1;
+                                telemetry.advanceWave(nextWave, { action_log: actionLog });
+                                startWave(nextWave);
+                            }
+                        } else {
+                            failLevel('НЕВЕРНАЯ КОМАНДА', false);
+                        }
+                    }
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        totalWaves,
+                        commandText,
+                        currentTask,
+                        timerPercent,
+                        timerSec,
+                        failVisible,
+                        failReason,
+                        cmdInput,
+                        startGame,
+                        submitCommand
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>

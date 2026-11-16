@@ -1,0 +1,367 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 17 :: Сетевое администрирование :: Уровень 1';
+---
+
+<TaskLayout title="Уровень 1 — Таблица маршрутизации" level={1} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-success pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-success fw-bold text-uppercase" id="phaseTitle">Этап 1 из 3: Маршрутизация пакетов</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-success mb-3" style="height: 12px;">
+            <div class="progress-bar bg-success" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="statusBanner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <div class="card bg-dark border-success rounded-0" id="mainCard">
+            <div class="card-body p-3 p-md-4">
+                <p id="phaseDesc" class="text-light mb-3">
+                    Выберите входящий пакет в очереди слева, затем кликните по подходящему интерфейсу маршрутизатора справа (с учётом масок CIDR и шлюза по умолчанию).
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-5">
+                        <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2">
+                            ОЧЕРЕДЬ ПАКЕТОВ (Выберите пакет)
+                        </div>
+                        <div id="sourceList" class="d-flex flex-column gap-2"></div>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2">
+                            ТАБЛИЦА МАРШРУТИЗАЦИИ (Кликните интерфейс)
+                        </div>
+                        <div id="targetSlots" class="d-flex flex-column gap-2"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end gap-2">
+                    <button type="button" id="checkBtn" class="btn btn-success text-dark rounded-0 fw-bold px-4 py-2 w-100 text-uppercase" style="min-height: 48px;" disabled>
+                        Отправить пакеты в порты
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="victoryBox" class="alert alert-success bg-success text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">МАРШРУТИЗАЦИЯ НАСТРОЕНА</h3>
+            <p class="fs-5 mb-0 fw-semibold">УРОВЕНЬ 1 ПРОЙДЕН. Все сетевые пакеты доставлены в верные интерфейсы.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 3;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: TOTAL_PHASES
+            });
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function generatePhaseData(phase) {
+                if (phase === 1) {
+                    const oct3 = rnd(1, 50);
+                    const routes = [
+                        { id: 'eth0', cidr: `192.168.${oct3}.0/24`, label: 'Локальная сеть (/24)' },
+                        { id: 'eth1', cidr: '10.0.0.0/8', label: 'Корпоративная сеть (/8)' },
+                        { id: 'eth2', cidr: '172.16.0.0/16', label: 'Серверная подсеть (/16)' },
+                        { id: 'eth3', cidr: '0.0.0.0/0', label: 'Шлюз по умолчанию (Default)' }
+                    ];
+                    const packets = [
+                        { ip: `192.168.${oct3}.${rnd(2, 250)}`, correctSlot: 'eth0' },
+                        { ip: `10.${rnd(1, 200)}.${rnd(1, 200)}.${rnd(2, 250)}`, correctSlot: 'eth1' },
+                        { ip: `172.16.${rnd(1, 200)}.${rnd(2, 250)}`, correctSlot: 'eth2' },
+                        { ip: `8.8.${rnd(1, 8)}.${rnd(2, 250)}`, correctSlot: 'eth3' }
+                    ];
+                    return {
+                        desc: 'Этап 1: Распределите пакеты по интерфейсам согласно префиксам /24, /16, /8 и шлюзу по умолчанию 0.0.0.0/0.',
+                        routes,
+                        packets: shuffle(packets)
+                    };
+                }
+
+                if (phase === 2) {
+                    const oct3 = rnd(10, 99);
+                    const otherOct3 = oct3 + 1;
+                    const routes = [
+                        { id: 'eth0', cidr: `192.168.${oct3}.0/24`, label: 'Подсеть отдела (/24)' },
+                        { id: 'eth1', cidr: '172.16.0.0/16', label: 'Сеть ЦОД (/16)' },
+                        { id: 'eth2', cidr: '10.0.0.0/8', label: 'Внутренняя сеть (/8)' },
+                        { id: 'eth3', cidr: '0.0.0.0/0', label: 'Шлюз по умолчанию' }
+                    ];
+                    const packets = [
+                        { ip: `192.168.${oct3}.${rnd(10, 240)}`, correctSlot: 'eth0' },
+                        { ip: `192.168.${otherOct3}.${rnd(10, 240)}`, correctSlot: 'eth3' },
+                        { ip: `172.${rnd(17, 30)}.${rnd(1, 100)}.${rnd(2, 200)}`, correctSlot: 'eth3' },
+                        { ip: `172.16.${rnd(2, 200)}.${rnd(2, 200)}`, correctSlot: 'eth1' },
+                        { ip: `10.${rnd(10, 90)}.${rnd(1, 90)}.${rnd(2, 200)}`, correctSlot: 'eth2' }
+                    ];
+                    return {
+                        desc: 'Этап 2: Внимательно проверяйте все фиксированные октеты! Пакеты из чужих подсетей должны уйти в шлюз по умолчанию (0.0.0.0/0).',
+                        routes,
+                        packets: shuffle(packets)
+                    };
+                }
+
+                // Phase 3: Longest prefix match (192.168.10.0/24 vs 192.168.0.0/16)
+                const sub3 = rnd(5, 40);
+                const other3 = sub3 + rnd(2, 15);
+                const routes = [
+                    { id: 'eth0', cidr: `192.168.${sub3}.0/24`, label: 'Точный маршрут (/24)' },
+                    { id: 'eth1', cidr: '192.168.0.0/16', label: 'Общая сеть офиса (/16)' },
+                    { id: 'eth2', cidr: `10.${sub3}.0.0/16`, label: 'Магистраль (/16)' },
+                    { id: 'eth3', cidr: '0.0.0.0/0', label: 'Шлюз по умолчанию' }
+                ];
+                const packets = [
+                    { ip: `192.168.${sub3}.${rnd(2, 240)}`, correctSlot: 'eth0' },
+                    { ip: `192.168.${other3}.${rnd(2, 240)}`, correctSlot: 'eth1' },
+                    { ip: `10.${sub3}.${rnd(1, 100)}.${rnd(2, 240)}`, correctSlot: 'eth2' },
+                    { ip: `10.${other3}.${rnd(1, 100)}.${rnd(2, 240)}`, correctSlot: 'eth3' },
+                    { ip: `1.1.1.${rnd(1, 200)}`, correctSlot: 'eth3' }
+                ];
+                return {
+                    desc: 'Этап 3 (Приоритет самой длинной маски): Если пакет подходит и под /24, и под /16 — выбирайте более точный маршрут (/24)!',
+                    routes,
+                    packets: shuffle(packets)
+                };
+            }
+
+            let currentPhase = 1;
+            let totalPacketsInPhase = 0;
+            let errorsCount = 0;
+            let selectedItemEl = null;
+            let locked = false;
+            const actionLog = [];
+
+            const sourceListEl = document.getElementById('sourceList');
+            const targetSlotsEl = document.getElementById('targetSlots');
+            const checkBtn = document.getElementById('checkBtn');
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const phaseDescEl = document.getElementById('phaseDesc');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const statusBannerEl = document.getElementById('statusBanner');
+            const mainCardEl = document.getElementById('mainCard');
+            const victoryBoxEl = document.getElementById('victoryBox');
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-success bg-success text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.textContent = '';
+            }
+
+            function updateCheckBtn() {
+                const placedCount = targetSlotsEl.querySelectorAll('.item-card').length;
+                const remainingCount = sourceListEl.querySelectorAll('.item-card').length;
+                checkBtn.disabled = locked || remainingCount > 0 || placedCount !== totalPacketsInPhase;
+            }
+
+            function initPhase() {
+                locked = false;
+                selectedItemEl = null;
+                hideBanner();
+
+                const data = generatePhaseData(currentPhase);
+                totalPacketsInPhase = data.packets.length;
+
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}: Маршрутизация пакетов`;
+                phaseDescEl.textContent = data.desc;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+
+                sourceListEl.innerHTML = '';
+                targetSlotsEl.innerHTML = '';
+
+                data.packets.forEach((pkt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'item-card btn btn-outline-success rounded-0 text-start p-3 w-100 text-light d-flex justify-content-between align-items-center';
+                    btn.style.minHeight = '48px';
+                    btn.id = `pkt_${currentPhase}_${idx}`;
+                    btn.dataset.correctSlot = pkt.correctSlot;
+                    btn.dataset.ip = pkt.ip;
+
+                    const ipSpan = document.createElement('span');
+                    ipSpan.className = 'fw-bold';
+                    ipSpan.textContent = `DST: ${pkt.ip}`;
+
+                    const tagSpan = document.createElement('span');
+                    tagSpan.className = 'badge bg-black border border-success text-success rounded-0';
+                    tagSpan.textContent = 'IPv4';
+
+                    btn.appendChild(ipSpan);
+                    btn.appendChild(tagSpan);
+                    sourceListEl.appendChild(btn);
+                });
+
+                data.routes.forEach((route) => {
+                    const slotDiv = document.createElement('div');
+                    slotDiv.className = 'slot border border-secondary bg-black p-2 p-sm-3';
+                    slotDiv.style.minHeight = '64px';
+                    slotDiv.style.cursor = 'pointer';
+                    slotDiv.dataset.slotId = route.id;
+
+                    const headerDiv = document.createElement('div');
+                    headerDiv.className = 'd-flex justify-content-between align-items-center mb-1 gap-2 flex-wrap';
+                    headerDiv.style.pointerEvents = 'none';
+
+                    const cidrSpan = document.createElement('span');
+                    cidrSpan.className = 'text-success fw-bold';
+                    cidrSpan.textContent = `${route.id} → ${route.cidr}`;
+
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'small text-secondary';
+                    labelSpan.textContent = route.label;
+
+                    headerDiv.appendChild(cidrSpan);
+                    headerDiv.appendChild(labelSpan);
+
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'slot-content d-flex flex-column gap-2 w-100';
+
+                    slotDiv.appendChild(headerDiv);
+                    slotDiv.appendChild(contentDiv);
+                    targetSlotsEl.appendChild(slotDiv);
+                });
+
+                updateCheckBtn();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function selectItem(itemEl) {
+                if (itemEl.parentElement && itemEl.parentElement.classList.contains('slot-content')) {
+                    const slotEl = itemEl.closest('.slot');
+                    sourceListEl.appendChild(itemEl);
+                    itemEl.classList.remove('active', 'bg-success', 'text-dark', 'fw-bold');
+                    itemEl.classList.add('text-light');
+                    if (slotEl && slotEl.querySelectorAll('.item-card').length === 0) {
+                        slotEl.classList.replace('border-success', 'border-secondary');
+                    }
+                    selectedItemEl = null;
+                    updateCheckBtn();
+                    return;
+                }
+
+                sourceListEl.querySelectorAll('.item-card').forEach(el => {
+                    el.classList.remove('active', 'bg-success', 'text-dark', 'fw-bold');
+                    el.classList.add('text-light');
+                });
+                itemEl.classList.remove('text-light');
+                itemEl.classList.add('active', 'bg-success', 'text-dark', 'fw-bold');
+                selectedItemEl = itemEl;
+            }
+
+            // Single-bound delegated listeners
+            sourceListEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const itemEl = e.target.closest('.item-card');
+                if (itemEl) selectItem(itemEl);
+            });
+
+            targetSlotsEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const clickedItem = e.target.closest('.item-card');
+                if (clickedItem && !selectedItemEl) {
+                    selectItem(clickedItem);
+                    return;
+                }
+
+                const slotEl = e.target.closest('.slot');
+                if (!slotEl || !selectedItemEl) return;
+
+                const contentDiv = slotEl.querySelector('.slot-content');
+                selectedItemEl.classList.remove('active', 'bg-success', 'text-dark', 'fw-bold');
+                selectedItemEl.classList.add('text-light');
+                contentDiv.appendChild(selectedItemEl);
+                slotEl.classList.remove('border-secondary', 'border-danger');
+                slotEl.classList.add('border-success');
+                selectedItemEl = null;
+                updateCheckBtn();
+            });
+
+            checkBtn.addEventListener('click', () => {
+                if (locked) return;
+                let isCorrect = true;
+                const slots = targetSlotsEl.querySelectorAll('.slot');
+
+                slots.forEach(slot => {
+                    const items = slot.querySelectorAll('.item-card');
+                    let slotHasError = false;
+                    items.forEach(item => {
+                        if (item.dataset.correctSlot !== slot.dataset.slotId) {
+                            isCorrect = false;
+                            slotHasError = true;
+                            item.classList.remove('btn-outline-success', 'text-light');
+                            item.classList.add('btn-danger', 'text-white');
+                            setTimeout(() => {
+                                item.classList.remove('btn-danger', 'text-white');
+                                item.classList.add('btn-outline-success', 'text-light');
+                                sourceListEl.appendChild(item);
+                                if (slot.querySelectorAll('.item-card').length === 0) {
+                                    slot.classList.remove('border-danger', 'border-success');
+                                    slot.classList.add('border-secondary');
+                                }
+                                updateCheckBtn();
+                            }, 800);
+                        }
+                    });
+                    if (slotHasError) {
+                        slot.classList.remove('border-success');
+                        slot.classList.add('border-danger');
+                    }
+                });
+
+                if (isCorrect) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        showBanner('Пакеты доставлены верно! Переход к следующему этапу...', false);
+                        locked = true;
+                        setTimeout(() => initPhase(), 600);
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'МАРШРУТИЗАЦИЯ НАСТРОЕНА';
+                        mainCardEl.classList.add('d-none');
+                        victoryBoxEl.classList.remove('d-none');
+                        hideBanner();
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_failed` });
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    showBanner('Ошибка маршрутизации! Ошибочные пакеты возвращены в очередь.', true);
+                }
+                updateCheckBtn();
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>

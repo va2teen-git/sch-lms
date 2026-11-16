@@ -1,0 +1,221 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 18 :: Виды деятельности в сети Интернет :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Антифишинг-фильтр" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase" id="phaseTitle">Этап 1 из 5: Антифишинг-фильтр</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-warning mb-3" style="height: 12px;">
+            <div class="progress-bar bg-warning" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="pasteNotice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите официальный домен вручную.
+        </div>
+
+        <div class="card bg-dark border-warning rounded-0" id="gameArea">
+            <div class="card-header border-warning text-warning fw-bold text-uppercase">
+                Модуль безопасности DPI: Инспекция SSL-соединений
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <p class="text-light small mb-3">
+                    В корпоративной сети замечены фишинговые атаки. Проанализируйте цель сотрудника и введите <strong>настоящий официальный домен</strong> сервиса (даже если ниже показан верный URL).
+                </p>
+
+                <div class="bg-black border border-secondary p-3 mb-3">
+                    <div class="text-secondary small text-uppercase mb-1">Цель запроса пользователя:</div>
+                    <div class="fs-4 text-white fw-bold" id="userIntent">Инициализация...</div>
+                </div>
+
+                <div class="bg-black border border-warning p-3 mb-4 text-center">
+                    <div class="text-secondary small text-uppercase mb-1">Запрашиваемый URL из перехвата:</div>
+                    <div class="fs-5 text-warning fw-bold text-break" id="targetUrl">https://...</div>
+                </div>
+
+                <label for="domainInput" class="form-label text-light small mb-2">
+                    Официальный домен второго/третьего уровня (например: <code>gosuslugi.ru</code>):
+                </label>
+                <div class="input-group w-100" style="max-width: 580px;">
+                    <input type="text" id="domainInput" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="domain.ru" autocomplete="off" spellcheck="false" />
+                    <button type="button" id="checkBtn" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5" style="min-height: 48px;">ПРОВЕРИТЬ</button>
+                </div>
+
+                <div id="feedbackMsg" class="alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="successArea" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">СЕТЬ В БЕЗОПАСНОСТИ</h3>
+            <p class="fs-5 mb-0 fw-semibold">УРОВЕНЬ 2 ПРОЙДЕН. Все фишинговые подмены выявлены и заблокированы.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            const database = [
+                { intent: 'Госуслуги', correctDomains: ['gosuslugi.ru', 'www.gosuslugi.ru'], fake: ['gosuslugi-auth.ru', 'gosuslygi.ru', 'login-gosuslugi.com'] },
+                { intent: 'ФНС (Налоговая)', correctDomains: ['nalog.gov.ru', 'www.nalog.gov.ru', 'nalog.ru'], fake: ['nalog-gov-ru.net', 'lkfl-nalog.ru'] },
+                { intent: 'Социальный фонд (СФР)', correctDomains: ['sfr.gov.ru', 'www.sfr.gov.ru'], fake: ['sfr-gov.ru', 'pfrf-sfr.ru'] },
+                { intent: 'Росреестр', correctDomains: ['rosreestr.gov.ru', 'www.rosreestr.gov.ru'], fake: ['rosreestr-gov.ru', 'rosreestr-online.ru'] },
+                { intent: 'Сайт Администрации Санкт-Петербурга', correctDomains: ['gov.spb.ru', 'www.gov.spb.ru'], fake: ['spb-gov.ru', 'gov-spb-login.com'] },
+                { intent: 'Здоровье петербуржца (Запись к врачу)', correctDomains: ['gorzdrav.spb.ru', 'www.gorzdrav.spb.ru'], fake: ['gorzdrav.online-med.ru', 'spb-gorzdrav.com'] },
+                { intent: 'Сбербанк Онлайн', correctDomains: ['online.sberbank.ru', 'sberbank.ru', 'www.sberbank.ru'], fake: ['sberbank-online.com', 'sber-online-login.ru'] },
+                { intent: 'Т-Банк (Тинькофф)', correctDomains: ['tbank.ru', 'www.tbank.ru', 'tinkoff.ru'], fake: ['t-bank-online.ru', 'tinkoff-tbank.ru'] },
+                { intent: 'Альфа-Банк', correctDomains: ['alfabank.ru', 'www.alfabank.ru'], fake: ['alfa-bank-login.ru', 'alfabank-ru.com'] },
+                { intent: 'Ozon', correctDomains: ['ozon.ru', 'www.ozon.ru'], fake: ['ozon-sale.ru', 'ozon-market.com'] },
+                { intent: 'Wildberries', correctDomains: ['wildberries.ru', 'www.wildberries.ru'], fake: ['wildberies.ru', 'wb-sale24.ru'] },
+                { intent: 'Авито', correctDomains: ['avito.ru', 'www.avito.ru'], fake: ['avito-delivery.ru', 'avito-pay.ru'] },
+                { intent: 'РЖД', correctDomains: ['rzd.ru', 'www.rzd.ru'], fake: ['rzd-ticket.ru', 'rzd-online.com'] },
+                { intent: 'Аэрофлот', correctDomains: ['aeroflot.ru', 'www.aeroflot.ru'], fake: ['aeroflot-tickets.ru', 'aeroflot-ru.com'] },
+                { intent: 'Почта России', correctDomains: ['pochta.ru', 'www.pochta.ru'], fake: ['pochta-tracking.ru', 'pochta-ru.com'] },
+                { intent: 'Электронный дневник', correctDomains: ['dnevnik.ru', 'www.dnevnik.ru'], fake: ['dnevnik-school.ru', 'login-dnevnik.ru'] },
+                { intent: 'Stepik', correctDomains: ['stepik.org', 'www.stepik.org'], fake: ['stepik-courses.ru', 'stepik.com'] },
+                { intent: 'Учи.ру', correctDomains: ['uchi.ru', 'www.uchi.ru'], fake: ['uchi-ru-login.com', 'uchi-school.ru'] },
+                { intent: 'ВКонтакте', correctDomains: ['vk.com', 'www.vk.com'], fake: ['vk-login.com', 'vk.ru.com'] },
+                { intent: 'Яндекс', correctDomains: ['ya.ru', 'yandex.ru', 'www.ya.ru'], fake: ['yandex-search.com', 'ya-ru.online'] }
+            ];
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            let pool = shuffle(database);
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let currentScenario = null;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const userIntentEl = document.getElementById('userIntent');
+            const targetUrlEl = document.getElementById('targetUrl');
+            const inputEl = document.getElementById('domainInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const feedbackEl = document.getElementById('feedbackMsg');
+            const pasteNoticeEl = document.getElementById('pasteNotice');
+            const gameAreaEl = document.getElementById('gameArea');
+            const successAreaEl = document.getElementById('successArea');
+
+            function initPhase() {
+                locked = false;
+                if (pool.length === 0) {
+                    pool = shuffle(database);
+                }
+                currentScenario = pool.pop();
+
+                const isReal = Math.random() > 0.5;
+                let displayedUrl = '';
+                if (isReal) {
+                    displayedUrl = 'https://' + currentScenario.correctDomains[0] + '/login';
+                } else {
+                    const fakeDomain = currentScenario.fake[Math.floor(Math.random() * currentScenario.fake.length)];
+                    displayedUrl = 'http://' + fakeDomain + '/secure';
+                }
+
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}: Антифишинг-фильтр`;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+                userIntentEl.textContent = currentScenario.intent;
+                targetUrlEl.textContent = displayedUrl;
+
+                inputEl.value = '';
+                inputEl.disabled = false;
+                checkBtn.disabled = false;
+                inputEl.classList.remove('border-danger', 'bg-danger', 'text-white');
+                inputEl.classList.add('border-warning', 'bg-black', 'text-warning');
+                feedbackEl.classList.add('d-none');
+                feedbackEl.textContent = '';
+
+                inputEl.focus();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function normalizeDomain(val) {
+                return val
+                    .trim()
+                    .toLowerCase()
+                    .replace(/^https?:\/\//, '')
+                    .replace(/\/.*$/, '')
+                    .replace(/\s+/g, '');
+            }
+
+            function checkAnswer() {
+                if (locked || !currentScenario) return;
+                const clean = normalizeDomain(inputEl.value);
+                if (!clean) return;
+
+                const isCorrect = currentScenario.correctDomains.includes(clean);
+
+                if (isCorrect) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        initPhase();
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'СЕТЬ В БЕЗОПАСНОСТИ';
+                        gameAreaEl.classList.add('d-none');
+                        successAreaEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_error_${clean}` });
+
+                    inputEl.classList.remove('border-warning', 'bg-black', 'text-warning');
+                    inputEl.classList.add('border-danger', 'bg-danger', 'text-white');
+                    inputEl.disabled = true;
+                    checkBtn.disabled = true;
+                    feedbackEl.textContent = 'ОШИБКА: Неверный официальный домен! Генерация нового инцидента...';
+                    feedbackEl.classList.remove('d-none');
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => initPhase(), 1100);
+                }
+            }
+
+            // Anti-Paste & single-bound listeners
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+            });
+            checkBtn.addEventListener('click', checkAnswer);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>
