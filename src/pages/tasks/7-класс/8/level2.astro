@@ -198,36 +198,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     // =========================================================================
-    // ТЕЛЕМЕТРИЯ (Стандарты xAPI / IMS Caliper)
+    // ТЕЛЕМЕТРИЯ (Единый хелпер LMSTelemetry)
     // =========================================================================
-    const startTime = new Date();
-    let attempts = 0;
     const missionName = '7 класс :: Урок 8 :: Контрольная работа: Сервисы интернет-коммуникаций. Сетевой этикет. Стратегии безопасного поведения в Интернете (Уровень 2)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
 
     function triggerError(message, retryCallback) {
-        attempts++;
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         if (errorMessage) errorMessage.textContent = message;
         if (errorBox) errorBox.classList.remove('d-none');
 
         // Отправка сигнала телеметрии о сбое текущей попытки
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        telemetry.hardcoreReset();
 
         setTimeout(() => {
             if (errorBox) errorBox.classList.add('d-none');
@@ -318,6 +305,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+            telemetry.advanceStage(2);
             initPhase2();
         } else {
             triggerError('ОШИБКА РАСЧЕТА: Неверно вычислено значение! Проверьте формулу N = A^L и мощности наборов символов.', () => {
@@ -379,6 +367,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+            telemetry.advanceStage(3);
             initPhase3();
         } else {
             triggerError('ОШИБКА ПОРТА: Неверно указан номер сетевого порта IANA для данного протокола!', () => {
@@ -458,6 +447,7 @@ Subject: Предоставьте СНИЛС для подтверждения �
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+            telemetry.advanceStage(4);
             initPhase4();
         } else {
             triggerError('ОШИБКА АУДИТА RFC: Неверно извлечен параметр из служебных заголовков письма! Проверьте поля Return-Path, Reply-To и нижний узел Received.', () => {
@@ -518,6 +508,7 @@ Subject: Предоставьте СНИЛС для подтверждения �
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+            telemetry.advanceStage(5);
             initPhase5();
         } else {
             triggerError('ОШИБКА АНАЛИЗА URL: Неверно определен домен 2-го уровня или символ подмены!', () => {
@@ -574,7 +565,7 @@ Subject: Предоставьте СНИЛС для подтверждения �
             document.getElementById('success-screen').classList.remove('d-none');
             document.getElementById('phase-badge').className = 'badge bg-warning text-dark border border-warning rounded-0 px-3 py-2';
             document.getElementById('phase-badge').textContent = 'Уровень пройден!';
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete();
         } else {
             triggerError('ОШИБКА ПРАВОВОЙ КВАЛИФИКАЦИИ: Неверно указан номер статьи УК РФ или Федерального закона!', () => {
                 initPhase5();

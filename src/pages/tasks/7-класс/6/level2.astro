@@ -153,34 +153,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     // ================= ТЕЛЕМЕТРИЯ =================
-    const startTime = new Date();
-    let attempts = 0;
     const missionName = 'Урок 6 :: Компьютерные вирусы и антивирусные программы (Уровень 2)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
 
     function triggerError(message, retryCallback) {
-        attempts++;
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         errorMessage.textContent = message;
         errorBox.classList.remove('d-none');
 
         // Отправка сигнала hardcore_reset
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        telemetry.hardcoreReset();
 
         setTimeout(() => {
             errorBox.classList.add('d-none');
@@ -225,6 +212,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (val === p1CurrentExpected) {
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
             initPhase2();
         } else {
             triggerError(`Неверно! Файл "${document.getElementById('p1-filename').textContent}" запускается по своему последнему расширению. Генерация нового файла...`, () => {
@@ -284,6 +272,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isMatch && val.length > 0) {
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
+            telemetry.advanceStage(3);
             initPhase3();
         } else {
             triggerError('Неверный класс угрозы! Перепроверьте формулировку в логе. Генерация нового инцидента...', () => {
@@ -336,6 +325,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (val === p3CurrentExpectedNumber) {
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
+            telemetry.advanceStage(4);
             initPhase4();
         } else {
             triggerError(`Ошибка в вычислениях! Ожидалось верное расчетное значение. Генерация новых параметров...`, () => {
@@ -383,6 +373,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isMatch) {
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');
+            telemetry.advanceStage(5);
             initPhase5();
         } else {
             triggerError('Неверно выбранное действие! Для ценных файлов используют лечение, для неизвестных - карантин, для бесполезного зловреда - удаление. Регенерация...', () => {
@@ -428,7 +419,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Успешное завершение Уровня 2!
             document.getElementById('phase5').classList.add('d-none');
             document.getElementById('success-screen').classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete();
         } else {
             triggerError('Неверно! Вспомните материалы теории (статья 273 УК РФ и до 7 лет лишения свободы). Повторный опрос...', () => {
                 initPhase5();

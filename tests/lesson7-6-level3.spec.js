@@ -25,10 +25,10 @@ test.describe('7 класс. Урок 6. Уровень 3: Аркада Firewall
     // 4. Наличие локального таймера на волну
     expect(content).toMatch(/timer|timeleft|waveTimeLimit/i);
 
-    // 5. Контракт телеметрии
-    expect(content).toContain('TELEMETRY_EVENT');
-    expect(content).toContain('level_complete');
-    expect(content).toContain('hardcore_reset');
+    // 5. Контракт телеметрии (LMSTelemetry)
+    expect(content).toContain('LMSTelemetry');
+    expect(content).toContain('.complete(');
+    expect(content).toContain('.hardcoreReset(');
     expect(content).toContain('Урок 6');
 
     // 6. Тактические действия и экраны

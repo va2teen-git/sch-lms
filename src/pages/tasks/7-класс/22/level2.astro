@@ -171,29 +171,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     </div>
 </TaskLayout>
 
-<script>
+<script is:inline>
     const MISSION_NAME = 'Урок 22 :: Форматирование текстовых документов (Уровень 2)';
-    const startTime = Date.now();
-    let attemptsCount = 0;
     const actionLog = [];
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 2,
+        totalStages: 5
+    });
 
     function logAction(action, details = {}) {
         actionLog.push({ time: new Date().toISOString(), action, ...details });
-    }
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.round((Date.now() - startTime) / 1000);
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: MISSION_NAME,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success,
-            action_log: actionLog
-        }, '*');
     }
 
     function normalizeNumberInput(str) {
@@ -204,11 +192,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function triggerError(msg, regenCallback) {
-        attemptsCount++;
+        telemetry.hardcoreReset({ action_log: actionLog });
         const attEl = document.getElementById('attempts-display');
-        if (attEl) attEl.textContent = String(attemptsCount);
-
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        if (attEl) attEl.textContent = String(telemetry.getState().attemptsCount);
 
         const fbBox = document.getElementById('feedback-box');
         const fbText = document.getElementById('feedback-text');
@@ -271,6 +257,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase1')?.classList.add('d-none');
             document.getElementById('phase2')?.classList.remove('d-none');
             setPhaseHeader(2, 'Геометрия полосы набора и таблиц на листе А4');
+            telemetry.advanceStage(2, { action_log: actionLog });
             initPhase2();
         } else {
             triggerError(`Неверно! Высота блока равна N × K × I (${p1Expected} пт).`, initPhase1);
@@ -325,6 +312,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase2')?.classList.add('d-none');
             document.getElementById('phase3')?.classList.remove('d-none');
             setPhaseHeader(3, 'Трассировка операций буфера обмена');
+            telemetry.advanceStage(3, { action_log: actionLog });
             initPhase3();
         } else {
             triggerError('Ошибка расчета ширины столбца! Проверьте формулу: (Ширина_листа − Левое_поле − Правое_поле) / Число_столбцов.', initPhase2);
@@ -422,6 +410,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase3')?.classList.add('d-none');
             document.getElementById('phase4')?.classList.remove('d-none');
             setPhaseHeader(4, 'Аудит дампа непечатаемых символов (Ctrl+F10)');
+            telemetry.advanceStage(4, { action_log: actionLog });
             initPhase4();
         } else {
             triggerError('Неверный результат трассировки буфера обмена! Помните: Delete не затирает буфер обмена.', initPhase3);
@@ -493,6 +482,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase4')?.classList.add('d-none');
             document.getElementById('phase5')?.classList.remove('d-none');
             setPhaseHeader(5, 'Экспертиза стандарта ОГЭ 13.2 и горячих клавиш');
+            telemetry.advanceStage(5, { action_log: actionLog });
             initPhase5();
         } else {
             triggerError(`Неверно! Помните: число абзацев определяется маркерами ¶ (${p4ExpectedParas}), а не ↵. Ошибок набора: ${p4ExpectedErrors}.`, initPhase4);
@@ -577,7 +567,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             logAction('phase5_complete', { answer: raw });
             document.getElementById('phase5')?.classList.add('d-none');
             document.getElementById('success-screen')?.classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete({ action_log: actionLog });
         } else {
             triggerError(`Неверно! Проверьте балл по критериям ОГЭ (0, 1 или 2) и комбинацию клавиш (формат БАЛЛ:CTRL+КЛАВИША).`, initPhase5);
         }

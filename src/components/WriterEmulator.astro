@@ -4,13 +4,15 @@ export interface Props {
   initialHTML?: string;
   hardcoreReset?: boolean;
   checkOgeFormat?: boolean;
+  disableAutoTelemetry?: boolean;
 }
 
 const { 
   missionName, 
   initialHTML = '<p></p>', 
   hardcoreReset = false,
-  checkOgeFormat = true
+  checkOgeFormat = true,
+  disableAutoTelemetry = false
 } = Astro.props;
 ---
 <div class="d-flex flex-column h-100 bg-black p-2 rounded-0 user-select-none-header">
@@ -666,7 +668,7 @@ const {
 <script src="/static/jodit/jodit.min.js" is:inline></script>
 <script src="/static/writer-validator.js" is:inline></script>
 
-<script define:vars={{ missionName, hardcoreReset, checkOgeFormat }}>
+<script define:vars={{ missionName, hardcoreReset, checkOgeFormat, disableAutoTelemetry }}>
     let attempts = 0;
     let startTime = Date.now();
     let editor = null;
@@ -762,6 +764,7 @@ const {
     }
 
     function sendTelemetry(actionType, status, success = false) {
+        if (disableAutoTelemetry) return;
         const levelMatch = String(missionName || '').match(/Уровень\s*(\d+)/i) || window.location.pathname.match(/level(\d+)/i);
         const resolvedLevel = levelMatch ? parseInt(levelMatch[1], 10) : 1;
         const msg = {
@@ -801,7 +804,9 @@ const {
         }
     }
 
-    sendTelemetry('in_progress', 'in_progress');
+    if (!disableAutoTelemetry) {
+        sendTelemetry('in_progress', 'in_progress');
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         // Инициализация Jodit без родного тулбара, так как мы отрисовали аутентичную панель LibreOffice

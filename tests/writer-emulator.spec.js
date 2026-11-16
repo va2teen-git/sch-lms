@@ -4,6 +4,10 @@ test.describe('LibreOffice Writer Emulator Suite', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    const startBtn = page.locator('#start-btn');
+    if (await startBtn.isVisible()) {
+      await startBtn.click();
+    }
     const taskDescription = page.locator('#task-description');
     await expect(taskDescription).toBeVisible();
     await expect(taskDescription).not.toContainText('Загрузка');

@@ -25,7 +25,7 @@ export const GET: APIRoute = async ({ request }) => {
     let rows: any[];
     if (courseSlug && lessonId) {
       rows = db.prepare(`
-        SELECT action_type, mission_name, is_hardcore, level_number 
+        SELECT action_type, mission_name, is_hardcore, level_number, status, success 
         FROM telemetry 
         WHERE (first_name = ? AND last_name = ?)
           AND (student_class = ? OR class_name = ?)
@@ -51,7 +51,7 @@ export const GET: APIRoute = async ({ request }) => {
       );
     } else {
       rows = db.prepare(`
-        SELECT action_type, mission_name, is_hardcore, level_number 
+        SELECT action_type, mission_name, is_hardcore, level_number, status, success 
         FROM telemetry 
         WHERE (first_name = ? AND last_name = ?)
           AND (student_class = ? OR class_name = ?)
@@ -88,15 +88,16 @@ export const GET: APIRoute = async ({ request }) => {
       if (row.action_type === 'normal_reset' && row.is_hardcore === 0) {
         normalLevels.clear();
       }
-      if (row.action_type === 'level_complete' || row.action_type === 'task_completed') {
+      const isLegacyComplete = row.action_type === '' && row.status === 'completed' && row.success === 1;
+      if (row.action_type === 'level_complete' || row.action_type === 'task_completed' || isLegacyComplete) {
         let lvlKey = mName;
         if (row.level_number === 1 || row.level_number === 2 || row.level_number === 3) {
           lvlKey = `lvl_${row.level_number}`;
-        } else if (/Уровень\s*1/i.test(mName)) {
+        } else if (/Уровень\s*1/i.test(mName) || /\(Базовый\)/i.test(mName)) {
           lvlKey = 'lvl_1';
         } else if (/Уровень\s*2/i.test(mName)) {
           lvlKey = 'lvl_2';
-        } else if (/Уровень\s*3/i.test(mName)) {
+        } else if (/Уровень\s*3/i.test(mName) || /10\s*волн/i.test(mName)) {
           lvlKey = 'lvl_3';
         }
         if (row.is_hardcore === 1) {

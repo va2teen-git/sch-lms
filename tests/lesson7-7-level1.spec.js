@@ -27,10 +27,10 @@ test.describe('7 класс. Урок 7. Уровень 1: Компьютерн�
     expect(content).not.toContain('type="radio"');
     expect(content).not.toContain('<select');
 
-    // 5. Контракт телеметрии
-    expect(content).toContain('TELEMETRY_EVENT');
-    expect(content).toContain('level_complete');
-    expect(content).toContain('hardcore_reset');
+    // 5. Контракт телеметрии (LMSTelemetry)
+    expect(content).toContain('LMSTelemetry');
+    expect(content).toContain('.complete(');
+    expect(content).toContain('.hardcoreReset(');
     expect(content).toContain('Урок 7');
   });
 

@@ -3,8 +3,16 @@ import { verifySurfaceContrast } from './procedural-contracts.js';
 
 test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в LibreOffice Writer: 10 волн)', () => {
 
+  async function startArcade(page) {
+    const startBtn = page.locator('#start-btn');
+    if (await startBtn.isVisible()) {
+      await startBtn.click();
+    }
+  }
+
   test('Отслеживание действий ученика в реальном времени (actionLog, панель инструментов, диалоги и живой чек-лист)', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
     await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
 
     // Получаем данные Волны 1 и проверяем увеличенный таймер (85 сек)
@@ -47,6 +55,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
 
   test('Полное боевое прохождение всех 10 волн скоростной печати и форматирования до экрана победы', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
 
     // --- ВОЛНА 1: Полужирное начертание ---
     await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
@@ -200,6 +209,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
 
   test('Хардкор-сброс на Волну 1 при ошибке форматирования на старших волнах', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
 
     // Переходим на Волну 5
     await page.evaluate(() => window.jumpToLevel3Wave(5));
@@ -215,6 +225,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
 
   test('Контрастность текста образца (Surface-Foreground Pairing) на всех 10 волнах и защита от белого текста на белом фоне на уровне платформы', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
 
     for (let waveNum = 1; waveNum <= 10; waveNum++) {
       await page.evaluate((w) => window.jumpToLevel3Wave(w), waveNum);
@@ -266,6 +277,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
 
   test('Стабильность геометрии страницы: при нажатии Пробела и наборе текста страница и рабочая область редактора не сжимаются', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
     await expect(page.locator('#wave-badge')).toContainText('ВОЛНА 1 / 10');
 
     const getDimensions = () => page.evaluate(() => ({
@@ -297,6 +309,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
 
   test('Глубокое тестирование Волны 3 (все 3 процедурных варианта и способы ввода: кнопки #btn-sup/#btn-sub при наборе, спецсимволы Ω, копирование образца, ввод е/ё, кириллических аналогов и дефиса)', async ({ page }) => {
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
 
     for (let variantIdx = 0; variantIdx < 3; variantIdx++) {
       await page.evaluate((idx) => {
@@ -381,6 +394,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
   test('Реалистичное клавиатурно-мышечное прохождение всех 10 волн по всем 3 процедурным вариантам (30 комбинаций волн через реальный ввод текста, кнопки тулбара, спецсимволы Ω, списки и таблицы)', async ({ page }) => {
     test.setTimeout(60000);
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
 
     for (let variantIdx = 0; variantIdx < 3; variantIdx++) {
       await page.evaluate((idx) => {
@@ -585,6 +599,7 @@ test.describe('7 класс - Урок 22 - Уровень 3 (Аркада в Li
   test('Ручное человеческое прохождение всех 10 волн (пост-выделение текста клавишами Shift+Arrow после набора, клик по линейке #ruler-first-line, меню Формат/Вставка/Таблица и навигация Tab по ячейкам)', async ({ page }) => {
     test.setTimeout(90000);
     await page.goto('/tasks/7-класс/22/level3');
+    await startArcade(page);
 
     for (let variantIdx = 0; variantIdx < 3; variantIdx++) {
       await page.evaluate((idx) => {

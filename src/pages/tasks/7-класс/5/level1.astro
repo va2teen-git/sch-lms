@@ -75,38 +75,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     </div>
 </div>
 
-<script>
-    // Телеметрия
-    const startTime = new Date();
-    let attempts = 0;
+<script is:inline>
+    // Телеметрия (единый хелпер LMSTelemetry)
     const missionName = 'Урок 5 :: Архивация данных (Базовый)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    // Отправка начала
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function showError(msg) {
-        attempts++;
         const errBox = document.getElementById('error-box');
         const errMsg = document.getElementById('error-message');
         errMsg.textContent = msg;
         errBox.classList.remove('d-none');
-        
+
         // По правилам Уровня 1 - отправляем hardcore_reset, но сбрасываем только текущую фазу локально
-        sendTelemetry('hardcore_reset', 'in_progress', false);
-        
+        telemetry.hardcoreReset();
+
         setTimeout(() => {
             errBox.classList.add('d-none');
         }, 3000);
@@ -167,6 +153,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isCorrect) {
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
         } else {
             showError('Выбраны файлы, не подлежащие сжатию (или пропущены подходящие). Генерация нового списка...');
             setTimeout(generatePhase1, 1000);
@@ -194,6 +181,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (val === p2CorrectAnswer) {
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
+            telemetry.advanceStage(3);
         } else {
             showError('Неверный расчет размера архива. Повторите вычисление с новыми данными.');
             setTimeout(generatePhase2, 1000);
@@ -235,7 +223,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (ans === p3CorrectAnswer) {
                 document.getElementById('phase3').classList.add('d-none');
                 document.getElementById('success-screen').classList.remove('d-none');
-                sendTelemetry('level_complete', 'completed', true);
+                telemetry.complete();
             } else {
                 showError('Выбран неверный инструмент. Возник конфликт совместимости. Генерируется новая задача...');
                 setTimeout(generatePhase3, 1000);

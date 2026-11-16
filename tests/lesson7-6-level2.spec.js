@@ -34,10 +34,10 @@ test.describe('7 класс. Урок 6. Уровень 2: Аналитика у
     expect(content).toContain('id="input-p4"');
     expect(content).toContain('id="input-p5"');
 
-    // 5. Контракт телеметрии
-    expect(content).toContain('TELEMETRY_EVENT');
-    expect(content).toContain('level_complete');
-    expect(content).toContain('hardcore_reset');
+    // 5. Контракт телеметрии (LMSTelemetry)
+    expect(content).toContain('LMSTelemetry');
+    expect(content).toContain('.complete(');
+    expect(content).toContain('.hardcoreReset(');
     expect(content).toContain('Урок 6');
   });
 

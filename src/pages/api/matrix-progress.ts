@@ -31,7 +31,7 @@ export const GET: APIRoute = async ({ request }) => {
     db = new Database(dbPath, { readonly: true });
 
     const rows = db.prepare(`
-      SELECT course_slug, lesson_id, level_number, mission_name, action_type, is_hardcore, time_spent_sec, success
+      SELECT course_slug, lesson_id, level_number, mission_name, action_type, is_hardcore, time_spent_sec, status, success
       FROM telemetry
       WHERE (first_name = ? AND last_name = ?)
         AND (student_class = ? OR class_name = ?)
@@ -90,16 +90,17 @@ export const GET: APIRoute = async ({ request }) => {
         continue;
       }
 
-      if (aType === 'level_complete' || aType === 'task_completed') {
+      const isLegacyComplete = aType === '' && r.status === 'completed' && r.success === 1;
+      if (aType === 'level_complete' || aType === 'task_completed' || isLegacyComplete) {
         entry.hasActivity = true;
         let lvlKey = mName;
         if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
           lvlKey = `lvl_${r.level_number}`;
-        } else if (mName.includes('Уровень 1')) {
+        } else if (mName.includes('Уровень 1') || /\(Базовый\)/i.test(mName)) {
           lvlKey = 'lvl_1';
         } else if (mName.includes('Уровень 2')) {
           lvlKey = 'lvl_2';
-        } else if (mName.includes('Уровень 3')) {
+        } else if (mName.includes('Уровень 3') || /10\s*волн/i.test(mName)) {
           lvlKey = 'lvl_3';
         }
 

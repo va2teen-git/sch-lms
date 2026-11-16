@@ -219,37 +219,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     </div>
 </TaskLayout>
 
-<script>
+<script is:inline>
     const MISSION_NAME = 'Урок 22 :: Форматирование текстовых документов (Уровень 1)';
-    const startTime = Date.now();
-    let attemptsCount = 0;
     const actionLog = [];
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 1,
+        totalStages: 3
+    });
 
     function logAction(action, details = {}) {
         actionLog.push({ time: new Date().toISOString(), action, ...details });
     }
 
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.round((Date.now() - startTime) / 1000);
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: MISSION_NAME,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success,
-            action_log: actionLog
-        }, '*');
-    }
-
     function triggerError(msg, regenCallback) {
-        attemptsCount++;
+        telemetry.hardcoreReset({ action_log: actionLog });
         const attEl = document.getElementById('attempts-display');
-        if (attEl) attEl.textContent = String(attemptsCount);
-
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        if (attEl) attEl.textContent = String(telemetry.getState().attemptsCount);
 
         const errBox = document.getElementById('error-box');
         const errMsg = document.getElementById('error-message');
@@ -429,6 +415,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const title = document.getElementById('phase-title');
             if (badge) badge.textContent = 'Шаг 2 из 3';
             if (title) title.textContent = 'Слот-пазл непечатаемых символов и горячих клавиш';
+            telemetry.advanceStage(2, { action_log: actionLog });
             initPhase2();
         } else {
             triggerError('Ошибка классификации! Проверьте различие между изменением содержания (редактированием), оформлением символов и свойствами абзаца.', () => {
@@ -558,6 +545,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const title = document.getElementById('phase-title');
             if (badge) badge.textContent = 'Шаг 3 из 3';
             if (title) title.textContent = 'Калибратор параметров страницы и абзаца';
+            telemetry.advanceStage(3, { action_log: actionLog });
             initPhase3();
         } else {
             triggerError('Неверное сопоставление служебных символов или горячих клавиш! Проверьте таблицу непечатаемых знаков.', () => {
@@ -722,7 +710,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             logAction('phase3_complete');
             document.getElementById('phase3')?.classList.add('d-none');
             document.getElementById('success-screen')?.classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete({ action_log: actionLog });
         } else {
             triggerError('Параметры калибратора не совпадают с техническим заданием! Проверьте кегль, красную строку, поля, выравнивание и интервал.', () => {
                 initPhase3();
