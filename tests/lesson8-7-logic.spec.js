@@ -52,10 +52,10 @@ test.describe('Lesson 8-7: Logical Statements (Architecture & Content Suite)', (
     expect(code).toContain('import TaskLayout');
     expect(code).toContain('<TaskLayout level={1}');
 
-    // Телеметрия
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Телеметрия (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 7');
 
     // 3 фазы / шага
@@ -82,10 +82,10 @@ test.describe('Lesson 8-7: Logical Statements (Architecture & Content Suite)', (
     expect(code).toContain('id="phase4"');
     expect(code).toContain('id="phase5"');
 
-    // Телеметрия
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Телеметрия (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 7');
 
     // Запрет тегов style
@@ -108,10 +108,10 @@ test.describe('Lesson 8-7: Logical Statements (Architecture & Content Suite)', (
     // Обратный отсчет таймера
     expect(code).toMatch(/timer|timeleft|phaseTimeLeft/i);
 
-    // Телеметрия
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Телеметрия (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 7');
 
     // Запрет тегов style

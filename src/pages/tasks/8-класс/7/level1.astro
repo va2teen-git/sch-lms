@@ -133,29 +133,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script is:inline>
         (function() {
             const missionName = 'Урок 7 :: Логические высказывания (Уровень 1)';
-            const startTime = Date.now();
-            let attempts = 0;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: 3
+            });
             let currentPhase = 1;
             let activeCardsData = [];
             let selectedCardElement = null;
-
-            // Телеметрия
-            function sendTelemetry(actionType, isSuccess = false) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: actionType,
-                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                    start_time: new Date(startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: attempts,
-                    success: isSuccess
-                }, '*');
-            }
-
-            // Отправка начала работы
-            sendTelemetry('in_progress', false);
+            let levelCompleted = false;
 
             // Банки данных для процедурной генерации по 3 фазам
             const PHASES_BANK = {
@@ -423,11 +409,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 });
 
                 if (hasError) {
-                    attempts++;
-                    document.getElementById('attempts-display').textContent = attempts;
-                    
                     // Сигнал телеметрии о сбросе
-                    sendTelemetry('hardcore_reset', false);
+                    telemetry.hardcoreReset({ stage: currentPhase });
+                    const totalAttempts = telemetry.getState().attemptsCount;
+                    document.getElementById('attempts-display').textContent = totalAttempts;
 
                     // Визуализация ошибки
                     const feedback = document.getElementById('feedback-box');
@@ -442,6 +427,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 } else {
                     // Шаг успешно пройден
                     if (currentPhase < 3) {
+                        telemetry.advanceStage(currentPhase + 1);
                         initPhase(currentPhase + 1);
                     } else {
                         // Все 3 фазы пройдены!
@@ -452,8 +438,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Финал миссии
             function finishMission() {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                sendTelemetry('level_complete', true);
+                if (levelCompleted) return;
+                levelCompleted = true;
+                const verifyBtn = document.getElementById('verify-btn');
+                if (verifyBtn) verifyBtn.disabled = true;
+
+                telemetry.complete({ stage: 3 });
+                const state = telemetry.getState();
 
                 document.getElementById('phase1') && document.getElementById('phase1').classList.add('d-none');
                 document.querySelector('.row.g-3').classList.add('d-none');
@@ -462,8 +453,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 document.getElementById('phase-badge').textContent = 'УСПЕХ';
                 document.getElementById('phase-title').textContent = 'Все фазы успешно пройдены';
 
-                document.getElementById('final-time').textContent = timeSpent;
-                document.getElementById('final-attempts').textContent = attempts;
+                document.getElementById('final-time').textContent = Math.max(1, state.timeSpentSec);
+                document.getElementById('final-attempts').textContent = state.attemptsCount;
                 document.getElementById('success-screen').classList.remove('d-none');
             }
 

@@ -230,23 +230,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     <script is:inline>
         const missionName = 'Урок 9 :: Определение истинности составного высказывания (Уровень 1)';
-        const startTime = Date.now();
-        let attempts = 0;
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 1,
+            totalStages: 3
+        });
+        let currentStage = 1;
         let isLocked = false;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        let levelCompleted = false;
 
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -264,9 +255,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         function triggerErrorAndRegenerate(message, regenerateFn) {
             if (isLocked) return;
             isLocked = true;
-            attempts++;
-            document.getElementById('attempts-display').textContent = String(attempts);
-            sendTelemetry('hardcore_reset', false);
+            telemetry.hardcoreReset({ stage: currentStage });
+            document.getElementById('attempts-display').textContent = String(telemetry.getState().attemptsCount);
 
             const feedbackBox = document.getElementById('feedback-box');
             const feedbackText = document.getElementById('feedback-text');
@@ -420,6 +410,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             );
 
             if (allCorrect) {
+                currentStage = 2;
+                telemetry.advanceStage(2);
                 document.getElementById('phase1').classList.add('d-none');
                 document.getElementById('phase2').classList.remove('d-none');
                 document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
@@ -632,6 +624,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             );
 
             if (allCorrect) {
+                currentStage = 3;
+                telemetry.advanceStage(3);
                 document.getElementById('phase2').classList.add('d-none');
                 document.getElementById('phase3').classList.remove('d-none');
                 document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
@@ -831,9 +825,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const falseOk = Array.from(falseCards).every(c => c.getAttribute('data-expected-bucket') === 'false');
 
             if (trueOk && falseOk && (trueCards.length + falseCards.length === 6)) {
+                if (levelCompleted) return;
+                levelCompleted = true;
+                document.getElementById('p3-verify-btn').disabled = true;
                 document.getElementById('phase3').classList.add('d-none');
                 document.getElementById('success-screen').classList.remove('d-none');
-                sendTelemetry('level_complete', true);
+                telemetry.complete({ stage: 3 });
             } else {
                 triggerErrorAndRegenerate(
                     'Один или несколько объектов распределены в неверный логический шлюз!',

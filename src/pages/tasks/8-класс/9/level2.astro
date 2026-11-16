@@ -187,29 +187,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     <script is:inline>
         const missionName = 'Урок 9 :: Определение истинности составного высказывания (Уровень 2)';
-        const startTime = Date.now();
-        let attempts = 0;
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 2,
+            totalStages: 5
+        });
+        let currentStage = 1;
         let isLocked = false;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        let levelCompleted = false;
 
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
         function setPhaseHeader(stepNum, title) {
+            currentStage = stepNum;
+            if (stepNum > 1) {
+                telemetry.advanceStage(stepNum);
+            }
             document.getElementById('phase-badge').textContent = `Шаг ${stepNum} из 5`;
             document.getElementById('phase-title').textContent = title;
         }
@@ -217,9 +212,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         function triggerErrorAndRegenerate(message, regenerateFn) {
             if (isLocked) return;
             isLocked = true;
-            attempts++;
-            document.getElementById('attempts-display').textContent = String(attempts);
-            sendTelemetry('hardcore_reset', false);
+            telemetry.hardcoreReset({ stage: currentStage });
+            document.getElementById('attempts-display').textContent = String(telemetry.getState().attemptsCount);
 
             const fb = document.getElementById('feedback-box');
             document.getElementById('feedback-text').textContent = message;
@@ -507,9 +501,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const expected = input.getAttribute('data-expected');
 
             if (val !== '' && val === expected) {
+                if (levelCompleted) return;
+                levelCompleted = true;
+                document.getElementById('p5-btn').disabled = true;
                 document.getElementById('phase5').classList.add('d-none');
                 document.getElementById('success-screen').classList.remove('d-none');
-                sendTelemetry('level_complete', true);
+                telemetry.complete({ stage: 5 });
             } else {
                 triggerErrorAndRegenerate(
                     'Неверное количество целых чисел N! Проверьте формулу N = b − a + 1 для включенных границ и учет фильтра.',

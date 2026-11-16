@@ -221,24 +221,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     <script is:inline>
         const missionName = 'Урок 10 :: Таблицы истинности (Уровень 2)';
-        const startTime = Date.now();
-        let attempts = 0;
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 2,
+            totalStages: 5
+        });
         let isLocked = false;
         let currentPhase = 1;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        let levelCompleted = false;
 
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -252,9 +242,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         function triggerErrorAndRegenerate(message, regenerateFn) {
             if (isLocked) return;
             isLocked = true;
-            attempts++;
-            document.getElementById('attempts-display').textContent = String(attempts);
-            sendTelemetry('hardcore_reset', false);
+            telemetry.hardcoreReset({ stage: currentPhase });
+            document.getElementById('attempts-display').textContent = String(telemetry.getState().attemptsCount);
 
             const fb = document.getElementById('feedback-box');
             document.getElementById('feedback-text').textContent = message;
@@ -327,7 +316,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 document.getElementById('phase2').classList.remove('d-none');
                 setPhaseHeader(2, 'Аналитический вес функции (Количество единиц в таблице)');
                 currentPhase = 2;
-                sendTelemetry('in_progress', false);
+                telemetry.advanceStage(2);
                 initPhase2();
             } else {
                 triggerErrorAndRegenerate(
@@ -418,7 +407,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 document.getElementById('phase3').classList.remove('d-none');
                 setPhaseHeader(3, 'Пик инверсии: Дешифровка перемешанных столбцов таблицы');
                 currentPhase = 3;
-                sendTelemetry('in_progress', false);
+                telemetry.advanceStage(3);
                 initPhase3();
             } else {
                 triggerErrorAndRegenerate(
@@ -535,7 +524,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 document.getElementById('phase4').classList.remove('d-none');
                 setPhaseHeader(4, 'Долина консолидации: Инварианты законов логики и инверсии');
                 currentPhase = 4;
-                sendTelemetry('in_progress', false);
+                telemetry.advanceStage(4);
                 initPhase4();
             } else {
                 triggerErrorAndRegenerate(
@@ -605,7 +594,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 document.getElementById('phase5').classList.remove('d-none');
                 setPhaseHeader(5, 'Кульминационный пик: Анализ системы логических функций');
                 currentPhase = 5;
-                sendTelemetry('in_progress', false);
+                telemetry.advanceStage(5);
                 initPhase5();
             } else {
                 triggerErrorAndRegenerate(
@@ -697,17 +686,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const expected = input.getAttribute('data-expected');
 
             if (userVal === expected && userVal !== '') {
-                const finalTimeSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                document.getElementById('final-attempts').textContent = String(attempts);
-                document.getElementById('final-time').textContent = String(finalTimeSec);
+                if (levelCompleted) return;
+                levelCompleted = true;
+                document.getElementById('p5-verify-btn').disabled = true;
+                telemetry.complete({ stage: 5 });
+                const state = telemetry.getState();
+                document.getElementById('final-attempts').textContent = String(state.attemptsCount);
+                document.getElementById('final-time').textContent = String(Math.max(1, state.timeSpentSec));
 
                 document.getElementById('phase5').classList.add('d-none');
                 document.getElementById('victory-screen').classList.remove('d-none');
                 document.getElementById('phase-badge').className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
                 document.getElementById('phase-badge').textContent = 'Успешно завершено';
                 document.getElementById('phase-title').textContent = 'Все 5 этапов аналитического тренажера пройдены!';
-
-                sendTelemetry('level_complete', true);
             } else {
                 triggerErrorAndRegenerate(
                     'Неверный подсчет совместных наборов! Проверьте истинность условий F₁ и F₂ для каждого из 8 возможных наборов.',
@@ -724,7 +715,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         // Экспорт DEV-состояния для Playwright автотестов и симулятора персон
         window.__DEV_LEVEL2_STATE__ = {
             getPhase: () => currentPhase,
-            getAttempts: () => attempts,
+            getAttempts: () => telemetry.getState().attemptsCount,
             solvePhase1: () => {
                 const input = document.getElementById('p1-input');
                 input.value = input.getAttribute('data-expected');
@@ -753,9 +744,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         };
 
         // =========================================================================
-        // СТАРТ ТРЕНАЖЕРА
+        // СТАРТ ТРЕНАЖЕРА (телеметрия стартует отложенно по первому действию)
         // =========================================================================
         initPhase1();
-        sendTelemetry('in_progress', false);
     </script>
 </TaskLayout>

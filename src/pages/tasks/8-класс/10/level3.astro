@@ -317,22 +317,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script src="/static/vue.global.js" is:inline></script>
     <script is:inline>
         const missionName = 'Урок 10 :: Таблицы истинности (Уровень 3)';
-        const sessionStartTime = Date.now();
-        let totalAttemptsCount = 0;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(sessionStartTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: totalAttemptsCount,
-                success: success
-            }, '*');
-        }
+        let telemetry = null;
 
         // Web Audio Синтезатор звуковых сигналов
         let audioCtx = null;
@@ -695,31 +680,45 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         if (alarmActive.value || gameState.value !== 'playing') return;
                         phaseTimeLeft.value = Math.max(0, Number((phaseTimeLeft.value - 0.1).toFixed(1)));
                         if (phaseTimeLeft.value <= 0) {
-                            triggerHardcoreReset('Время истекло! Фронт импульса врезался в некорректный шлюз.');
+                            triggerHardcoreReset('Время истекло! Фронт импульса врезался в некорректный шлюз.', true);
                         }
                     }, 100);
                 }
 
-                function triggerHardcoreReset(reason) {
+                function triggerHardcoreReset(reason, isTimeout = false) {
                     if (alarmActive.value) return;
                     stopTimer();
+                    if (resetTimeoutId) clearTimeout(resetTimeoutId);
+
+                    if (telemetry) {
+                        const sent = telemetry.hardcoreReset({
+                            wave: currentWave.value + 1,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        attempts.value = telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            alarmActive.value = false;
+                            return;
+                        }
+                    }
+
                     alarmActive.value = true;
                     alarmReason.value = reason;
-                    attempts.value++;
-                    totalAttemptsCount = attempts.value;
                     playAlarmSiren();
-                    sendTelemetry('hardcore_reset', false);
 
                     resetTimeoutId = setTimeout(() => {
+                        if (gameState.value !== 'playing' || (telemetry && telemetry.getState().isAfkPaused)) return;
                         alarmActive.value = false;
                         currentWave.value = 0;
+                        if (telemetry) telemetry.setWave(1, 10);
                         buildWave(0);
                         startWaveTimer();
                     }, 1100);
                 }
 
                 function toggleNode(which) {
-                    if (alarmActive.value || gameState.value !== 'playing') return;
+                    if (alarmActive.value || gameState.value !== 'playing' || (telemetry && telemetry.getState().isAfkPaused)) return;
+                    if (telemetry) telemetry.markActivity();
                     playClickTick();
                     if (which === 'R1') nodeR1.value = nodeR1.value === 1 ? 0 : 1;
                     else if (which === 'R2') nodeR2.value = nodeR2.value === 1 ? 0 : 1;
@@ -727,7 +726,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
 
                 function firePulse() {
-                    if (alarmActive.value || gameState.value !== 'playing') return;
+                    if (alarmActive.value || gameState.value !== 'playing' || (telemetry && telemetry.getState().isAfkPaused)) return;
+                    if (telemetry) telemetry.markActivity();
 
                     const okR1 = nodeR1.value === waveData.value.expectedR1;
                     const okR2 = nodeR2.value === waveData.value.expectedR2;
@@ -736,15 +736,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     if (okR1 && okR2 && okF) {
                         playSuccessChime();
                         if (currentWave.value + 1 >= 10) {
+                            if (gameState.value === 'success') return;
                             stopTimer();
                             gameState.value = 'success';
-                            sendTelemetry('level_complete', true);
+                            if (telemetry) telemetry.complete({ wave: 10 });
                         } else {
                             currentWave.value++;
+                            if (telemetry) telemetry.advanceWave(currentWave.value + 1);
                             buildWave(currentWave.value);
                         }
                     } else {
-                        triggerHardcoreReset('Ошибка вычисления столбцов! Значения R₁, R₂ или F не соответствуют строке таблицы.');
+                        triggerHardcoreReset('Ошибка вычисления столбцов! Значения R₁, R₂ или F не соответствуют строке таблицы.', false);
                     }
                 }
 
@@ -753,11 +755,26 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     alarmActive.value = false;
                     currentWave.value = 0;
                     gameState.value = 'playing';
+                    if (telemetry) {
+                        telemetry.start();
+                        telemetry.setWave(1, 10);
+                        telemetry.progress({ wave: 1, total_waves: 10, stage: 1, total_stages: 10 });
+                    }
                     buildWave(0);
                     startWaveTimer();
                 }
 
+                telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: 10,
+                    onAfkRetry: () => {
+                        startGame();
+                    }
+                });
+
                 function handleKeyDown(e) {
+                    if (telemetry && telemetry.getState().isAfkPaused) return;
                     if (gameState.value === 'intro' && e.key === 'Enter') {
                         e.preventDefault();
                         startGame();

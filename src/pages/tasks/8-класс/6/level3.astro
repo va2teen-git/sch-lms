@@ -70,22 +70,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script src="/static/vue.global.js" is:inline></script>
     <script is:inline>
         const missionName = 'Урок 6 :: Уровень 3 (Системы счисления)';
-        let sessionStartTime = Date.now();
-        let attempts = 0;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(sessionStartTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        let telemetry = null;
 
         const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
@@ -120,21 +105,33 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 const startGame = () => {
                     clearTimers();
-                    sessionStartTime = Date.now();
                     gameState.value = 'playing';
                     score.value = 0;
                     timeLeft.value = 60;
                     timeBonus.value = false;
                     generateLevel();
-                    sendTelemetry('in_progress');
+                    if (telemetry) {
+                        telemetry.start();
+                        telemetry.setWave(1, 10);
+                        telemetry.progress({ wave: 1, total_waves: 10, stage: 1, total_stages: 10 });
+                    }
                     
                     timerInterval = setInterval(() => {
                         timeLeft.value--;
                         if (timeLeft.value <= 0) {
-                            failGame('Истекло время дефрагментации.');
+                            failGame('Истекло время дефрагментации.', true);
                         }
                     }, 1000);
                 };
+
+                telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: 10,
+                    onAfkRetry: () => {
+                        startGame();
+                    }
+                });
 
                 const generateLevel = () => {
                     // Target decimal from 30 to 200
@@ -203,7 +200,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 };
 
                 const handleCellClick = (cell) => {
-                    if (gameState.value !== 'playing') return;
+                    if (gameState.value !== 'playing' || (telemetry && telemetry.getState().isAfkPaused)) return;
+                    if (telemetry) telemetry.markActivity();
 
                     if (cell.isCorrect) {
                         score.value++;
@@ -217,27 +215,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         if (score.value >= 10) {
                             winGame();
                         } else {
+                            if (telemetry) telemetry.advanceWave(score.value + 1);
                             generateLevel();
                         }
                     } else {
-                        failGame('Обнаружен битый сектор (неверное значение).');
+                        failGame('Обнаружен битый сектор (неверное значение).', false);
                     }
                 };
 
-                const failGame = (reason) => {
+                const failGame = (reason, isTimeout = false) => {
                     clearTimers();
+                    // Decoupled arcade failure: sends 'level_fail' (with AFK guard on Wave 1)
+                    if (telemetry) {
+                        const sent = telemetry.levelFail({
+                            wave: score.value + 1,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        if (sent === false) {
+                            return;
+                        }
+                    }
+
                     gameState.value = 'failed';
                     failReason.value = reason;
-                    attempts++;
-                    // Decoupled arcade failure: sends 'level_fail' (in hardcore mode, platform handler issues hardcore_reset)
-                    sendTelemetry('level_fail');
 
                     restartCountdown.value = 3;
                     autoRestartInterval = setInterval(() => {
                         restartCountdown.value--;
                         if (restartCountdown.value <= 0) {
                             clearTimers();
-                            if (gameState.value === 'failed') {
+                            if (gameState.value === 'failed' && (!telemetry || !telemetry.getState().isAfkPaused)) {
                                 startGame();
                             }
                         }
@@ -245,9 +252,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 };
 
                 const winGame = () => {
+                    if (gameState.value === 'success') return;
                     clearTimers();
                     gameState.value = 'success';
-                    sendTelemetry('level_complete', true);
+                    if (telemetry) telemetry.complete({ wave: 10 });
                 };
 
                 onUnmounted(() => {

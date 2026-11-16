@@ -5,11 +5,11 @@ test.describe('Grade 8 Lesson 8: Logic Operations Level 1', () => {
   test('Zero Multiple Choice check: no radio buttons or select dropdowns', async ({ page }) => {
     await page.goto('/tasks/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/8/level1');
     
-    // Ensure no multiple-choice input elements
-    const radios = await page.locator('input[type="radio"]').count();
+    // Ensure no multiple-choice input elements inside task container
+    const radios = await page.locator('#game-container input[type="radio"]').count();
     expect(radios).toBe(0);
 
-    const selects = await page.locator('select').count();
+    const selects = await page.locator('#game-container select').count();
     expect(selects).toBe(0);
   });
 
@@ -213,7 +213,7 @@ test.describe('Grade 8 Lesson 8: Logic Operations Level 1', () => {
     await page.goto('/lesson/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/8');
 
     // Verify Lesson Header
-    await expect(page.locator('header h1')).toContainText('Логические операции «и», «или», «не»');
+    await expect(page.locator('header h1').first()).toContainText('Логические операции «и», «или», «не»');
 
     // Verify Theory Content is rendered
     const theorySection = page.locator('section').first();

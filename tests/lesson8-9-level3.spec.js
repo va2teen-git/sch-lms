@@ -15,9 +15,9 @@ test.describe('8 класс — Урок 9: Определение истинн�
     expect(code).toContain('createApp');
     expect(code).toContain('Vue');
     expect(code).toMatch(/timer|timeleft|phaseTimeLeft/i);
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 9');
 
     expect(code.includes('<style>')).toBe(false);
@@ -64,8 +64,10 @@ test.describe('8 класс — Урок 9: Определение истинн�
     await expect(page.locator('#alarm-box')).toBeVisible();
     const events = await page.evaluate(() => window.__telemetryEvents);
     expect(events.length).toBeGreaterThanOrEqual(1);
-    expect(events[0].action_type).toBe('hardcore_reset');
-    expect(events[0].success).toBe(false);
+    const resetEvent = events.find(e => e.action_type === 'hardcore_reset');
+    expect(resetEvent).toBeTruthy();
+    expect(resetEvent.success).toBe(false);
+    expect(resetEvent.wave).toBe(2);
 
     // После окончания сирены прогресс обязан сброситься на Волну 1 / 10
     await expect(page.locator('#wave-indicator')).toContainText('1 / 10', { timeout: 3000 });

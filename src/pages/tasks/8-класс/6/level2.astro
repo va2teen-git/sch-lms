@@ -78,24 +78,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         </div>
     </div>
 
-    <script>
+    <script is:inline>
         const missionName = 'Урок 6 :: Уровень 2 (Системы счисления)';
-        let startTime = Date.now();
-        let attempts = 0;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 2,
+            totalStages: 5
+        });
+        let levelCompleted = false;
 
         // Фаза 1: Bin -> Hex (верхний сегмент байта 128..255 -> 80..FF, без пересечения с Уровнем 1)
         let p1Correct = '';
@@ -160,6 +150,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const inputEl = document.getElementById(inputId);
             const btnEl = document.getElementById(btnId);
             const feedbackEl = document.getElementById(feedbackId);
+            if (levelCompleted || btnEl.disabled) return;
             
             let userVal = normalizeAnswer(inputEl.value);
             let targetVal = normalizeAnswer(correctVal);
@@ -170,13 +161,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 nextEl.classList.remove('d-none');
                 
                 if (nextPhaseId === 'success-screen') {
-                    sendTelemetry('level_complete', true);
+                    levelCompleted = true;
+                    inputEl.disabled = true;
+                    btnEl.disabled = true;
+                    telemetry.complete({ stage: 5 });
                 } else {
-                    sendTelemetry('in_progress');
+                    telemetry.advanceStage(phaseNum + 1);
                 }
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                telemetry.hardcoreReset({ stage: phaseNum });
                 
                 inputEl.disabled = true;
                 btnEl.disabled = true;
@@ -214,8 +207,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             });
         });
 
-        // Инициализация при старте
-        sendTelemetry('in_progress');
+        // Инициализация при старте (телеметрия стартует отложенно по первому действию)
         initPhase1();
         initPhase2();
         initPhase3();
