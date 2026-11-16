@@ -201,23 +201,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (function() {
     const missionName = 'Урок 9 :: Информация и данные (Уровень 3)';
-    const startTime = new Date();
-    let globalAttempts = 0;
-
-    function sendTelemetry(actionType, success = false) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: success ? 'completed' : 'in_progress',
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: globalAttempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', false);
 
     // Синтезатор звуковых сигналов (Web Audio API)
     let audioCtx = null;
@@ -436,6 +419,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             let waves = generateWaves();
             let timerInterval = null;
+            let resetTimeout = null;
+
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 3,
+                totalWaves: 10,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(timerInterval);
+                    clearTimeout(resetTimeout);
+                    alarmActive.value = false;
+                },
+                onAfkRetry: () => {
+                    alarmActive.value = false;
+                    currentWaveIndex.value = 0;
+                    waves = generateWaves();
+                    startTimer();
+                }
+            });
 
             const currentWave = computed(() => {
                 return waves[currentWaveIndex.value] || waves[0];
@@ -463,62 +465,78 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     timeLeft.value = Math.max(0, timeLeft.value - stepMs / 1000);
                     if (timeLeft.value <= 0) {
                         clearInterval(timerInterval);
-                        triggerHardcoreFail('ВРЕМЯ ИСТЕКЛО: Переполнение входного буфера шлюза! Не успели принять решение.');
+                        triggerHardcoreFail('ВРЕМЯ ИСТЕКЛО: Переполнение входного буфера шлюза! Не успели принять решение.', true);
                     }
                 }, stepMs);
             }
 
             function submitAction(action) {
-                if (alarmActive.value || completed.value || !started.value) return;
+                if (alarmActive.value || completed.value || !started.value || telemetry.getState().isAfkPaused) return;
+                telemetry.markActivity();
 
                 if (action === currentWave.value.expected) {
                     playSound('success');
                     if (currentWaveIndex.value < 9) {
                         currentWaveIndex.value++;
+                        telemetry.advanceWave(currentWaveIndex.value + 1);
                         startTimer();
                     } else {
                         finishGame();
                     }
                 } else {
-                    triggerHardcoreFail(currentWave.value.failReason);
+                    triggerHardcoreFail(currentWave.value.failReason, false);
                 }
             }
 
-            function triggerHardcoreFail(reason) {
+            function triggerHardcoreFail(reason, isTimeout = false) {
+                clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
+                const failedWave = currentWaveIndex.value + 1;
+                const sent = telemetry.hardcoreReset({
+                    wave: failedWave,
+                    isTimeout: Boolean(isTimeout)
+                });
+                attemptsCount.value = 1 + telemetry.getState().attemptsCount;
+                if (sent === false) {
+                    alarmActive.value = false;
+                    return;
+                }
+
                 playSound('alarm');
                 alarmActive.value = true;
                 alarmMessage.value = reason;
-                clearInterval(timerInterval);
-                globalAttempts++;
-                attemptsCount.value++;
 
-                sendTelemetry('hardcore_reset', false);
-
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
                     alarmActive.value = false;
-                    currentWaveIndex.value = 0;
-                    waves = generateWaves();
-                    startTimer();
+                    if (started.value && !completed.value && !telemetry.getState().isAfkPaused) {
+                        currentWaveIndex.value = 0;
+                        waves = generateWaves();
+                        startTimer();
+                    }
                 }, 2000);
             }
 
             function startGame() {
+                clearTimeout(resetTimeout);
                 getAudioContext();
                 started.value = true;
                 currentWaveIndex.value = 0;
                 waves = generateWaves();
+                telemetry.start();
+                telemetry.progress({ wave: 1, total_waves: 10, stage: 1, total_stages: 10 });
                 startTimer();
             }
 
             function finishGame() {
                 clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
                 completed.value = true;
                 playSound('victory');
-                sendTelemetry('level_complete', true);
+                telemetry.complete({ wave: 10 });
             }
 
             function handleKeyDown(e) {
-                if (!started.value || completed.value || alarmActive.value) return;
+                if (!started.value || completed.value || alarmActive.value || telemetry.getState().isAfkPaused) return;
                 const key = e.key.toLowerCase();
 
                 if (key === '1' || key === 'a' || key === 'ф' || key === 'arrowleft') {
@@ -536,6 +554,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             onUnmounted(() => {
                 clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
                 window.removeEventListener('keydown', handleKeyDown);
             });
 

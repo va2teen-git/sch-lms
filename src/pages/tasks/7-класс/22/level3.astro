@@ -12,9 +12,10 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
     <!-- Основной модуль текстового процессора LibreOffice Writer -->
     <div class="flex-grow-1 d-flex flex-column">
         <WriterEmulator
-            missionName="Урок 22 :: Скоростная печать и форматирование (10 волн)"
+            missionName="Урок 22 :: Скоростная печать и форматирование (Уровень 3)"
             checkOgeFormat={false}
             hardcoreReset={false}
+            disableAutoTelemetry={true}
         />
     </div>
 
@@ -715,6 +716,23 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
 
         const app = createApp({
             template: `
+                <div v-if="!started" id="intro-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-75 p-3" style="z-index: 1050;">
+                    <div class="card bg-black border-danger border-2 rounded-0 shadow-lg text-light p-4" style="max-width: 620px; width: 100%;">
+                        <div class="badge bg-danger text-uppercase rounded-0 align-self-start mb-2 px-2 py-1">Уровень 3 :: Аркада (10 волн)</div>
+                        <h3 class="fw-bold text-warning mb-3">Скоростная вёрстка в LibreOffice Writer</h3>
+                        <p class="small text-light mb-2">
+                            Вам предстоит пройти <strong>10 волн</strong> скоростного набора и форматирования документов по стандарту ОГЭ 13.2.
+                        </p>
+                        <ul class="small text-secondary mb-4 ps-3">
+                            <li>На каждой волне действует таймер и живой чек-лист требований.</li>
+                            <li>Нарушение требований волны, истечение таймера или типографские «костыли» сбрасывают прогресс на Волну 1.</li>
+                            <li>Учёт чистого времени уровня начинается после нажатия кнопки «Начать».</li>
+                        </ul>
+                        <button id="start-btn" type="button" class="btn btn-danger btn-lg rounded-0 fw-bold px-4" @click="startGame">
+                            Начать миссию
+                        </button>
+                    </div>
+                </div>
                 <div class="bg-black border-bottom border-danger p-2 px-3">
                     <div class="container-fluid px-0">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
@@ -782,6 +800,7 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
             `,
             setup() {
                 const maxWaves = 10;
+                const started = ref(false);
                 const waves = ref(generateAllWaves());
                 const currentWave = ref(1);
                 const timeLeft = ref(190);
@@ -798,6 +817,24 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
 
                 let timerInterval = null;
 
+                const missionName = 'Урок 22 :: Скоростная печать и форматирование (Уровень 3)';
+                const telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: maxWaves,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        if (timerInterval) clearInterval(timerInterval);
+                        resetAlert.value = '';
+                    },
+                    onAfkRetry: () => {
+                        resetAlert.value = '';
+                        waves.value = generateAllWaves();
+                        loadWave(1, true);
+                        startTimer();
+                    }
+                });
+
                 const activeWave = computed(() => {
                     return waves.value[currentWave.value - 1] || waves.value[0];
                 });
@@ -812,20 +849,6 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                     const m = Math.floor(s / 60);
                     const rem = s % 60;
                     return `${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
-                }
-
-                function sendTelemetry(eventName, statusStr, isSuccess) {
-                    if (window.parent) {
-                        window.parent.postMessage({
-                            type: 'TELEMETRY_EVENT',
-                            lessonId: 'Урок 22',
-                            level: 3,
-                            event: eventName,
-                            status: statusStr,
-                            success: isSuccess,
-                            wave: currentWave.value
-                        }, '*');
-                    }
                 }
 
                 function syncSidebarAndMode() {
@@ -868,9 +891,20 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                     refreshLiveState();
                 }
 
-                function triggerHardcoreReset(reasonMsg) {
+                function triggerHardcoreReset(reasonMsg, isTimeout = false) {
+                    const failedWave = currentWave.value;
+                    const wState = window.getWriterState ? window.getWriterState() : null;
+                    const sent = telemetry.hardcoreReset({
+                        wave: failedWave,
+                        isTimeout: Boolean(isTimeout),
+                        action_log: wState?.actionLog?.slice(-50)
+                    });
+                    if (sent === false) {
+                        if (timerInterval) clearInterval(timerInterval);
+                        resetAlert.value = '';
+                        return;
+                    }
                     resetAlert.value = reasonMsg;
-                    sendTelemetry('hardcore_reset', 'in_progress', false);
                     waves.value = generateAllWaves();
                     loadWave(1, true);
                 }
@@ -878,13 +912,29 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                 function startTimer() {
                     if (timerInterval) clearInterval(timerInterval);
                     timerInterval = setInterval(() => {
-                        if (isCompleted.value) return;
+                        if (!started.value || isCompleted.value || telemetry.getState().isAfkPaused) return;
                         if (timeLeft.value > 0) {
                             timeLeft.value--;
                         } else {
-                            triggerHardcoreReset(`Время на Волне ${currentWave.value} истекло!`);
+                            triggerHardcoreReset(`Время на Волне ${currentWave.value} истекло!`, true);
                         }
                     }, 1000);
+                }
+
+                function startGame() {
+                    started.value = true;
+                    isCompleted.value = false;
+                    resetAlert.value = '';
+                    telemetry.start();
+                    telemetry.progress({
+                        wave: 1,
+                        total_waves: maxWaves,
+                        stage: 1,
+                        total_stages: maxWaves
+                    });
+                    waves.value = generateAllWaves();
+                    loadWave(1, true);
+                    startTimer();
                 }
 
                 function handleWriterChange() {
@@ -892,6 +942,9 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                 }
 
                 function handleWriterAction(e) {
+                    if (started.value && !telemetry.getState().isAfkPaused) {
+                        telemetry.markActivity();
+                    }
                     if (e && e.detail) {
                         actionCount.value = e.detail.totalActions || (actionCount.value + 1);
                         if (e.detail.entry && e.detail.entry.type) {
@@ -903,12 +956,25 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
 
                 function handleWriterError(e) {
                     const score = e?.detail?.report?.score ?? 0;
+                    const wState = window.getWriterState ? window.getWriterState() : null;
+                    const sent = telemetry.hardcoreReset({
+                        wave: currentWave.value,
+                        isTimeout: false,
+                        action_log: wState?.actionLog?.slice(-50)
+                    });
+                    if (sent === false) {
+                        if (timerInterval) clearInterval(timerInterval);
+                        resetAlert.value = '';
+                        return;
+                    }
                     waves.value = generateAllWaves();
                     loadWave(1, false);
                     resetAlert.value = `Детектор ОГЭ 13.2 заблокировал документ (${score}/2 баллов): обнаружены типографские костыли или нарушение стандарта! Прогресс сброшен на Волну 1.`;
                 }
 
                 function handleWriterCheck(e) {
+                    if (!started.value || isCompleted.value || telemetry.getState().isAfkPaused) return;
+                    telemetry.markActivity();
                     refreshLiveState();
                     const checks = liveChecks.value;
                     const failed = checks.filter(c => !c.passed);
@@ -918,29 +984,39 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                             const completedNum = currentWave.value;
                             e.detail.resolve(true, `✅ Волна ${completedNum} из ${maxWaves} пройдена! Загружена Волна ${completedNum + 1}.`, false);
                             resetAlert.value = '';
+                            telemetry.advanceWave(completedNum + 1, {
+                                action_log: e.detail.actionLog?.slice(-50)
+                            });
                             loadWave(completedNum + 1, true);
                         } else {
+                            if (timerInterval) clearInterval(timerInterval);
                             isCompleted.value = true;
                             resetAlert.value = '';
                             e.detail.resolve(true, '🏆 Все 10 волн скоростной вёрстки успешно пройдены!', true);
-                            sendTelemetry('level_complete', 'completed', true);
+                            telemetry.complete({
+                                wave: maxWaves,
+                                action_log: e.detail.actionLog?.slice(-50)
+                            });
                         }
                     } else {
                         const failedNames = failed.map(f => f.label).join(', ');
                         e.detail.resolve(false, `❌ Не выполнено условие Волны ${currentWave.value}: ${failedNames}`, false);
-                        triggerHardcoreReset(`Ошибка на Волне ${currentWave.value}. Не выполнены требования: ${failedNames}.`);
+                        triggerHardcoreReset(`Ошибка на Волне ${currentWave.value}. Не выполнены требования: ${failedNames}.`, false);
                     }
                 }
 
                 function restartArcade() {
                     isCompleted.value = false;
                     resetAlert.value = '';
+                    started.value = true;
                     waves.value = generateAllWaves();
                     loadWave(1, true);
+                    startTimer();
                 }
 
                 // Экспорт для E2E-тестирования и диагностики волн
                 window.getLevel3ArcadeState = () => ({
+                    started: started.value,
                     currentWave: currentWave.value,
                     maxWaves,
                     timeLeft: timeLeft.value,
@@ -952,6 +1028,8 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                 });
                 window.jumpToLevel3Wave = (waveNum) => {
                     if (waveNum >= 1 && waveNum <= maxWaves) {
+                        isCompleted.value = false;
+                        resetAlert.value = '';
                         loadWave(waveNum, true);
                     }
                 };
@@ -962,7 +1040,7 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                 };
 
                 onMounted(() => {
-                    // Дожидаемся инициализации WriterEmulator и синхронизируем Волну 1
+                    // Дожидаемся инициализации WriterEmulator и синхронизируем Волну 1 (таймер стартует по кнопке «Начать миссию»)
                     setTimeout(() => {
                         syncSidebarAndMode();
                         refreshLiveState();
@@ -971,7 +1049,6 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                     document.addEventListener('writer-action', handleWriterAction);
                     document.addEventListener('writer-check', handleWriterCheck);
                     document.addEventListener('writer-error', handleWriterError);
-                    startTimer();
                 });
 
                 onUnmounted(() => {
@@ -983,6 +1060,7 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                 });
 
                 return {
+                    started,
                     maxWaves,
                     currentWave,
                     activeWave,
@@ -993,6 +1071,7 @@ import WriterEmulator from '../../../../components/WriterEmulator.astro';
                     lastActionName,
                     liveChecks,
                     formatTime,
+                    startGame,
                     restartArcade
                 };
             }

@@ -7,6 +7,10 @@ test.describe('Grade 7 Lesson 22 Level 3 — Student Persona Simulations (Writer
 
   test.beforeEach(async ({ page }) => {
     await page.goto(taskUrl);
+    const startBtn = page.locator('#start-btn');
+    if (await startBtn.isVisible()) {
+      await startBtn.click();
+    }
     await expect(page.locator('.jodit-wysiwyg')).toBeVisible();
     await expect(page.locator('#wave-badge')).toBeVisible();
   });

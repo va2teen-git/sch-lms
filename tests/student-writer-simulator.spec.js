@@ -7,6 +7,10 @@ test.describe('StudentWriterSimulator Engine Unit & Integration Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Open Grade 7 Lesson 22 Level 3 which contains LibreOffice Writer emulator
     await page.goto('/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/22/level3');
+    const startBtn = page.locator('#start-btn');
+    if (await startBtn.isVisible()) {
+      await startBtn.click();
+    }
     await expect(page.locator('.jodit-wysiwyg')).toBeVisible();
   });
 

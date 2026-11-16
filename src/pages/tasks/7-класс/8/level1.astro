@@ -212,36 +212,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     // =========================================================================
-    // ТЕЛЕМЕТРИЯ (Стандарты xAPI / IMS Caliper)
+    // ТЕЛЕМЕТРИЯ (Единый хелпер LMSTelemetry)
     // =========================================================================
-    const startTime = new Date();
-    let attempts = 0;
     const missionName = '7 класс :: Урок 8 :: Контрольная работа: Сервисы интернет-коммуникаций. Сетевой этикет. Стратегии безопасного поведения в Интернете (Уровень 1)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function triggerError(message, retryCallback) {
-        attempts++;
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         if (errorMessage) errorMessage.textContent = message;
         if (errorBox) errorBox.classList.remove('d-none');
 
         // Сигнал телеметрии об ошибке текущей попытки
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        telemetry.hardcoreReset();
 
         setTimeout(() => {
             if (errorBox) errorBox.classList.add('d-none');
@@ -611,6 +598,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+            telemetry.advanceStage(2);
             initPhase2();
         } else {
             triggerError(incorrectReason || 'ОШИБКА МАРШРУТИЗАЦИИ: Некоторые сообщения распределены неверно!', () => {
@@ -915,6 +903,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+            telemetry.advanceStage(3);
             initPhase3();
         } else {
             triggerError(`ОШИБКА СЕТЕВОГО ЭТИКЕТА: Неверно подобран элемент для ${incorrectSlotName}! Исключите сленг, капслок и опасные вложения.`, () => {
@@ -1153,7 +1142,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('success-screen').classList.remove('d-none');
             document.getElementById('phase-badge').className = 'badge bg-success text-dark border border-success rounded-0 px-3 py-2';
             document.getElementById('phase-badge').textContent = 'Уровень пройден!';
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete();
         } else {
             triggerError('ОШИБКА КОММУТАЦИИ: Нарушена криптографическая стойкость каналов! Не используйте уязвимые открытые порты без шифрования.', () => {
                 initPhase3();

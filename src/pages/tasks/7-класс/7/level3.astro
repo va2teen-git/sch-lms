@@ -556,7 +556,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function rotateNode(r, c) {
-                if (!started.value || completed.value || alarmActive.value) return;
+                if (!started.value || completed.value || alarmActive.value || telemetry.getState().isAfkPaused) return;
+                telemetry.markActivity();
 
                 const cur = grid.value[r][c];
                 if (cur === 'RIGHT') grid.value[r][c] = 'DOWN';
@@ -604,22 +605,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             // Телеметрия
-            const startTime = new Date();
-            let attempts = 0;
             const missionName = 'Урок 7 :: Компьютерные сети. Поиск информации в сети Интернет (Уровень 3)';
-
-            function sendTelemetry(action_type, status, success) {
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: action_type,
-                    status: status,
-                    start_time: startTime.toISOString(),
-                    time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-                    attempts_count: attempts,
-                    success: success
-                }, '*');
-            }
+            let resetTimeout = null;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 3,
+                totalWaves: 10,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(timerInterval);
+                    clearTimeout(resetTimeout);
+                    alarmActive.value = false;
+                },
+                onAfkRetry: () => {
+                    alarmActive.value = false;
+                    generate10Waves();
+                    startTimer();
+                }
+            });
 
             function startTimer() {
                 clearInterval(timerInterval);
@@ -632,29 +635,40 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     timeLeft.value = Math.max(0, timeLeft.value - 0.1);
                     if (timeLeft.value <= 0.05) {
                         clearInterval(timerInterval);
-                        dispatchPacket(); // Автоматический пуск при истечении времени
+                        dispatchPacket(true); // Автоматический пуск при истечении времени
                     }
                 }, 100);
             }
 
-            function handleHardcoreFailure(msg) {
-                attempts++;
+            function handleHardcoreFailure(msg, isTimeout = false) {
                 clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
+
+                // Тотальный сброс телеметрии (с AFK-защитой на волне 1)
+                const sent = telemetry.hardcoreReset({
+                    wave: currentWaveIndex.value + 1,
+                    isTimeout: Boolean(isTimeout)
+                });
+                if (sent === false) {
+                    alarmActive.value = false;
+                    return;
+                }
+
                 alarmMessage.value = msg;
                 alarmActive.value = true;
 
-                // Тотальный сброс телеметрии
-                sendTelemetry('hardcore_reset', 'in_progress', false);
-
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
                     alarmActive.value = false;
-                    generate10Waves();
-                    startTimer();
+                    if (started.value && !completed.value && !telemetry.getState().isAfkPaused) {
+                        generate10Waves();
+                        startTimer();
+                    }
                 }, 1800);
             }
 
-            function dispatchPacket() {
-                if (!started.value || completed.value || alarmActive.value) return;
+            function dispatchPacket(isTimeout = false) {
+                if (!started.value || completed.value || alarmActive.value || telemetry.getState().isAfkPaused) return;
+                if (!isTimeout) telemetry.markActivity();
 
                 const result = currentPathResult.value;
 
@@ -664,13 +678,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         currentWaveIndex.value++;
                         resetGridDirections();
                         updateTestState();
+                        telemetry.advanceWave(currentWaveIndex.value + 1);
                         startTimer();
                     } else {
                         // Все 10 волн успешно завершены!
                         clearInterval(timerInterval);
                         completed.value = true;
                         updateTestState();
-                        sendTelemetry('level_complete', 'completed', true);
+                        telemetry.complete({ wave: waves.value.length });
                     }
                 } else {
                     // Ошибка маршрутизации: либо не тот сервер, либо тупик/обрыв
@@ -680,15 +695,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         const gotName = TARGET_SERVERS[result.exitRow].name;
                         failReason = `Пакет доставлен в [${gotName}], но требовался терминал [${targetName}]!`;
                     }
-                    handleHardcoreFailure(failReason);
+                    handleHardcoreFailure(failReason, isTimeout);
                 }
             }
 
             function startGame() {
+                clearTimeout(resetTimeout);
                 started.value = true;
                 completed.value = false;
                 alarmActive.value = false;
-                sendTelemetry('in_progress', 'in_progress', false);
+                telemetry.start();
+                telemetry.progress({ wave: 1, total_waves: 10, stage: 1, total_stages: 10 });
                 generate10Waves();
                 startTimer();
             }
@@ -698,10 +715,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     startGame();
                     return;
                 }
-                if (started.value && !completed.value && !alarmActive.value) {
+                if (started.value && !completed.value && !alarmActive.value && !telemetry.getState().isAfkPaused) {
                     if (e.code === 'Space' || e.key === ' ' || e.key === 'Enter') {
                         e.preventDefault();
-                        dispatchPacket();
+                        dispatchPacket(false);
                     }
                 }
             }
@@ -713,6 +730,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             onUnmounted(() => {
                 clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
                 window.removeEventListener('keydown', handleKeyDown);
             });
 

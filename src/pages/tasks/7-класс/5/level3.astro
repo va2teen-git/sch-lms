@@ -103,7 +103,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         setup() {
             const started = ref(false);
             const completed = ref(false);
-            const startTime = ref(null);
             
             const totalTime = 60; // 60 seconds
             const timeLeft = ref(totalTime);
@@ -173,23 +172,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 return `00:${secs.toString().padStart(2, '0')}`;
             });
 
-            const sendTelemetry = (action_type, status, success = false) => {
-                const timeSpent = startTime.value ? Math.floor((Date.now() - startTime.value) / 1000) : 0;
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 5 :: Архивация :: Уровень 3',
-                    action_type: action_type,
-                    status: status,
-                    start_time: startTime.value ? new Date(startTime.value).toISOString() : new Date().toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: 1,
-                    success: success
-                }, '*');
-            };
+            const telemetry = window.LMSTelemetry.create({
+                missionName: 'Урок 5 :: Архивация :: Уровень 3',
+                level: 3,
+                totalWaves: initialPhases.length,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(timerInterval);
+                    started.value = false;
+                    completed.value = false;
+                    currentPhaseIndex.value = 0;
+                    timeLeft.value = totalTime;
+                    actionLog.value = [];
+                    inputValue.value = "";
+                },
+                onAfkRetry: () => {
+                    startGame();
+                }
+            });
 
-            const hardcoreReset = (reason) => {
+            const hardcoreReset = (reason, isTimeout = false) => {
                 clearInterval(timerInterval);
-                sendTelemetry('hardcore_reset', 'in_progress', false);
+                const failedWave = currentPhaseIndex.value + 1;
+                const sent = telemetry.hardcoreReset({
+                    wave: failedWave,
+                    isTimeout: Boolean(isTimeout),
+                    action_log: actionLog.value.slice(-20).map(msg => ({ time: new Date().toISOString(), action: msg }))
+                });
+                if (sent === false) {
+                    return;
+                }
                 alert(`КРИТИЧЕСКАЯ ОШИБКА: ${reason}\n\nСВЯЗЬ ПОТЕРЯНА. ИНИЦИАЛИЗАЦИЯ ПОЛНОГО СБРОСА.`);
                 
                 // Reset state
@@ -202,19 +214,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             };
 
             const startGame = () => {
+                clearInterval(timerInterval);
                 started.value = true;
                 completed.value = false;
                 currentPhaseIndex.value = 0;
                 timeLeft.value = totalTime;
                 actionLog.value = ["УСТАНОВЛЕНО СОЕДИНЕНИЕ", "СИСТЕМА АРХИВАЦИИ АКТИВНА"];
-                startTime.value = Date.now();
-
-                sendTelemetry('in_progress', 'in_progress', false);
+                telemetry.start();
+                telemetry.progress({ wave: 1, total_waves: phases.value.length, stage: 1, total_stages: phases.value.length });
 
                 timerInterval = setInterval(() => {
                     timeLeft.value -= 1;
                     if (timeLeft.value <= 0) {
-                        hardcoreReset('ВРЕМЯ ВЫШЛО. ВАС ОБНАРУЖИЛИ.');
+                        hardcoreReset('ВРЕМЯ ВЫШЛО. ВАС ОБНАРУЖИЛИ.', true);
                     }
                 }, 1000);
                 
@@ -240,8 +252,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     // Victory
                     clearInterval(timerInterval);
                     completed.value = true;
-                    sendTelemetry('level_complete', 'completed', true);
+                    telemetry.complete({
+                        wave: phases.value.length,
+                        action_log: actionLog.value.slice(-20).map(msg => ({ time: new Date().toISOString(), action: msg }))
+                    });
                 } else {
+                    telemetry.advanceWave(currentPhaseIndex.value + 1, {
+                        action_log: [{ time: new Date().toISOString(), action: logMessage }]
+                    });
                     focusInputIfNeeded();
                 }
             };

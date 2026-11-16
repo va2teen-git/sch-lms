@@ -590,9 +590,9 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
     if (!isPrinceRow) {
       if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
         lvlNum = r.level_number as 1 | 2 | 3;
-      } else if (mNameStr.includes('Уровень 1')) lvlNum = 1;
+      } else if (mNameStr.includes('Уровень 1') || /\(Базовый\)/i.test(mNameStr)) lvlNum = 1;
       else if (mNameStr.includes('Уровень 2')) lvlNum = 2;
-      else if (mNameStr.includes('Уровень 3')) lvlNum = 3;
+      else if (mNameStr.includes('Уровень 3') || /10\s*волн/i.test(mNameStr)) lvlNum = 3;
     }
 
     // Manual lesson restart via "#reset-lesson-btn" should NOT count as an error
@@ -809,7 +809,12 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
           }
         }
 
-        if (r.action_type === 'level_complete') {
+        const isEffectiveComplete =
+          r.action_type === 'level_complete' ||
+          r.action_type === 'task_completed' ||
+          (r.action_type === '' && r.status === 'completed' && r.success === 1);
+
+        if (isEffectiveComplete) {
           target.completed = true;
           target.status = 'completed';
           if (rTs && !target.completeTs) target.completeTs = rTs;

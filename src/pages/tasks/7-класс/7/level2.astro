@@ -173,34 +173,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     // ================= ТЕЛЕМЕТРИЯ И АРХИТЕКТУРНЫЙ КОНТРАКТ =================
-    const startTime = new Date();
-    let attempts = 0;
     const missionName = 'Урок 7 :: Компьютерные сети. Поиск информации в сети Интернет (Уровень 2)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
 
     function triggerError(message, retryCallback) {
-        attempts++;
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         errorMessage.textContent = message;
         errorBox.classList.remove('d-none');
 
         // Отправка сигнала hardcore_reset
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        telemetry.hardcoreReset();
 
         setTimeout(() => {
             errorBox.classList.add('d-none');
@@ -302,6 +289,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (val === p1CurrentExpected) {
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
             initPhase2();
         } else {
             triggerError('Неверный уровень домена! Помните: уровни считаются справа налево, начиная с домена 1-го уровня. Перегенерация...', () => {
@@ -369,6 +357,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (val === p2ExpectedNumber) {
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
+            telemetry.advanceStage(3);
             initPhase3();
         } else {
             triggerError('Ошибка в анализе адреса! Напоминание: значение каждого октета IPv4 обязано быть в диапазоне от 0 до 255 (8 бит). Перегенерация...', () => {
@@ -430,6 +419,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (val === p3CurrentExpected) {
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
+            telemetry.advanceStage(4);
             initPhase4();
         } else {
             triggerError('Неверный сетевой параметр! Вспомните спецификацию из теории (HTTP: 80, HTTPS: 443, FTP: 21, 404 Not Found, 100 м). Повтор задания...', () => {
@@ -520,6 +510,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isCorrect) {
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');
+            telemetry.advanceStage(5);
             initPhase5();
         } else {
             triggerError('Неверный синтаксис запроса! Проверьте отсутствие пробела после знака минус (-слово) или правильность кавычек. Перегенерация...', () => {
@@ -582,7 +573,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Завершение Уровня 2!
             document.getElementById('phase5').classList.add('d-none');
             document.getElementById('success-screen').classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete();
         } else {
             triggerError('Неверный ответ! Обратитесь к разделу «Правовые и этические нормы» теоретического материала. Регенерация...', () => {
                 initPhase5();

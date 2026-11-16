@@ -15,9 +15,9 @@ test.describe('Grade 7 Lesson 9: Information & Data Level 2', () => {
     expect(content.includes('<style ')).toBe(false);
     expect(content).not.toContain('type="radio"');
     expect(content).not.toContain('<select');
-    expect(content).toContain('TELEMETRY_EVENT');
-    expect(content).toContain('level_complete');
-    expect(content).toContain('hardcore_reset');
+    expect(content).toContain('LMSTelemetry');
+    expect(content).toContain('.complete(');
+    expect(content).toContain('.hardcoreReset(');
     expect(content).toContain('Урок 9');
   });
 

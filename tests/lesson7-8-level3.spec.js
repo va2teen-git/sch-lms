@@ -29,10 +29,10 @@ test.describe('Grade 7 Lesson 8: Cyber Security & Internet Communications Level 
     // 5. Наличие динамического таймера
     expect(content).toMatch(/timer|timeleft|waveTimeLimit/i);
 
-    // 6. Контракт телеметрии
-    expect(content).toContain('TELEMETRY_EVENT');
-    expect(content).toContain('level_complete');
-    expect(content).toContain('hardcore_reset');
+    // 6. Контракт телеметрии (LMSTelemetry)
+    expect(content).toContain('LMSTelemetry');
+    expect(content).toContain('.complete(');
+    expect(content).toContain('.hardcoreReset(');
     expect(content).toContain('Урок 8');
 
     // 7. Тактические элементы шлюза брандмауэра

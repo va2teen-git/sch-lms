@@ -153,34 +153,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     // ================= ТЕЛЕМЕТРИЯ =================
-    const startTime = new Date();
-    let attempts = 0;
     const missionName = 'Урок 6 :: Компьютерные вирусы и антивирусные программы (Уровень 1)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function triggerError(message, retryCallback) {
-        attempts++;
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         errorMessage.textContent = message;
         errorBox.classList.remove('d-none');
 
         // Отправка сигнала сброса текущей попытки
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        telemetry.hardcoreReset();
 
         setTimeout(() => {
             errorBox.classList.add('d-none');
@@ -259,6 +246,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Клик-выбор (альтернатива drag & drop для тач/быстрого ввода)
             card.addEventListener('click', (e) => {
+                if (p1SelectedCard && p1SelectedCard !== card && card.closest('.p1-dropzone')) {
+                    return;
+                }
                 e.stopPropagation();
                 document.querySelectorAll('.p1-card').forEach(c => c.classList.remove('border-warning'));
                 if (p1SelectedCard === card) {
@@ -347,6 +337,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Успех Фазы 1
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
             initPhase2();
         }
     });
@@ -400,6 +391,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 token.style.cursor = 'grab';
             });
             token.addEventListener('click', (e) => {
+                if (p2SelectedToken && p2SelectedToken !== token && token.closest('.p2-drop-target')) {
+                    return;
+                }
                 e.stopPropagation();
                 document.querySelectorAll('.p2-token').forEach(t => t.classList.remove('border-warning'));
                 if (p2SelectedToken === token) {
@@ -472,18 +466,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             container.appendChild(slotCard);
         });
 
-        // Возврат токена в палитру по клику
-        palette.addEventListener('click', () => {
-            if (p2SelectedToken) {
-                p2SelectedToken.classList.remove('border-warning');
-                palette.appendChild(p2SelectedToken);
-                p2SelectedToken = null;
-                updatePhase2State();
-            }
-        });
-
         updatePhase2State();
     }
+
+    // Возврат токена в палитру по клику (однократная привязка вне initPhase2)
+    document.getElementById('p2-tokens-palette').addEventListener('click', () => {
+        if (p2SelectedToken) {
+            const palette = document.getElementById('p2-tokens-palette');
+            p2SelectedToken.classList.remove('border-warning');
+            palette.appendChild(p2SelectedToken);
+            p2SelectedToken = null;
+            updatePhase2State();
+        }
+    });
 
     function updatePhase2State() {
         const slots = document.querySelectorAll('.p2-drop-target');
@@ -514,6 +509,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Успех Фазы 2
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
+            telemetry.advanceStage(3);
             initPhase3();
         }
     });
@@ -626,7 +622,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Успешное завершение Уровня 1!
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('success-screen').classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete();
         }
     });
 

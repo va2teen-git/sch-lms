@@ -54,32 +54,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         </div>
     </div>
 
-    <script>
+    <script is:inline>
         const MISSION_NAME = '7 класс Урок 5 :: Архивация (Уровень 2)';
         const TOTAL_PHASES = 5;
         let currentPhase = 1;
-        let startTime = Date.now();
-        let attemptsCount = 0;
         let currentTask = {};
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: MISSION_NAME,
+            level: 2,
+            totalStages: TOTAL_PHASES
+        });
 
         // Базы для процедурной генерации
         const fileBases = ['reports', 'photos', 'backup', 'system_logs', 'homework', 'project_x', 'db_dump'];
         const exts = ['zip', 'rar', '7z'];
         const passwords = ['12345', 'qwerty', 'admin', 'Pa$$w0rd', 'secret', '']; // '' means no password
         const volumes = ['', '10', '50', '100', '500', '1000']; // '' means no split
-
-        function sendTelemetry(action, success = false) {
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: MISSION_NAME,
-                action_type: action,
-                status: success ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
-                attempts_count: attemptsCount,
-                success: success
-            }, '*');
-        }
 
         function generateTask() {
             const base = fileBases[Math.floor(Math.random() * fileBases.length)];
@@ -132,23 +123,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 volVal === currentTask.volumeSize
             );
 
-            attemptsCount++;
-
             if (isCorrect) {
                 if (currentPhase >= TOTAL_PHASES) {
                     // Успех всего задания
-                    sendTelemetry('level_complete', true);
+                    telemetry.complete();
                     document.getElementById('game-container').classList.add('d-none');
                     document.getElementById('success-container').classList.remove('d-none');
                 } else {
                     currentPhase++;
                     initPhase();
-                    sendTelemetry('in_progress');
+                    telemetry.advanceStage(currentPhase);
                 }
             } else {
                 // Ошибка -> хардкор сброс и новая генерация текущей фазы
                 document.getElementById('error-msg').classList.remove('d-none');
-                sendTelemetry('hardcore_reset');
+                telemetry.hardcoreReset();
                 
                 // Задержка перед генерацией новой задачи, чтобы ученик успел увидеть ошибку
                 setTimeout(() => {
@@ -158,7 +147,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         // Начальный старт
-        sendTelemetry('in_progress');
         initPhase();
     </script>
 </TaskLayout>

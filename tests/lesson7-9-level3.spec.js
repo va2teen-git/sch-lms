@@ -18,9 +18,9 @@ test.describe('Grade 7 Lesson 9: Information & Data Level 3 (Arcade Stream Analy
     expect(content).toContain('createApp');
     expect(content).toContain('Vue');
     expect(content).toContain('/static/vue.global.js');
-    expect(content).toContain('TELEMETRY_EVENT');
-    expect(content).toContain('level_complete');
-    expect(content).toContain('hardcore_reset');
+    expect(content).toContain('LMSTelemetry');
+    expect(content).toContain('.complete(');
+    expect(content).toContain('.hardcoreReset(');
     expect(content).toContain('Урок 9');
   });
 

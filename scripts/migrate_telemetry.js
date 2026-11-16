@@ -90,7 +90,7 @@ function parseLevel(missionName, actionType, rawLog) {
   }
   if (/Уровень\s*1/i.test(m) || /Ур\s*1/i.test(m) || /\(Базовый\)/i.test(m)) return 1;
   if (/Уровень\s*2/i.test(m) || /Ур\s*2/i.test(m)) return 2;
-  if (/Уровень\s*3/i.test(m) || /Ур\s*3/i.test(m) || /Аркада/i.test(m)) return 3;
+  if (/Уровень\s*3/i.test(m) || /Ур\s*3/i.test(m) || /Аркада/i.test(m) || /10\s*волн/i.test(m)) return 3;
 
   if (rawLog) {
     try {

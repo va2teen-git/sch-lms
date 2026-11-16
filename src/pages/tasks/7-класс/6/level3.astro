@@ -166,23 +166,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const waveTimeLimit = 6; // секунд на волну
             const timeLeft = ref(waveTimeLimit);
             let timerInterval = null;
+            let resetTimeout = null;
 
-            const startTime = new Date();
-            let attempts = 0;
             const missionName = 'Урок 6 :: Компьютерные вирусы и антивирусные программы (Уровень 3)';
-
-            function sendTelemetry(action_type, status, success) {
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: action_type,
-                    status: status,
-                    start_time: startTime.toISOString(),
-                    time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-                    attempts_count: attempts,
-                    success: success
-                }, '*');
-            }
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 3,
+                totalWaves: 10,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(timerInterval);
+                    clearTimeout(resetTimeout);
+                    alarmActive.value = false;
+                },
+                onAfkRetry: () => {
+                    alarmActive.value = false;
+                    generate10Waves();
+                    startTimer();
+                }
+            });
 
             // Банк образцов для процедурной генерации 10 волн
             const SCENARIOS_BANK = [
@@ -388,41 +390,53 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     timeLeft.value--;
                     if (timeLeft.value <= 0) {
                         clearInterval(timerInterval);
-                        handleHardcoreFailure('ВРЕМЯ ИСТЕКЛО! Периметр пробит, вредоносный пакет просочился в память!');
+                        handleHardcoreFailure('ВРЕМЯ ИСТЕКЛО! Периметр пробит, вредоносный пакет просочился в память!', true);
                     }
                 }, 1000);
             }
 
-            function handleHardcoreFailure(msg) {
-                attempts++;
+            function handleHardcoreFailure(msg, isTimeout = false) {
                 clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
+
+                // Тотальный сброс телеметрии (с AFK-защитой на волне 1)
+                const sent = telemetry.hardcoreReset({
+                    wave: currentWaveIndex.value + 1,
+                    isTimeout: Boolean(isTimeout)
+                });
+                if (sent === false) {
+                    alarmActive.value = false;
+                    return;
+                }
+
                 alarmMessage.value = msg;
                 alarmActive.value = true;
 
-                // Тотальный сброс телеметрии
-                sendTelemetry('hardcore_reset', 'in_progress', false);
-
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
                     alarmActive.value = false;
-                    generate10Waves();
-                    startTimer();
+                    if (started.value && !completed.value && !telemetry.getState().isAfkPaused) {
+                        generate10Waves();
+                        startTimer();
+                    }
                 }, 1800);
             }
 
             function submitAction(actionType) {
-                if (!started.value || completed.value || alarmActive.value) return;
+                if (!started.value || completed.value || alarmActive.value || telemetry.getState().isAfkPaused) return;
+                telemetry.markActivity();
 
                 const expected = currentWave.value.expected;
                 if (actionType === expected) {
                     // Верное действие!
                     if (currentWaveIndex.value < waves.value.length - 1) {
                         currentWaveIndex.value++;
+                        telemetry.advanceWave(currentWaveIndex.value + 1);
                         startTimer();
                     } else {
                         // Все 10 волн успешно завершены!
                         clearInterval(timerInterval);
                         completed.value = true;
-                        sendTelemetry('level_complete', 'completed', true);
+                        telemetry.complete({ wave: waves.value.length });
                     }
                 } else {
                     // Ошибка действия -> Тотальный хардкор-сброс
@@ -432,15 +446,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     else if (expected === 'QUARANTINE') reason = 'Неизвестный 0-Day требовал изоляции в карантин!';
                     else if (expected === 'DISINFECT') reason = 'Критичный системный файл подлежал лечению, а не блокировке!';
 
-                    handleHardcoreFailure(reason);
+                    handleHardcoreFailure(reason, false);
                 }
             }
 
             function startGame() {
+                clearTimeout(resetTimeout);
                 started.value = true;
                 completed.value = false;
                 alarmActive.value = false;
-                sendTelemetry('in_progress', 'in_progress', false);
+                telemetry.start();
+                telemetry.progress({ wave: 1, total_waves: 10, stage: 1, total_stages: 10 });
                 generate10Waves();
                 startTimer();
             }
@@ -464,6 +480,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             onUnmounted(() => {
                 clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
                 window.removeEventListener('keydown', handleKeyDown);
             });
 

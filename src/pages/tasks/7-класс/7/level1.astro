@@ -151,34 +151,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     // ================= ТЕЛЕМЕТРИЯ =================
-    const startTime = new Date();
-    let attempts = 0;
     const missionName = '7 класс :: Урок 7 :: Компьютерные сети. Поиск информации в сети Интернет (Уровень 1)';
-
-    function sendTelemetry(action_type, status, success) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: action_type,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((new Date() - startTime) / 1000),
-            attempts_count: attempts,
-            success: success
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function triggerError(message, retryCallback) {
-        attempts++;
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         errorMessage.textContent = message;
         errorBox.classList.remove('d-none');
 
         // Отправка сигнала сброса текущей попытки
-        sendTelemetry('hardcore_reset', 'in_progress', false);
+        telemetry.hardcoreReset();
 
         setTimeout(() => {
             errorBox.classList.add('d-none');
@@ -281,36 +268,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             pool.appendChild(card);
         });
-
-        // Навешиваем слушатели на дроп-зоны шлюзов
-        document.querySelectorAll('.p1-dropzone').forEach(zone => {
-            zone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                zone.classList.add('border-warning');
-            });
-            zone.addEventListener('dragleave', () => {
-                zone.classList.remove('border-warning');
-            });
-            zone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                zone.classList.remove('border-warning');
-                const cardId = e.dataTransfer.getData('text/plain');
-                const cardElem = document.querySelector(`.p1-card[data-id="${cardId}"]`);
-                if (cardElem) {
-                    moveCardToBucket(cardElem, zone);
-                }
-            });
-
-            // Поддержка перемещения по клику
-            zone.addEventListener('click', () => {
-                if (p1SelectedCard) {
-                    moveCardToBucket(p1SelectedCard, zone);
-                    p1SelectedCard.classList.remove('border-warning', 'border-2');
-                    p1SelectedCard = null;
-                }
-            });
-        });
     }
+
+    // Навешиваем слушатели на дроп-зоны шлюзов однократно (вне initPhase1)
+    document.querySelectorAll('.p1-dropzone').forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.classList.add('border-warning');
+        });
+        zone.addEventListener('dragleave', () => {
+            zone.classList.remove('border-warning');
+        });
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.classList.remove('border-warning');
+            const cardId = e.dataTransfer.getData('text/plain');
+            const cardElem = document.querySelector(`.p1-card[data-id="${cardId}"]`);
+            if (cardElem) {
+                moveCardToBucket(cardElem, zone);
+            }
+        });
+
+        // Поддержка перемещения по клику
+        zone.addEventListener('click', () => {
+            if (p1SelectedCard) {
+                moveCardToBucket(p1SelectedCard, zone);
+                p1SelectedCard.classList.remove('border-warning', 'border-2');
+                p1SelectedCard = null;
+            }
+        });
+    });
 
     function moveCardToBucket(card, zone) {
         const slotsContainer = zone.querySelector('.bucket-slots');
@@ -343,6 +330,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isCorrect) {
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
             initPhase2();
         } else {
             triggerError('ОШИБКА МАРШРУТИЗАЦИИ: Некоторые доменные зоны распределены неверно!', () => {
@@ -568,6 +556,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isSuccess) {
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
+            telemetry.advanceStage(3);
             initPhase3();
         } else {
             triggerError('ОШИБКА СИНТАКСИСА URL: Компоненты адреса документа собраны неверно!', () => {
@@ -684,7 +673,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isAllCorrect) {
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('success-screen').classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete();
         } else {
             triggerError('ОШИБКА КОММУТАЦИИ: Неверно подобран тип физического канала связи для некоторых узлов!', () => {
                 initPhase3();
