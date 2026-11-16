@@ -33,7 +33,7 @@
 7. **Готовые компоненты (Терминал, Python IDE, Prince of Persia)** -> Читать `docs/components.md`
    *(Описание пропсов и использования `Terminal.astro`, `PythonIDE.astro`, `PrinceEmulator.astro` и настройка бонуса `princeBonusLevel`)*
 8. **Рабочий процесс ИИ (AI Workflow, Worktree, Параллельная работа агентов и Оформление багов)** -> Читать `docs/ai-workflow.md`
-   *(Изоляция боевого сервера, параллельные worktree D:\school-lms-dev-X, гигиена веток, оформление багов через GitHub Issues/CLI, регламент обновления продакшна и чек-лист качества)*
+   *(Изоляция боевого сервера на ALT Linux, параллельные worktree `~/Projects/school-lms-dev-X`, гигиена веток, оформление багов через GitHub Issues/CLI, регламент обновления продакшна и чек-лист качества)*
 9. **Обязательное тестирование уроков** -> Читать `docs/testing.md`
    *(Требования к e2e тестам на Playwright, проверка телеметрии и хардкор-режима)*
 

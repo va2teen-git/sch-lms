@@ -353,6 +353,7 @@ PrinceJS.Utils = {
       let queryLevel = parseInt(query.get("level") || query.get("l"), 10);
       if ((!isNaN(queryLevel) && queryLevel >= 1 && queryLevel <= 14) || queryLevel >= 90) {
         PrinceJS.currentLevel = queryLevel;
+        PrinceJS.initialLevel = queryLevel;
       }
     }
     if (query.get("health") || query.get("h")) {
@@ -391,12 +392,28 @@ PrinceJS.Utils = {
       PrinceJS.SKIP_CUTSCENES = true;
     }
 
+    if (query.get("minLevel")) {
+      let queryMinLevel = parseInt(query.get("minLevel"), 10);
+      if (!isNaN(queryMinLevel) && queryMinLevel > 0) {
+        PrinceJS.minLevel = queryMinLevel;
+        if (PrinceJS.currentLevel < PrinceJS.minLevel) {
+          PrinceJS.currentLevel = PrinceJS.minLevel;
+        }
+        if (PrinceJS.initialLevel < PrinceJS.minLevel) {
+          PrinceJS.initialLevel = PrinceJS.minLevel;
+        }
+      }
+    }
+
     if (query.get("maxLevel")) {
       let queryMaxLevel = parseInt(query.get("maxLevel"), 10);
       if (!isNaN(queryMaxLevel) && queryMaxLevel > 0) {
         PrinceJS.maxLevel = queryMaxLevel;
         if (PrinceJS.currentLevel > PrinceJS.maxLevel) {
           PrinceJS.currentLevel = PrinceJS.maxLevel;
+        }
+        if (PrinceJS.initialLevel > PrinceJS.maxLevel) {
+          PrinceJS.initialLevel = PrinceJS.maxLevel;
         }
       }
     }
@@ -410,24 +427,35 @@ PrinceJS.Utils = {
 
   updateQuery: function () {
     PrinceJS.minutes = PrinceJS.Utils.getRemainingMinutes();
-    if (PrinceJS.shortcut) {
-      PrinceJS.Utils.setHistoryState({
-        l: PrinceJS.currentLevel,
-        h: PrinceJS.maxHealth,
-        t: PrinceJS.minutes,
-        s: PrinceJS.strength,
-        w: PrinceJS.screenWidth,
-        _: true
-      });
-    } else {
-      PrinceJS.Utils.setHistoryState({
-        level: PrinceJS.currentLevel,
-        health: PrinceJS.maxHealth,
-        time: PrinceJS.minutes,
-        strength: PrinceJS.strength,
-        width: PrinceJS.screenWidth
-      });
+    const state = PrinceJS.shortcut
+      ? {
+          l: PrinceJS.currentLevel,
+          h: PrinceJS.maxHealth,
+          t: PrinceJS.minutes,
+          s: PrinceJS.strength,
+          w: PrinceJS.screenWidth,
+          _: true
+        }
+      : {
+          level: PrinceJS.currentLevel,
+          health: PrinceJS.maxHealth,
+          time: PrinceJS.minutes,
+          strength: PrinceJS.strength,
+          width: PrinceJS.screenWidth
+        };
+    if (PrinceJS.minLevel) {
+      state.minLevel = PrinceJS.minLevel;
     }
+    if (PrinceJS.maxLevel) {
+      state.maxLevel = PrinceJS.maxLevel;
+    }
+    if (PrinceJS.SKIP_TITLE) {
+      state.skipTitle = true;
+    }
+    if (PrinceJS.SKIP_CUTSCENES) {
+      state.skipCutscenes = true;
+    }
+    PrinceJS.Utils.setHistoryState(state);
   },
 
   restoreQuery: function () {
@@ -439,18 +467,32 @@ PrinceJS.Utils = {
   },
 
   clearQuery: function () {
-    if (PrinceJS.shortcut) {
-      PrinceJS.Utils.setHistoryState({
-        s: PrinceJS.strength,
-        w: PrinceJS.screenWidth,
-        _: true
-      });
-    } else {
-      PrinceJS.Utils.setHistoryState({
-        strength: PrinceJS.strength,
-        width: PrinceJS.screenWidth
-      });
+    const state = PrinceJS.shortcut
+      ? {
+          s: PrinceJS.strength,
+          w: PrinceJS.screenWidth,
+          _: true
+        }
+      : {
+          strength: PrinceJS.strength,
+          width: PrinceJS.screenWidth
+        };
+    if (PrinceJS.initialLevel && (PrinceJS.minLevel || PrinceJS.maxLevel || PrinceJS.initialLevel !== 1)) {
+      state[PrinceJS.shortcut ? "l" : "level"] = PrinceJS.initialLevel;
     }
+    if (PrinceJS.minLevel) {
+      state.minLevel = PrinceJS.minLevel;
+    }
+    if (PrinceJS.maxLevel) {
+      state.maxLevel = PrinceJS.maxLevel;
+    }
+    if (PrinceJS.SKIP_TITLE) {
+      state.skipTitle = true;
+    }
+    if (PrinceJS.SKIP_CUTSCENES) {
+      state.skipCutscenes = true;
+    }
+    PrinceJS.Utils.setHistoryState(state);
   },
 
   setHistoryState(state) {

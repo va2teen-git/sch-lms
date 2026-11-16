@@ -150,9 +150,13 @@ PrinceJS.Game.prototype = {
       ) {
         if (this.isRemainingMinutesShown() || this.isLevelShown()) {
           if (pos.x >= 0 && pos.x <= 0.2 * size.width) {
-            this.previousLevel(PrinceJS.currentLevel, true);
+            if (!PrinceJS.minLevel || PrinceJS.currentLevel > PrinceJS.minLevel) {
+              this.previousLevel(PrinceJS.currentLevel, true);
+            }
           } else if (pos.x >= 0.8 * size.width && pos.x <= size.width) {
-            this.nextLevel(PrinceJS.currentLevel, true, true);
+            if (!PrinceJS.maxLevel) {
+              this.nextLevel(PrinceJS.currentLevel, true, true);
+            }
           } else if (pos.x >= 0.4 * size.width && pos.x <= 0.6 * size.width) {
             this.restartLevel(true);
           }
@@ -168,9 +172,13 @@ PrinceJS.Game.prototype = {
           this.showRemainingMinutes();
         }
       } else if (PrinceJS.Utils.gamepadPreviousPressed(this.game)) {
-        this.previousLevel(PrinceJS.currentLevel, true);
+        if (!PrinceJS.minLevel || PrinceJS.currentLevel > PrinceJS.minLevel) {
+          this.previousLevel(PrinceJS.currentLevel, true);
+        }
       } else if (PrinceJS.Utils.gamepadNextPressed(this.game)) {
-        this.nextLevel(PrinceJS.currentLevel, true, true);
+        if (!PrinceJS.maxLevel) {
+          this.nextLevel(PrinceJS.currentLevel, true, true);
+        }
       }
     }
   },
@@ -634,6 +642,11 @@ PrinceJS.Game.prototype = {
 
     PrinceJS.danger = null;
     const completedLvl = triggerLevel || PrinceJS.currentLevel;
+
+    if (skipped && PrinceJS.maxLevel && completedLvl >= PrinceJS.maxLevel) {
+      return;
+    }
+
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({
@@ -673,6 +686,9 @@ PrinceJS.Game.prototype = {
 
   previousLevel: function (triggerLevel, skipped = false) {
     if (triggerLevel !== undefined && triggerLevel !== PrinceJS.currentLevel) {
+      return;
+    }
+    if (PrinceJS.minLevel && PrinceJS.currentLevel <= PrinceJS.minLevel) {
       return;
     }
 
