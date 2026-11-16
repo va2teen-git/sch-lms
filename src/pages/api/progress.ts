@@ -21,6 +21,7 @@ export const GET: APIRoute = async ({ request }) => {
     const courseSlug = url.searchParams.get('courseSlug');
     const lessonId = url.searchParams.get('lessonId');
 
+    const trimmedPrefix = lessonPrefix.trim();
     let rows: any[];
     if (courseSlug && lessonId) {
       rows = db.prepare(`
@@ -28,24 +29,59 @@ export const GET: APIRoute = async ({ request }) => {
         FROM telemetry 
         WHERE (first_name = ? AND last_name = ?)
           AND (student_class = ? OR class_name = ?)
-          AND ((course_slug = ? AND lesson_id = ?) OR mission_name LIKE ?)
+          AND (
+            (course_slug = ? AND lesson_id = ?)
+            OR (
+              (course_slug IS NULL OR course_slug = '')
+              AND (mission_name = ? OR mission_name LIKE ? OR mission_name LIKE ? OR mission_name LIKE ?)
+            )
+          )
         ORDER BY timestamp ASC
-      `).all(firstName.trim(), lastName.trim(), className.trim(), className.trim(), courseSlug.trim(), lessonId.trim(), `%${lessonPrefix.trim()}%`);
+      `).all(
+        firstName.trim(),
+        lastName.trim(),
+        className.trim(),
+        className.trim(),
+        courseSlug.trim(),
+        lessonId.trim(),
+        trimmedPrefix,
+        `${trimmedPrefix} %`,
+        `${trimmedPrefix}:%`,
+        `%${trimmedPrefix} %`
+      );
     } else {
       rows = db.prepare(`
         SELECT action_type, mission_name, is_hardcore 
         FROM telemetry 
         WHERE (first_name = ? AND last_name = ?)
           AND (student_class = ? OR class_name = ?)
-          AND mission_name LIKE ?
+          AND (mission_name = ? OR mission_name LIKE ? OR mission_name LIKE ? OR mission_name LIKE ?)
         ORDER BY timestamp ASC
-      `).all(firstName.trim(), lastName.trim(), className.trim(), className.trim(), `%${lessonPrefix.trim()}%`);
+      `).all(
+        firstName.trim(),
+        lastName.trim(),
+        className.trim(),
+        className.trim(),
+        trimmedPrefix,
+        `${trimmedPrefix} %`,
+        `${trimmedPrefix}:%`,
+        `%${trimmedPrefix} %`
+      );
     }
 
     const normalLevels = new Set();
     const hardcoreLevels = new Set();
+    let princeCompleted = false;
 
     rows.forEach((row: any) => {
+      const mName = String(row.mission_name || '');
+      const isPrince = mName.includes('Prince of Persia') || row.action_type === 'prince_complete';
+      if (isPrince) {
+        if (row.action_type === 'level_complete' || row.action_type === 'prince_complete') {
+          princeCompleted = true;
+        }
+        return;
+      }
       if (row.action_type === 'hardcore_reset' && row.is_hardcore === 1) {
         hardcoreLevels.clear();
       }
@@ -71,7 +107,8 @@ export const GET: APIRoute = async ({ request }) => {
       unlockedNormal,
       unlockedHardcore,
       isNormalCompleted,
-      isHardcoreCompleted
+      isHardcoreCompleted,
+      princeCompleted
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

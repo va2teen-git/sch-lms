@@ -23,6 +23,8 @@ export interface AttemptMetric {
   attemptNumber: number;
   mode: 'normal' | 'hardcore';
   status: 'completed' | 'in_progress' | 'failed';
+  courseSlug?: string | null;
+  lessonId?: string | null;
   startedAt: string | null;
   lastActiveAt: string | null;
   totalTimeSec: number;
@@ -36,6 +38,8 @@ export interface AttemptMetric {
   sprintCpm?: number | null;
   sprintWpm?: number | null;
   sprintTimeSec?: number | null;
+  princeCompleted?: boolean;
+  princeBestTimeSec?: number | null;
 }
 
 export interface StudentMetric {
@@ -77,12 +81,20 @@ export interface StudentMetric {
   sprintCpm?: number | null;
   sprintWpm?: number | null;
   sprintAccuracy?: number | null;
+  princeCompleted?: boolean;
+  princeBestTimeSec?: number | null;
+  princeLevels?: number[];
   currentAttempt?: AttemptMetric | null;
   attempts: AttemptMetric[];
+  lastCourseSlug?: string | null;
+  lastLessonId?: string | null;
+  workedLessons?: Array<{ courseSlug: string; lessonId: string }>;
 
   recentEvents: Array<{
     id: number;
     mission: string;
+    course_slug?: string | null;
+    lesson_id?: string | null;
     action_type: string;
     timestamp: string;
     time_spent: number;
@@ -143,8 +155,8 @@ export const GET: APIRoute = async ({ request }) => {
       const match = lessonFilter.match(/\d+/);
       const lId = match ? match[0] : null;
       if (lId) {
-        lessonCondition = ' AND (lesson_id = ? OR mission_name LIKE ?)';
-        params.push(lId, `%Урок ${lId}%`);
+        lessonCondition = " AND (lesson_id = ? OR ((lesson_id IS NULL OR lesson_id = '') AND (mission_name = ? OR mission_name LIKE ? OR mission_name LIKE ? OR mission_name LIKE ?)))";
+        params.push(lId, `Урок ${lId}`, `%Урок ${lId} %`, `%Урок ${lId}:%`, `%Урок ${lId}`);
       } else {
         const prefix = lessonFilter.startsWith('Урок ') ? lessonFilter : `Урок ${lessonFilter}`;
         lessonCondition = ' AND mission_name LIKE ?';
@@ -190,6 +202,7 @@ export const GET: APIRoute = async ({ request }) => {
       _attemptOrder: string[];
       _legacyIdx: number;
       _lastHc: number | null;
+      _workedLessonsMap: Record<string, { courseSlug: string; lessonId: string }>;
     }
 
     // Grouping by student
@@ -248,19 +261,35 @@ export const GET: APIRoute = async ({ request }) => {
           sprintCpm: null,
           sprintWpm: null,
           sprintAccuracy: null,
+          princeCompleted: false,
+          princeBestTimeSec: null,
+          princeLevels: [],
           currentAttempt: null,
           attempts: [],
+          lastCourseSlug: null,
+          lastLessonId: null,
+          workedLessons: [],
           recentEvents: [],
           _attemptsMap: {},
           _attemptOrder: [],
           _legacyIdx: 1,
-          _lastHc: null
+          _lastHc: null,
+          _workedLessonsMap: {}
         };
       }
 
       const s = studentsMap[canonicalKey];
       s.lastSeen = r.timestamp;
       s.latestIsHardcore = r.is_hardcore;
+      const rowCourse = r.course_slug ? String(r.course_slug).trim() : null;
+      const rowLesson = r.lesson_id ? String(r.lesson_id).trim() : null;
+      if (rowCourse) s.lastCourseSlug = rowCourse;
+      if (rowLesson) s.lastLessonId = rowLesson;
+      if (rowCourse && rowLesson) {
+        const wlKey = `${rowCourse}::${rowLesson}`;
+        if (s._workedLessonsMap[wlKey]) delete s._workedLessonsMap[wlKey];
+        s._workedLessonsMap[wlKey] = { courseSlug: rowCourse, lessonId: rowLesson };
+      }
       const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
       const rStart = r.start_time ? new Date(r.start_time) : null;
       const validStart = rStart && !isNaN(rStart.getTime()) ? rStart : null;
@@ -288,6 +317,8 @@ export const GET: APIRoute = async ({ request }) => {
           attemptNumber: attNum || s._attemptOrder.length,
           mode: attMode,
           status: 'in_progress',
+          courseSlug: rowCourse,
+          lessonId: rowLesson,
           startedAt: r.timestamp,
           lastActiveAt: r.timestamp,
           totalTimeSec: 0,
@@ -300,20 +331,49 @@ export const GET: APIRoute = async ({ request }) => {
           },
           sprintCpm: null,
           sprintWpm: null,
-          sprintTimeSec: null
+          sprintTimeSec: null,
+          princeCompleted: false,
+          princeBestTimeSec: null
         };
       }
 
       const att = s._attemptsMap[attId];
       att.lastActiveAt = r.timestamp;
+      if (!att.courseSlug && rowCourse) att.courseSlug = rowCourse;
+      if (!att.lessonId && rowLesson) att.lessonId = rowLesson;
 
-      // Extract Level Number
+      const mNameStr = String(r.mission_name || '');
+      const isPrinceRow = mNameStr.includes('Prince of Persia') || r.action_type === 'prince_complete';
+
+      if (isPrinceRow && (r.action_type === 'level_complete' || r.action_type === 'prince_complete') && r.success !== 0) {
+        s.princeCompleted = true;
+        att.princeCompleted = true;
+        const pMatch = mNameStr.match(/Уровень\s*(\d+)/i);
+        if (pMatch) {
+          const pLvl = parseInt(pMatch[1], 10);
+          if (s.princeLevels && !s.princeLevels.includes(pLvl)) {
+            s.princeLevels.push(pLvl);
+          }
+        }
+        if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > 0) {
+          if (s.princeBestTimeSec === null || s.princeBestTimeSec === undefined || r.time_spent_sec < s.princeBestTimeSec) {
+            s.princeBestTimeSec = r.time_spent_sec;
+          }
+          if (att.princeBestTimeSec === null || att.princeBestTimeSec === undefined || r.time_spent_sec < att.princeBestTimeSec) {
+            att.princeBestTimeSec = r.time_spent_sec;
+          }
+        }
+      }
+
+      // Extract Level Number (exclude Prince of Persia bonus levels)
       let lvlNum: 1 | 2 | 3 | null = null;
-      if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
-        lvlNum = r.level_number as 1 | 2 | 3;
-      } else if (r.mission_name.includes('Уровень 1')) lvlNum = 1;
-      else if (r.mission_name.includes('Уровень 2')) lvlNum = 2;
-      else if (r.mission_name.includes('Уровень 3')) lvlNum = 3;
+      if (!isPrinceRow) {
+        if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
+          lvlNum = r.level_number as 1 | 2 | 3;
+        } else if (mNameStr.includes('Уровень 1')) lvlNum = 1;
+        else if (mNameStr.includes('Уровень 2')) lvlNum = 2;
+        else if (mNameStr.includes('Уровень 3')) lvlNum = 3;
+      }
 
       const isError = r.action_type === 'hardcore_reset' || r.action_type === 'level_fail' || (r.action_log && r.action_log.includes('Error'));
 
@@ -483,6 +543,8 @@ export const GET: APIRoute = async ({ request }) => {
       s.recentEvents.push({
         id: r.id,
         mission: r.mission_name,
+        course_slug: rowCourse,
+        lesson_id: rowLesson,
         action_type: r.action_type,
         timestamp: r.timestamp,
         time_spent: r.time_spent_sec,
@@ -687,10 +749,13 @@ export const GET: APIRoute = async ({ request }) => {
       // Reverse recent events so newest is first
       s.recentEvents.reverse();
 
+      s.workedLessons = Object.values(s._workedLessonsMap).reverse();
+
       delete (s as any)._attemptsMap;
       delete (s as any)._attemptOrder;
       delete (s as any)._legacyIdx;
       delete (s as any)._lastHc;
+      delete (s as any)._workedLessonsMap;
 
       return s;
     });
@@ -714,6 +779,7 @@ export const GET: APIRoute = async ({ request }) => {
     const hardcoreCount = filteredStudents.filter(s => s.lessonStatus === 'hardcore_completed').length;
     const inProgressCount = filteredStudents.filter(s => s.lessonStatus === 'in_progress').length;
     const totalErrors = filteredStudents.reduce((sum, s) => sum + s.totalErrors, 0);
+    const princeCount = filteredStudents.filter(s => s.princeCompleted).length;
 
     const avgTimeSec = completedCount > 0
       ? Math.round(completedStudents.reduce((sum, s) => sum + s.totalActiveTimeSec, 0) / completedCount)
@@ -737,6 +803,7 @@ export const GET: APIRoute = async ({ request }) => {
         totalStudents,
         completedCount,
         hardcoreCount,
+        princeCount,
         inProgressCount,
         avgTimeSec,
         totalErrors

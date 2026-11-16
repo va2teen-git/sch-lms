@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => {
-  const baseUrl = 'http://localhost:4321';
+  const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
 
   test('GET /api/teacher/stats returns valid schema and KPI aggregations', async ({ request }) => {
     const res = await request.get(`${baseUrl}/api/teacher/stats?date=all`);
@@ -174,13 +174,16 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     await expect(page.locator('#class-select-label')).toHaveText('Выбрано: 2 кл.');
 
     // Click outside to close menu
-    await page.locator('#progress-table').click();
+    await page.getByRole('heading', { name: 'Панель мониторинга урока' }).click();
     await expect(page.locator('#class-dropdown-menu')).toBeHidden();
 
     // Check that table rows contain the selected classes
-    const classCells = await page.locator('.student-row td:nth-child(3)').allTextContents();
-    const unique = [...new Set(classCells.map(c => c.trim()))];
-    expect(unique.every(c => c === '10-класс_углубленный' || c === '11-класс_углубленный')).toBe(true);
+    await expect(async () => {
+      const classCells = await page.locator('.student-row td:nth-child(3)').allTextContents();
+      const unique = [...new Set(classCells.map(c => c.trim()))];
+      expect(unique.length).toBeGreaterThan(0);
+      expect(unique.every(c => c === '10-класс_углубленный' || c === '11-класс_углубленный')).toBe(true);
+    }).toPass({ timeout: 5000 });
   });
 
   test('GET /api/teacher/stats attributes 10th grade students who solved 8th grade lesson to 10-класс_углубленный', async ({ request }) => {
@@ -232,34 +235,143 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     expect(body.students.length).toBeGreaterThan(0);
   });
 
-  test('Student dashboard /courses allows switching course catalog without resetting student profile', async ({ page }) => {
+  test('Student dashboard /courses renders scrollable all-class lesson matrix without single-class lock', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(baseUrl);
-    await page.evaluate(() => {
-      localStorage.setItem('student_firstName', 'Алексей');
-      localStorage.setItem('student_lastName', 'Смирнов');
-      localStorage.setItem('student_class', '10-класс_углубленный');
+    await page.fill('#firstName', 'Алексей');
+    await page.fill('#lastName', 'Смирнов');
+    await page.selectOption('#classSelect', '11-класс_углубленный');
+    await page.click('button[type="submit"]');
+
+    await page.waitForURL('**/courses');
+    await expect(page.locator('#student-name')).toHaveText('Смирнов Алексей');
+    await expect(page.locator('#class-name')).toContainText('11 класс_углубленный');
+
+    // Dropdown course-select must no longer exist; matrix must render all 7 classes
+    await expect(page.locator('#course-select')).toHaveCount(0);
+    const matrix = page.locator('#lessons-matrix');
+    await expect(matrix).toBeVisible();
+    await expect(page.locator('[data-course-row]')).toHaveCount(7);
+
+    // Matrix scrolls horizontally to the right
+    const scrollDims = await matrix.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+      overflowX: getComputedStyle(el).overflowX,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+    expect(scrollDims.scrollWidth).toBeGreaterThan(scrollDims.clientWidth);
+    expect(['auto', 'scroll']).toContain(scrollDims.overflowX);
+    expect(['auto', 'scroll']).toContain(scrollDims.overflowY);
+
+    // Matrix scrolls vertically when viewport height is constrained
+    await page.setViewportSize({ width: 1280, height: 360 });
+    const smallHeightDims = await matrix.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
+    expect(smallHeightDims.scrollHeight).toBeGreaterThan(smallHeightDims.clientHeight);
+
+    // Card displays class label, ordinal number, and topic for 7-класс lesson 7
+    const card7_7 = page.locator('#lessons-matrix a[data-course="7-класс"][data-lesson="7"]');
+    await expect(card7_7).toHaveAttribute('href', '/lesson/7-класс/7');
+    const cardText = await card7_7.textContent();
+    expect(cardText).toContain('7 кл');
+    expect(cardText).toContain('№7');
+
+    // Profile stays 11th grade in localStorage
+    const savedClass = await page.evaluate(() => localStorage.getItem('student_class'));
+    expect(savedClass).toBe('11-класс_углубленный');
+  });
+
+  test('GET /api/progress isolates lesson progress across courses with the same lesson number', async ({ request }) => {
+    const uniq = Date.now();
+    const fName = `ТестИзоляция${uniq}`;
+    const lName = 'Ученик';
+    const sClass = '11-класс_углубленный';
+
+    // Complete 11-класс_углубленный lesson 7 (all 3 levels)
+    for (const lvl of [1, 2, 3]) {
+      const postRes = await request.post(`${baseUrl}/api/telemetry`, {
+        data: {
+          student_firstName: fName,
+          student_lastName: lName,
+          student_class: sClass,
+          course_slug: '11-класс_углубленный',
+          lesson_id: '7',
+          level_number: lvl,
+          mission_name: `Урок 7 :: Тест 11 кл (Уровень ${lvl})`,
+          action_type: 'level_complete',
+          status: 'completed',
+          time_spent_sec: 10,
+          attempts_count: 1,
+          success: true,
+          is_hardcore: false
+        }
+      });
+      expect(postRes.status()).toBe(200);
+    }
+
+    // 11-класс_углубленный lesson 7 must be completed
+    const prog11 = await request.get(`${baseUrl}/api/progress?firstName=${encodeURIComponent(fName)}&lastName=${encodeURIComponent(lName)}&className=${encodeURIComponent(sClass)}&lessonPrefix=${encodeURIComponent('Урок 7')}&courseSlug=11-класс_углубленный&lessonId=7`);
+    expect(prog11.status()).toBe(200);
+    const body11 = await prog11.json();
+    expect(body11.isNormalCompleted).toBe(true);
+
+    // 7-класс lesson 7 for the SAME 11th grade student must NOT be marked completed!
+    const prog7 = await request.get(`${baseUrl}/api/progress?firstName=${encodeURIComponent(fName)}&lastName=${encodeURIComponent(lName)}&className=${encodeURIComponent(sClass)}&lessonPrefix=${encodeURIComponent('Урок 7')}&courseSlug=7-класс&lessonId=7`);
+    expect(prog7.status()).toBe(200);
+    const body7 = await prog7.json();
+    expect(body7.isNormalCompleted).toBe(false);
+    expect(body7.unlockedNormal).toBe(1);
+  });
+
+  test('Teacher dashboard displays cross-course lesson badge and filters 11th grade student solving 7th grade lesson', async ({ page, request }) => {
+    const uniq = Date.now();
+    const fName = `Максим${uniq}`;
+    const lName = 'КроссКурс';
+
+    const postRes = await request.post(`${baseUrl}/api/telemetry`, {
+      data: {
+        student_firstName: fName,
+        student_lastName: lName,
+        student_class: '11-класс_углубленный',
+        course_slug: '7-класс',
+        lesson_id: '7',
+        level_number: 1,
+        mission_name: 'Урок 7 :: Устройство сетей (Уровень 1)',
+        action_type: 'level_complete',
+        status: 'completed',
+        time_spent_sec: 25,
+        attempts_count: 1,
+        success: true,
+        is_hardcore: false
+      }
     });
+    expect(postRes.status()).toBe(200);
 
-    await page.goto(`${baseUrl}/courses`);
-    await expect(page.locator('#student-name')).toHaveText('Смирнов Алексей');
-    await expect(page.locator('#class-name')).toContainText('10 класс_углубленный');
+    // Stats API returns workedLessons with 7-класс lesson 7 under student's 11-класс_углубленный cohort
+    const statsRes = await request.get(`${baseUrl}/api/teacher/stats?class=11-класс_углубленный&course=7-класс&lesson=7&date=today&exclude_tests=0`);
+    expect(statsRes.status()).toBe(200);
+    const statsBody = await statsRes.json();
+    const found = statsBody.students.find(s => s.firstName === fName && s.lastName === lName);
+    expect(found).toBeDefined();
+    expect(found.className).toBe('11-класс_углубленный');
+    expect(found.workedLessons).toContainEqual({ courseSlug: '7-класс', lessonId: '7' });
 
-    const courseSelect = page.locator('#course-select');
-    await expect(courseSelect).toBeVisible();
-    await expect(courseSelect).toHaveValue('10-класс_углубленный');
+    // Teacher UI filters by 11-класс_углубленный + Другой курс 7-класс Урок 7 and renders cross-course badge
+    await page.goto(`${baseUrl}/teacher?date=today`);
+    await page.locator('#filter-exclude-tests').uncheck();
+    await page.locator('#filter-class').click();
+    await page.locator('input[value="11-класс_углубленный"]').check();
+    await page.locator('#progress-table').click();
+    await page.locator('#filter-lesson').selectOption('7-класс::Урок 7');
+    await page.fill('#filter-search', fName);
 
-    // Switch to 8-класс
-    await courseSelect.selectOption('8-класс');
-    await page.waitForTimeout(200);
-
-    // Profile stays 10th grade
-    await expect(page.locator('#student-name')).toHaveText('Смирнов Алексей');
-    await expect(page.locator('#class-name')).toContainText('10 класс_углубленный');
-
-    // Lessons container now contains 8th grade lesson links
-    const lessonLinks = await page.locator('#lessons-container a').evaluateAll(links => links.map(a => a.getAttribute('href')));
-    expect(lessonLinks.length).toBeGreaterThan(0);
-    expect(lessonLinks.some(href => href.includes('/lesson/8-класс/'))).toBe(true);
+    const row = page.locator('.student-row', { hasText: fName });
+    await expect(row).toBeVisible();
+    await expect(row.locator('td:nth-child(3)')).toHaveText('11-класс_углубленный');
+    await expect(row.locator('td:nth-child(4)')).toContainText('7 кл • Ур. 7');
   });
 
   test('Teacher dashboard detail modal displays student attempt history', async ({ page }) => {
@@ -277,5 +389,166 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     // Close modal
     await page.locator('#modal-close-btn').click();
     await expect(page.locator('#detail-modal')).toBeHidden();
+  });
+
+  test('Matrix displays level colors for incomplete lessons and achievement emojis (✅ 💀 ⚔️ ⚡) + Prince badge on /teacher', async ({ page, request }) => {
+    const uniq = Date.now();
+    const fName = `МатрицаСтатус${uniq}`;
+    const lName = 'Ученик';
+    const sClass = '11-класс_углубленный';
+
+    const postEvent = async (payload) => {
+      const r = await request.post(`${baseUrl}/api/telemetry`, { data: payload });
+      expect(r.status()).toBe(200);
+    };
+
+    // 1. 7-класс Урок 4 -> stopped at Level 1 (in_progress with time > 0)
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '4',
+      level_number: 1,
+      mission_name: 'Урок 4 :: Тест (Уровень 1)',
+      action_type: 'in_progress',
+      status: 'in_progress',
+      time_spent_sec: 15,
+      attempts_count: 1,
+      success: false,
+      is_hardcore: false
+    });
+
+    // 2. 7-класс Урок 5 -> stopped at Level 2 (Level 1 completed)
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '5',
+      level_number: 1,
+      mission_name: 'Урок 5 :: Тест (Уровень 1)',
+      action_type: 'level_complete',
+      status: 'completed',
+      time_spent_sec: 20,
+      attempts_count: 1,
+      success: true,
+      is_hardcore: false
+    });
+
+    // 3. 7-класс Урок 6 -> stopped at Level 3 (Levels 1 & 2 completed)
+    for (const lvl of [1, 2]) {
+      await postEvent({
+        student_firstName: fName,
+        student_lastName: lName,
+        student_class: sClass,
+        course_slug: '7-класс',
+        lesson_id: '6',
+        level_number: lvl,
+        mission_name: `Урок 6 :: Тест (Уровень ${lvl})`,
+        action_type: 'level_complete',
+        status: 'completed',
+        time_spent_sec: 20,
+        attempts_count: 1,
+        success: true,
+        is_hardcore: false
+      });
+    }
+
+    // 4. 7-класс Урок 7 -> completed in Hardcore + Prince of Persia + Logo-Storm
+    for (const lvl of [1, 2, 3]) {
+      await postEvent({
+        student_firstName: fName,
+        student_lastName: lName,
+        student_class: sClass,
+        course_slug: '7-класс',
+        lesson_id: '7',
+        level_number: lvl,
+        mission_name: `Урок 7 :: Тест (Уровень ${lvl})`,
+        action_type: 'level_complete',
+        status: 'completed',
+        time_spent_sec: 25,
+        attempts_count: 1,
+        success: true,
+        is_hardcore: true
+      });
+    }
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '7',
+      level_number: 0,
+      mission_name: 'Урок 7 :: Двоичное кодирование :: Prince of Persia (Уровень 1)',
+      action_type: 'level_complete',
+      status: 'completed',
+      time_spent_sec: 42,
+      attempts_count: 1,
+      success: true,
+      is_hardcore: true
+    });
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '7',
+      level_number: 0,
+      mission_name: 'Урок 7 :: Лого-Шторм',
+      action_type: 'sprint_complete',
+      status: 'completed',
+      time_spent_sec: 18,
+      attempts_count: 1,
+      success: true,
+      action_log: JSON.stringify({ cpm: 240, wpm: 48, accuracy: 98 })
+    });
+
+    // Open /courses as this student
+    await page.goto(baseUrl);
+    await page.evaluate(({ fName, lName, sClass }) => {
+      localStorage.setItem('student_firstName', fName);
+      localStorage.setItem('student_lastName', lName);
+      localStorage.setItem('student_class', sClass);
+    }, { fName, lName, sClass });
+
+    await page.goto(`${baseUrl}/courses`);
+
+    const c4 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="4"]');
+    await expect(c4).toHaveAttribute('data-progress-state', 'stopped-1');
+    await expect(c4).toHaveClass(/bg-emerald-50/);
+    await expect(c4).toContainText('Ур.1');
+
+    const c5 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="5"]');
+    await expect(c5).toHaveAttribute('data-progress-state', 'stopped-2');
+    await expect(c5).toHaveClass(/bg-amber-50/);
+    await expect(c5).toContainText('Ур.2');
+
+    const c6 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="6"]');
+    await expect(c6).toHaveAttribute('data-progress-state', 'stopped-3');
+    await expect(c6).toHaveClass(/bg-red-50/);
+    await expect(c6).toContainText('Ур.3');
+
+    const c7 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="7"]');
+    await expect(c7).toHaveAttribute('data-progress-state', 'completed');
+    const c7Badges = await c7.locator('.card-status-badges').textContent();
+    expect(c7Badges).toContain('✅');
+    expect(c7Badges).toContain('💀');
+    expect(c7Badges).toContain('⚔️');
+    expect(c7Badges).toContain('⚡');
+
+    // Verify /teacher shows Prince of Persia achievement badge and modal card
+    await page.goto(`${baseUrl}/teacher?date=today`);
+    await page.locator('#filter-exclude-tests').uncheck();
+    await page.locator('#filter-lesson').selectOption('7-класс::Урок 7');
+    await page.fill('#filter-search', fName);
+
+    const row = page.locator('.student-row', { hasText: fName });
+    await expect(row).toBeVisible();
+    await expect(row.locator('td:nth-child(4)')).toContainText('⚔️ Принц Персии');
+
+    await row.locator('.view-log-btn').click();
+    await expect(page.locator('#modal-level-cards')).toContainText('Prince of Persia (1989)');
+    await expect(page.locator('#modal-level-cards')).toContainText('Покорен');
   });
 });
