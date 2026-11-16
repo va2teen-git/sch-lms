@@ -238,22 +238,6 @@ if (InternetCheckConnection("<span class="text-danger fw-bold" v-text="currentTa
     <script is:inline>
         const { createApp } = Vue;
         const missionName = 'Урок 20 :: Вредоносное ПО и методы борьбы с ним (Уровень 3)';
-        let sessionStartTime = Date.now();
-        let attempts = 0;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(sessionStartTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
 
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -289,7 +273,8 @@ if (InternetCheckConnection("<span class="text-danger fw-bold" v-text="currentTa
                     maxPhaseTime: 10.0,
                     timerInterval: null,
                     failMessage: '',
-                    currentTask: {}
+                    currentTask: {},
+                    telemetry: null
                 };
             },
             computed: {
@@ -297,13 +282,49 @@ if (InternetCheckConnection("<span class="text-danger fw-bold" v-text="currentTa
                     return this.phaseTimeLeft.toFixed(1);
                 }
             },
+            mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: this.totalPhases,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        clearInterval(this.timerInterval);
+                        this.failMessage = '';
+                    },
+                    onAfkRetry: () => {
+                        this.failMessage = '';
+                        this.currentPhase = 1;
+                        this.gameState = 'playing';
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.loadPhase(1);
+                    }
+                });
+            },
+            beforeUnmount() {
+                clearInterval(this.timerInterval);
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
+            },
             methods: {
                 startGame() {
-                    sessionStartTime = Date.now();
-                    attempts = 0;
+                    const isFreshStart = this.gameState !== 'failed';
                     this.currentPhase = 1;
                     this.gameState = 'playing';
-                    sendTelemetry('in_progress');
+                    if (this.telemetry) {
+                        if (isFreshStart) {
+                            this.telemetry.reset({ allowRecomplete: true });
+                        }
+                        this.telemetry.start();
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalPhases,
+                            stage: 1,
+                            total_stages: this.totalPhases
+                        });
+                    }
                     this.loadPhase(1);
                 },
 
@@ -320,33 +341,50 @@ if (InternetCheckConnection("<span class="text-danger fw-bold" v-text="currentTa
                         this.phaseTimeLeft = Math.max(0, this.phaseTimeLeft - 0.1);
                         if (this.phaseTimeLeft <= 0.001) {
                             clearInterval(this.timerInterval);
-                            this.triggerFailure('Время на нейтрализацию угрозы истекло! Вредоносный код парализовал инфраструктуру.');
+                            this.triggerFailure('Время на нейтрализацию угрозы истекло! Вредоносный код парализовал инфраструктуру.', true);
                         }
                     }, 100);
                 },
 
-                triggerFailure(reason) {
+                triggerFailure(reason, isTimeout = false) {
                     clearInterval(this.timerInterval);
-                    attempts++;
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentPhase,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        if (sent === false) {
+                            return;
+                        }
+                    }
                     this.failMessage = reason;
                     this.gameState = 'failed';
-                    sendTelemetry('hardcore_reset');
                 },
 
                 handleOptionClick(idx) {
+                    if (this.gameState !== 'playing') return;
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                     clearInterval(this.timerInterval);
+                    if (this.telemetry) {
+                        this.telemetry.markActivity();
+                    }
                     const opt = this.currentTask.options[idx];
 
                     if (opt.isCorrect) {
                         if (this.currentPhase >= this.totalPhases) {
                             this.gameState = 'success';
-                            sendTelemetry('level_complete', true);
+                            if (this.telemetry) {
+                                this.telemetry.complete({ wave: this.totalPhases, stage: this.totalPhases });
+                            }
                         } else {
-                            sendTelemetry('in_progress');
-                            this.loadPhase(this.currentPhase + 1);
+                            const nextWave = this.currentPhase + 1;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(nextWave);
+                            }
+                            this.loadPhase(nextWave);
                         }
                     } else {
-                        this.triggerFailure(`Неверное действие аварийного реагирования: [${opt.text}]. Произошла компрометация узла!`);
+                        this.triggerFailure(`Неверное действие аварийного реагирования: [${opt.text}]. Произошла компрометация узла!`, false);
                     }
                 },
 

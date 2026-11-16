@@ -230,6 +230,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     createApp({
         data() {
             return {
+                missionName: 'Урок 7 :: Двоичное кодирование (Уровень 3)',
                 gameState: 'intro', // 'intro', 'playing', 'victory'
                 currentWave: 1,
                 totalWaves: 8,
@@ -238,7 +239,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 phaseTimeLeft: 12.0,
                 maxPhaseTime: 12.0,
                 timerInterval: null,
+                resetTimeout: null,
                 crashMessage: null,
+                telemetry: null,
 
                 // Состояния переключателей в дереве (0 = влево, 1 = вправо)
                 switches: {
@@ -268,7 +271,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             formattedFinalTime() {
-                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const totalSec = this.telemetry
+                    ? Math.max(1, this.telemetry.getTimeSpentSec())
+                    : Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
                 const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const s = String(totalSec % 60).padStart(2, '0');
                 return `${m}:${s}`;
@@ -312,36 +317,71 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
         },
 
-        methods: {
-            sendTelemetry(actionType, isSuccess) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 7 :: Двоичное кодирование (Уровень 3)',
-                    action_type: actionType,
-                    status: isSuccess ? 'completed' : 'in_progress',
-                    start_time: new Date(this.startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: this.attempts,
-                    success: isSuccess
-                }, '*');
-            },
+        mounted() {
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: this.missionName,
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(this.timerInterval);
+                    clearTimeout(this.resetTimeout);
+                    this.crashMessage = null;
+                },
+                onAfkRetry: () => {
+                    this.crashMessage = null;
+                    if (this.gameState === 'playing') {
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.initWave(1);
+                    }
+                }
+            });
+        },
 
+        beforeUnmount() {
+            clearInterval(this.timerInterval);
+            clearTimeout(this.resetTimeout);
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
+        },
+
+        methods: {
             startGame() {
+                clearTimeout(this.resetTimeout);
                 this.gameState = 'playing';
                 this.currentWave = 1;
+                this.attempts = 0;
                 this.startTime = Date.now();
-                this.sendTelemetry('in_progress', false);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalWaves);
+                    this.telemetry.progress({
+                        wave: 1,
+                        total_waves: this.totalWaves,
+                        stage: 1,
+                        total_stages: this.totalWaves
+                    });
+                }
                 this.initWave(1);
             },
 
             restartGame() {
+                clearInterval(this.timerInterval);
+                clearTimeout(this.resetTimeout);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                }
                 this.gameState = 'intro';
                 this.currentWave = 1;
-                clearInterval(this.timerInterval);
             },
 
             toggleSwitch(nodeId) {
+                if (this.telemetry) {
+                    this.telemetry.markActivity();
+                }
                 if (this.switches[nodeId] === '0') {
                     this.switches[nodeId] = '1';
                 } else {
@@ -436,38 +476,66 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     this.phaseTimeLeft -= 0.1;
                     if (this.phaseTimeLeft <= 0) {
                         this.phaseTimeLeft = 0;
-                        this.handleFailure('Таймер исчерпан! Пакет сошел с линии задержки в буфере.');
+                        this.handleFailure('Таймер исчерпан! Пакет сошел с линии задержки в буфере.', true);
                     }
                 }, 100);
             },
 
             dispatchPacket() {
+                if (this.gameState !== 'playing' || this.crashMessage) return;
+                if (this.telemetry) {
+                    this.telemetry.markActivity();
+                }
                 if (this.currentRouteMatchesTarget) {
                     // Успех текущей волны!
                     clearInterval(this.timerInterval);
                     if (this.currentWave >= this.totalWaves) {
                         // Победа в хардкоре!
                         this.gameState = 'victory';
-                        this.sendTelemetry('level_complete', true);
+                        if (this.telemetry) {
+                            this.telemetry.complete({ wave: this.totalWaves, stage: this.totalWaves });
+                        }
                     } else {
-                        this.initWave(this.currentWave + 1);
+                        const nextWave = this.currentWave + 1;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(nextWave);
+                        }
+                        this.initWave(nextWave);
                     }
                 } else {
                     // Ошибка маршрутизации!
                     const actualTerm = this.getTerminalFor(this.activeTerminalPath) || 'ТУПИК';
-                    this.handleFailure(`Пакет [${this.currentWaveData.targetSymbol}:${this.currentWaveData.targetCode}] ошибочно направлен в [${actualTerm}:${this.activeTerminalPath}]!`);
+                    this.handleFailure(`Пакет [${this.currentWaveData.targetSymbol}:${this.currentWaveData.targetCode}] ошибочно направлен в [${actualTerm}:${this.activeTerminalPath}]!`, false);
                 }
             },
 
-            handleFailure(reason) {
+            handleFailure(reason, isTimeout = false) {
                 clearInterval(this.timerInterval);
-                this.attempts++;
+                clearTimeout(this.resetTimeout);
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: this.currentWave,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        this.crashMessage = null;
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
                 this.crashMessage = reason;
-                this.sendTelemetry('hardcore_reset', false);
 
                 // Задержка 1.5 сек и полный сброс на волну 1!
-                setTimeout(() => {
+                this.resetTimeout = setTimeout(() => {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.crashMessage = null;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
                     this.initWave(1);
                 }, 1500);
             }

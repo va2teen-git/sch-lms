@@ -261,8 +261,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     playerBuffer: [],
                     maxBufferSize: 4,
                     failMessage: '',
-                    startTime: null,
-                    attemptsCount: 0
+                    attemptsCount: 0,
+                    telemetry: null
                 };
             },
 
@@ -275,22 +275,53 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
             },
 
+            mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: MISSION_NAME,
+                    level: 3,
+                    totalWaves: this.totalPhases,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        if (this.timerInterval) clearInterval(this.timerInterval);
+                        this.failMessage = '';
+                    },
+                    onAfkRetry: () => {
+                        this.failMessage = '';
+                        this.currentPhase = 1;
+                        this.gameState = 'playing';
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.loadWave(1);
+                    }
+                });
+            },
+
+            beforeUnmount() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
+            },
+
             methods: {
                 startGame() {
-                    this.startTime = Date.now();
+                    const isFreshStart = this.gameState !== 'failed';
                     this.currentPhase = 1;
                     this.gameState = 'playing';
 
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: MISSION_NAME,
-                        action_type: 'in_progress',
-                        status: 'in_progress',
-                        start_time: new Date(this.startTime).toISOString(),
-                        time_spent_sec: 0,
-                        attempts_count: this.attemptsCount,
-                        success: false
-                    }, '*');
+                    if (this.telemetry) {
+                        if (isFreshStart) {
+                            this.telemetry.reset({ allowRecomplete: true });
+                            this.attemptsCount = 0;
+                        }
+                        this.telemetry.start();
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalPhases,
+                            stage: 1,
+                            total_stages: this.totalPhases
+                        });
+                    }
 
                     this.loadWave(1);
                 },
@@ -358,7 +389,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         this.phaseTimeLeft -= 0.1;
                         if (this.phaseTimeLeft <= 0) {
                             clearInterval(this.timerInterval);
-                            this.triggerFail('Тайм-аут протокола! Сессионный криптографический ключ деактивирован сервером.');
+                            this.triggerFail('Тайм-аут протокола! Сессионный криптографический ключ деактивирован сервером.', true);
                         }
                     }, 100);
                 },
@@ -385,7 +416,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 },
 
                 selectCell(r, c) {
+                    if (this.gameState !== 'playing') return;
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                     if (!this.isCellSelectable(r, c)) return;
+                    if (this.telemetry) {
+                        this.telemetry.markActivity();
+                    }
 
                     const cell = this.matrix[r][c];
                     cell.used = true;
@@ -398,6 +434,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                             this.notifyComplete();
                         } else {
                             this.currentPhase++;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(this.currentPhase);
+                            }
                             this.loadWave(this.currentPhase);
                         }
                         return;
@@ -406,7 +445,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     // Проверка переполнения буфера
                     if (this.playerBuffer.length >= this.maxBufferSize) {
                         clearInterval(this.timerInterval);
-                        this.triggerFail('Буфер памяти переполнен! Неверная цепочка вызвала тревогу криптопроцессора.');
+                        this.triggerFail('Буфер памяти переполнен! Неверная цепочка вызвала тревогу криптопроцессора.', false);
                         return;
                     }
 
@@ -438,38 +477,32 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     return false;
                 },
 
-                triggerFail(msg) {
-                    this.attemptsCount++;
+                triggerFail(msg, isTimeout = false) {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentPhase,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attemptsCount = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            return;
+                        }
+                    } else {
+                        this.attemptsCount++;
+                    }
                     this.failMessage = msg;
                     this.gameState = 'failed';
-
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: MISSION_NAME,
-                        action_type: 'hardcore_reset',
-                        status: 'in_progress',
-                        start_time: new Date(this.startTime).toISOString(),
-                        time_spent_sec: Math.floor((Date.now() - this.startTime) / 1000),
-                        attempts_count: this.attemptsCount,
-                        success: false
-                    }, '*');
                 },
 
                 notifyComplete() {
+                    if (this.gameState === 'success') return;
                     clearInterval(this.timerInterval);
-                    const totalSec = Math.floor((Date.now() - this.startTime) / 1000);
                     this.gameState = 'success';
 
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: MISSION_NAME,
-                        action_type: 'level_complete',
-                        status: 'completed',
-                        start_time: new Date(this.startTime).toISOString(),
-                        time_spent_sec: totalSec,
-                        attempts_count: this.attemptsCount,
-                        success: true
-                    }, '*');
+                    if (this.telemetry) {
+                        this.telemetry.complete({ wave: this.totalPhases, stage: this.totalPhases });
+                    }
                 }
             }
         }).mount('#app');

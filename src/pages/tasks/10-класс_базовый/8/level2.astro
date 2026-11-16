@@ -178,35 +178,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     document.addEventListener('DOMContentLoaded', () => {
-        const startTime = Date.now();
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 8 :: Подходы к измерению информации (Уровень 2)',
+            level: 2,
+            totalStages: 5
+        });
         let attempts = 0;
         let currentPhase = 1;
+        let isLevelCompleted = false;
 
-        // Таймер
+        // Таймер (отсчёт начинается с первого реального действия)
         const timerDisplay = document.getElementById('timer-display');
         setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const s = String(elapsed % 60).padStart(2, '0');
             if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
         }, 1000);
-
-        // Телеметрия
-        function sendTelemetry(actionType, isSuccess) {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: 'Урок 8 :: Подходы к измерению информации (Уровень 2)',
-                action_type: actionType,
-                status: isSuccess ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: isSuccess
-            }, '*');
-        }
-
-        sendTelemetry('in_progress', false);
 
         // Нормализация числового ввода
         function normalizeInput(val) {
@@ -222,12 +210,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         let isProcessing = false;
 
         function triggerPhaseError(feedbackEl, callback) {
-            if (isProcessing) return;
+            if (isProcessing || isLevelCompleted) return;
             isProcessing = true;
-            attempts++;
+            telemetry.hardcoreReset({ stage: currentPhase });
+            attempts = telemetry.getState().attemptsCount;
             if (attemptsDisplay) attemptsDisplay.textContent = attempts;
             if (feedbackEl) feedbackEl.classList.remove('d-none');
-            sendTelemetry('hardcore_reset', false);
 
             setTimeout(() => {
                 if (feedbackEl) feedbackEl.classList.add('d-none');
@@ -414,6 +402,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         // ==========================================
         function goToP2() {
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
@@ -423,6 +412,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         function goToP3() {
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 5 [Пик 1]';
@@ -432,6 +422,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         function goToP4() {
             currentPhase = 4;
+            telemetry.advanceStage(4);
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 4 из 5 [Долина]';
@@ -441,6 +432,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         function goToP5() {
             currentPhase = 5;
+            telemetry.advanceStage(5);
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 5 из 5 [Кульминация]';
@@ -449,7 +441,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         function finishLevel() {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            if (isLevelCompleted) return;
+            isLevelCompleted = true;
+            const timeSpent = Math.max(1, telemetry.getTimeSpentSec());
             const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
             const s = String(timeSpent % 60).padStart(2, '0');
 
@@ -462,7 +456,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('final-time').textContent = `${m}:${s}`;
             document.getElementById('final-attempts').textContent = attempts + 1;
 
-            sendTelemetry('level_complete', true);
+            telemetry.complete({ stage: 5 });
 
             document.getElementById('restart-level-btn').onclick = () => {
                 location.reload();
@@ -497,5 +491,5 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         // Старт
         initP1();
-    });
+    }, { once: true });
 </script>
