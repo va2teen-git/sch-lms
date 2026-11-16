@@ -1,0 +1,306 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 18 :: Средства искусственного интеллекта :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Эпоха Генеративного ИИ" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase" id="phaseTitle">Этап 1 из 5: Генеративный ИИ</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-warning mb-3" style="height: 12px;">
+            <div class="progress-bar bg-warning" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="pasteNotice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите значение вручную.
+        </div>
+
+        <div class="card bg-dark border-warning rounded-0" id="gameArea">
+            <div class="card-header border-warning text-warning fw-bold text-uppercase" id="cardHeader">
+                Анализатор нейросетевых логов
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <p class="text-light small mb-2" id="phaseLegend">...</p>
+
+                <div id="svgWrap" class="text-center mb-3 d-none">
+                    <svg id="attentionSvg" viewBox="0 0 400 180" class="w-100" style="max-width: 400px; max-height: 180px;"></svg>
+                </div>
+
+                <pre class="bg-black text-light border border-secondary p-3 mb-3 small" id="logBox" style="white-space: pre-wrap;">...</pre>
+                <div class="fs-6 text-white fw-bold mb-2" id="questionPrompt">...</div>
+
+                <div class="input-group w-100" style="max-width: 580px;">
+                    <input type="text" id="answerInput" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="Ответ..." autocomplete="off" spellcheck="false" />
+                    <button type="button" id="checkBtn" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5" style="min-height: 48px;">ПРИМЕНИТЬ</button>
+                </div>
+
+                <div id="feedbackMsg" class="alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="successArea" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">ЭВОЛЮЦИЯ ЗАВЕРШЕНА</h3>
+            <p class="fs-5 mb-0 fw-semibold">УРОВЕНЬ 2 ПРОЙДЕН. Вы освоили архитектуры от GAN до LLM и RLHF.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function buildPhase1() {
+                const fakeId = String(rnd(1000, 9999));
+                const logs = [];
+                for (let i = 0; i < 4; i++) {
+                    logs.push(`REAL-${rnd(1000, 9999)}-OK`);
+                }
+                logs.push(`FAKE-${fakeId}-ER`);
+                return {
+                    header: 'Этап 1 из 5: Архитектура GAN (2014)',
+                    legend: 'Генератор создаёт подделки (метка FAKE), а Дискриминатор отделяет их от оригиналов (REAL).',
+                    log: shuffle(logs).join('\n'),
+                    prompt: 'Найдите подделку и введите её 4-значный цифровой ID:',
+                    placeholder: 'XXXX',
+                    svg: null,
+                    check: (v) => v.trim() === fakeId
+                };
+            }
+
+            function buildPhase2() {
+                const words = shuffle(['apple', 'robot', 'network', 'learning', 'neuron', 'brain', 'data', 'vector']).slice(0, 5);
+                const scores = shuffle([0.921, 0.742, 0.518, 0.305, 0.119]);
+                let bestWord = '';
+                let maxScore = -1;
+                const logs = [];
+                let svgHtml = `<circle cx="200" cy="90" r="26" fill="#212529" stroke="#ffc107" stroke-width="2"/><text x="200" y="95" font-size="12" fill="#ffc107" text-anchor="middle" font-family="monospace">TARGET</text>`;
+                const angleStep = (2 * Math.PI) / 5;
+
+                words.forEach((word, idx) => {
+                    const sc = scores[idx];
+                    if (sc > maxScore) {
+                        maxScore = sc;
+                        bestWord = word;
+                    }
+                    logs.push(`[ATTENTION] target -> ${word} : ${sc.toFixed(3)}`);
+                    const angle = idx * angleStep - Math.PI / 2;
+                    const cx = 200 + 135 * Math.cos(angle);
+                    const cy = 90 + 62 * Math.sin(angle);
+                    const sw = (sc * 4.5).toFixed(1);
+                    svgHtml += `<line x1="200" y1="90" x2="${cx.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#ffc107" stroke-width="${sw}" stroke-opacity="0.8"/>`;
+                    svgHtml += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="19" fill="#212529" stroke="#ffc107" stroke-width="1.5"/>`;
+                    svgHtml += `<text x="${cx.toFixed(1)}" y="${(cy + 4).toFixed(1)}" font-size="10" fill="#ffffff" text-anchor="middle" font-family="monospace">${word.slice(0, 4)}</text>`;
+                });
+
+                return {
+                    header: 'Этап 2 из 5: Трансформеры и Self-Attention (2017)',
+                    legend: 'Механизм внимания рассчитывает силу связи каждого слова с целевым словом.',
+                    log: logs.join('\n'),
+                    prompt: 'Введите слово (полностью, на латинице) с наибольшим коэффициентом внимания:',
+                    placeholder: 'Слово...',
+                    svg: svgHtml,
+                    check: (v) => v.trim().toLowerCase() === bestWord
+                };
+            }
+
+            function buildPhase3() {
+                const tokens = shuffle(['SYS', 'USER', 'GEN', 'MODEL', 'CTX', 'END', 'MASK']).slice(0, 4);
+                const threshold = rnd(500, 800);
+                const targetToken = tokens[0];
+                const items = [`{token:"${targetToken}", freq:${threshold + rnd(15, 120)}}`];
+                for (let i = 1; i < 4; i++) {
+                    items.push(`{token:"${tokens[i]}", freq:${rnd(50, threshold - 60)}}`);
+                }
+                return {
+                    header: 'Этап 3 из 5: Эра LLM и токенизация (2018)',
+                    legend: `Большие языковые модели оценивают частоту встречаемости токенов в обучающем корпусе.`,
+                    log: shuffle(items).join(' | '),
+                    prompt: `Найдите и введите токен (без кавычек), чья частота строго больше ${threshold}:`,
+                    placeholder: 'Токен...',
+                    svg: null,
+                    check: (v) => v.trim().toUpperCase() === targetToken
+                };
+            }
+
+            function buildPhase4() {
+                const codes = ['ACT_99', 'EXEC_01', 'RUN_X', 'DO_TASK', 'SYS_CMD'];
+                const ans = `${codes[rnd(0, codes.length - 1)]}_${rnd(10, 99)}`;
+                const obj = {
+                    header: { v: '1.0', auth: 'Bearer ***' },
+                    payload: {
+                        context: 'history_log',
+                        prompt: {
+                            role: 'system',
+                            instruction_code: ans,
+                            max_tokens: 2048
+                        }
+                    }
+                };
+                return {
+                    header: 'Этап 4 из 5: Промпт-инжиниринг GPT-3 (2020)',
+                    legend: 'Изучите JSON-запрос к API языковой модели и извлеките системный код инструкции.',
+                    log: JSON.stringify(obj, null, 2),
+                    prompt: 'Введите значение поля instruction_code:',
+                    placeholder: 'Код...',
+                    svg: null,
+                    check: (v) => v.trim() === ans
+                };
+            }
+
+            function buildPhase5() {
+                const models = shuffle(['ALPHA', 'BETA', 'GAMMA', 'DELTA']);
+                const rewards = shuffle([14, 9, 3, -2]);
+                let bestModel = '';
+                let maxR = -999;
+                const rows = [];
+                models.forEach((m, i) => {
+                    if (rewards[i] > maxR) {
+                        maxR = rewards[i];
+                        bestModel = m;
+                    }
+                    rows.push(`${m}: ${rewards[i]}`);
+                });
+                return {
+                    header: 'Этап 5 из 5: Выравнивание RLHF (2022+)',
+                    legend: 'Асессоры оценивали ответы нескольких моделей. Политика обновляется по модели с максимальной наградой.',
+                    log: rows.join('  |  '),
+                    prompt: 'Введите идентификатор модели с максимальной наградой (латиницей):',
+                    placeholder: 'Модель...',
+                    svg: null,
+                    check: (v) => v.trim().toUpperCase() === bestModel
+                };
+            }
+
+            const builders = [buildPhase1, buildPhase2, buildPhase3, buildPhase4, buildPhase5];
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let currentTask = null;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const cardHeaderEl = document.getElementById('cardHeader');
+            const phaseLegendEl = document.getElementById('phaseLegend');
+            const svgWrapEl = document.getElementById('svgWrap');
+            const attentionSvgEl = document.getElementById('attentionSvg');
+            const logBoxEl = document.getElementById('logBox');
+            const questionPromptEl = document.getElementById('questionPrompt');
+            const inputEl = document.getElementById('answerInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const feedbackEl = document.getElementById('feedbackMsg');
+            const pasteNoticeEl = document.getElementById('pasteNotice');
+            const gameAreaEl = document.getElementById('gameArea');
+            const successAreaEl = document.getElementById('successArea');
+
+            function initPhase() {
+                locked = false;
+                currentTask = builders[currentPhase - 1]();
+
+                phaseTitleEl.textContent = currentTask.header;
+                cardHeaderEl.textContent = currentTask.header;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+                phaseLegendEl.textContent = currentTask.legend;
+                logBoxEl.textContent = currentTask.log;
+                questionPromptEl.textContent = currentTask.prompt;
+
+                if (currentTask.svg) {
+                    svgWrapEl.classList.remove('d-none');
+                    attentionSvgEl.innerHTML = currentTask.svg;
+                } else {
+                    svgWrapEl.classList.add('d-none');
+                    attentionSvgEl.innerHTML = '';
+                }
+
+                inputEl.value = '';
+                inputEl.placeholder = currentTask.placeholder;
+                inputEl.disabled = false;
+                checkBtn.disabled = false;
+                inputEl.classList.remove('border-danger', 'bg-danger', 'text-white');
+                inputEl.classList.add('border-warning', 'bg-black', 'text-warning');
+                feedbackEl.classList.add('d-none');
+                feedbackEl.textContent = '';
+
+                inputEl.focus();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function checkAnswer() {
+                if (locked || !currentTask) return;
+                telemetry.start();
+                const raw = inputEl.value.trim();
+                if (!raw) return;
+
+                if (currentTask.check(raw)) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        initPhase();
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'ЭВОЛЮЦИЯ ЗАВЕРШЕНА';
+                        gameAreaEl.classList.add('d-none');
+                        successAreaEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_failed` });
+
+                    inputEl.classList.remove('border-warning', 'bg-black', 'text-warning');
+                    inputEl.classList.add('border-danger', 'bg-danger', 'text-white');
+                    inputEl.disabled = true;
+                    checkBtn.disabled = true;
+                    feedbackEl.textContent = 'ОШИБКА: Неверный параметр! Загрузка нового батча логов...';
+                    feedbackEl.classList.remove('d-none');
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => initPhase(), 1100);
+                }
+            }
+
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => e.preventDefault());
+            checkBtn.addEventListener('click', checkAnswer);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>

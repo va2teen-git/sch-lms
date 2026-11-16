@@ -1,0 +1,266 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 16 :: Основы теории игр :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Матричный анализ дерева игры" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase" id="phaseTitle">Этап 1 из 5: Ретроспективный анализ</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-warning mb-3" style="height: 12px;">
+            <div class="progress-bar bg-warning" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="pasteNotice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите ответ вручную.
+        </div>
+
+        <div class="card bg-dark border-warning rounded-0" id="gameArea">
+            <div class="card-header border-warning text-warning fw-bold text-uppercase">
+                Анализатор графа игры (В- и П-позиции)
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <pre class="bg-black text-info border border-secondary p-3 mb-3 fs-6" id="treeDiagram" style="white-space: pre-wrap;">...</pre>
+                <div class="fs-5 text-white fw-bold mb-3" id="questionText">Инициализация...</div>
+
+                <div class="w-100" style="max-width: 580px;">
+                    <label for="answerInput" class="form-label text-light small mb-1" id="inputLabel1">Ваш ответ:</label>
+                    <div class="input-group mb-2">
+                        <input type="text" id="answerInput" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="В или П" autocomplete="off" spellcheck="false" />
+                    </div>
+
+                    <div id="secondInputWrap" class="d-none mb-3">
+                        <label for="answerInput2" class="form-label text-light small mb-1" id="inputLabel2">Кто выиграет при идеальной игре?</label>
+                        <input type="text" id="answerInput2" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="первый / второй" autocomplete="off" spellcheck="false" />
+                    </div>
+
+                    <button type="button" id="checkBtn" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5 w-100 mt-2" style="min-height: 48px;">
+                        АНАЛИЗИРОВАТЬ
+                    </button>
+                </div>
+
+                <div id="feedbackMsg" class="alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="successArea" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">ГРАФ РАСШИФРОВАН</h3>
+            <p class="fs-5 mb-0 fw-semibold">УРОВЕНЬ 2 ПРОЙДЕН. Вы безошибочно определили все В- и П-позиции.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function pickLetters(count) {
+                return shuffle(['A','B','C','D','E','F','G','H','K','L','M','N','P','Q','R','S','T','U','W','X','Y','Z']).slice(0, count);
+            }
+
+            function buildStage(phase) {
+                const [l1, l2, l3, n1, n2, root] = pickLetters(6);
+
+                if (phase === 1) {
+                    return {
+                        diagram: `Конечные позиции (листья): [${l1}], [${l2}], [${l3}]\nХодов больше нет — предыдущий игрок уже достиг цели.`,
+                        question: 'Каков статус этих листьев для игрока, чья сейчас очередь ходить? (введите В или П)',
+                        label1: 'Статус листьев (В или П):',
+                        placeholder1: 'В или П',
+                        hasSecond: false,
+                        check: (v1) => v1.toLowerCase() === 'п'
+                    };
+                }
+
+                if (phase === 2) {
+                    const mix = Math.random() > 0.5;
+                    const rightStatus = mix ? 'В' : 'П';
+                    return {
+                        diagram: `      [Узел ${n1}]\n      /      \\\n   ход 1    ход 2\n    /          \\\n [${l1}] (П)    [${l2}] (${rightStatus})`,
+                        question: `Вы находитесь в узле ${n1}. Ход 1 ведёт в (${l1}: П), ход 2 — в (${l2}: ${rightStatus}). Каков статус узла ${n1}?`,
+                        label1: `Статус узла ${n1} (В или П):`,
+                        placeholder1: 'В или П',
+                        hasSecond: false,
+                        check: (v1) => v1.toLowerCase() === 'в'
+                    };
+                }
+
+                if (phase === 3) {
+                    return {
+                        diagram: `      [Узел ${n2}]\n      /      \\\n   ход 1    ход 2\n    /          \\\n [${l3}] (В)    [${n1}] (В)`,
+                        question: `Вы находитесь в узле ${n2}. Оба возможных хода ведут в позиции (В), выигрышные для соперника. Каков статус узла ${n2}?`,
+                        label1: `Статус узла ${n2} (В или П):`,
+                        placeholder1: 'В или П',
+                        hasSecond: false,
+                        check: (v1) => v1.toLowerCase() === 'п'
+                    };
+                }
+
+                if (phase === 4) {
+                    const isLeftWin = Math.random() > 0.5;
+                    const leftNode = isLeftWin ? n2 : n1;
+                    const rightNode = isLeftWin ? n1 : n2;
+                    const leftSt = isLeftWin ? 'П' : 'В';
+                    const rightSt = isLeftWin ? 'В' : 'П';
+                    const winLetter = isLeftWin ? leftNode : rightNode;
+                    return {
+                        diagram: `      [Старт ${root}]\n      /       \\\n   ход 1     ход 2\n    /           \\\n [${leftNode}] (${leftSt})   [${rightNode}] (${rightSt})`,
+                        question: `Игра начинается в узле ${root}, ваш ход первый. В какой узел нужно походить для гарантированной победы?`,
+                        label1: 'Буква победного узла:',
+                        placeholder1: `Например: ${winLetter}`,
+                        hasSecond: false,
+                        check: (v1) => v1.toUpperCase() === winLetter.toUpperCase()
+                    };
+                }
+
+                // Phase 5: 3-level backward induction
+                const pStarts = Math.random() > 0.5;
+                // If root is V (pStarts=true), at least one child is P (all its leaves are V); if root is P (pStarts=false), both children are V (each has at least one P leaf)
+                const bLeaves = pStarts ? ['В', 'В'] : ['П', 'В'];
+                const cLeaves = pStarts ? ['П', 'В'] : ['В', 'П'];
+                const expectedRoot = pStarts ? 'В' : 'П';
+                const expectedWinner = pStarts ? 'первый' : 'второй';
+
+                return {
+                    diagram: `           [Старт ${root}]\n           /         \\\n       [Узел ${n1}]     [Узел ${n2}]\n       /    \\         /    \\\n   (${bLeaves[0]})   (${bLeaves[1]})   (${cLeaves[0]})   (${cLeaves[1]})`,
+                    question: `Вычислите статус стартового узла ${root} снизу вверх и определите победителя при идеальной игре обоих игроков.`,
+                    label1: `Статус старта ${root} (В или П):`,
+                    placeholder1: 'В или П',
+                    hasSecond: true,
+                    label2: 'Кто победит при идеальной игре? (первый или второй):',
+                    check: (v1, v2) => v1.toLowerCase() === expectedRoot.toLowerCase() && v2.toLowerCase() === expectedWinner
+                };
+            }
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let currentTask = null;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const treeDiagramEl = document.getElementById('treeDiagram');
+            const questionTextEl = document.getElementById('questionText');
+            const inputLabel1El = document.getElementById('inputLabel1');
+            const inputLabel2El = document.getElementById('inputLabel2');
+            const inputEl = document.getElementById('answerInput');
+            const input2El = document.getElementById('answerInput2');
+            const secondWrapEl = document.getElementById('secondInputWrap');
+            const checkBtn = document.getElementById('checkBtn');
+            const feedbackEl = document.getElementById('feedbackMsg');
+            const pasteNoticeEl = document.getElementById('pasteNotice');
+            const gameAreaEl = document.getElementById('gameArea');
+            const successAreaEl = document.getElementById('successArea');
+
+            function initPhase() {
+                locked = false;
+                currentTask = buildStage(currentPhase);
+
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}: Ретроспективный анализ`;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+                treeDiagramEl.textContent = currentTask.diagram;
+                questionTextEl.textContent = currentTask.question;
+                inputLabel1El.textContent = currentTask.label1;
+                inputEl.placeholder = currentTask.placeholder1;
+
+                secondWrapEl.classList.toggle('d-none', !currentTask.hasSecond);
+                if (currentTask.hasSecond && currentTask.label2) {
+                    inputLabel2El.textContent = currentTask.label2;
+                }
+
+                inputEl.value = '';
+                input2El.value = '';
+                inputEl.disabled = false;
+                input2El.disabled = false;
+                checkBtn.disabled = false;
+                inputEl.classList.remove('border-danger', 'bg-danger', 'text-white');
+                inputEl.classList.add('border-warning', 'bg-black', 'text-warning');
+                input2El.classList.remove('border-danger', 'bg-danger', 'text-white');
+                input2El.classList.add('border-warning', 'bg-black', 'text-warning');
+                feedbackEl.classList.add('d-none');
+                feedbackEl.textContent = '';
+
+                inputEl.focus();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function checkAnswer() {
+                if (locked || !currentTask) return;
+                telemetry.start();
+                const v1 = inputEl.value.trim();
+                const v2 = input2El.value.trim();
+                if (!v1 || (currentTask.hasSecond && !v2)) return;
+
+                if (currentTask.check(v1, v2)) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        initPhase();
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'ГРАФ РАСШИФРОВАН';
+                        gameAreaEl.classList.add('d-none');
+                        successAreaEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_failed` });
+
+                    inputEl.classList.remove('border-warning', 'bg-black', 'text-warning');
+                    inputEl.classList.add('border-danger', 'bg-danger', 'text-white');
+                    inputEl.disabled = true;
+                    input2El.disabled = true;
+                    checkBtn.disabled = true;
+                    feedbackEl.textContent = 'ОШИБКА: Неверная оценка позиции! Перегенерация дерева...';
+                    feedbackEl.classList.remove('d-none');
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => initPhase(), 1100);
+                }
+            }
+
+            [inputEl, input2El].forEach((el) => {
+                el.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    pasteNoticeEl.classList.remove('d-none');
+                    setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+                });
+                el.addEventListener('drop', (e) => e.preventDefault());
+                el.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        checkAnswer();
+                    }
+                });
+            });
+            checkBtn.addEventListener('click', checkAnswer);
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>

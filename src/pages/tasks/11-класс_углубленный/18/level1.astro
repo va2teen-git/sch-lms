@@ -1,0 +1,246 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 18 :: Средства искусственного интеллекта :: Уровень 1';
+---
+
+<TaskLayout title="Уровень 1 — Эволюция ИИ (Калибратор нейронов)" level={1} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-success pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-success fw-bold text-uppercase" id="phaseTitle">Этап 1 из 3: Перцептрон Розенблатта (1957)</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-success mb-3" style="height: 12px;">
+            <div class="progress-bar bg-success" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="statusBanner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <div class="card bg-dark border-success rounded-0" id="mainCard">
+            <div class="card-body p-3 p-md-4">
+                <p class="text-light small mb-3" id="phaseLegend">...</p>
+
+                <div class="bg-black border border-success p-3 mb-3">
+                    <div id="visualWrap" class="text-center mb-3 d-none">
+                        <svg id="perceptronSvg" viewBox="0 0 320 140" class="w-100" style="max-width: 340px; max-height: 140px;"></svg>
+                    </div>
+                    <div class="fs-6 text-white mb-2" id="paramsBlock">...</div>
+                    <div class="text-info fw-bold" id="formulaBlock">...</div>
+                </div>
+
+                <!-- Interactive Analog Calibrator (Slider + Fine Tune) -->
+                <div class="bg-black border border-secondary p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-success small fw-bold text-uppercase" id="sliderLabel">КАЛИБРОВКА ПАРАМЕТРА:</span>
+                        <span class="badge bg-success text-dark rounded-0 fs-5 px-3 py-1" id="sliderReadout">0</span>
+                    </div>
+                    <input type="range" class="form-range mb-3" id="calibSlider" min="0" max="100" step="1" value="0" />
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <button type="button" id="decBtn" class="btn btn-outline-success rounded-0 fw-bold flex-fill" style="min-height: 48px;">− Шаг</button>
+                        <button type="button" id="incBtn" class="btn btn-outline-success rounded-0 fw-bold flex-fill" style="min-height: 48px;">+ Шаг</button>
+                    </div>
+                </div>
+
+                <button type="button" id="checkBtn" class="btn btn-success text-dark rounded-0 fw-bold px-4 py-2 w-100 text-uppercase" style="min-height: 48px;">
+                    Зафиксировать калибровку
+                </button>
+            </div>
+        </div>
+
+        <div id="victoryBox" class="alert alert-success bg-success text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">СИСТЕМА ОБУЧЕНА</h3>
+            <p class="fs-5 mb-0 fw-semibold">Исторические этапы эволюции нейросетей успешно откалиброваны.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 3;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: TOTAL_PHASES
+            });
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let expectedVal = 0;
+            let sliderStep = 1;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const statusBannerEl = document.getElementById('statusBanner');
+            const phaseLegendEl = document.getElementById('phaseLegend');
+            const visualWrapEl = document.getElementById('visualWrap');
+            const perceptronSvgEl = document.getElementById('perceptronSvg');
+            const paramsBlockEl = document.getElementById('paramsBlock');
+            const formulaBlockEl = document.getElementById('formulaBlock');
+            const sliderLabelEl = document.getElementById('sliderLabel');
+            const sliderReadoutEl = document.getElementById('sliderReadout');
+            const calibSliderEl = document.getElementById('calibSlider');
+            const decBtn = document.getElementById('decBtn');
+            const incBtn = document.getElementById('incBtn');
+            const checkBtn = document.getElementById('checkBtn');
+            const mainCardEl = document.getElementById('mainCard');
+            const victoryBoxEl = document.getElementById('victoryBox');
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-success bg-success text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.textContent = '';
+            }
+
+            function syncReadout() {
+                sliderReadoutEl.textContent = String(calibSliderEl.value);
+            }
+
+            function initPhase() {
+                locked = false;
+                hideBanner();
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+
+                if (currentPhase === 1) {
+                    const x1 = rnd(2, 9), x2 = rnd(2, 9), w1 = rnd(1, 5), w2 = rnd(1, 5);
+                    expectedVal = x1 * w1 + x2 * w2;
+                    sliderStep = 1;
+                    calibSliderEl.min = '0';
+                    calibSliderEl.max = '100';
+                    calibSliderEl.step = '1';
+                    calibSliderEl.value = '0';
+
+                    phaseTitleEl.textContent = 'Этап 1 из 3: Перцептрон Розенблатта (1957)';
+                    phaseLegendEl.textContent = 'Нейрон умножает входные сигналы на веса связей и суммирует их. Откалибруйте суммарный сигнал S.';
+                    visualWrapEl.classList.remove('d-none');
+                    perceptronSvgEl.innerHTML = `
+                        <line x1="55" y1="30" x2="205" y2="70" stroke="#198754" stroke-width="2" />
+                        <line x1="55" y1="110" x2="205" y2="70" stroke="#198754" stroke-width="2" />
+                        <circle cx="55" cy="30" r="20" fill="#212529" stroke="#198754" stroke-width="2" />
+                        <text x="55" y="35" font-size="14" fill="#ffffff" text-anchor="middle" font-family="monospace">${x1}</text>
+                        <circle cx="55" cy="110" r="20" fill="#212529" stroke="#198754" stroke-width="2" />
+                        <text x="55" y="115" font-size="14" fill="#ffffff" text-anchor="middle" font-family="monospace">${x2}</text>
+                        <text x="130" y="42" font-size="13" fill="#198754" font-family="monospace">w₁=${w1}</text>
+                        <text x="130" y="108" font-size="13" fill="#198754" font-family="monospace">w₂=${w2}</text>
+                        <circle cx="205" cy="70" r="28" fill="#212529" stroke="#198754" stroke-width="2" />
+                        <text x="205" y="76" font-size="20" fill="#198754" text-anchor="middle" font-family="monospace">∑</text>
+                        <line x1="233" y1="70" x2="295" y2="70" stroke="#198754" stroke-width="2" />
+                        <text x="268" y="60" font-size="14" fill="#0dcaf0" font-family="monospace">S=?</text>
+                    `;
+                    paramsBlockEl.innerHTML = `Входы: <strong>x₁ = ${x1}</strong>, <strong>x₂ = ${x2}</strong> | Веса: <strong>w₁ = ${w1}</strong>, <strong>w₂ = ${w2}</strong>`;
+                    formulaBlockEl.textContent = 'Формула: S = x₁ × w₁ + x₂ × w₂';
+                    sliderLabelEl.textContent = 'ЗНАЧЕНИЕ S:';
+                } else if (currentPhase === 2) {
+                    const P = rnd(15, 55);
+                    const diff = rnd(2, 12) * 2;
+                    const T = Math.random() > 0.5 ? P + diff : P - diff;
+                    const L = 0.5;
+                    expectedVal = (T - P) * L;
+                    sliderStep = 1;
+                    calibSliderEl.min = '-20';
+                    calibSliderEl.max = '20';
+                    calibSliderEl.step = '1';
+                    calibSliderEl.value = '0';
+
+                    phaseTitleEl.textContent = 'Этап 2 из 3: Обратное распространение (1986)';
+                    phaseLegendEl.textContent = 'Вычислите величину коррекции веса Delta и установите ползунок в точное положение (возможны отрицательные значения).';
+                    visualWrapEl.classList.add('d-none');
+                    paramsBlockEl.innerHTML = `Эталон (Target): <strong>T = ${T}</strong> | Ответ сети (Predicted): <strong>P = ${P}</strong> | Шаг обучения: <strong>L = ${L}</strong>`;
+                    formulaBlockEl.textContent = 'Формула: Delta = (T − P) × L';
+                    sliderLabelEl.textContent = 'КОРРЕКЦИЯ DELTA:';
+                } else {
+                    const K = rnd(1, 5) * 100;
+                    const batches = rnd(4, 14);
+                    const N = K * batches;
+                    const T = rnd(2, 5) * 5;
+                    expectedVal = batches * T;
+                    sliderStep = 5;
+                    calibSliderEl.min = '0';
+                    calibSliderEl.max = '400';
+                    calibSliderEl.step = '5';
+                    calibSliderEl.value = '0';
+
+                    phaseTitleEl.textContent = 'Этап 3 из 3: Прорыв AlexNet и GPU (2012)';
+                    phaseLegendEl.textContent = 'GPU обрабатывает пакет из K изображений параллельно. Рассчитайте и откалибруйте суммарное время обработки всего датасета.';
+                    visualWrapEl.classList.add('d-none');
+                    paramsBlockEl.innerHTML = `Датасет: <strong>N = ${N}</strong> изображений | Пакет GPU: <strong>K = ${K}</strong> | Время пакета: <strong>T = ${T} мс</strong>`;
+                    formulaBlockEl.textContent = 'Формула: Time = (N / K) × T';
+                    sliderLabelEl.textContent = 'ВРЕМЯ GPU (мс):';
+                }
+
+                syncReadout();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            calibSliderEl.addEventListener('input', () => {
+                telemetry.start();
+                syncReadout();
+            });
+
+            decBtn.addEventListener('click', () => {
+                if (locked) return;
+                telemetry.start();
+                const next = Math.max(Number(calibSliderEl.min), Number(calibSliderEl.value) - sliderStep);
+                calibSliderEl.value = String(next);
+                syncReadout();
+            });
+
+            incBtn.addEventListener('click', () => {
+                if (locked) return;
+                telemetry.start();
+                const next = Math.min(Number(calibSliderEl.max), Number(calibSliderEl.value) + sliderStep);
+                calibSliderEl.value = String(next);
+                syncReadout();
+            });
+
+            checkBtn.addEventListener('click', () => {
+                if (locked) return;
+                telemetry.start();
+                const val = Number(calibSliderEl.value);
+
+                if (val === expectedVal) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        showBanner('Калибровка точна! Загружаем следующий этап эволюции...', false);
+                        locked = true;
+                        setTimeout(initPhase, 650);
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'СИСТЕМА ОБУЧЕНА';
+                        mainCardEl.classList.add('d-none');
+                        victoryBoxEl.classList.remove('d-none');
+                        hideBanner();
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_failed_${val}` });
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    showBanner('Сбой калибровки! Генерируем новые входные параметры...', true);
+                    setTimeout(initPhase, 1100);
+                }
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>

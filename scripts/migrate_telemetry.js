@@ -162,11 +162,19 @@ function parseLessonAndCourse(missionName, recordedClassName) {
     } else if (/Сетевое\s+администрирование/i.test(m) || /g10_adv_16/i.test(m)) {
       courseSlug = '10-класс_углубленный';
       lessonId = '17';
+    } else if (/Деревья/i.test(m) || /g11_adv_1[45]/i.test(m)) {
+      courseSlug = '11-класс_углубленный';
+      lessonId = '15';
     } else if (/Основы\s+теории\s+игр/i.test(m)) {
-      courseSlug = '10-класс_углубленный';
-      lessonId = '19';
+      if (m.includes('10-класс_углубленный')) {
+        courseSlug = '10-класс_углубленный';
+        lessonId = '19';
+      } else {
+        courseSlug = '11-класс_углубленный';
+        lessonId = '16';
+      }
     } else if (/Средства\s+искусственного\s+интеллекта/i.test(m)) {
-      courseSlug = '11-класс_базовый';
+      courseSlug = '11-класс_углубленный';
       lessonId = '18';
     } else if (/Глобальная\s+сеть/i.test(m)) {
       courseSlug = '9-класс';
@@ -174,9 +182,15 @@ function parseLessonAndCourse(missionName, recordedClassName) {
     } else if (/Законодательство\s+РФ/i.test(m) || /Законодательство\s+Российской/i.test(m)) {
       courseSlug = '10-класс_базовый';
       lessonId = '6';
-    } else if (/Сервисы\s+Интернета/i.test(m) || /электронные\s+сервисы/i.test(m)) {
+    } else if (/Государственные\s+электронные\s+сервисы/i.test(m)) {
       courseSlug = '11-класс_базовый';
+      lessonId = '5';
+    } else if (/Сервисы\s+Интернета/i.test(m)) {
+      courseSlug = '10-класс_углубленный';
       lessonId = '18';
+    } else if (/электронные\s+сервисы/i.test(m)) {
+      courseSlug = '11-класс_базовый';
+      lessonId = '5';
     } else if (/Форматирование\s+текста/i.test(m)) {
       courseSlug = '7-класс';
       lessonId = '22';
@@ -339,10 +353,13 @@ const runMigration = db.transaction(() => {
       nextStudentClass = studentPrimaryClass.get(normKey) || r.class_name || 'Unknown';
     }
 
-    // Preserve already populated course_slug, lesson_id, level_number (including 0)
+    // Preserve already populated course_slug, lesson_id, level_number (including 0),
+    // except for previously misclassified legacy topic strings corrected in Stage 3.
     const parsedMeta = parseLessonAndCourse(r.mission_name, r.class_name);
-    const nextCourseSlug = (r.course_slug && r.course_slug !== 'Unknown') ? r.course_slug : parsedMeta.courseSlug;
-    const nextLessonId = (r.lesson_id && String(r.lesson_id).trim() !== '') ? String(r.lesson_id).trim() : parsedMeta.lessonId;
+    const hasExplicitSlugInMission = courses.some(c => (r.mission_name || '').includes(c.slug));
+    const isStage3TopicOverride = !hasExplicitSlugInMission && /Государственные\s+электронные\s+сервисы|Сервисы\s+Интернета|Основы\s+теории\s+игр|Средства\s+искусственного\s+интеллекта|Деревья/i.test(r.mission_name || '');
+    const nextCourseSlug = (!isStage3TopicOverride && r.course_slug && r.course_slug !== 'Unknown') ? r.course_slug : parsedMeta.courseSlug;
+    const nextLessonId = (!isStage3TopicOverride && r.lesson_id && String(r.lesson_id).trim() !== '') ? String(r.lesson_id).trim() : parsedMeta.lessonId;
 
     const hasExistingLevel = r.level_number !== null && r.level_number !== undefined;
     const nextLevelNumber = hasExistingLevel

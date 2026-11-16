@@ -1,0 +1,460 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 18 :: Средства искусственного интеллекта :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Матч Века: AlphaGo MCTS" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="card bg-black border border-danger border-2 rounded-0 p-3 p-md-4">
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" id="startScreen" class="text-center mx-auto py-3" style="max-width: 660px;">
+                <h1 class="h2 text-danger fw-bold mb-3 text-uppercase">МАТЧ ВЕКА: ALPHAGO (MCTS)</h1>
+                <div class="text-start text-light lh-base mb-4 fs-6">
+                    <p>Вы управляете вычислительным кластером <strong class="text-white">AlphaGo</strong> на доске Го 5×5 (25 перекрестий). Вам предстоит пройти <strong class="text-info">10 волн</strong> вычислений:</p>
+                    <ul class="mb-3">
+                        <li><strong>Policy / MCTS волны:</strong> кликайте прямо по узлу на поле 5×5 с максимальной вероятностью <code>P</code> или наибольшей суммой <code>Q + U</code>.</li>
+                        <li><strong>Value / Ход 37 волны:</strong> вычислите точный процент побед или введите координаты легендарного хода.</li>
+                    </ul>
+                    <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 mb-0">
+                        <strong class="text-danger">ХАРДКОР-СБРОС:</strong> Ошибка или истечение таймера сбрасывает кластер на Волну 1.
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-danger text-white rounded-0 fs-5 fw-bold px-4 py-3 w-100 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    [ ИНИЦИАЛИЗАЦИЯ КЛАСТЕРА ]
+                </button>
+            </div>
+
+            <!-- Active game -->
+            <div v-if="started && !gameWon">
+                <div class="d-flex gap-1 mb-3">
+                    <div
+                        v-for="idx in totalWaves"
+                        :key="idx"
+                        class="flex-fill"
+                        style="height: 6px;"
+                        :class="idx < wave ? 'bg-success' : (idx === wave ? 'bg-danger' : 'bg-secondary')"
+                    ></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 flex-wrap gap-2">
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ВОЛНА <span v-text="wave"></span> / <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="badge rounded-0 fs-6 px-3 py-2" :class="timerSec <= 4 ? 'bg-danger text-white' : 'bg-dark border border-warning text-warning'">
+                        TTL: <span v-text="timerSec"></span> с
+                    </span>
+                </div>
+
+                <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 12px;">
+                    <div
+                        class="progress-bar"
+                        role="progressbar"
+                        :class="timerPercent < 30 ? 'bg-danger' : (timerPercent < 60 ? 'bg-warning' : 'bg-info')"
+                        :style="{ width: timerPercent + '%' }"
+                    ></div>
+                </div>
+
+                <div class="bg-dark border border-danger p-3 mb-3">
+                    <div class="text-danger small fw-bold text-uppercase mb-1" v-text="task.title"></div>
+                    <div class="fs-6 text-white fw-bold" v-text="task.desc"></div>
+                </div>
+
+                <!-- Spatial 5x5 Go / MCTS Matrix (Direct Surface) -->
+                <div v-if="task.mode === 'board'" class="mb-2">
+                    <div v-for="r in 5" :key="r" class="d-flex gap-1 mb-1">
+                        <button
+                            v-for="c in 5"
+                            :key="c"
+                            type="button"
+                            class="board-cell btn rounded-0 flex-fill p-1 text-center font-monospace fw-bold d-flex flex-column justify-content-center align-items-center"
+                            :data-coord="coordLabel(r - 1, c - 1)"
+                            :data-best="board[r - 1][c - 1].isBest ? '1' : '0'"
+                            :class="cellClass(board[r - 1][c - 1])"
+                            style="min-width: 0; min-height: 52px; overflow: hidden; word-break: break-word;"
+                            @click="selectCell(r - 1, c - 1)"
+                        >
+                            <span class="small text-secondary lh-1" v-text="coordLabel(r - 1, c - 1)"></span>
+                            <span v-if="board[r - 1][c - 1].label" class="lh-1 mt-1" style="font-size: clamp(0.6rem, 1.5vw, 0.78rem);" v-text="board[r - 1][c - 1].label"></span>
+                            <span v-else class="text-secondary small">·</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Value / Move 37 Manual Input -->
+                <div v-if="task.mode === 'input'" class="d-flex justify-content-center my-4">
+                    <div class="input-group w-100" style="max-width: 460px;">
+                        <span class="input-group-text bg-dark text-danger border-danger rounded-0 fw-bold" v-text="task.prefix"></span>
+                        <input
+                            ref="taskInput"
+                            v-model="userInput"
+                            type="text"
+                            class="form-control bg-black text-white border-danger rounded-0 fs-4 text-center fw-bold"
+                            :placeholder="task.placeholder"
+                            autocomplete="off"
+                            @input="onUserTyping"
+                            @keyup.enter="submitInput"
+                        />
+                        <button
+                            type="button"
+                            id="submitBtn"
+                            class="btn btn-danger text-white rounded-0 fw-bold px-4"
+                            style="min-height: 48px;"
+                            @click="submitInput"
+                        >
+                            ВВОД
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" id="successArea" class="text-center py-5">
+                <div class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold py-5">
+                    <h2 class="h2 fw-bold text-uppercase mb-3">ХОД 37 ВЫПОЛНЕН</h2>
+                    <p class="fs-5 mb-0">Кластер AlphaGo завершил все 10 фаз расчёта без единого сбоя.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure overlay -->
+        <div v-if="failVisible" id="failOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-danger text-white text-center p-4" style="z-index: 1050;">
+            <h1 class="display-5 fw-bold text-uppercase mb-2">СБОЙ КЛАСТЕРА</h1>
+            <p class="fs-4 mb-0" v-text="failReason"></p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, nextTick, onMounted, onUnmounted } = Vue;
+            const TOTAL_WAVES = 10;
+            const COLS = ['A', 'B', 'C', 'D', 'E'];
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const totalWaves = TOTAL_WAVES;
+                    const board = ref([]);
+                    const task = ref({ mode: 'board', title: '', desc: '', prefix: '', placeholder: '', answer: '' });
+                    const userInput = ref('');
+                    const taskInput = ref(null);
+                    const timeRemainingMs = ref(18000);
+                    const waveDurationMs = ref(18000);
+                    const failVisible = ref(false);
+                    const failReason = ref('');
+
+                    const timerPercent = computed(() => {
+                        if (waveDurationMs.value <= 0) return 0;
+                        return Math.max(0, Math.min(100, (timeRemainingMs.value / waveDurationMs.value) * 100));
+                    });
+                    const timerSec = computed(() => Math.max(0, Math.ceil(timeRemainingMs.value / 1000)));
+
+                    let timerInterval = null;
+                    let resetTimeout = null;
+                    let lastTick = 0;
+                    const actionLog = [];
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(timerInterval);
+                            clearTimeout(resetTimeout);
+                            timerInterval = null;
+                            failVisible.value = false;
+                        },
+                        onAfkRetry: () => {
+                            failVisible.value = false;
+                            restartFromWave1();
+                        }
+                    });
+
+                    function coordLabel(r, c) {
+                        return `${COLS[c]}${5 - r}`;
+                    }
+
+                    function makeEmptyBoard() {
+                        const grid = [];
+                        for (let r = 0; r < 5; r++) {
+                            const row = [];
+                            for (let c = 0; c < 5; c++) {
+                                row.push({ candidate: false, label: '', isBest: false });
+                            }
+                            grid.push(row);
+                        }
+                        return grid;
+                    }
+
+                    function getWaveDurationMs(w) {
+                        return Math.max(10000, 18000 - (w - 1) * 800);
+                    }
+
+                    function buildWave(w) {
+                        const allCoords = [];
+                        for (let r = 0; r < 5; r++) {
+                            for (let c = 0; c < 5; c++) allCoords.push([r, c]);
+                        }
+                        const picked = shuffle(allCoords).slice(0, 6);
+
+                        if (w <= 3) {
+                            // Policy Network on 5x5 board
+                            const grid = makeEmptyBoard();
+                            const probs = shuffle([
+                                (0.55 + Math.random() * 0.35).toFixed(2),
+                                (0.10 + Math.random() * 0.15).toFixed(2),
+                                (0.05 + Math.random() * 0.15).toFixed(2),
+                                (0.04 + Math.random() * 0.12).toFixed(2),
+                                (0.02 + Math.random() * 0.10).toFixed(2),
+                                (0.01 + Math.random() * 0.08).toFixed(2)
+                            ]);
+                            let maxVal = -1;
+                            let bestIdx = 0;
+                            probs.forEach((p, idx) => {
+                                if (parseFloat(p) > maxVal) {
+                                    maxVal = parseFloat(p);
+                                    bestIdx = idx;
+                                }
+                            });
+                            picked.forEach(([r, c], idx) => {
+                                grid[r][c] = {
+                                    candidate: true,
+                                    label: `P=${probs[idx]}`,
+                                    isBest: idx === bestIdx
+                                };
+                            });
+                            board.value = grid;
+                            task.value = {
+                                mode: 'board',
+                                title: 'СЕТЬ ПОЛИТИКИ (POLICY NETWORK)',
+                                desc: 'Кликните по клетке доски 5×5 с МАКСИМАЛЬНОЙ вероятностью хода P:',
+                                prefix: '',
+                                placeholder: '',
+                                answer: ''
+                            };
+                        } else if (w <= 6) {
+                            // Value Network calculation
+                            const wins = rnd(12, 85);
+                            const losses = rnd(5, 30);
+                            const total = wins + losses;
+                            const winrate = Math.round((wins / total) * 100);
+                            board.value = makeEmptyBoard();
+                            task.value = {
+                                mode: 'input',
+                                title: 'СЕТЬ ЦЕННОСТИ (VALUE NETWORK)',
+                                desc: `Сыграно симуляций: ${total}. Побед: ${wins}, поражений: ${losses}. Вычислите процент побед (целое число):`,
+                                prefix: 'Винрейт (%) =',
+                                placeholder: '0–100',
+                                answer: String(winrate)
+                            };
+                        } else if (w <= 9) {
+                            // MCTS Q + U on 5x5 board (unique max score)
+                            const grid = makeEmptyBoard();
+                            const scores = shuffle([19, 16, 14, 11, 9, 6]);
+                            const maxScore = Math.max(...scores);
+                            picked.forEach(([r, c], idx) => {
+                                const sc = scores[idx];
+                                const q = rnd(2, sc - 2);
+                                const u = sc - q;
+                                grid[r][c] = {
+                                    candidate: true,
+                                    label: `Q=${q} U=${u}`,
+                                    isBest: sc === maxScore
+                                };
+                            });
+                            board.value = grid;
+                            task.value = {
+                                mode: 'board',
+                                title: 'ПОИСК В ДЕРЕВЕ МОНТЕ-КАРЛО (MCTS)',
+                                desc: 'Кликните по узлу на доске 5×5 с НАИБОЛЬШЕЙ суммой (Q + U):',
+                                prefix: '',
+                                placeholder: '',
+                                answer: ''
+                            };
+                        } else {
+                            // Wave 10: Move 37 coordinate
+                            const letters = 'ABCDEFGHJKLMNOPQRST';
+                            const coord = `${letters[rnd(0, letters.length - 1)]}${rnd(1, 19)}`;
+                            board.value = makeEmptyBoard();
+                            task.value = {
+                                mode: 'input',
+                                title: 'ЛЕГЕНДАРНЫЙ ХОД 37',
+                                desc: `Нейросеть нашла победный нетривиальный ход (вероятность 0.01%). Зафиксируйте координаты хода: ${coord}`,
+                                prefix: 'Координата =',
+                                placeholder: coord,
+                                answer: coord
+                            };
+                        }
+                    }
+
+                    function startWave(w) {
+                        clearInterval(timerInterval);
+                        wave.value = w;
+                        telemetry.setWave(w, TOTAL_WAVES);
+                        userInput.value = '';
+                        buildWave(w);
+
+                        const dur = getWaveDurationMs(w);
+                        waveDurationMs.value = dur;
+                        timeRemainingMs.value = dur;
+                        lastTick = Date.now();
+
+                        if (task.value.mode === 'input') {
+                            nextTick(() => {
+                                if (taskInput.value) taskInput.value.focus();
+                            });
+                        }
+
+                        timerInterval = setInterval(() => {
+                            const now = Date.now();
+                            const delta = now - lastTick;
+                            lastTick = now;
+                            timeRemainingMs.value -= delta;
+                            if (timeRemainingMs.value <= 0) {
+                                failLevel('ВРЕМЯ РАСЧЁТА ИСТЕКЛО', true);
+                            }
+                        }, 100);
+                    }
+
+                    function restartFromWave1() {
+                        startWave(1);
+                    }
+
+                    function startGame() {
+                        clearTimeout(resetTimeout);
+                        started.value = true;
+                        gameWon.value = false;
+                        failVisible.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: TOTAL_WAVES, stage: 1, total_stages: TOTAL_WAVES });
+                        restartFromWave1();
+                    }
+
+                    function failLevel(reason, isTimeout) {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        const failedWave = wave.value;
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+                        const sent = telemetry.fail({
+                            wave: failedWave,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            return;
+                        }
+
+                        failReason.value = `${reason}. Сброс на Волну 1...`;
+                        failVisible.value = true;
+                        resetTimeout = setTimeout(() => {
+                            failVisible.value = false;
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                restartFromWave1();
+                            }
+                        }, 1500);
+                    }
+
+                    function advanceSuccess() {
+                        if (wave.value >= TOTAL_WAVES) {
+                            gameWon.value = true;
+                            telemetry.complete({ wave: TOTAL_WAVES, action_log: actionLog });
+                        } else {
+                            const nextWave = wave.value + 1;
+                            telemetry.advanceWave(nextWave, { action_log: actionLog });
+                            startWave(nextWave);
+                        }
+                    }
+
+                    function selectCell(r, c) {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        const cell = board.value[r][c];
+                        clearInterval(timerInterval);
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_cell_${coordLabel(r, c)}` });
+
+                        if (cell.candidate && cell.isBest) {
+                            advanceSuccess();
+                        } else {
+                            failLevel('НЕОПТИМАЛЬНЫЙ УЗЕЛ ДОСКИ', false);
+                        }
+                    }
+
+                    function onUserTyping() {
+                        telemetry.markActivity();
+                    }
+
+                    function submitInput() {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        const clean = String(userInput.value).trim().toUpperCase();
+                        if (!clean) return;
+                        clearInterval(timerInterval);
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_input_${clean}` });
+
+                        if (clean === task.value.answer.toUpperCase()) {
+                            advanceSuccess();
+                        } else {
+                            failLevel(`НЕВЕРНОЕ ЗНАЧЕНИЕ (ожидалось ${task.value.answer})`, false);
+                        }
+                    }
+
+                    function cellClass(cell) {
+                        if (cell.candidate) return 'btn-outline-danger bg-dark text-white border-danger';
+                        return 'btn-outline-secondary bg-black text-secondary border-secondary opacity-50';
+                    }
+
+                    onMounted(() => {
+                        // Anti-paste handled on window for input
+                    });
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        totalWaves,
+                        board,
+                        task,
+                        userInput,
+                        taskInput,
+                        timerPercent,
+                        timerSec,
+                        failVisible,
+                        failReason,
+                        coordLabel,
+                        startGame,
+                        selectCell,
+                        onUserTyping,
+                        submitInput,
+                        cellClass
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>

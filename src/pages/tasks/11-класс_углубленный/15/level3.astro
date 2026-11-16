@@ -1,0 +1,378 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 15 :: Деревья :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Кибер-турнир: Дерево игры (Минимакс)" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="card bg-black border border-danger border-2 rounded-0 p-3 p-md-4">
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" id="startScreen" class="text-center mx-auto py-3" style="max-width: 660px;">
+                <h1 class="h2 text-danger fw-bold mb-3 text-uppercase">КИБЕР-ТУРНИР: МИНИМАКС-ДЕРЕВО</h1>
+                <div class="text-start text-light lh-base mb-4 fs-6">
+                    <p>Вы участвуете в турнире ИИ по дискретным играм. Перед вами дерево игры глубиной 3: <strong class="text-info">MAX</strong> (выбирает максимум), <strong class="text-warning">MIN</strong> (выбирает минимум) и 8 листьев со значениями <strong>1–9</strong>.</p>
+                    <p>Вычислите итоговое значение корня <strong class="text-info">MAX</strong> снизу вверх (применяйте альфа-бета отсечение!), введите цифру от 1 до 9 прямо в терминал корня и нажмите <kbd class="bg-dark border border-secondary">Enter</kbd>. При желании кликайте по узлам-листьям, чтобы помечать отсечённые ветви.</p>
+                    <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 mb-0">
+                        <strong class="text-danger">ХАРДКОР-СБРОС:</strong> Неверное значение корня или истечение таймера сбрасывает серию на Волну 1. Всего 10 волн.
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-danger text-white rounded-0 fs-5 fw-bold px-4 py-3 w-100 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    [ НАЧАТЬ ТУРНИР ]
+                </button>
+            </div>
+
+            <!-- Active game -->
+            <div v-if="started && !gameWon">
+                <div class="d-flex gap-1 mb-3">
+                    <div
+                        v-for="idx in totalWaves"
+                        :key="idx"
+                        class="flex-fill"
+                        style="height: 6px;"
+                        :class="idx < wave ? 'bg-success' : (idx === wave ? 'bg-danger' : 'bg-secondary')"
+                    ></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 flex-wrap gap-2">
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ВОЛНА <span v-text="wave"></span> / <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="badge rounded-0 fs-6 px-3 py-2" :class="timerSec <= 4 ? 'bg-danger text-white' : 'bg-dark border border-warning text-warning'">
+                        Таймер: <span v-text="timerSec"></span> с
+                    </span>
+                </div>
+
+                <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 12px;">
+                    <div
+                        class="progress-bar"
+                        role="progressbar"
+                        :class="timerPercent < 30 ? 'bg-danger' : (timerPercent < 60 ? 'bg-warning' : 'bg-info')"
+                        :style="{ width: timerPercent + '%' }"
+                    ></div>
+                </div>
+
+                <!-- Minimax Tree Visualization -->
+                <div class="bg-dark border border-secondary p-2 p-sm-3 mb-3">
+                    <div class="d-flex justify-content-center align-items-center gap-2 mb-2 flex-wrap">
+                        <span class="badge bg-info text-dark rounded-0">▲ MAX (Корень): ?</span>
+                        <span class="badge bg-warning text-dark rounded-0">▼ MIN</span>
+                        <span class="badge bg-info text-dark rounded-0">▲ MAX</span>
+                        <span class="badge bg-dark border border-light text-light rounded-0">ЛИСТЬЯ (клик = отсечь)</span>
+                    </div>
+
+                    <svg viewBox="0 0 640 235" class="w-100 d-block mb-2" style="max-height: 235px;">
+                        <!-- Edges Root -> MIN -->
+                        <line x1="320" y1="26" x2="160" y2="82" stroke="#6c757d" stroke-width="2" />
+                        <line x1="320" y1="26" x2="480" y2="82" stroke="#6c757d" stroke-width="2" />
+                        <!-- Edges MIN -> MAX -->
+                        <line x1="160" y1="82" x2="80" y2="146" stroke="#6c757d" stroke-width="2" />
+                        <line x1="160" y1="82" x2="240" y2="146" stroke="#6c757d" stroke-width="2" />
+                        <line x1="480" y1="82" x2="400" y2="146" stroke="#6c757d" stroke-width="2" />
+                        <line x1="480" y1="82" x2="560" y2="146" stroke="#6c757d" stroke-width="2" />
+                        <!-- Edges MAX -> Leaves -->
+                        <line x1="80" y1="146" x2="40" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="80" y1="146" x2="120" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="240" y1="146" x2="200" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="240" y1="146" x2="280" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="400" y1="146" x2="360" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="400" y1="146" x2="440" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="560" y1="146" x2="520" y2="206" stroke="#6c757d" stroke-width="2" />
+                        <line x1="560" y1="146" x2="600" y2="206" stroke="#6c757d" stroke-width="2" />
+
+                        <!-- Root MAX -->
+                        <rect x="275" y="6" width="90" height="36" fill="#052c65" stroke="#0dcaf0" stroke-width="2" />
+                        <text x="320" y="29" fill="#0dcaf0" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MAX: ?</text>
+
+                        <!-- Level 1 MIN -->
+                        <rect x="125" y="64" width="70" height="32" fill="#332701" stroke="#ffc107" stroke-width="2" />
+                        <text x="160" y="85" fill="#ffc107" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">▼ MIN</text>
+                        <rect x="445" y="64" width="70" height="32" fill="#332701" stroke="#ffc107" stroke-width="2" />
+                        <text x="480" y="85" fill="#ffc107" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">▼ MIN</text>
+
+                        <!-- Level 2 MAX -->
+                        <g v-for="(mx, idx) in [80, 240, 400, 560]" :key="'m' + idx">
+                            <rect :x="mx - 32" y="130" width="64" height="30" fill="#052c65" stroke="#0dcaf0" stroke-width="2" />
+                            <text :x="mx" y="150" fill="#0dcaf0" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">▲ MAX</text>
+                        </g>
+
+                        <!-- Leaves -->
+                        <g
+                            v-for="(val, idx) in leaves"
+                            :key="'l' + idx"
+                            style="cursor: pointer;"
+                            @click="togglePrune(idx)"
+                        >
+                            <rect
+                                :x="(40 + idx * 80) - 22"
+                                y="186"
+                                width="44"
+                                height="42"
+                                :fill="pruned[idx] ? '#2b0909' : '#111111'"
+                                :stroke="pruned[idx] ? '#dc3545' : '#f8f9fa'"
+                                stroke-width="2"
+                            />
+                            <text
+                                :x="40 + idx * 80"
+                                y="214"
+                                :fill="pruned[idx] ? '#6c757d' : '#ffffff'"
+                                font-size="20"
+                                font-weight="bold"
+                                font-family="monospace"
+                                text-anchor="middle"
+                                v-text="val"
+                            ></text>
+                        </g>
+                    </svg>
+                </div>
+
+                <!-- Root Value Direct Input -->
+                <div class="d-flex justify-content-center">
+                    <div class="input-group w-100" style="max-width: 440px;">
+                        <span class="input-group-text bg-dark text-info border-danger rounded-0 fw-bold">КОРЕНЬ MAX =</span>
+                        <input
+                            ref="rootInput"
+                            v-model="userAnswer"
+                            type="number"
+                            min="1"
+                            max="9"
+                            class="form-control bg-black text-white border-danger rounded-0 fs-4 text-center fw-bold"
+                            placeholder="1–9"
+                            autocomplete="off"
+                            @input="onUserTyping"
+                            @keyup.enter="submitAnswer"
+                        />
+                        <button
+                            type="button"
+                            id="submitBtn"
+                            class="btn btn-danger text-white rounded-0 fw-bold px-4"
+                            style="min-height: 48px;"
+                            @click="submitAnswer"
+                        >
+                            ХОД [Enter]
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" id="successArea" class="text-center py-5">
+                <div class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold py-5">
+                    <h2 class="h2 fw-bold text-uppercase mb-3">ГРОССМЕЙСТЕР ИИ</h2>
+                    <p class="fs-5 mb-0">Все 10 минимакс-деревьев вычислены безошибочно.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure overlay -->
+        <div v-if="failVisible" id="failOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-danger text-white text-center p-4" style="z-index: 1050;">
+            <h1 class="display-5 fw-bold text-uppercase mb-2">СБОЙ ТУРНИРА</h1>
+            <p class="fs-4 mb-0" v-text="failReason"></p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, nextTick, onMounted, onUnmounted } = Vue;
+            const TOTAL_WAVES = 10;
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const totalWaves = TOTAL_WAVES;
+                    const leaves = ref([1, 2, 3, 4, 5, 6, 7, 8]);
+                    const pruned = ref(Array(8).fill(false));
+                    const userAnswer = ref('');
+                    const rootInput = ref(null);
+                    const timeRemainingMs = ref(19000);
+                    const waveDurationMs = ref(19000);
+                    const failVisible = ref(false);
+                    const failReason = ref('');
+
+                    const timerPercent = computed(() => {
+                        if (waveDurationMs.value <= 0) return 0;
+                        return Math.max(0, Math.min(100, (timeRemainingMs.value / waveDurationMs.value) * 100));
+                    });
+                    const timerSec = computed(() => Math.max(0, Math.ceil(timeRemainingMs.value / 1000)));
+
+                    let expectedRoot = 0;
+                    let timerInterval = null;
+                    let resetTimeout = null;
+                    let lastTick = 0;
+                    const actionLog = [];
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(timerInterval);
+                            clearTimeout(resetTimeout);
+                            timerInterval = null;
+                            failVisible.value = false;
+                        },
+                        onAfkRetry: () => {
+                            failVisible.value = false;
+                            restartFromWave1();
+                        }
+                    });
+
+                    function getWaveDurationMs(w) {
+                        return Math.max(11000, 19000 - (w - 1) * 800);
+                    }
+
+                    function generateWave(w) {
+                        clearInterval(timerInterval);
+                        wave.value = w;
+                        telemetry.setWave(w, TOTAL_WAVES);
+
+                        const arr = [];
+                        for (let i = 0; i < 8; i++) {
+                            arr.push(Math.floor(Math.random() * 9) + 1);
+                        }
+                        leaves.value = arr;
+                        pruned.value = Array(8).fill(false);
+                        userAnswer.value = '';
+
+                        const max1 = Math.max(arr[0], arr[1]);
+                        const max2 = Math.max(arr[2], arr[3]);
+                        const max3 = Math.max(arr[4], arr[5]);
+                        const max4 = Math.max(arr[6], arr[7]);
+                        const min1 = Math.min(max1, max2);
+                        const min2 = Math.min(max3, max4);
+                        expectedRoot = Math.max(min1, min2);
+
+                        const dur = getWaveDurationMs(w);
+                        waveDurationMs.value = dur;
+                        timeRemainingMs.value = dur;
+                        lastTick = Date.now();
+
+                        nextTick(() => {
+                            if (rootInput.value) rootInput.value.focus();
+                        });
+
+                        timerInterval = setInterval(() => {
+                            const now = Date.now();
+                            const delta = now - lastTick;
+                            lastTick = now;
+                            timeRemainingMs.value -= delta;
+                            if (timeRemainingMs.value <= 0) {
+                                failLevel('ВРЕМЯ ВЫШЛО', true);
+                            }
+                        }, 100);
+                    }
+
+                    function restartFromWave1() {
+                        generateWave(1);
+                    }
+
+                    function startGame() {
+                        clearTimeout(resetTimeout);
+                        started.value = true;
+                        gameWon.value = false;
+                        failVisible.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: TOTAL_WAVES, stage: 1, total_stages: TOTAL_WAVES });
+                        restartFromWave1();
+                    }
+
+                    function togglePrune(idx) {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        telemetry.markActivity();
+                        pruned.value[idx] = !pruned.value[idx];
+                    }
+
+                    function onUserTyping() {
+                        telemetry.markActivity();
+                    }
+
+                    function failLevel(reason, isTimeout) {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        const failedWave = wave.value;
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+                        const sent = telemetry.fail({
+                            wave: failedWave,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            return;
+                        }
+
+                        failReason.value = `${reason}. Сброс на Волну 1...`;
+                        failVisible.value = true;
+                        resetTimeout = setTimeout(() => {
+                            failVisible.value = false;
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                restartFromWave1();
+                            }
+                        }, 1500);
+                    }
+
+                    function submitAnswer() {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        const val = parseInt(String(userAnswer.value).trim(), 10);
+                        if (isNaN(val)) return;
+
+                        clearInterval(timerInterval);
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_ans_${val}` });
+
+                        if (val === expectedRoot) {
+                            if (wave.value >= TOTAL_WAVES) {
+                                gameWon.value = true;
+                                telemetry.complete({ wave: TOTAL_WAVES, action_log: actionLog });
+                            } else {
+                                const nextWave = wave.value + 1;
+                                telemetry.advanceWave(nextWave, { action_log: actionLog });
+                                generateWave(nextWave);
+                            }
+                        } else {
+                            failLevel(`НЕВЕРНЫЙ КОРЕНЬ (ожидалось ${expectedRoot})`, false);
+                        }
+                    }
+
+                    onMounted(() => {
+                        // Prevent paste in input
+                        if (rootInput.value) {
+                            rootInput.value.addEventListener('paste', (e) => e.preventDefault());
+                        }
+                    });
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        totalWaves,
+                        leaves,
+                        pruned,
+                        userAnswer,
+                        rootInput,
+                        timerPercent,
+                        timerSec,
+                        failVisible,
+                        failReason,
+                        startGame,
+                        togglePrune,
+                        onUserTyping,
+                        submitAnswer
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>

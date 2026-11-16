@@ -1,0 +1,460 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 16 :: Основы теории игр :: Уровень 1';
+---
+
+<TaskLayout title="Уровень 1 — Основы теории игр" level={1} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-success pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-success fw-bold text-uppercase" id="phaseTitle">Этап 1 из 3: Классификация игр</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-success mb-3" style="height: 12px;">
+            <div class="progress-bar bg-success" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="statusBanner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <!-- Stage 1: Interactive Bin Classification -->
+        <div class="card bg-dark border-success rounded-0" id="stage1Card">
+            <div class="card-body p-3 p-md-4">
+                <p class="text-light mb-3">
+                    Распределите игры по корзинам: выберите карточку снизу и кликните по категории («Полная информация» или «Случайность / Скрытые данные»).
+                </p>
+                <div class="row g-2 mb-3" id="s1Buckets">
+                    <div class="col-12 col-sm-6">
+                        <div class="bucket border border-secondary bg-black p-3 h-100" data-cat="full" style="min-height: 140px; cursor: pointer;">
+                            <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2" style="pointer-events: none;">
+                                Полная информация (код 1)
+                            </div>
+                            <div class="slot-content d-flex flex-column gap-2"></div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <div class="bucket border border-secondary bg-black p-3 h-100" data-cat="rand" style="min-height: 140px; cursor: pointer;">
+                            <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2" style="pointer-events: none;">
+                                Случайность / Скрытые данные (код 0)
+                            </div>
+                            <div class="slot-content d-flex flex-column gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2">ИГРЫ ДЛЯ РАСПРЕДЕЛЕНИЯ</div>
+                <div id="s1Items" class="d-flex flex-wrap gap-2 bg-black border border-secondary p-3 mb-3" style="min-height: 72px;"></div>
+                <button type="button" id="s1CheckBtn" class="btn btn-success text-dark rounded-0 fw-bold w-100 text-uppercase" style="min-height: 48px;" disabled>
+                    Проверить классификацию
+                </button>
+            </div>
+        </div>
+
+        <!-- Stage 2: Interactive Tree Node Labeling -->
+        <div class="card bg-dark border-success rounded-0 d-none" id="stage2Card">
+            <div class="card-body p-3 p-md-4">
+                <p class="text-light mb-3">
+                    Проведите ретроспективный анализ дерева снизу вверх: кликайте по узлам <strong class="text-success">A, B, C</strong>, чтобы переключить их статус (<code>? → В → П</code>).
+                </p>
+                <div class="bg-black border border-secondary p-3 mb-3">
+                    <div class="row g-3 align-items-center text-center">
+                        <div class="col-12">
+                            <button type="button" class="node-toggle btn btn-outline-success rounded-0 fw-bold px-4 py-2" data-node="A" id="nodeA" style="min-width: 150px; min-height: 52px;">
+                                Старт A: <span class="node-val">?</span>
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="node-toggle btn btn-outline-success rounded-0 fw-bold px-3 py-2 w-100" data-node="B" id="nodeB" style="min-height: 52px;">
+                                Узел B: <span class="node-val">?</span>
+                            </button>
+                            <div class="small text-secondary mt-2" id="bLeavesDesc">Листья: ...</div>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="node-toggle btn btn-outline-success rounded-0 fw-bold px-3 py-2 w-100" data-node="C" id="nodeC" style="min-height: 52px;">
+                                Узел C: <span class="node-val">?</span>
+                            </button>
+                            <div class="small text-secondary mt-2" id="cLeavesDesc">Листья: ...</div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="s2CheckBtn" class="btn btn-success text-dark rounded-0 fw-bold w-100 text-uppercase" style="min-height: 48px;" disabled>
+                    Подтвердить статусы узлов
+                </button>
+            </div>
+        </div>
+
+        <!-- Stage 3: Slot & Snap Ideal Play Theorem -->
+        <div class="card bg-dark border-success rounded-0 d-none" id="stage3Card">
+            <div class="card-body p-3 p-md-4">
+                <p class="text-light mb-3" id="s3Prompt">
+                    Соберите верную формулировку постулата идеальной игры: выберите токен внизу и кликните по нужному пропуску.
+                </p>
+                <div class="bg-black border border-success p-3 mb-3 lh-lg fs-6 text-light" id="s3Sentence">
+                    Если первый игрок начинает партию в
+                    <button type="button" class="s3-slot btn btn-outline-warning rounded-0 fw-bold px-3 py-1 mx-1" data-slot="0" style="min-width: 130px; min-height: 42px;">[ слот 1 ]</button>
+                    позиции, то у него
+                    <button type="button" class="s3-slot btn btn-outline-warning rounded-0 fw-bold px-3 py-1 mx-1" data-slot="1" style="min-width: 100px; min-height: 42px;">[ слот 2 ]</button>
+                    выигрышная стратегия. При идеальной игре победит
+                    <button type="button" class="s3-slot btn btn-outline-warning rounded-0 fw-bold px-3 py-1 mx-1" data-slot="2" style="min-width: 110px; min-height: 42px;">[ слот 3 ]</button>
+                    игрок.
+                </div>
+                <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2">ПАЛИТРА ТОКЕНОВ</div>
+                <div id="s3Tokens" class="d-flex flex-wrap gap-2 bg-black border border-secondary p-3 mb-3"></div>
+                <button type="button" id="s3CheckBtn" class="btn btn-success text-dark rounded-0 fw-bold w-100 text-uppercase" style="min-height: 48px;" disabled>
+                    Завершить протокол
+                </button>
+            </div>
+        </div>
+
+        <div id="victoryBox" class="alert alert-success bg-success text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">УРОВЕНЬ ПРОЙДЕН</h3>
+            <p class="fs-5 mb-0 fw-semibold">Базовые понятия теории игр и ретроспективный анализ усвоены.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 3;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: TOTAL_PHASES
+            });
+
+            const gamesBank = [
+                { name: 'Шахматы', cat: 'full' },
+                { name: 'Крестики-нолики', cat: 'full' },
+                { name: 'Игра в Го', cat: 'full' },
+                { name: 'Кучи камней', cat: 'full' },
+                { name: 'Шашки', cat: 'full' },
+                { name: 'Покер', cat: 'rand' },
+                { name: 'Камень-ножницы-бумага', cat: 'rand' },
+                { name: 'Нарды (с кубиками)', cat: 'rand' },
+                { name: 'Морской бой', cat: 'rand' },
+                { name: 'Мафия', cat: 'rand' }
+            ];
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const statusBannerEl = document.getElementById('statusBanner');
+            const victoryBoxEl = document.getElementById('victoryBox');
+            const stageCards = [
+                document.getElementById('stage1Card'),
+                document.getElementById('stage2Card'),
+                document.getElementById('stage3Card')
+            ];
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-success bg-success text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.textContent = '';
+            }
+
+            function showStage(n) {
+                stageCards.forEach((c, idx) => {
+                    c.classList.toggle('d-none', idx + 1 !== n);
+                });
+                progressBarEl.style.width = `${((n - 1) / TOTAL_PHASES) * 100}%`;
+            }
+
+            // --- Stage 1 state & handlers ---
+            const s1Buckets = document.getElementById('s1Buckets');
+            const s1Items = document.getElementById('s1Items');
+            const s1CheckBtn = document.getElementById('s1CheckBtn');
+            let s1Selected = null;
+
+            function updateS1Btn() {
+                const left = s1Items.querySelectorAll('.s1-item').length;
+                const placed = s1Buckets.querySelectorAll('.s1-item').length;
+                s1CheckBtn.disabled = locked || left > 0 || placed === 0;
+            }
+
+            function initStage1() {
+                locked = false;
+                s1Selected = null;
+                hideBanner();
+                showStage(1);
+                phaseTitleEl.textContent = 'Этап 1 из 3: Классификация игр';
+                s1Items.innerHTML = '';
+                s1Buckets.querySelectorAll('.slot-content').forEach(sc => sc.innerHTML = '');
+                const fulls = shuffle(gamesBank.filter(g => g.cat === 'full')).slice(0, 3);
+                const rands = shuffle(gamesBank.filter(g => g.cat === 'rand')).slice(0, 3);
+                const picked = shuffle([...fulls, ...rands]);
+                picked.forEach((g, idx) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = `s1_item_${idx}`;
+                    btn.className = 's1-item btn btn-outline-success rounded-0 text-light fw-bold px-3 py-2';
+                    btn.style.minHeight = '48px';
+                    btn.dataset.cat = g.cat;
+                    btn.textContent = g.name;
+                    s1Items.appendChild(btn);
+                });
+                updateS1Btn();
+            }
+
+            s1Items.addEventListener('click', (e) => {
+                if (locked) return;
+                const btn = e.target.closest('.s1-item');
+                if (!btn) return;
+                telemetry.start();
+                s1Items.querySelectorAll('.s1-item').forEach(el => {
+                    el.classList.remove('bg-success', 'text-dark');
+                    el.classList.add('text-light');
+                });
+                btn.classList.remove('text-light');
+                btn.classList.add('bg-success', 'text-dark');
+                s1Selected = btn;
+            });
+
+            s1Buckets.addEventListener('click', (e) => {
+                if (locked) return;
+                const item = e.target.closest('.s1-item');
+                if (item && !s1Selected) {
+                    s1Items.appendChild(item);
+                    updateS1Btn();
+                    return;
+                }
+                const bucket = e.target.closest('.bucket');
+                if (!bucket || !s1Selected) return;
+                telemetry.start();
+                s1Selected.classList.remove('bg-success', 'text-dark');
+                s1Selected.classList.add('text-light');
+                bucket.querySelector('.slot-content').appendChild(s1Selected);
+                s1Selected = null;
+                updateS1Btn();
+            });
+
+            s1CheckBtn.addEventListener('click', () => {
+                if (locked) return;
+                telemetry.start();
+                let ok = true;
+                s1Buckets.querySelectorAll('.bucket').forEach(b => {
+                    const cat = b.dataset.cat;
+                    b.querySelectorAll('.s1-item').forEach(item => {
+                        if (item.dataset.cat !== cat) ok = false;
+                    });
+                });
+                if (ok) {
+                    actionLog.push({ time: new Date().toISOString(), action: 'stage_1_passed' });
+                    currentPhase = 2;
+                    telemetry.advanceStage(2, { action_log: actionLog });
+                    showBanner('Верно! Переходим к ретроспективному анализу дерева...', false);
+                    locked = true;
+                    setTimeout(initStage2, 600);
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: 'stage_1_failed' });
+                    telemetry.hardcoreReset({ stage: 1, action_log: actionLog });
+                    showBanner('Ошибка классификации! Формируем новый набор игр...', true);
+                    setTimeout(initStage1, 1000);
+                }
+            });
+
+            // --- Stage 2 state & handlers ---
+            const stage2Card = document.getElementById('stage2Card');
+            const s2CheckBtn = document.getElementById('s2CheckBtn');
+            const bLeavesDesc = document.getElementById('bLeavesDesc');
+            const cLeavesDesc = document.getElementById('cLeavesDesc');
+            let s2State = { A: '?', B: '?', C: '?' };
+            let s2Expected = { A: 'В', B: 'В', C: 'П' };
+
+            function updateS2UI() {
+                ['A', 'B', 'C'].forEach(k => {
+                    const btn = document.getElementById(`node${k}`);
+                    btn.querySelector('.node-val').textContent = s2State[k];
+                    btn.classList.remove('btn-outline-success', 'btn-success', 'btn-danger', 'text-dark', 'text-white');
+                    if (s2State[k] === 'В') btn.classList.add('btn-success', 'text-dark');
+                    else if (s2State[k] === 'П') btn.classList.add('btn-danger', 'text-white');
+                    else btn.classList.add('btn-outline-success');
+                });
+                s2CheckBtn.disabled = locked || s2State.A === '?' || s2State.B === '?' || s2State.C === '?';
+            }
+
+            function initStage2() {
+                locked = false;
+                hideBanner();
+                showStage(2);
+                phaseTitleEl.textContent = 'Этап 2 из 3: Ретроспективный анализ дерева';
+                s2State = { A: '?', B: '?', C: '?' };
+
+                const bLeaves = Math.random() > 0.5 ? ['П', 'В'] : ['В', 'В'];
+                const cLeaves = bLeaves.includes('П') ? ['В', 'В'] : ['П', 'В'];
+                const bExpected = bLeaves.includes('П') ? 'В' : 'П';
+                const cExpected = cLeaves.includes('П') ? 'В' : 'П';
+                const aExpected = (bExpected === 'П' || cExpected === 'П') ? 'В' : 'П';
+                s2Expected = { A: aExpected, B: bExpected, C: cExpected };
+
+                bLeavesDesc.textContent = `Ведёт в листья: (${bLeaves[0]}) и (${bLeaves[1]})`;
+                cLeavesDesc.textContent = `Ведёт в листья: (${cLeaves[0]}) и (${cLeaves[1]})`;
+                updateS2UI();
+            }
+
+            stage2Card.addEventListener('click', (e) => {
+                if (locked) return;
+                const btn = e.target.closest('.node-toggle');
+                if (!btn) return;
+                telemetry.start();
+                const node = btn.dataset.node;
+                const order = ['?', 'В', 'П'];
+                s2State[node] = order[(order.indexOf(s2State[node]) + 1) % order.length];
+                updateS2UI();
+            });
+
+            s2CheckBtn.addEventListener('click', () => {
+                if (locked) return;
+                telemetry.start();
+                const ok = s2State.A === s2Expected.A && s2State.B === s2Expected.B && s2State.C === s2Expected.C;
+                if (ok) {
+                    actionLog.push({ time: new Date().toISOString(), action: 'stage_2_passed' });
+                    currentPhase = 3;
+                    telemetry.advanceStage(3, { action_log: actionLog });
+                    showBanner('Верно! Переходим к финальному постулату...', false);
+                    locked = true;
+                    setTimeout(initStage3, 600);
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: 'stage_2_failed' });
+                    telemetry.hardcoreReset({ stage: 2, action_log: actionLog });
+                    showBanner('Ошибка анализа! Генерируем новое дерево позиций...', true);
+                    setTimeout(initStage2, 1000);
+                }
+            });
+
+            // --- Stage 3 state & handlers ---
+            const s3TokensEl = document.getElementById('s3Tokens');
+            const s3SentenceEl = document.getElementById('s3Sentence');
+            const s3PromptEl = document.getElementById('s3Prompt');
+            const s3CheckBtn = document.getElementById('s3CheckBtn');
+            const allTokens = ['выигрышной', 'проигрышной', 'есть', 'нет', 'первый', 'второй'];
+            let s3Expected = ['выигрышной', 'есть', 'первый'];
+            let s3Slots = ['', '', ''];
+            let s3SelectedToken = null;
+
+            function updateS3UI() {
+                s3SentenceEl.querySelectorAll('.s3-slot').forEach((slotEl, idx) => {
+                    const val = s3Slots[idx];
+                    slotEl.textContent = val || `[ слот ${idx + 1} ]`;
+                    slotEl.classList.toggle('btn-warning', Boolean(val));
+                    slotEl.classList.toggle('text-dark', Boolean(val));
+                    slotEl.classList.toggle('btn-outline-warning', !val);
+                });
+                s3CheckBtn.disabled = locked || s3Slots.some(v => !v);
+            }
+
+            function initStage3() {
+                locked = false;
+                hideBanner();
+                showStage(3);
+                phaseTitleEl.textContent = 'Этап 3 из 3: Постулат идеальной игры';
+                const startWin = Math.random() > 0.5;
+                s3Expected = startWin
+                    ? ['выигрышной', 'есть', 'первый']
+                    : ['проигрышной', 'нет', 'второй'];
+                s3PromptEl.textContent = startWin
+                    ? 'Соберите теорему для случая ВЫИГРЫШНОЙ стартовой позиции (кликните токен -> кликните слот):'
+                    : 'Соберите теорему для случая ПРОИГРЫШНОЙ стартовой позиции (кликните токен -> кликните слот):';
+                s3Slots = ['', '', ''];
+                s3SelectedToken = null;
+                s3TokensEl.innerHTML = '';
+                shuffle(allTokens).forEach((tok, idx) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = `s3_tok_${idx}`;
+                    btn.className = 's3-tok btn btn-outline-success rounded-0 fw-bold px-3 py-2 text-light';
+                    btn.style.minHeight = '48px';
+                    btn.dataset.token = tok;
+                    btn.textContent = tok;
+                    s3TokensEl.appendChild(btn);
+                });
+                updateS3UI();
+            }
+
+            s3TokensEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const btn = e.target.closest('.s3-tok');
+                if (!btn) return;
+                telemetry.start();
+                s3TokensEl.querySelectorAll('.s3-tok').forEach(el => {
+                    el.classList.remove('bg-success', 'text-dark');
+                    el.classList.add('text-light');
+                });
+                btn.classList.remove('text-light');
+                btn.classList.add('bg-success', 'text-dark');
+                s3SelectedToken = btn.dataset.token;
+            });
+
+            s3SentenceEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const slotEl = e.target.closest('.s3-slot');
+                if (!slotEl) return;
+                const idx = parseInt(slotEl.dataset.slot, 10);
+                if (!s3SelectedToken) {
+                    s3Slots[idx] = '';
+                    updateS3UI();
+                    return;
+                }
+                telemetry.start();
+                s3Slots[idx] = s3SelectedToken;
+                s3SelectedToken = null;
+                s3TokensEl.querySelectorAll('.s3-tok').forEach(el => {
+                    el.classList.remove('bg-success', 'text-dark');
+                    el.classList.add('text-light');
+                });
+                updateS3UI();
+            });
+
+            s3CheckBtn.addEventListener('click', () => {
+                if (locked) return;
+                telemetry.start();
+                const ok = s3Slots.every((v, i) => v === s3Expected[i]);
+                if (ok) {
+                    locked = true;
+                    progressBarEl.style.width = '100%';
+                    phaseTitleEl.textContent = 'ПРОТОКОЛ ЗАВЕРШЁН';
+                    stage3Card.classList.add('d-none');
+                    victoryBoxEl.classList.remove('d-none');
+                    hideBanner();
+                    actionLog.push({ time: new Date().toISOString(), action: 'stage_3_passed' });
+                    telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: 'stage_3_failed' });
+                    telemetry.hardcoreReset({ stage: 3, action_log: actionLog });
+                    showBanner('Неверная сборка постулата! Перезапуск этапа 3...', true);
+                    setTimeout(initStage3, 1000);
+                }
+            });
+
+            initStage1();
+        })();
+    </script>
+</TaskLayout>

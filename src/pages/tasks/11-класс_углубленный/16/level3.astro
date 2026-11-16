@@ -1,0 +1,382 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 16 :: Основы теории игр :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Кибер-Камни (Аркада)" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="card bg-black border border-danger border-2 rounded-0 p-3 p-md-4">
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" id="startScreen" class="text-center mx-auto py-3" style="max-width: 660px;">
+                <h1 class="h2 text-danger fw-bold mb-3 text-uppercase">ПРОТОКОЛ «КИБЕР-КАМНИ»</h1>
+                <div class="text-start text-light lh-base mb-4 fs-6">
+                    <p>Вы и ИИ-бот по очереди добавляете терабайты данных в буфер сервера. Вы ходите <strong class="text-white">первым</strong>. Побеждает тот, после хода которого объём данных достигнет или превысит <strong class="text-info">Цель (ТБ)</strong>.</p>
+                    <p>На каждом шаге передавайте боту только <strong class="text-warning">П-позицию</strong> (проигрышную). Для быстрого выбора хода можно нажимать клавиши <kbd class="bg-dark border border-secondary">1</kbd>–<kbd class="bg-dark border border-secondary">4</kbd>.</p>
+                    <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 mb-0">
+                        <strong class="text-danger">ХАРДКОР-СБРОС:</strong> Если отдать боту выигрышную (В) позицию или не успеть по таймеру, серия из 10 волн сбрасывается на Волну 1.
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-danger text-white rounded-0 fs-5 fw-bold px-4 py-3 w-100 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    [ НАЧАТЬ ВЗЛОМ ]
+                </button>
+            </div>
+
+            <!-- Active game -->
+            <div v-if="started && !gameWon">
+                <div class="d-flex gap-1 mb-3">
+                    <div
+                        v-for="idx in totalWaves"
+                        :key="idx"
+                        class="flex-fill"
+                        style="height: 6px;"
+                        :class="idx < wave ? 'bg-success' : (idx === wave ? 'bg-danger' : 'bg-secondary')"
+                    ></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 flex-wrap gap-2">
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ВОЛНА <span v-text="wave"></span> / <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="badge rounded-0 fs-6 px-3 py-2" :class="timerSec <= 4 ? 'bg-danger text-white' : 'bg-dark border border-warning text-warning'">
+                        Ход: <span v-text="timerSec"></span> с
+                    </span>
+                </div>
+
+                <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 12px;">
+                    <div
+                        class="progress-bar"
+                        role="progressbar"
+                        :class="timerPercent < 30 ? 'bg-danger' : (timerPercent < 60 ? 'bg-warning' : 'bg-info')"
+                        :style="{ width: timerPercent + '%' }"
+                    ></div>
+                </div>
+
+                <!-- Data Buffer Gauge (Data Source) -->
+                <div class="bg-dark border border-danger p-3 mb-3 text-center">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge bg-info text-dark rounded-0 fs-6">ЦЕЛЬ: ≥ <span v-text="targetTB"></span> ТБ</span>
+                        <span class="small fw-bold" :class="isPlayerTurn ? 'text-success' : 'text-warning'" v-text="turnLabel"></span>
+                    </div>
+
+                    <div class="display-4 fw-bold text-white my-2">
+                        <span id="currentData" v-text="currentTB"></span> <span class="fs-4 text-danger">ТБ</span>
+                    </div>
+
+                    <div class="progress rounded-0 bg-black border border-secondary mb-2" style="height: 18px;">
+                        <div
+                            class="progress-bar bg-danger"
+                            role="progressbar"
+                            :style="{ width: Math.min(100, (currentTB / targetTB) * 100) + '%' }"
+                        ></div>
+                    </div>
+                </div>
+
+                <!-- Move Controls -->
+                <div class="row g-2 mb-3">
+                    <div v-for="(m, idx) in moves" :key="idx" class="col">
+                        <button
+                            type="button"
+                            class="move-btn btn btn-outline-danger text-white rounded-0 fw-bold fs-5 w-100 py-3"
+                            :data-move-idx="idx"
+                            :disabled="!isPlayerTurn || failVisible"
+                            style="min-height: 54px;"
+                            @click="makeMove(idx)"
+                        >
+                            <span class="badge bg-dark border border-secondary text-secondary rounded-0 me-1" v-text="idx + 1"></span>
+                            <span v-text="m.t + m.v"></span> ТБ
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-black border border-secondary p-2 small text-light" style="max-height: 110px; overflow-y: auto;">
+                    <div v-for="(line, i) in logs" :key="i" v-text="line"></div>
+                </div>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" id="successArea" class="text-center py-5">
+                <div class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold py-5">
+                    <h2 class="h2 fw-bold text-uppercase mb-3">СИСТЕМА ВЗЛОМАНА</h2>
+                    <p class="fs-5 mb-0">Все 10 волн ИИ-бота пройдены по оптимальной выигрышной стратегии.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure overlay -->
+        <div v-if="failVisible" id="failOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-danger text-white text-center p-4" style="z-index: 1050;">
+            <h1 class="display-5 fw-bold text-uppercase mb-2">ПРОИГРЫШНАЯ ПЕРЕДАЧА</h1>
+            <p class="fs-4 mb-0" v-text="failReason"></p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+            const TOTAL_WAVES = 10;
+
+            const BASE_CONFIGS = [
+                { targetBase: 21, targetRange: 4, moves: [{ t: '+', v: 1 }, { t: '+', v: 2 }, { t: '*', v: 2 }] },
+                { targetBase: 25, targetRange: 4, moves: [{ t: '+', v: 1 }, { t: '+', v: 3 }, { t: '*', v: 2 }] },
+                { targetBase: 30, targetRange: 4, moves: [{ t: '+', v: 1 }, { t: '*', v: 2 }] },
+                { targetBase: 33, targetRange: 4, moves: [{ t: '+', v: 1 }, { t: '+', v: 4 }, { t: '*', v: 2 }] },
+                { targetBase: 38, targetRange: 4, moves: [{ t: '+', v: 2 }, { t: '*', v: 2 }] },
+                { targetBase: 40, targetRange: 4, moves: [{ t: '+', v: 1 }, { t: '*', v: 3 }] },
+                { targetBase: 45, targetRange: 5, moves: [{ t: '+', v: 2 }, { t: '+', v: 3 }, { t: '*', v: 2 }] },
+                { targetBase: 50, targetRange: 5, moves: [{ t: '+', v: 1 }, { t: '+', v: 2 }, { t: '*', v: 3 }] },
+                { targetBase: 55, targetRange: 5, moves: [{ t: '+', v: 2 }, { t: '+', v: 5 }, { t: '*', v: 2 }] },
+                { targetBase: 60, targetRange: 6, moves: [{ t: '+', v: 1 }, { t: '+', v: 4 }, { t: '*', v: 2 }, { t: '*', v: 3 }] }
+            ];
+
+            function calculateVP(target, moves) {
+                const arr = [];
+                for (let i = target - 1; i >= 1; i--) {
+                    let hasWin = false;
+                    for (const m of moves) {
+                        const next = m.t === '+' ? i + m.v : i * m.v;
+                        if (next >= target || arr[next] === 'P') {
+                            hasWin = true;
+                            break;
+                        }
+                    }
+                    arr[i] = hasWin ? 'V' : 'P';
+                }
+                return arr;
+            }
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const totalWaves = TOTAL_WAVES;
+                    const targetTB = ref(21);
+                    const currentTB = ref(10);
+                    const moves = ref([]);
+                    const isPlayerTurn = ref(false);
+                    const turnLabel = ref('ВАШ ХОД');
+                    const logs = ref([]);
+                    const timeRemainingMs = ref(20000);
+                    const waveDurationMs = ref(20000);
+                    const failVisible = ref(false);
+                    const failReason = ref('');
+
+                    const timerPercent = computed(() => {
+                        if (waveDurationMs.value <= 0) return 0;
+                        return Math.max(0, Math.min(100, (timeRemainingMs.value / waveDurationMs.value) * 100));
+                    });
+                    const timerSec = computed(() => Math.max(0, Math.ceil(timeRemainingMs.value / 1000)));
+
+                    let statusArray = [];
+                    let timerInterval = null;
+                    let botTimeout = null;
+                    let resetTimeout = null;
+                    let lastTick = 0;
+                    const actionLog = [];
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(timerInterval);
+                            clearTimeout(botTimeout);
+                            clearTimeout(resetTimeout);
+                            timerInterval = null;
+                            failVisible.value = false;
+                        },
+                        onAfkRetry: () => {
+                            failVisible.value = false;
+                            restartFromWave1();
+                        }
+                    });
+
+                    function getWaveDurationMs(w) {
+                        return Math.max(11000, 20000 - (w - 1) * 900);
+                    }
+
+                    function startPlayerTurn() {
+                        clearInterval(timerInterval);
+                        isPlayerTurn.value = true;
+                        turnLabel.value = 'ВАШ ХОД (выберите операцию)';
+
+                        const dur = getWaveDurationMs(wave.value);
+                        waveDurationMs.value = dur;
+                        timeRemainingMs.value = dur;
+                        lastTick = Date.now();
+
+                        timerInterval = setInterval(() => {
+                            const now = Date.now();
+                            const delta = now - lastTick;
+                            lastTick = now;
+                            timeRemainingMs.value -= delta;
+                            if (timeRemainingMs.value <= 0) {
+                                failLevel('ВРЕМЯ НА ХОД ИСТЕКЛО', true);
+                            }
+                        }, 100);
+                    }
+
+                    function startWave(w) {
+                        clearInterval(timerInterval);
+                        clearTimeout(botTimeout);
+                        wave.value = w;
+                        telemetry.setWave(w, TOTAL_WAVES);
+
+                        const cfg = BASE_CONFIGS[w - 1];
+                        const target = cfg.targetBase + Math.floor(Math.random() * cfg.targetRange);
+                        targetTB.value = target;
+                        moves.value = cfg.moves;
+                        statusArray = calculateVP(target, cfg.moves);
+
+                        const validStarts = [];
+                        for (let i = Math.max(1, Math.floor(target * 0.15)); i <= Math.floor(target * 0.45); i++) {
+                            if (statusArray[i] === 'V') validStarts.push(i);
+                        }
+                        if (validStarts.length === 0) {
+                            for (let i = 1; i < target; i++) {
+                                if (statusArray[i] === 'V') validStarts.push(i);
+                            }
+                        }
+                        currentTB.value = validStarts.length > 0 ? validStarts[Math.floor(Math.random() * validStarts.length)] : 1;
+                        logs.value.unshift(`> Волна ${w}: Цель >= ${target} ТБ, старт = ${currentTB.value} ТБ`);
+                        if (logs.value.length > 8) logs.value.pop();
+
+                        startPlayerTurn();
+                    }
+
+                    function restartFromWave1() {
+                        logs.value = [];
+                        startWave(1);
+                    }
+
+                    function startGame() {
+                        clearTimeout(resetTimeout);
+                        started.value = true;
+                        gameWon.value = false;
+                        failVisible.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: TOTAL_WAVES, stage: 1, total_stages: TOTAL_WAVES });
+                        restartFromWave1();
+                    }
+
+                    function failLevel(reason, isTimeout) {
+                        clearInterval(timerInterval);
+                        clearTimeout(botTimeout);
+                        clearTimeout(resetTimeout);
+                        isPlayerTurn.value = false;
+                        const failedWave = wave.value;
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+                        const sent = telemetry.fail({
+                            wave: failedWave,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            return;
+                        }
+
+                        failReason.value = `${reason}. Сброс на Волну 1...`;
+                        failVisible.value = true;
+                        resetTimeout = setTimeout(() => {
+                            failVisible.value = false;
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                restartFromWave1();
+                            }
+                        }, 1500);
+                    }
+
+                    function makeMove(idx) {
+                        if (!started.value || gameWon.value || failVisible.value || !isPlayerTurn.value || telemetry.getState().isAfkPaused) return;
+                        const m = moves.value[idx];
+                        if (!m) return;
+
+                        clearInterval(timerInterval);
+                        isPlayerTurn.value = false;
+                        telemetry.markActivity();
+
+                        const nextVal = m.t === '+' ? currentTB.value + m.v : currentTB.value * m.v;
+                        logs.value.unshift(`> Вы: [${m.t}${m.v}] -> ${nextVal} ТБ`);
+                        currentTB.value = nextVal;
+
+                        if (nextVal >= targetTB.value) {
+                            if (wave.value >= TOTAL_WAVES) {
+                                gameWon.value = true;
+                                telemetry.complete({ wave: TOTAL_WAVES, action_log: actionLog });
+                            } else {
+                                const nextWave = wave.value + 1;
+                                telemetry.advanceWave(nextWave, { action_log: actionLog });
+                                startWave(nextWave);
+                            }
+                            return;
+                        }
+
+                        if (statusArray[nextVal] === 'V') {
+                            failLevel(`ОТДАНА В-ПОЗИЦИЯ (${nextVal} ТБ)`, false);
+                            return;
+                        }
+
+                        turnLabel.value = 'ХОД ИИ-БОТА...';
+                        botTimeout = setTimeout(() => {
+                            if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                            const botM = moves.value[Math.floor(Math.random() * moves.value.length)];
+                            const botNext = botM.t === '+' ? currentTB.value + botM.v : currentTB.value * botM.v;
+                            logs.value.unshift(`> ИИ: [${botM.t}${botM.v}] -> ${botNext} ТБ`);
+                            currentTB.value = botNext;
+
+                            if (botNext >= targetTB.value) {
+                                failLevel('ИИ ПЕРЕГРУЗИЛ СЕРВЕР ПЕРВЫМ', false);
+                                return;
+                            }
+                            startPlayerTurn();
+                        }, 450);
+                    }
+
+                    function onKeyDown(e) {
+                        if (!started.value || gameWon.value || failVisible.value || !isPlayerTurn.value || telemetry.getState().isAfkPaused) return;
+                        const num = parseInt(e.key, 10);
+                        if (num >= 1 && num <= moves.value.length) {
+                            e.preventDefault();
+                            makeMove(num - 1);
+                        }
+                    }
+
+                    onMounted(() => {
+                        window.addEventListener('keydown', onKeyDown);
+                    });
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                        clearTimeout(botTimeout);
+                        clearTimeout(resetTimeout);
+                        window.removeEventListener('keydown', onKeyDown);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        totalWaves,
+                        targetTB,
+                        currentTB,
+                        moves,
+                        isPlayerTurn,
+                        turnLabel,
+                        logs,
+                        timerPercent,
+                        timerSec,
+                        failVisible,
+                        failReason,
+                        startGame,
+                        makeMove
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>
