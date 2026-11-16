@@ -18,10 +18,10 @@ test.describe('Lesson 11-23 Level 1: Markov Normal Algorithms Architecture & E2E
     expect(code.includes('<style>')).toBe(false);
     expect(code.includes('<style ')).toBe(false);
 
-    // Telemetry and mission naming
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry and mission naming (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 23');
 
     // 3 Phases according to Level 1 specification

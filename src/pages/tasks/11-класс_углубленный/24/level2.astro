@@ -248,9 +248,13 @@ iterations = 0
 
 <script is:inline>
 (function() {
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
     let currentPhase = 1;
     let attemptsCount = 0;
-    let startTime = Date.now();
     let timerInterval = null;
     let isLocked = false;
 
@@ -258,7 +262,7 @@ iterations = 0
     function startTimer() {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const secs = String(elapsed % 60).padStart(2, '0');
             const el = document.getElementById('timer-display');
@@ -274,7 +278,9 @@ iterations = 0
 
     // Телеметрия: Ошибка / Сброс
     function triggerErrorReset(msg, callback) {
-        attemptsCount++;
+        telemetry.markActivity();
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttemptsDisplay();
         isLocked = true;
 
@@ -284,12 +290,6 @@ iterations = 0
             ft.textContent = msg;
             fb.classList.remove('d-none');
         }
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 2)',
-            action_type: 'hardcore_reset'
-        }, '*');
 
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
@@ -301,7 +301,10 @@ iterations = 0
     // Телеметрия: Завершение уровня
     function completeLevel() {
         if (timerInterval) clearInterval(timerInterval);
-        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+        const evt = telemetry.complete({ stage: 5 });
+        const st = telemetry.getState();
+        const elapsedSec = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        attemptsCount = st.attemptsCount;
         const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
         const secs = String(elapsedSec % 60).padStart(2, '0');
 
@@ -312,17 +315,6 @@ iterations = 0
 
         document.getElementById('final-attempts').textContent = String(attemptsCount);
         document.getElementById('final-time').textContent = `${mins}:${secs}`;
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 2)',
-            action_type: 'level_complete',
-            status: 'completed',
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: elapsedSec,
-            attempts_count: attemptsCount,
-            success: true
-        }, '*');
     }
 
     function randInt(min, max) {
@@ -357,6 +349,7 @@ iterations = 0
 
         if (!isNaN(userVal) && userVal === p1Expected) {
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             document.getElementById('level-badge').textContent = 'Шаг 2 из 5';
@@ -417,6 +410,7 @@ iterations = 0
 
         if (!isNaN(userVal) && userVal === p2Expected) {
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             document.getElementById('level-badge').textContent = 'Шаг 3 из 5';
@@ -465,6 +459,7 @@ iterations = 0
 
         if (userVal === p3Expected || (p3Expected === 'LOOP' && userVal === 'ЦИКЛ') || (p3Expected === 'HALT' && userVal === 'ОСТАНОВ')) {
             currentPhase = 4;
+            telemetry.advanceStage(4);
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
             document.getElementById('level-badge').textContent = 'Шаг 4 из 5';
@@ -563,6 +558,7 @@ iterations = 0
 
         if (userVal === p4Expected) {
             currentPhase = 5;
+            telemetry.advanceStage(5);
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');
             document.getElementById('level-badge').textContent = 'Шаг 5 из 5';

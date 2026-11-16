@@ -4,7 +4,7 @@ import path from 'path';
 
 test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () => {
   const taskFile = path.join(process.cwd(), 'src/pages/tasks/11-класс_углубленный/22/level1.astro');
-  const pageUrl = 'http://localhost:4321/tasks/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/22/level1';
+  const pageUrl = '/tasks/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/22/level1';
 
   test('1. Architectural compliance and standards check', async () => {
     expect(fs.existsSync(taskFile)).toBe(true);
@@ -19,10 +19,10 @@ test.describe('Lesson 11-22 Level 1: Post Machine Architecture & E2E Suite', () 
     expect(code.includes('<style>')).toBe(false);
     expect(code.includes('<style ')).toBe(false);
 
-    // Telemetry and mission naming
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry and mission naming (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 22');
 
     // 3 Phases according to Level 1 specification

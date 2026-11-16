@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 
 test.describe('Comprehensive Telemetry & Attempt Lifecycle Engine Suite', () => {
-  const baseUrl = 'http://localhost:4321';
+  const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
   const dbPath = path.join(process.cwd(), 'telemetry.db');
 
   test('1. Academic Mastery Retention: Normal pass is never revoked by subsequent hardcore failure', async ({ request }) => {

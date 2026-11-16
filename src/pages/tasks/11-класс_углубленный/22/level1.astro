@@ -187,22 +187,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     <script is:inline>
         const missionName = 'Урок 22 :: Машина Поста (Уровень 1)';
-        const startTime = Date.now();
-        let attempts = 0;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
+        const telemetry = window.LMSTelemetry.create({
+            missionName: missionName,
+            level: 1,
+            totalStages: 3
+        });
+        let isResetting = false;
+        let isCompleted = false;
 
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -348,6 +339,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         function checkPhase1Result(userReportedCrash) {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const feedback = document.getElementById('p1-feedback');
             const submitStep = document.getElementById('p1-submit-step');
             const submitCrash = document.getElementById('p1-submit-crash');
@@ -367,16 +360,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (isCorrect) {
                 document.getElementById('phase1').classList.add('d-none');
                 document.getElementById('phase2').classList.remove('d-none');
-                sendTelemetry('in_progress');
+                telemetry.advanceStage(2);
                 initPhase2();
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 1 });
                 submitStep.disabled = true;
                 submitCrash.disabled = true;
                 feedback.classList.remove('d-none');
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase1();
                     submitStep.disabled = false;
                     submitCrash.disabled = false;
@@ -531,6 +525,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         document.getElementById('p2-submit-btn').addEventListener('click', () => {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const feedback = document.getElementById('p2-feedback');
             const submitBtn = document.getElementById('p2-submit-btn');
 
@@ -540,15 +536,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (isMatch) {
                 document.getElementById('phase2').classList.add('d-none');
                 document.getElementById('phase3').classList.remove('d-none');
-                sendTelemetry('in_progress');
+                telemetry.advanceStage(3);
                 initPhase3();
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 2 });
                 submitBtn.disabled = true;
                 feedback.classList.remove('d-none');
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase2();
                     submitBtn.disabled = false;
                     feedback.classList.add('d-none');
@@ -682,6 +679,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         document.getElementById('p3-submit-btn').addEventListener('click', () => {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const feedback = document.getElementById('p3-feedback');
             const submitBtn = document.getElementById('p3-submit-btn');
 
@@ -689,16 +688,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const headMatch = p3WorkHead === p3ExpectedHead;
 
             if (tapeMatch && headMatch) {
+                isCompleted = true;
                 document.getElementById('phase3').classList.add('d-none');
                 document.getElementById('success-screen').classList.remove('d-none');
-                sendTelemetry('level_complete', true);
+                telemetry.complete({ stage: 3 });
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 3 });
                 submitBtn.disabled = true;
                 feedback.classList.remove('d-none');
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase3();
                     submitBtn.disabled = false;
                     feedback.classList.add('d-none');
@@ -707,7 +708,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         // Старт симуляции
-        sendTelemetry('in_progress');
         initPhase1();
     </script>
 </TaskLayout>

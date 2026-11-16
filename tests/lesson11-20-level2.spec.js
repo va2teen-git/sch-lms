@@ -5,7 +5,7 @@ test.describe('Lesson 11-20 Level 2: Advanced Turing Machine', () => {
 
   test('should complete Level 2 successfully with text inputs', async ({ page }) => {
     // Navigate to the lesson page
-    await page.goto('http://localhost:4321/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
+    await page.goto('/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
     
     // Force show iframe-2
     await page.evaluate(() => {
@@ -130,7 +130,7 @@ test.describe('Lesson 11-20 Level 2: Advanced Turing Machine', () => {
   });
 
   test('should handle error properly and hardcore reset behavior on Level 2', async ({ page }) => {
-    await page.goto('http://localhost:4321/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
+    await page.goto('/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
     
     // Enable Hardcore mode
     await page.evaluate(() => {

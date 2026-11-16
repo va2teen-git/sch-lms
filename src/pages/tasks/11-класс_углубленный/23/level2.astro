@@ -235,25 +235,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     </div>
 
     <script is:inline>
-        const startTime = Date.now();
-        let attempts = 0;
-
-        function sendTelemetry(actionType, isSuccess = false) {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-            const payload = {
-                type: 'TELEMETRY_EVENT',
-                mission_name: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 2)',
-                action_type: actionType,
-                status: isSuccess ? 'completed' : (actionType === 'hardcore_reset' ? 'failed' : 'in_progress'),
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: isSuccess
-            };
-            if (window.parent && window.parent !== window) {
-                window.parent.postMessage(payload, '*');
-            }
-        }
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 2)',
+            level: 2,
+            totalStages: 5
+        });
+        let isResetting = false;
+        let isCompleted = false;
 
         // Вспомогательная функция нормализации ввода формулы
         function normalizeRule(str) {
@@ -308,6 +296,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         function checkPhase1() {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const rawVal = document.getElementById('p1-input').value.trim();
             const normVal = normalizeRule(rawVal);
             const isValid = p1CurrentTask.validAnswers.some(ans => normalizeRule(ans) === normVal);
@@ -315,15 +305,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (isValid) {
                 document.getElementById('phase1').classList.add('d-none');
                 document.getElementById('phase2').classList.remove('d-none');
+                telemetry.advanceStage(2);
                 initPhase2();
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 1 });
                 const feedback = document.getElementById('p1-feedback');
                 feedback.classList.remove('d-none');
                 document.getElementById('p1-btn').disabled = true;
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase1();
                     feedback.classList.add('d-none');
                     document.getElementById('p1-btn').disabled = false;
@@ -389,21 +381,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         function checkPhase2() {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const rawVal = document.getElementById('p2-input').value.trim();
             const cleanVal = rawVal.replace(/["']/g, '');
 
             if (cleanVal === p2CurrentTask.expected) {
                 document.getElementById('phase2').classList.add('d-none');
                 document.getElementById('phase3').classList.remove('d-none');
+                telemetry.advanceStage(3);
                 initPhase3();
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 2 });
                 const feedback = document.getElementById('p2-feedback');
                 feedback.classList.remove('d-none');
                 document.getElementById('p2-btn').disabled = true;
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase2();
                     feedback.classList.add('d-none');
                     document.getElementById('p2-btn').disabled = false;
@@ -478,21 +474,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         function checkPhase3() {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const rawVal = document.getElementById('p3-input').value.trim();
             const intVal = parseInt(rawVal, 10);
 
             if (intVal === p3CurrentTask.expectedSteps) {
                 document.getElementById('phase3').classList.add('d-none');
                 document.getElementById('phase4').classList.remove('d-none');
+                telemetry.advanceStage(4);
                 initPhase4();
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 3 });
                 const feedback = document.getElementById('p3-feedback');
                 feedback.classList.remove('d-none');
                 document.getElementById('p3-btn').disabled = true;
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase3();
                     feedback.classList.add('d-none');
                     document.getElementById('p3-btn').disabled = false;
@@ -582,6 +582,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         function checkPhase4() {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const rawVal = document.getElementById('p4-input').value.trim();
             const intVal = parseInt(rawVal, 10);
             let expectedVal = 0;
@@ -597,15 +599,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (intVal === expectedVal) {
                 document.getElementById('phase4').classList.add('d-none');
                 document.getElementById('phase5').classList.remove('d-none');
+                telemetry.advanceStage(5);
                 initPhase5();
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 4 });
                 const feedback = document.getElementById('p4-feedback');
                 feedback.classList.remove('d-none');
                 document.getElementById('p4-btn').disabled = true;
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase4();
                     feedback.classList.add('d-none');
                     document.getElementById('p4-btn').disabled = false;
@@ -674,25 +678,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         function checkPhase5() {
+            if (isResetting || isCompleted) return;
+            telemetry.markActivity();
             const rawVal = document.getElementById('p5-input').value.trim().toUpperCase();
 
             if (rawVal === p5CurrentTask.verdict) {
+                isCompleted = true;
                 document.getElementById('phase5').classList.add('d-none');
                 document.getElementById('success-screen').classList.remove('d-none');
 
-                const totalSec = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                document.getElementById('final-time').textContent = totalSec;
-                document.getElementById('final-errors').textContent = attempts;
-
-                sendTelemetry('level_complete', true);
+                const evt = telemetry.complete({ stage: 5 });
+                const st = telemetry.getState();
+                document.getElementById('final-time').textContent = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+                document.getElementById('final-errors').textContent = st.attemptsCount;
             } else {
-                attempts++;
-                sendTelemetry('hardcore_reset');
+                isResetting = true;
+                telemetry.hardcoreReset({ stage: 5 });
                 const feedback = document.getElementById('p5-feedback');
                 feedback.classList.remove('d-none');
                 document.getElementById('p5-btn').disabled = true;
 
                 setTimeout(() => {
+                    isResetting = false;
                     initPhase5();
                     feedback.classList.add('d-none');
                     document.getElementById('p5-btn').disabled = false;
@@ -701,7 +708,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         // Старт
-        sendTelemetry('in_progress');
         initPhase1();
     </script>
 </TaskLayout>

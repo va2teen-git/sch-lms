@@ -26,10 +26,10 @@ test.describe('Lesson 11-23 Level 3: Markov Reactor (Archetype 12 Dynamic Rule M
     expect(code).toMatch(/phaseTimeLeft/i);
     expect(code).toContain('timer-display');
 
-    // Telemetry and mission naming
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry and mission naming (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 23');
 
     // Archetype 12 Dynamic Rule Morphing specification

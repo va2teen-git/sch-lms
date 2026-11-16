@@ -256,9 +256,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (function() {
     // --- Состояние игры и метрики ---
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 25 :: Сложность вычислений (Уровень 1)',
+        level: 1,
+        totalStages: 3
+    });
     let currentPhase = 1;
     let attemptsCount = 0;
-    let startTime = Date.now();
     let timerInterval = null;
     let isLocked = false;
 
@@ -266,7 +270,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function startTimer() {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const secs = String(elapsed % 60).padStart(2, '0');
             const el = document.getElementById('timer-display');
@@ -282,7 +286,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Телеметрия: Ошибка / Сброс
     function triggerErrorReset(msg, callback) {
-        attemptsCount++;
+        telemetry.markActivity();
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttemptsDisplay();
         isLocked = true;
 
@@ -293,13 +299,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             fb.classList.remove('d-none');
         }
 
-        // Отправка сигнала телеметрии hardcore_reset
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 25 :: Сложность вычислений (Уровень 1)',
-            action_type: 'hardcore_reset'
-        }, '*');
-
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
             isLocked = false;
@@ -309,7 +308,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     function completeLevel() {
         if (timerInterval) clearInterval(timerInterval);
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const evt = telemetry.complete({ stage: 3 });
+        const st = telemetry.getState();
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        attemptsCount = st.attemptsCount;
         const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
         const secs = String(elapsed % 60).padStart(2, '0');
 
@@ -322,16 +324,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const ft = document.getElementById('final-time');
         if (fa) fa.textContent = String(attemptsCount);
         if (ft) ft.textContent = `${mins}:${secs}`;
-
-        // Телеметрия завершения
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 25 :: Сложность вычислений (Уровень 1)',
-            action_type: 'level_complete',
-            success: true,
-            attempts_count: attemptsCount,
-            time_spent_sec: elapsed
-        }, '*');
     }
 
     // =========================================================================
@@ -529,6 +521,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (isCorrect) {
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
             document.getElementById('phase-title').textContent = 'Классификация задач по фундаментальным классам (P, NPC, NP-hard)';
             document.getElementById('phase1').classList.add('d-none');
@@ -622,15 +615,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             poolEl.appendChild(cardEl);
         });
-
-        // Привязываем клики к бакетам
-        document.querySelectorAll('.target-bucket').forEach(bucket => {
-            bucket.onclick = () => {
-                if (isLocked || !p2SelectedCard) return;
-                moveCardToBucket(p2SelectedCard.el, bucket);
-            };
-        });
     }
+
+    // Однократная привязка кликов к бакетам
+    document.querySelectorAll('.target-bucket').forEach(bucket => {
+        bucket.addEventListener('click', () => {
+            if (isLocked || !p2SelectedCard) return;
+            moveCardToBucket(p2SelectedCard.el, bucket);
+        });
+    });
 
     function handleP2CardClick(cardEl, card) {
         document.querySelectorAll('.p2-task-card').forEach(c => c.classList.remove('border-warning', 'text-warning'));
@@ -695,6 +688,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (isCorrect) {
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
             document.getElementById('phase-title').textContent = 'Коммутация графа сведений Ричарда Карпа (≤ₚ)';
             document.getElementById('phase2').classList.add('d-none');

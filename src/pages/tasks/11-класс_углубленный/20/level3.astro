@@ -152,20 +152,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         let sessionStartTime = Date.now();
         let attempts = 0;
 
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(sessionStartTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
-
         function rnd(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
@@ -188,6 +174,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     phaseTimeLeft: 10.0,
                     maxPhaseTime: 10.0,
                     timerInterval: null,
+                    resetTimeout: null,
+                    telemetry: null,
                     failMessage: '',
                     currentTask: {}
                 };
@@ -197,13 +185,54 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     return this.phaseTimeLeft.toFixed(1);
                 }
             },
+            mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: this.totalPhases,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        clearInterval(this.timerInterval);
+                        clearTimeout(this.resetTimeout);
+                        this.failMessage = '';
+                        this.gameState = 'playing';
+                    },
+                    onAfkRetry: () => {
+                        this.failMessage = '';
+                        this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalPhases);
+                        }
+                        this.loadPhase(1);
+                    }
+                });
+            },
+            beforeUnmount() {
+                clearInterval(this.timerInterval);
+                clearTimeout(this.resetTimeout);
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
+            },
             methods: {
                 startGame() {
+                    clearTimeout(this.resetTimeout);
                     sessionStartTime = Date.now();
                     attempts = 0;
                     this.currentPhase = 1;
                     this.gameState = 'playing';
-                    sendTelemetry('in_progress');
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalPhases,
+                            stage: 1,
+                            total_stages: this.totalPhases
+                        });
+                    }
                     this.loadPhase(1);
                 },
 
@@ -212,16 +241,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     this.phaseTimeLeft = 10.0;
                     this.maxPhaseTime = 10.0;
                     clearInterval(this.timerInterval);
+                    clearTimeout(this.resetTimeout);
+                    if (this.telemetry) {
+                        this.telemetry.setWave(phaseNum, this.totalPhases);
+                    }
 
                     this.generateTaskForPhase(phaseNum);
 
                     // Запуск локального убывающего таймера
                     const tickRate = 100; // каждые 100мс
                     this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.phaseTimeLeft = Math.max(0, this.phaseTimeLeft - 0.1);
                         if (this.phaseTimeLeft <= 0.05) {
                             clearInterval(this.timerInterval);
-                            this.triggerFail('Время сектора истекло! Логическое ядро перегрелось и вошло в бесконечный цикл.');
+                            this.triggerFail('Время сектора истекло! Логическое ядро перегрелось и вошло в бесконечный цикл.', true);
                         }
                     }, tickRate);
                 },
@@ -368,33 +404,57 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 },
 
                 handleOptionClick(optIdx) {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
                     const selected = this.currentTask.options[optIdx];
                     if (selected.isCorrect) {
                         clearInterval(this.timerInterval);
                         if (this.currentPhase >= this.totalPhases) {
                             // Победа!
                             this.gameState = 'success';
-                            sendTelemetry('level_complete', true);
+                            if (this.telemetry) {
+                                this.telemetry.complete({ wave: this.totalPhases });
+                            }
                         } else {
-                            sendTelemetry('in_progress');
-                            this.loadPhase(this.currentPhase + 1);
+                            const nextWave = this.currentPhase + 1;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(nextWave);
+                            }
+                            this.loadPhase(nextWave);
                         }
                     } else {
                         clearInterval(this.timerInterval);
-                        this.triggerFail('Неверное решение! Вредоносный код вызвал фатальный сбой адресации.');
+                        this.triggerFail('Неверное решение! Вредоносный код вызвал фатальный сбой адресации.', false);
                     }
                 },
 
-                triggerFail(reason) {
-                    attempts++;
+                triggerFail(reason, isTimeout = false) {
+                    clearInterval(this.timerInterval);
+                    clearTimeout(this.resetTimeout);
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentPhase,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.failMessage = '';
+                            this.gameState = 'playing';
+                            return;
+                        }
+                    } else {
+                        attempts++;
+                    }
                     this.failMessage = reason;
                     this.gameState = 'failed';
-                    sendTelemetry('hardcore_reset');
 
                     // Через 2 секунды сброс на фазу 1 (тотальный сброс для Уровня 3)
-                    setTimeout(() => {
+                    this.resetTimeout = setTimeout(() => {
+                        if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                         this.currentPhase = 1;
                         this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalPhases);
+                        }
                         this.loadPhase(1);
                     }, 2000);
                 }

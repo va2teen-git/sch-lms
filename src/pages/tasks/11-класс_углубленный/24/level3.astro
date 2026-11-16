@@ -275,6 +275,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     currentWaveIdx: 0,
                     phaseTimeLeft: 10.0,
                     timerInterval: null,
+                    resetTimeout: null,
+                    telemetry: null,
+                    keydownHandler: null,
                     sessionStartTime: Date.now(),
                     attempts: 0,
                     failMessage: '',
@@ -286,16 +289,39 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     return WAVE_CONFIGS[this.currentWaveIdx] || WAVE_CONFIGS[0];
                 },
                 formattedSessionTime() {
-                    const elapsed = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+                    const elapsed = this.telemetry
+                        ? this.telemetry.getTimeSpentSec()
+                        : Math.floor((Date.now() - this.sessionStartTime) / 1000);
                     const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
                     const secs = String(elapsed % 60).padStart(2, '0');
                     return `${mins}:${secs}`;
                 }
             },
             mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 3)',
+                    level: 3,
+                    totalWaves: this.totalPhases,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        if (this.timerInterval) clearInterval(this.timerInterval);
+                        if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                        this.failMessage = '';
+                        this.gameState = 'playing';
+                    },
+                    onAfkRetry: () => {
+                        this.failMessage = '';
+                        this.currentWaveIdx = 0;
+                        this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalPhases);
+                        }
+                        this.startWave();
+                    }
+                });
                 // Глобальный перехват горячих клавиш клавиатуры 1, 2, 3
-                window.addEventListener('keydown', (e) => {
-                    if (this.gameState !== 'playing') return;
+                this.keydownHandler = (e) => {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
                     if (e.key === '1' || e.key === 'a' || e.key === 'A') {
                         this.handleDefenseAction('ALLOW');
                     } else if (e.key === '2' || e.key === 's' || e.key === 'S') {
@@ -303,20 +329,53 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     } else if (e.key === '3' || e.key === 'd' || e.key === 'D') {
                         this.handleDefenseAction('BLOCK');
                     }
-                });
+                };
+                window.addEventListener('keydown', this.keydownHandler);
+            },
+            beforeUnmount() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                if (this.keydownHandler) {
+                    window.removeEventListener('keydown', this.keydownHandler);
+                }
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
             },
             methods: {
                 startGame() {
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
                     this.currentWaveIdx = 0;
+                    this.attempts = 0;
+                    this.failMessage = '';
                     this.gameState = 'playing';
                     this.sessionStartTime = Date.now();
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalPhases,
+                            stage: 1,
+                            total_stages: this.totalPhases
+                        });
+                    }
                     this.startWave();
                 },
                 startWave() {
                     if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
                     this.phaseTimeLeft = this.currentWave.timeLimit;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(this.currentWaveIdx + 1, this.totalPhases);
+                    }
 
                     this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.phaseTimeLeft -= 0.1;
                         if (this.phaseTimeLeft <= 0.05) {
                             this.handleTimeout();
@@ -324,13 +383,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     }, 100);
                 },
                 handleDefenseAction(action) {
-                    if (this.gameState !== 'playing') return;
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
 
                     const expected = this.currentWave.correctAction;
                     if (action === expected) {
                         // Успех на волне
                         if (this.currentWaveIdx < WAVE_CONFIGS.length - 1) {
                             this.currentWaveIdx++;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(this.currentWaveIdx + 1);
+                            }
                             this.startWave();
                         } else {
                             this.handleVictory();
@@ -345,49 +407,51 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         } else {
                             errorDetail = `ОШИБКА КЛАССИФИКАЦИИ ШЛЮЗА: ${this.currentWave.explanation}`;
                         }
-                        this.triggerHardcoreFailure(errorDetail);
+                        this.triggerHardcoreFailure(errorDetail, false);
                     }
                 },
                 handleTimeout() {
                     if (this.timerInterval) clearInterval(this.timerInterval);
-                    this.triggerHardcoreFailure('ТАЙМ-АУТ ШЛЮЗА: Время вышло! Процесс успел проникнуть в защищенную память ядра!');
+                    this.triggerHardcoreFailure('ТАЙМ-АУТ ШЛЮЗА: Время вышло! Процесс успел проникнуть в защищенную память ядра!', true);
                 },
-                triggerHardcoreFailure(msg) {
+                triggerHardcoreFailure(msg, isTimeout = false) {
                     if (this.timerInterval) clearInterval(this.timerInterval);
-                    this.attempts++;
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentWaveIdx + 1,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.failMessage = '';
+                            this.gameState = 'playing';
+                            return;
+                        }
+                    } else {
+                        this.attempts++;
+                    }
                     this.failMessage = msg;
                     this.gameState = 'failed';
 
-                    // Отправка сигнала телеметрии hardcore_reset
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 3)',
-                        action_type: 'hardcore_reset'
-                    }, '*');
-
                     // Автоматический тотальный сброс на шаг 1 через 1.6 сек
-                    setTimeout(() => {
+                    this.resetTimeout = setTimeout(() => {
+                        if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                         this.currentWaveIdx = 0;
                         this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalPhases);
+                        }
                         this.startWave();
                     }, 1600);
                 },
                 handleVictory() {
                     if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
                     this.gameState = 'success';
-                    const elapsedSec = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-
-                    // Телеметрия: успешное прохождение уровня 3
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 3)',
-                        action_type: 'level_complete',
-                        status: 'completed',
-                        start_time: new Date(this.sessionStartTime).toISOString(),
-                        time_spent_sec: elapsedSec,
-                        attempts_count: this.attempts,
-                        success: true
-                    }, '*');
+                    if (this.telemetry) {
+                        this.telemetry.complete({ wave: this.totalPhases });
+                    }
                 }
             }
         }).mount('#app');
