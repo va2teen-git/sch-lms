@@ -1,0 +1,267 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 6 :: Контрольная работа: Глобальная сеть :: Уровень 1';
+---
+
+<TaskLayout title="Уровень 1 — Глобальная сеть" level={1} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-success pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-success text-uppercase fw-bold">Терминал // Уровень 1: Коммутация связей</h2>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-black border border-success text-success rounded-0 fs-6 px-3 py-2">ФАЗА: <span id="phase-indicator">1 / 3</span></span>
+                <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">Сбои: <span id="errors-indicator">0</span></span>
+            </div>
+        </div>
+
+        <p class="text-light small mb-3">
+            Выберите термин в левой колонке и кликните соответствующее определение в правой колонке, чтобы протянуть линию связи.
+        </p>
+
+        <div id="status-banner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <div class="position-relative border border-success bg-black p-3" id="game-area">
+            <svg id="lines-svg" class="position-absolute top-0 start-0 w-100 h-100" style="pointer-events: none; z-index: 0;"></svg>
+
+            <div class="row g-2 position-relative align-items-stretch" style="z-index: 1;">
+                <div class="col-5 d-flex flex-column justify-content-center gap-2" id="left-col"></div>
+                <div class="col-2"></div>
+                <div class="col-5 d-flex flex-column justify-content-center gap-2" id="right-col"></div>
+            </div>
+        </div>
+
+        <div id="victory-box" class="alert alert-success bg-success text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">Доступ Разрешен</h3>
+            <p class="mb-0 fw-semibold">Анализ данных завершён. Все связи установлены верно.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const DB = [
+                { term: 'Фишинг', def: 'Выуживание конфиденциальных данных с помощью поддельных сайтов' },
+                { term: 'Спам', def: 'Массовая рассылка нежелательных рекламных сообщений' },
+                { term: 'Брандмауэр', def: 'Устройство или программа для защиты сети от несанкционированного доступа' },
+                { term: 'Антивирус', def: 'Программа для обнаружения и безопасного удаления вредоносного ПО' },
+                { term: 'HTTP', def: 'Базовый протокол передачи гипертекста (без встроенного шифрования)' },
+                { term: 'HTTPS', def: 'Протокол передачи гипертекста, поддерживающий защищённое шифрование' },
+                { term: 'IP-адрес', def: 'Уникальный сетевой адрес узла в компьютерной сети' },
+                { term: 'Провайдер', def: 'Организация, предоставляющая доступ к услугам интернета' },
+                { term: 'Браузер', def: 'Специальная программа для просмотра веб-страниц' },
+                { term: 'URL', def: 'Единый указатель ресурса (стандартный адрес сайта в сети)' },
+                { term: 'Троян', def: 'Вредоносная программа, маскирующаяся под легитимное и полезное ПО' },
+                { term: 'DDoS-атака', def: 'Атака на систему с целью довести её до отказа путём перегрузки запросами' },
+                { term: 'Доменное имя', def: 'Удобное символьное имя для идентификации узлов в интернете' },
+                { term: 'Кибербуллинг', def: 'Систематическая травля и оскорбления пользователя в интернете' },
+                { term: 'Цифровой след', def: 'Совокупность информации о пользователе, оставляемой им в сети' },
+                { term: 'Куки (Cookies)', def: 'Фрагменты данных, отправленные веб-сервером и хранимые в браузере' },
+                { term: '2FA (Двухфакторная)', def: 'Метод защиты аккаунта двумя разными способами подтверждения' },
+                { term: 'VPN', def: 'Технология создания защищённого зашифрованного подключения к другой сети' },
+                { term: 'Malware', def: 'Любое программное обеспечение, созданное для нанесения вреда' },
+                { term: 'SSL/TLS', def: 'Криптографические протоколы для безопасной связи в интернете' }
+            ];
+
+            const TOTAL_PHASES = 3;
+            const PAIRS_PER_PHASE = 4;
+
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: TOTAL_PHASES
+            });
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let activeLeft = null;
+            let activeRight = null;
+            let matchedPairs = 0;
+            let matchedNodes = [];
+            let locked = false;
+            const actionLog = [];
+
+            const leftColEl = document.getElementById('left-col');
+            const rightColEl = document.getElementById('right-col');
+            const svgEl = document.getElementById('lines-svg');
+            const gameAreaEl = document.getElementById('game-area');
+            const phaseIndicatorEl = document.getElementById('phase-indicator');
+            const errorsIndicatorEl = document.getElementById('errors-indicator');
+            const statusBannerEl = document.getElementById('status-banner');
+            const victoryBoxEl = document.getElementById('victory-box');
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-success bg-success text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.textContent = '';
+            }
+
+            function resetBtnState(btn) {
+                btn.className = 'btn border border-success text-success bg-dark rounded-0 text-start p-2 p-sm-3 w-100 shadow-none';
+                btn.style.minHeight = '48px';
+            }
+
+            function setActiveBtnState(btn) {
+                btn.className = 'btn border border-success bg-success text-dark fw-bold rounded-0 text-start p-2 p-sm-3 w-100 shadow-none';
+                btn.style.minHeight = '48px';
+            }
+
+            function setMatchedBtnState(btn) {
+                btn.className = 'btn border border-secondary text-light opacity-50 bg-dark rounded-0 text-start p-2 p-sm-3 w-100 shadow-none disabled';
+                btn.style.minHeight = '48px';
+            }
+
+            function setErrorBtnState(btn) {
+                btn.className = 'btn border border-danger bg-danger text-white rounded-0 text-start p-2 p-sm-3 w-100 shadow-none disabled';
+                btn.style.minHeight = '48px';
+            }
+
+            function drawLine(elem1, elem2, color) {
+                const container = gameAreaEl.getBoundingClientRect();
+                const rect1 = elem1.getBoundingClientRect();
+                const rect2 = elem2.getBoundingClientRect();
+
+                const x1 = rect1.right - container.left;
+                const y1 = rect1.top + rect1.height / 2 - container.top;
+                const x2 = rect2.left - container.left;
+                const y2 = rect2.top + rect2.height / 2 - container.top;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', String(x1));
+                line.setAttribute('y1', String(y1));
+                line.setAttribute('x2', String(x2));
+                line.setAttribute('y2', String(y2));
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', '3');
+                svgEl.appendChild(line);
+            }
+
+            function renderColumn(container, items, side) {
+                container.innerHTML = '';
+                items.forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    resetBtnState(btn);
+                    btn.dataset.id = item.id;
+                    btn.dataset.side = side;
+                    btn.style.wordBreak = 'break-word';
+                    const span = document.createElement('span');
+                    span.style.pointerEvents = 'none';
+                    span.textContent = item.text;
+                    btn.appendChild(span);
+                    container.appendChild(btn);
+                });
+            }
+
+            function generatePhase() {
+                locked = false;
+                matchedPairs = 0;
+                activeLeft = null;
+                activeRight = null;
+                matchedNodes = [];
+                svgEl.innerHTML = '';
+                hideBanner();
+
+                const currentPairs = shuffle(DB).slice(0, PAIRS_PER_PHASE);
+                const terms = shuffle(currentPairs.map(p => ({ id: p.term, text: p.term })));
+                const defs = shuffle(currentPairs.map(p => ({ id: p.term, text: p.def })));
+
+                renderColumn(leftColEl, terms, 'left');
+                renderColumn(rightColEl, defs, 'right');
+                phaseIndicatorEl.textContent = `${currentPhase} / ${TOTAL_PHASES}`;
+            }
+
+            function checkMatch() {
+                const isMatch = activeLeft.dataset.id === activeRight.dataset.id;
+                if (isMatch) {
+                    matchedNodes.push({ l: activeLeft, r: activeRight });
+                    drawLine(activeLeft, activeRight, '#198754');
+                    setMatchedBtnState(activeLeft);
+                    setMatchedBtnState(activeRight);
+                    actionLog.push({ time: new Date().toISOString(), action: `match_${activeLeft.dataset.id}` });
+
+                    activeLeft = null;
+                    activeRight = null;
+                    matchedPairs += 1;
+
+                    if (matchedPairs === PAIRS_PER_PHASE) {
+                        locked = true;
+                        setTimeout(() => {
+                            if (currentPhase >= TOTAL_PHASES) {
+                                gameAreaEl.classList.add('d-none');
+                                victoryBoxEl.classList.remove('d-none');
+                                hideBanner();
+                                telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                            } else {
+                                currentPhase += 1;
+                                telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                                generatePhase();
+                            }
+                        }, 700);
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsIndicatorEl.textContent = String(errorsCount);
+                    setErrorBtnState(activeLeft);
+                    setErrorBtnState(activeRight);
+                    drawLine(activeLeft, activeRight, '#dc3545');
+                    actionLog.push({ time: new Date().toISOString(), action: `mismatch_phase_${currentPhase}` });
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    showBanner('Ошибка коммутации! Перегенерация фазы...', true);
+
+                    gameAreaEl.querySelectorAll('button').forEach(b => b.classList.add('disabled'));
+                    setTimeout(() => {
+                        generatePhase();
+                    }, 1200);
+                }
+            }
+
+            function handleColumnClick(e) {
+                if (locked) return;
+                const btn = e.target.closest('button[data-id]');
+                if (!btn || btn.classList.contains('disabled')) return;
+
+                const side = btn.dataset.side;
+                if (side === 'left') {
+                    if (activeLeft) resetBtnState(activeLeft);
+                    activeLeft = btn;
+                    setActiveBtnState(activeLeft);
+                } else {
+                    if (activeRight) resetBtnState(activeRight);
+                    activeRight = btn;
+                    setActiveBtnState(activeRight);
+                }
+
+                if (activeLeft && activeRight) {
+                    checkMatch();
+                }
+            }
+
+            // Event listeners attached strictly ONCE
+            leftColEl.addEventListener('click', handleColumnClick);
+            rightColEl.addEventListener('click', handleColumnClick);
+            window.addEventListener('resize', () => {
+                svgEl.innerHTML = '';
+                matchedNodes.forEach(pair => {
+                    drawLine(pair.l, pair.r, '#198754');
+                });
+            });
+
+            generatePhase();
+        })();
+    </script>
+</TaskLayout>

@@ -1,0 +1,323 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 4 :: Файлы и папки :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Кибер-защита ФС" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex flex-column p-3 p-md-4 border border-danger rounded-0" :class="errorFlash ? 'bg-danger bg-opacity-25' : 'bg-black'">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-danger pb-2 flex-wrap gap-2">
+                <h2 class="h4 m-0 fw-bold text-danger">ТЕРМИНАЛ // УРОВЕНЬ 3 (АРКАДА)</h2>
+                <div class="d-flex align-items-center gap-2" v-if="started && !gameWon">
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ВОЛНА: <span v-text="wave"></span> / <span v-text="maxWaves"></span>
+                    </span>
+                    <span class="badge rounded-0 fs-6 px-3 py-2" :class="waveTimeLeft <= 4 ? 'bg-danger text-white' : 'bg-dark border border-danger text-warning'">
+                        ТАЙМЕР: <span v-text="waveTimeLeft"></span> с
+                    </span>
+                </div>
+            </div>
+
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" class="text-center py-4 mx-auto" style="max-width: 640px;">
+                <h1 class="h2 text-danger fw-bold mb-3 text-uppercase">ВНИМАНИЕ: ВИРУСНАЯ АТАКА НА ФС</h1>
+                <p class="fs-5 text-light text-start lh-base">
+                    Файловая система атакована шифровальщиком. Вам предстоит пройти <strong class="text-white">10 волн</strong> сканирования:
+                    находить и изолировать повреждённые пути Windows, подменённые расширения файлов и противоречивые записи в журнале операций.
+                </p>
+                <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 text-start mb-4">
+                    <strong class="text-danger">ХАРДКОР-ПРАВИЛО:</strong> На каждую волну отводится динамический таймер (от 12 до 7 сек). Любая ошибка или истечение времени сбрасывает прогресс на Волну 1.
+                </div>
+                <button type="button" id="start-btn" class="btn btn-danger rounded-0 fs-4 fw-bold px-5 py-3 text-white text-uppercase" style="min-height: 56px;" @click="startGame">
+                    [ ИНИЦИАЛИЗАЦИЯ ЗАЩИТЫ ]
+                </button>
+            </div>
+
+            <!-- Active wave -->
+            <div v-if="started && !gameWon" class="w-100 mx-auto" style="max-width: 820px;">
+                <div class="progress rounded-0 bg-dark mb-3 border border-danger" style="height: 20px;">
+                    <div class="progress-bar bg-danger" role="progressbar" :style="{ width: ((wave / maxWaves) * 100) + '%' }"></div>
+                </div>
+
+                <div class="card bg-dark border-danger rounded-0 mb-3">
+                    <div class="card-body p-3">
+                        <div class="text-warning small fw-bold text-uppercase mb-1" v-text="currentChallenge.category"></div>
+                        <div class="fs-5 text-white fw-bold" v-text="currentChallenge.prompt"></div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column gap-2">
+                    <button
+                        v-for="(node, idx) in currentChallenge.nodes"
+                        :key="idx"
+                        type="button"
+                        class="btn btn-outline-danger rounded-0 text-start p-3 d-flex justify-content-between align-items-center gap-2 text-light"
+                        style="min-height: 52px;"
+                        @click="handleNodeClick(idx)"
+                    >
+                        <span class="font-monospace fs-6 text-wrap" style="word-break: break-word;">
+                            <span class="badge bg-danger text-white rounded-0 me-2" v-text="idx + 1"></span>
+                            <span v-text="node.label"></span>
+                        </span>
+                        <span class="badge bg-black border border-danger text-danger rounded-0 shrink-0" v-text="node.tag"></span>
+                    </button>
+                </div>
+                <div class="text-light opacity-75 small mt-2">
+                    Управление: кликните по аномальной строке или нажмите клавишу <kbd class="bg-dark border border-secondary">1</kbd>–<kbd class="bg-dark border border-secondary">4</kbd>.
+                </div>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" class="text-center py-4">
+                <div class="alert alert-danger rounded-0 border border-danger bg-danger text-white fw-bold fs-3 text-center py-5">
+                    СИСТЕМА ЗАЩИЩЕНА.<br>ВИРУС УНИЧТОЖЕН.<br>УРОК УСПЕШНО ЗАВЕРШЕН.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+            const MAX_WAVES = 10;
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const maxWaves = MAX_WAVES;
+                    const waveTimeLeft = ref(12);
+                    const errorFlash = ref(false);
+                    const currentChallenge = ref({ category: '', prompt: '', nodes: [], anomalyIndex: 0 });
+                    const actionLog = [];
+
+                    let waveTimerId = null;
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: MAX_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(waveTimerId);
+                            waveTimerId = null;
+                        },
+                        onAfkRetry: () => {
+                            startWave(1);
+                        }
+                    });
+
+                    function pick(arr) {
+                        return arr[Math.floor(Math.random() * arr.length)];
+                    }
+
+                    function shuffle(arr) {
+                        const copy = [...arr];
+                        for (let i = copy.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [copy[i], copy[j]] = [copy[j], copy[i]];
+                        }
+                        return copy;
+                    }
+
+                    function getWaveDuration(w) {
+                        return Math.max(7, 13 - Math.floor((w - 1) / 2));
+                    }
+
+                    function buildWaveChallenge(w) {
+                        const mode = w <= 3 ? 'path' : (w <= 6 ? 'spoof' : 'log');
+
+                        if (mode === 'path') {
+                            const disks = ['C:', 'D:', 'E:', 'F:'];
+                            const folders = ['Users', 'Windows', 'Projects', 'Games', 'Docs', 'System32'];
+                            const files = ['report.docx', 'driver.sys', 'notes.txt', 'photo.png', 'index.html'];
+
+                            const validItems = [];
+                            for (let i = 0; i < 3; i++) {
+                                validItems.push({
+                                    label: `${pick(disks)}\\${pick(folders)}\\${pick(folders)}\\${pick(files)}`,
+                                    tag: 'WINDOWS PATH',
+                                    isAnomaly: false
+                                });
+                            }
+                            const badFolder1 = pick(folders);
+                            const badFolder2 = pick(folders);
+                            const badFile = pick(files);
+                            const badDisk = pick(disks);
+                            const badVariants = [
+                                `${badDisk}/${badFolder1}/${badFolder2}/${badFile}`,
+                                `${badDisk}\\${badFolder1}/${badFile}`,
+                                `${badDisk[0]}\\${badFolder1}\\${badFile}`
+                            ];
+                            const anomaly = {
+                                label: pick(badVariants),
+                                tag: 'WINDOWS PATH',
+                                isAnomaly: true
+                            };
+                            const nodes = shuffle([...validItems, anomaly]);
+                            return {
+                                category: 'СКАНЕР СИНТАКСИСА ПУТЕЙ (WINDOWS)',
+                                prompt: 'Обнаружен сбойный маршрут! Выберите строку с нарушением синтаксиса пути Windows:',
+                                nodes,
+                                anomalyIndex: nodes.findIndex(n => n.isAnomaly)
+                            };
+                        }
+
+                        if (mode === 'spoof') {
+                            const pairs = [
+                                { type: 'Текстовый документ', ok: ['otchet.docx', 'readme.txt', 'essay.rtf'], bad: ['readme.exe', 'doc.mp3', 'notes.avi'] },
+                                { type: 'Графический файл', ok: ['logo.png', 'photo.jpg', 'icon.bmp'], bad: ['image.exe', 'scan.txt', 'pic.wav'] },
+                                { type: 'Звуковой файл', ok: ['track.mp3', 'voice.wav'], bad: ['song.exe', 'audio.docx'] },
+                                { type: 'Видеофайл', ok: ['clip.mp4', 'movie.avi'], bad: ['film.txt', 'video.exe'] }
+                            ];
+                            const shuffledTypes = shuffle(pairs);
+                            const validNodes = shuffledTypes.slice(0, 3).map(p => ({
+                                label: `${p.type} → ${pick(p.ok)}`,
+                                tag: 'РЕЕСТР ТИПОВ',
+                                isAnomaly: false
+                            }));
+                            const spoofPair = shuffledTypes[3];
+                            const badNode = {
+                                label: `${spoofPair.type} → ${pick(spoofPair.bad)}`,
+                                tag: 'РЕЕСТР ТИПОВ',
+                                isAnomaly: true
+                            };
+                            const nodes = shuffle([...validNodes, badNode]);
+                            return {
+                                category: 'ДЕТЕКТОР ПОДМЕНЫ РАСШИРЕНИЙ',
+                                prompt: 'Вирус подменил расширение одного из файлов! Изолируйте несоответствующую запись:',
+                                nodes,
+                                anomalyIndex: nodes.findIndex(n => n.isAnomaly)
+                            };
+                        }
+
+                        const validLogs = [
+                            { label: 'ДО: [A: file.txt, B: —] → ПОСЛЕ: [A: file.txt, B: file.txt] | ЛОГ: КОПИРОВАНИЕ', tag: 'АУДИТ ФС', isAnomaly: false },
+                            { label: 'ДО: [A: data.dat, B: —] → ПОСЛЕ: [A: —, B: data.dat] | ЛОГ: ПЕРЕМЕЩЕНИЕ', tag: 'АУДИТ ФС', isAnomaly: false },
+                            { label: 'ДО: [A: old.txt] → ПОСЛЕ: [A: new.txt] | ЛОГ: ПЕРЕИМЕНОВАНИЕ', tag: 'АУДИТ ФС', isAnomaly: false },
+                            { label: 'ДО: [A: temp.log] → ПОСЛЕ: [Корзина: temp.log] | ЛОГ: УДАЛЕНИЕ', tag: 'АУДИТ ФС', isAnomaly: false }
+                        ];
+                        const brokenLogs = [
+                            { label: 'ДО: [A: key.txt, B: —] → ПОСЛЕ: [A: key.txt, B: key.txt] | ЛОГ: ПЕРЕМЕЩЕНИЕ', tag: 'АУДИТ ФС', isAnomaly: true },
+                            { label: 'ДО: [A: doc.rtf, B: —] → ПОСЛЕ: [A: —, B: doc.rtf] | ЛОГ: КОПИРОВАНИЕ', tag: 'АУДИТ ФС', isAnomaly: true },
+                            { label: 'ДО: [A: img.png, B: —] → ПОСЛЕ: [A: —, B: img.png] | ЛОГ: ПЕРЕИМЕНОВАНИЕ', tag: 'АУДИТ ФС', isAnomaly: true }
+                        ];
+                        const nodes = shuffle([...shuffle(validLogs).slice(0, 3), pick(brokenLogs)]);
+                        return {
+                            category: 'АУДИТ ЖУРНАЛА ФАЙЛОВЫХ ОПЕРАЦИЙ',
+                            prompt: 'Найдите фальсифицированную запись лога, где операция противоречит состоянию папок:',
+                            nodes,
+                            anomalyIndex: nodes.findIndex(n => n.isAnomaly)
+                        };
+                    }
+
+                    function startWave(targetWave) {
+                        clearInterval(waveTimerId);
+                        wave.value = targetWave;
+                        telemetry.setWave(targetWave, MAX_WAVES);
+                        currentChallenge.value = buildWaveChallenge(targetWave);
+                        waveTimeLeft.value = getWaveDuration(targetWave);
+
+                        waveTimerId = setInterval(() => {
+                            if (!started.value || gameWon.value) return;
+                            waveTimeLeft.value -= 1;
+                            if (waveTimeLeft.value <= 0) {
+                                triggerReset('Таймер волны истёк', true);
+                            }
+                        }, 1000);
+                    }
+
+                    function startGame() {
+                        started.value = true;
+                        gameWon.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: MAX_WAVES, stage: 1, total_stages: MAX_WAVES });
+                        startWave(1);
+                    }
+
+                    function triggerReset(reason, isTimeout) {
+                        clearInterval(waveTimerId);
+                        waveTimerId = null;
+                        errorFlash.value = true;
+                        setTimeout(() => { errorFlash.value = false; }, 300);
+
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_reset_${reason}` });
+                        const sent = telemetry.fail({
+                            wave: wave.value,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            // AFK pause triggered by LMSTelemetry; wait for user click on "Повторить"
+                            return;
+                        }
+
+                        setTimeout(() => {
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                startWave(1);
+                            }
+                        }, 500);
+                    }
+
+                    function handleNodeClick(idx) {
+                        if (!started.value || gameWon.value || telemetry.getState().isAfkPaused) return;
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_pick_${idx}` });
+
+                        if (idx === currentChallenge.value.anomalyIndex) {
+                            if (wave.value >= MAX_WAVES) {
+                                clearInterval(waveTimerId);
+                                gameWon.value = true;
+                                telemetry.complete({ wave: MAX_WAVES, action_log: actionLog });
+                            } else {
+                                const nextWave = wave.value + 1;
+                                telemetry.advanceWave(nextWave, { action_log: actionLog });
+                                startWave(nextWave);
+                            }
+                        } else {
+                            triggerReset('Неверная нода', false);
+                        }
+                    }
+
+                    function onKeyDown(e) {
+                        if (!started.value || gameWon.value || telemetry.getState().isAfkPaused) return;
+                        if (['1', '2', '3', '4'].includes(e.key)) {
+                            const idx = Number(e.key) - 1;
+                            if (idx < currentChallenge.value.nodes.length) {
+                                handleNodeClick(idx);
+                            }
+                        }
+                    }
+
+                    onMounted(() => {
+                        window.addEventListener('keydown', onKeyDown);
+                    });
+
+                    onUnmounted(() => {
+                        clearInterval(waveTimerId);
+                        window.removeEventListener('keydown', onKeyDown);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        maxWaves,
+                        waveTimeLeft,
+                        errorFlash,
+                        currentChallenge,
+                        startGame,
+                        handleNodeClick
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>

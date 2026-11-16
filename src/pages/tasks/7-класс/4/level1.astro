@@ -1,0 +1,387 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 4 :: Файлы и папки :: Уровень 1';
+---
+
+<TaskLayout title="Уровень 1 — Файлы и папки" level={1} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-success pb-2 flex-wrap gap-2">
+            <h2 class="h4 m-0 fw-bold text-success">ТЕРМИНАЛ // УРОВЕНЬ 1</h2>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-black border border-success text-success rounded-0 fs-6 px-3 py-2" id="phase-title">ФАЗА 1 / 3</span>
+                <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">Сбои: <span id="errors-count">0</span></span>
+            </div>
+        </div>
+
+        <div class="card bg-black border-success rounded-0 mb-3">
+            <div class="card-body p-3 p-md-4">
+                <h3 class="h5 text-uppercase text-success fw-bold mb-2" id="task-heading">&gt;&gt; Загрузка...</h3>
+                <p class="text-light mb-0" id="task-desc"></p>
+            </div>
+        </div>
+
+        <div id="status-banner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <div class="row g-3" id="workspace-grid">
+            <div class="col-12 col-md-5">
+                <div class="card bg-dark border-success rounded-0 h-100">
+                    <div class="card-header border-success text-success fw-bold text-uppercase small">
+                        Палитра элементов (кликните для выбора)
+                    </div>
+                    <div class="card-body p-3 d-flex flex-column gap-2" id="palette-container"></div>
+                </div>
+            </div>
+            <div class="col-12 col-md-7">
+                <div class="card bg-dark border-success rounded-0 h-100">
+                    <div class="card-header border-success text-success fw-bold text-uppercase small">
+                        Рабочие слоты (кликните слот для размещения)
+                    </div>
+                    <div class="card-body p-3 d-flex flex-column gap-2" id="slots-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="button" id="reset-slots-btn" class="btn btn-outline-secondary rounded-0 fw-bold px-4 py-2" style="min-height: 48px;">
+                СБРОСИТЬ СЛОТЫ
+            </button>
+            <button type="button" id="check-btn" class="btn btn-success rounded-0 fw-bold px-4 py-2 text-dark" style="min-height: 48px;" disabled>
+                ПРОВЕРИТЬ СБОРКУ
+            </button>
+        </div>
+
+        <div id="victory-box" class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold fs-4 text-center py-5 mt-3 d-none">
+            ВЗЛОМ УСПЕШЕН.<br>СИСТЕМА ФАЙЛОВ И ПАПОК ОСВОЕНА.
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 3;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: TOTAL_PHASES
+            });
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let selectedTokenId = null;
+            let locked = false;
+            let tokens = [];
+            let slots = [];
+            let actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phase-title');
+            const errorsCountEl = document.getElementById('errors-count');
+            const headingEl = document.getElementById('task-heading');
+            const descEl = document.getElementById('task-desc');
+            const statusBannerEl = document.getElementById('status-banner');
+            const paletteEl = document.getElementById('palette-container');
+            const slotsEl = document.getElementById('slots-container');
+            const checkBtn = document.getElementById('check-btn');
+            const resetSlotsBtn = document.getElementById('reset-slots-btn');
+            const workspaceGrid = document.getElementById('workspace-grid');
+            const victoryBox = document.getElementById('victory-box');
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function logAction(action) {
+                actionLog.push({ time: new Date().toISOString(), action: action });
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.className = 'alert rounded-0 border-0 fw-bold d-none mb-3';
+                statusBannerEl.textContent = '';
+            }
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-success bg-success text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function buildPhase1() {
+                const bank = [
+                    { type: 'Текстовый документ', exts: ['.txt', '.docx', '.rtf'], distractor: '.mp3' },
+                    { type: 'Графический файл', exts: ['.png', '.jpg', '.bmp'], distractor: '.exe' },
+                    { type: 'Звуковой файл', exts: ['.mp3', '.wav'], distractor: '.docx' },
+                    { type: 'Видеофайл', exts: ['.mp4', '.avi'], distractor: '.txt' },
+                    { type: 'Исполняемая программа', exts: ['.exe'], distractor: '.jpg' }
+                ];
+                const picked = shuffle(bank).slice(0, 3);
+                const unused = bank.filter(b => !picked.includes(b));
+                const distractorPool = unused.length ? unused : bank;
+                const distractorItem = distractorPool[Math.floor(Math.random() * distractorPool.length)];
+                const distractorExt = distractorItem.exts[0];
+
+                headingEl.textContent = '>> Фаза 1: Идентификация расширений';
+                descEl.textContent = 'Выберите расширение в палитре слева и разместите его в слот соответствующего типа данных (один токен лишний).';
+
+                const rawTokens = picked.map((item, idx) => {
+                    const ext = item.exts[Math.floor(Math.random() * item.exts.length)];
+                    return { id: `t1_${idx}`, label: ext, expectedKey: item.type, usedInSlot: null };
+                });
+                const usedLabels = new Set(rawTokens.map(t => t.label));
+                let extraExt = distractorExt;
+                if (usedLabels.has(extraExt)) extraExt = '.sys';
+                rawTokens.push({ id: 't1_dist', label: extraExt, expectedKey: '__NONE__', usedInSlot: null });
+
+                tokens = shuffle(rawTokens);
+                slots = picked.map((item, idx) => ({
+                    id: `s1_${idx}`,
+                    title: item.type,
+                    acceptKey: item.type,
+                    placedTokenId: null
+                }));
+            }
+
+            function buildPhase2() {
+                const disks = ['C:', 'D:', 'E:', 'F:'];
+                const disk = disks[Math.floor(Math.random() * disks.length)];
+                const folderSets = [
+                    ['Users', 'Student', 'Documents'],
+                    ['Games', 'Steam', 'apps'],
+                    ['Work', 'Projects', 'School'],
+                    ['Photos', '2025', 'Summer']
+                ];
+                const folders = folderSets[Math.floor(Math.random() * folderSets.length)];
+                const files = ['report.docx', 'game.exe', 'config.sys', 'vacation.jpg', 'homework.txt'];
+                const file = files[Math.floor(Math.random() * files.length)];
+                const distractors = ['Backup', 'Temp', 'D:', 'System', 'archive.zip'].filter(
+                    d => d !== disk && !folders.includes(d) && d !== file
+                );
+                const extraToken = distractors[Math.floor(Math.random() * distractors.length)];
+
+                headingEl.textContent = '>> Фаза 2: Сборка полного имени файла (Windows)';
+                descEl.textContent = `Файл «${file}» лежит в папке «${folders[folders.length - 1]}». Иерархия: Диск ${disk} → ${folders.join(' → ')}. Расставьте токены пути по порядку (слева направо / сверху вниз).`;
+
+                const sequence = [disk, ...folders, file];
+                const rawTokens = sequence.map((part, idx) => ({
+                    id: `t2_${idx}`,
+                    label: part,
+                    expectedKey: part,
+                    usedInSlot: null
+                }));
+                rawTokens.push({
+                    id: 't2_dist',
+                    label: extraToken,
+                    expectedKey: '__NONE__',
+                    usedInSlot: null
+                });
+
+                tokens = shuffle(rawTokens);
+                slots = sequence.map((part, idx) => ({
+                    id: `s2_${idx}`,
+                    title: idx === 0 ? '1. Корневой диск' : (idx === sequence.length - 1 ? `${idx + 1}. Имя файла` : `${idx + 1}. Папка уровня ${idx}`),
+                    acceptKey: part,
+                    placedTokenId: null
+                }));
+            }
+
+            function buildPhase3() {
+                const ops = [
+                    { op: 'Копирование', desc: 'Создана точная копия файла в другой папке; оригинал остался на месте' },
+                    { op: 'Перемещение', desc: 'Файл появился в новом каталоге и исчез из исходной папки' },
+                    { op: 'Переименование', desc: 'Изменено имя файла без смены папки на диске' },
+                    { op: 'Удаление', desc: 'Файл отправлен в «Корзину» и убран из каталога' },
+                    { op: 'Создание', desc: 'На диске появился новый пустой файл или папка' }
+                ];
+                const picked = shuffle(ops).slice(0, 3);
+                const unused = ops.filter(o => !picked.includes(o));
+                const distractor = unused[0];
+
+                headingEl.textContent = '>> Фаза 3: Классификация файловых операций';
+                descEl.textContent = 'Сопоставьте каждую операцию из палитры с её описанием в журнале ОС.';
+
+                const rawTokens = picked.map((item, idx) => ({
+                    id: `t3_${idx}`,
+                    label: item.op,
+                    expectedKey: item.op,
+                    usedInSlot: null
+                }));
+                rawTokens.push({
+                    id: 't3_dist',
+                    label: distractor.op,
+                    expectedKey: '__NONE__',
+                    usedInSlot: null
+                });
+
+                tokens = shuffle(rawTokens);
+                slots = picked.map((item, idx) => ({
+                    id: `s3_${idx}`,
+                    title: item.desc,
+                    acceptKey: item.op,
+                    placedTokenId: null
+                }));
+            }
+
+            function render() {
+                phaseTitleEl.textContent = `ФАЗА ${currentPhase} / ${TOTAL_PHASES}`;
+                paletteEl.innerHTML = '';
+                slotsEl.innerHTML = '';
+
+                tokens.forEach(token => {
+                    if (token.usedInSlot) return;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.dataset.tokenId = token.id;
+                    const isSelected = selectedTokenId === token.id;
+                    btn.className = isSelected
+                        ? 'btn btn-success text-dark rounded-0 fw-bold text-start px-3 py-2 w-100'
+                        : 'btn btn-outline-success rounded-0 fw-bold text-start px-3 py-2 w-100';
+                    btn.style.minHeight = '48px';
+                    btn.textContent = token.label;
+                    paletteEl.appendChild(btn);
+                });
+
+                if (paletteEl.children.length === 0) {
+                    const emptyNote = document.createElement('div');
+                    emptyNote.className = 'text-light opacity-75 small py-2';
+                    emptyNote.textContent = 'Все токены распределены по слотам.';
+                    paletteEl.appendChild(emptyNote);
+                }
+
+                slots.forEach(slot => {
+                    const placed = slot.placedTokenId ? tokens.find(t => t.id === slot.placedTokenId) : null;
+                    const card = document.createElement('button');
+                    card.type = 'button';
+                    card.dataset.slotId = slot.id;
+                    card.className = placed
+                        ? 'btn btn-dark border border-success rounded-0 text-start p-3 w-100 d-flex justify-content-between align-items-center gap-2'
+                        : 'btn btn-black border border-secondary border-dashed rounded-0 text-start p-3 w-100 d-flex justify-content-between align-items-center gap-2';
+                    card.style.minHeight = '54px';
+
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'text-light small';
+                    labelSpan.style.pointerEvents = 'none';
+                    labelSpan.textContent = slot.title;
+
+                    const valSpan = document.createElement('span');
+                    valSpan.className = placed
+                        ? 'badge bg-success text-dark rounded-0 fs-6 px-3 py-2'
+                        : 'badge bg-secondary text-white rounded-0 px-2 py-1';
+                    valSpan.style.pointerEvents = 'none';
+                    valSpan.textContent = placed ? placed.label : 'Пусто';
+
+                    card.appendChild(labelSpan);
+                    card.appendChild(valSpan);
+                    slotsEl.appendChild(card);
+                });
+
+                const allFilled = slots.every(s => Boolean(s.placedTokenId));
+                checkBtn.disabled = !allFilled || locked;
+            }
+
+            function loadPhase(phaseNum) {
+                currentPhase = phaseNum;
+                selectedTokenId = null;
+                locked = false;
+                hideBanner();
+
+                if (currentPhase === 1) buildPhase1();
+                else if (currentPhase === 2) buildPhase2();
+                else if (currentPhase === 3) buildPhase3();
+
+                render();
+                logAction(`phase_${currentPhase}_loaded`);
+            }
+
+            function finishLevel() {
+                locked = true;
+                workspaceGrid.classList.add('d-none');
+                checkBtn.classList.add('d-none');
+                resetSlotsBtn.classList.add('d-none');
+                victoryBox.classList.remove('d-none');
+                hideBanner();
+                telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+            }
+
+            // Event listeners attached strictly ONCE via delegation
+            paletteEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const btn = e.target.closest('button[data-token-id]');
+                if (!btn) return;
+                const tid = btn.dataset.tokenId;
+                selectedTokenId = (selectedTokenId === tid) ? null : tid;
+                render();
+            });
+
+            slotsEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const btn = e.target.closest('button[data-slot-id]');
+                if (!btn) return;
+                const slot = slots.find(s => s.id === btn.dataset.slotId);
+                if (!slot) return;
+
+                if (selectedTokenId) {
+                    if (slot.placedTokenId) {
+                        const prev = tokens.find(t => t.id === slot.placedTokenId);
+                        if (prev) prev.usedInSlot = null;
+                    }
+                    const nextToken = tokens.find(t => t.id === selectedTokenId);
+                    if (nextToken) {
+                        nextToken.usedInSlot = slot.id;
+                        slot.placedTokenId = nextToken.id;
+                    }
+                    selectedTokenId = null;
+                } else if (slot.placedTokenId) {
+                    const prev = tokens.find(t => t.id === slot.placedTokenId);
+                    if (prev) prev.usedInSlot = null;
+                    slot.placedTokenId = null;
+                }
+                render();
+            });
+
+            resetSlotsBtn.addEventListener('click', () => {
+                if (locked) return;
+                tokens.forEach(t => { t.usedInSlot = null; });
+                slots.forEach(s => { s.placedTokenId = null; });
+                selectedTokenId = null;
+                hideBanner();
+                render();
+            });
+
+            checkBtn.addEventListener('click', () => {
+                if (locked) return;
+                const allCorrect = slots.every(s => {
+                    const tok = tokens.find(t => t.id === s.placedTokenId);
+                    return tok && tok.expectedKey === s.acceptKey;
+                });
+
+                if (allCorrect) {
+                    logAction(`phase_${currentPhase}_passed`);
+                    if (currentPhase < TOTAL_PHASES) {
+                        const nextPhase = currentPhase + 1;
+                        telemetry.advanceStage(nextPhase, { action_log: actionLog });
+                        showBanner('Верно! Переход к следующей фазе...', false);
+                        locked = true;
+                        setTimeout(() => loadPhase(nextPhase), 600);
+                    } else {
+                        finishLevel();
+                    }
+                } else {
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    logAction(`phase_${currentPhase}_error`);
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    showBanner('[!] ОШИБКА ДОСТУПА. Нарушена структура. Перегенерация задания...', true);
+                    locked = true;
+                    setTimeout(() => loadPhase(currentPhase), 1200);
+                }
+            });
+
+            loadPhase(1);
+        })();
+    </script>
+</TaskLayout>

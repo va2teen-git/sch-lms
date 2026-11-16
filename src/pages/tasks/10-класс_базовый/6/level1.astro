@@ -1,0 +1,323 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 6 :: Законодательство РФ :: Уровень 1';
+---
+
+<TaskLayout title="Уровень 1 — Лицензии ПО" level={1} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-success pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-success fw-bold text-uppercase" id="phaseTitle">Этап 1 из 3: Классификация</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-success mb-3" style="height: 12px;">
+            <div class="progress-bar bg-success" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="statusBanner" class="alert rounded-0 border-0 fw-bold d-none mb-3"></div>
+
+        <div class="card bg-dark border-success rounded-0" id="mainCard">
+            <div class="card-body p-3 p-md-4">
+                <p id="phaseDesc" class="text-light mb-3">
+                    Выберите факт о лицензии слева, затем кликните соответствующий классификатор справа.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2">
+                            БЛОК ДАННЫХ (Выберите элемент)
+                        </div>
+                        <div id="sourceList" class="d-flex flex-column gap-2"></div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="text-success small fw-bold text-uppercase border-bottom border-secondary pb-1 mb-2">
+                            КЛАССИФИКАТОР (Кликните для записи)
+                        </div>
+                        <div id="targetSlots" class="d-flex flex-column gap-2"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end gap-2">
+                    <button type="button" id="checkBtn" class="btn btn-success text-dark rounded-0 fw-bold px-4 py-2 w-100 text-uppercase" style="min-height: 48px;" disabled>
+                        Запустить верификацию
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="victoryBox" class="alert alert-success bg-success text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">СИСТЕМА ВЕРИФИЦИРОВАНА</h3>
+            <p class="fs-5 mb-0 fw-semibold">ДОСТУП РАЗРЕШЁН. Все типы лицензий классифицированы верно.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 3;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: TOTAL_PHASES
+            });
+
+            const dataBank = {
+                proprietary: [
+                    'Программа продаётся за деньги, исходный код закрыт.',
+                    'Исходный код является коммерческой тайной компании-разработчика.',
+                    'Примеры: Microsoft Office, Adobe Photoshop, AutoCAD.',
+                    'Вы не имеете права дизассемблировать или модифицировать код этой программы.',
+                    'Незаконное копирование может привести к штрафу до 5 млн рублей (ст. 1301 ГК РФ).',
+                    'Лицензионное соглашение (EULA) строго ограничивает количество компьютеров для установки.'
+                ],
+                shareware: [
+                    'Бесплатный пробный период (trial), после которого нужно купить лицензию.',
+                    'Программа работает бесплатно, но часть функций заблокирована до оплаты.',
+                    'Пример: WinRAR, который просит купить лицензию после 40 дней.',
+                    'Пользователь обязан удалить программу или купить ключ после окончания тестового периода.',
+                    'Разработчик разрешает бесплатно делиться копиями, но только для ознакомления.'
+                ],
+                freeware: [
+                    'Программа бесплатна, но исходный код закрыт. Её нельзя продавать.',
+                    'Разработчик не берёт денег, но запрещает изменять код программы.',
+                    'Примеры: браузеры (Google Chrome, Яндекс Браузер), бесплатные антивирусы.',
+                    'Вы можете использовать ПО бесконечно долго без оплаты, но не имеете доступа к коду.',
+                    'Программу можно свободно копировать, но нельзя продавать от своего имени.'
+                ],
+                opensource: [
+                    'Бесплатно, код открыт. Можно изменять и распространять.',
+                    'Примеры: ОС Linux, офисный пакет LibreOffice, GIMP.',
+                    'Специальная лицензия (например, GNU GPL) гарантирует ваше право на модификацию кода.',
+                    'Сообщество программистов со всего мира может совместно улучшать код этой программы.',
+                    'Можно свободно устанавливать на любое количество компьютеров, в том числе в офисе компании.'
+                ]
+            };
+
+            const slotsConfig = [
+                { id: 'proprietary', title: 'Коммерческое ПО (Proprietary)' },
+                { id: 'shareware', title: 'Условно-бесплатное (Shareware)' },
+                { id: 'freeware', title: 'Бесплатное ПО (Freeware)' },
+                { id: 'opensource', title: 'Свободное ПО (Open Source)' }
+            ];
+
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let selectedItemEl = null;
+            let locked = false;
+            const actionLog = [];
+
+            const availableItems = {
+                proprietary: [...dataBank.proprietary],
+                shareware: [...dataBank.shareware],
+                freeware: [...dataBank.freeware],
+                opensource: [...dataBank.opensource]
+            };
+
+            const sourceListEl = document.getElementById('sourceList');
+            const targetSlotsEl = document.getElementById('targetSlots');
+            const checkBtn = document.getElementById('checkBtn');
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const statusBannerEl = document.getElementById('statusBanner');
+            const mainCardEl = document.getElementById('mainCard');
+            const victoryBoxEl = document.getElementById('victoryBox');
+
+            function shuffle(array) {
+                const copy = [...array];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function showBanner(msg, isError) {
+                statusBannerEl.textContent = msg;
+                statusBannerEl.className = isError
+                    ? 'alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mb-3'
+                    : 'alert alert-success bg-success text-dark rounded-0 border-0 fw-bold mb-3';
+                statusBannerEl.classList.remove('d-none');
+            }
+
+            function hideBanner() {
+                statusBannerEl.classList.add('d-none');
+                statusBannerEl.textContent = '';
+            }
+
+            function updateCheckBtn() {
+                const slotContents = targetSlotsEl.querySelectorAll('.slot-content');
+                const allFilled = slotContents.length === slotsConfig.length &&
+                    Array.from(slotContents).every(slot => slot.children.length > 0);
+                checkBtn.disabled = !allFilled || locked;
+            }
+
+            function initPhase() {
+                locked = false;
+                selectedItemEl = null;
+                hideBanner();
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}: Классификация`;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+
+                sourceListEl.innerHTML = '';
+                targetSlotsEl.innerHTML = '';
+
+                const phaseItems = [];
+                slotsConfig.forEach(slot => {
+                    if (availableItems[slot.id].length === 0) {
+                        availableItems[slot.id] = [...dataBank[slot.id]];
+                    }
+                    const randIdx = Math.floor(Math.random() * availableItems[slot.id].length);
+                    const text = availableItems[slot.id].splice(randIdx, 1)[0];
+                    phaseItems.push({
+                        id: `item_${slot.id}_${currentPhase}`,
+                        text: text,
+                        correctSlot: slot.id
+                    });
+                });
+
+                shuffle(phaseItems).forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'item-card btn btn-outline-success rounded-0 text-start p-3 w-100 text-light';
+                    btn.style.minHeight = '48px';
+                    btn.id = item.id;
+                    btn.textContent = item.text;
+                    btn.dataset.correctSlot = item.correctSlot;
+                    sourceListEl.appendChild(btn);
+                });
+
+                shuffle(slotsConfig).forEach(slot => {
+                    const slotDiv = document.createElement('div');
+                    slotDiv.className = 'slot border border-secondary bg-black p-2 p-sm-3';
+                    slotDiv.style.minHeight = '64px';
+                    slotDiv.style.cursor = 'pointer';
+                    slotDiv.dataset.slotId = slot.id;
+
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = 'small text-success fw-bold text-uppercase mb-1';
+                    titleDiv.style.pointerEvents = 'none';
+                    titleDiv.textContent = slot.title;
+
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'slot-content w-100';
+
+                    slotDiv.appendChild(titleDiv);
+                    slotDiv.appendChild(contentDiv);
+                    targetSlotsEl.appendChild(slotDiv);
+                });
+
+                updateCheckBtn();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function selectItem(itemEl) {
+                if (itemEl.parentElement.classList.contains('slot-content')) {
+                    const slotEl = itemEl.closest('.slot');
+                    if (slotEl) slotEl.classList.replace('border-success', 'border-secondary');
+                    sourceListEl.appendChild(itemEl);
+                    itemEl.classList.remove('active', 'bg-success', 'text-dark', 'fw-bold');
+                    itemEl.classList.add('text-light');
+                    selectedItemEl = null;
+                    updateCheckBtn();
+                    return;
+                }
+
+                sourceListEl.querySelectorAll('.item-card').forEach(el => {
+                    el.classList.remove('active', 'bg-success', 'text-dark', 'fw-bold');
+                    el.classList.add('text-light');
+                });
+                itemEl.classList.remove('text-light');
+                itemEl.classList.add('active', 'bg-success', 'text-dark', 'fw-bold');
+                selectedItemEl = itemEl;
+            }
+
+            // Event listeners attached strictly ONCE via delegation
+            sourceListEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const itemEl = e.target.closest('.item-card');
+                if (itemEl) selectItem(itemEl);
+            });
+
+            targetSlotsEl.addEventListener('click', (e) => {
+                if (locked) return;
+                const clickedItem = e.target.closest('.item-card');
+                if (clickedItem && !selectedItemEl) {
+                    selectItem(clickedItem);
+                    return;
+                }
+
+                const slotEl = e.target.closest('.slot');
+                if (!slotEl || !selectedItemEl) return;
+
+                const contentDiv = slotEl.querySelector('.slot-content');
+                if (contentDiv.children.length > 0) {
+                    const existing = contentDiv.children[0];
+                    sourceListEl.appendChild(existing);
+                }
+
+                selectedItemEl.classList.remove('active', 'bg-success', 'text-dark', 'fw-bold');
+                selectedItemEl.classList.add('text-light');
+                contentDiv.appendChild(selectedItemEl);
+                slotEl.classList.remove('border-secondary', 'border-danger');
+                slotEl.classList.add('border-success');
+                selectedItemEl = null;
+                updateCheckBtn();
+            });
+
+            checkBtn.addEventListener('click', () => {
+                if (locked) return;
+                let isCorrect = true;
+                const slots = targetSlotsEl.querySelectorAll('.slot');
+
+                slots.forEach(slot => {
+                    const item = slot.querySelector('.item-card');
+                    if (item && item.dataset.correctSlot !== slot.dataset.slotId) {
+                        isCorrect = false;
+                        slot.classList.remove('border-success');
+                        slot.classList.add('border-danger');
+                        item.classList.remove('btn-outline-success', 'text-light');
+                        item.classList.add('btn-danger', 'text-white');
+                        setTimeout(() => {
+                            item.classList.remove('btn-danger', 'text-white');
+                            item.classList.add('btn-outline-success', 'text-light');
+                            slot.classList.remove('border-danger');
+                            slot.classList.add('border-secondary');
+                            sourceListEl.appendChild(item);
+                            updateCheckBtn();
+                        }, 800);
+                    }
+                });
+
+                if (isCorrect) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        showBanner('Верно! Переход к следующему этапу...', false);
+                        locked = true;
+                        setTimeout(() => initPhase(), 600);
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'СИСТЕМА ВЕРИФИЦИРОВАНА';
+                        mainCardEl.classList.add('d-none');
+                        victoryBoxEl.classList.remove('d-none');
+                        hideBanner();
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_failed` });
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    showBanner('Неверная классификация! Ошибочные карточки возвращены в палитру.', true);
+                }
+                updateCheckBtn();
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>
