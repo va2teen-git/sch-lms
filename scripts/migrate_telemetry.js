@@ -23,7 +23,10 @@ const columnsToAdd = [
   { name: 'level_number', type: 'INTEGER' },
   { name: 'attempt_id', type: 'TEXT' },
   { name: 'attempt_number', type: 'INTEGER DEFAULT 1' },
-  { name: 'attempt_mode', type: 'TEXT DEFAULT "normal"' }
+  { name: 'attempt_mode', type: 'TEXT DEFAULT "normal"' },
+  { name: 'stage_current', type: 'INTEGER' },
+  { name: 'stage_total', type: 'INTEGER' },
+  { name: 'wave_number', type: 'INTEGER' }
 ];
 
 for (const col of columnsToAdd) {
@@ -40,7 +43,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_telemetry_student_cohort ON telemetry(student_class, timestamp);
   CREATE INDEX IF NOT EXISTS idx_telemetry_course_lesson ON telemetry(course_slug, lesson_id, timestamp);
   CREATE INDEX IF NOT EXISTS idx_telemetry_attempt ON telemetry(attempt_id);
-  CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, lesson_id, attempt_id);
+  CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, last_name, first_name, attempt_id);
   CREATE INDEX IF NOT EXISTS idx_telemetry_sprint ON telemetry(course_slug, lesson_id, student_class, action_type);
 `);
 console.log('Indexes created/verified.');
@@ -48,10 +51,10 @@ console.log('Indexes created/verified.');
 // Step 2: Build primary student_class mapping
 console.log('Analyzing student cohorts...');
 const classCountRows = db.prepare(`
-  SELECT first_name, last_name, class_name, count(*) as cnt 
-  FROM telemetry 
-  WHERE first_name NOT LIKE '%Unknown%' AND last_name NOT LIKE '%Unknown%' 
-    AND class_name NOT LIKE '%Unknown%' AND class_name != '11-ИТ' 
+  SELECT first_name, last_name, class_name, count(*) as cnt
+  FROM telemetry
+  WHERE first_name NOT LIKE '%Unknown%' AND last_name NOT LIKE '%Unknown%'
+    AND class_name NOT LIKE '%Unknown%' AND class_name != '11-ИТ'
   GROUP BY first_name, last_name, class_name
 `).all();
 
@@ -73,12 +76,35 @@ studentClassCounts.forEach((counts, normKey) => {
 
 console.log(`Mapped ${studentPrimaryClass.size} students to permanent cohorts.`);
 
-// Step 3: Helper functions for parsing mission_name
-function parseLevel(missionName) {
-  if (!missionName) return null;
-  if (/Уровень\s*1/i.test(missionName) || /Ур\s*1/i.test(missionName) || /\(Базовый\)/i.test(missionName)) return 1;
-  if (/Уровень\s*2/i.test(missionName) || /Ур\s*2/i.test(missionName)) return 2;
-  if (/Уровень\s*3/i.test(missionName) || /Ур\s*3/i.test(missionName) || /Аркада/i.test(missionName)) return 3;
+// Step 3: Helper functions
+function toPosInt(val) {
+  if (val === undefined || val === null || val === '') return null;
+  const n = parseInt(String(val), 10);
+  return !isNaN(n) && n > 0 ? n : null;
+}
+
+function parseLevel(missionName, actionType, rawLog) {
+  const m = String(missionName || '');
+  if (actionType === 'sprint_complete' || actionType === 'prince_complete' || m.includes('Prince of Persia')) {
+    return 0;
+  }
+  if (/Уровень\s*1/i.test(m) || /Ур\s*1/i.test(m) || /\(Базовый\)/i.test(m)) return 1;
+  if (/Уровень\s*2/i.test(m) || /Ур\s*2/i.test(m)) return 2;
+  if (/Уровень\s*3/i.test(m) || /Ур\s*3/i.test(m) || /Аркада/i.test(m)) return 3;
+
+  if (rawLog) {
+    try {
+      const parsed = typeof rawLog === 'string' ? JSON.parse(rawLog) : rawLog;
+      const items = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
+      for (const item of items) {
+        if (item && typeof item === 'object') {
+          const tl = toPosInt(item.task_level ?? item.level_number ?? item.level);
+          if (tl && tl >= 1 && tl <= 3) return tl;
+        }
+      }
+    } catch (e) {}
+  }
+
   return null;
 }
 
@@ -106,7 +132,7 @@ function parseLessonAndCourse(missionName, recordedClassName) {
     }
   }
 
-  // 3. Topic matching
+  // 3. Topic matching for legacy mission names
   if (!courseSlug || !lessonId) {
     if (/Машина\s+Тьюринга/i.test(m)) {
       courseSlug = '11-класс_углубленный';
@@ -126,6 +152,9 @@ function parseLessonAndCourse(missionName, recordedClassName) {
     } else if (/Вредоносн/i.test(m)) {
       courseSlug = '10-класс_базовый';
       lessonId = '20';
+    } else if (/Сетевое\s+администрирование/i.test(m)) {
+      courseSlug = '10-класс_углубленный';
+      lessonId = '17';
     } else if (/Основы\s+теории\s+игр/i.test(m)) {
       courseSlug = '10-класс_углубленный';
       lessonId = '19';
@@ -167,52 +196,207 @@ function parseLessonAndCourse(missionName, recordedClassName) {
   return { lessonId, courseSlug };
 }
 
-// Step 4: Migrate rows in a single transaction
+function defaultTotalStages(lvlNum, stage, wave) {
+  if (!stage && !wave) return null;
+  if (lvlNum === 1) return Math.max(3, stage || 0);
+  if (lvlNum === 2) return Math.max(5, stage || 0);
+  if (lvlNum === 3) return Math.max(10, stage || 0, wave || 0);
+  return null;
+}
+
+function extractStageAndWaveFromLog(rawLog, lvlNum, actionType) {
+  let stage = null;
+  let totalStages = null;
+  let wave = null;
+
+  if (!rawLog) {
+    return { stageCurrent: null, stageTotal: null, waveNumber: null };
+  }
+
+  try {
+    const parsed = typeof rawLog === 'string' ? JSON.parse(rawLog) : rawLog;
+    const items = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
+
+    for (const item of items) {
+      if (typeof item === 'string') {
+        const phaseStrMatch = item.match(/\b(?:Phase|Фаза|Этап|Шаг)\s*(\d+)\b/i);
+        if (phaseStrMatch) {
+          const n = toPosInt(phaseStrMatch[1]);
+          if (n) stage = Math.max(stage || 0, n);
+        }
+        const waveStrMatch = item.match(/\b(?:Wave|Волна)\s*(\d+)\b/i);
+        if (waveStrMatch) {
+          const w = toPosInt(waveStrMatch[1]);
+          if (w) {
+            wave = Math.max(wave || 0, w);
+            if (!stage) stage = wave;
+          }
+        }
+        continue;
+      }
+
+      if (!item || typeof item !== 'object') continue;
+
+      const tStages = toPosInt(item.total_stages ?? item.totalStages ?? item.total_phases ?? item.totalPhases);
+      if (tStages) totalStages = tStages;
+
+      const tWaves = toPosInt(item.total_waves ?? item.totalWaves);
+      if (tWaves && !totalStages) totalStages = tWaves;
+
+      const sVal = toPosInt(item.stage);
+      const pVal = toPosInt(item.phase);
+      const stepVal = toPosInt(item.step);
+      const act = String(item.action || '');
+
+      if (sVal) {
+        stage = sVal;
+      } else if (pVal) {
+        stage = pVal;
+      } else if (stepVal) {
+        stage = act.includes('_complete') ? stepVal + 1 : stepVal;
+      } else if (act) {
+        const actMatch = act.match(/^(?:phase|step|stage)[_-]?(\d+)(?:_(complete))?/i);
+        if (actMatch) {
+          const n = toPosInt(actMatch[1]);
+          if (n) {
+            stage = actMatch[2] ? n + 1 : n;
+          }
+        }
+      }
+
+      const wVal = toPosInt(item.wave ?? item.wave_number);
+      if (wVal) {
+        wave = wVal;
+        if (!stage) stage = wVal;
+      }
+    }
+  } catch (e) {
+    // Ignore malformed JSON in legacy logs
+  }
+
+  if (lvlNum === 3 && stage && !wave) {
+    wave = stage;
+  }
+
+  if ((stage || wave) && !totalStages) {
+    totalStages = defaultTotalStages(lvlNum, stage, wave);
+  }
+
+  if (actionType === 'level_complete' && totalStages && stage && stage < totalStages && lvlNum >= 1 && lvlNum <= 3) {
+    stage = totalStages;
+    if (lvlNum === 3) wave = totalStages;
+  }
+
+  return {
+    stageCurrent: stage,
+    stageTotal: totalStages,
+    waveNumber: wave
+  };
+}
+
+// Step 4: Idempotent migration in a single transaction
 console.log('Fetching all telemetry rows for migration...');
-const rows = db.prepare('SELECT id, first_name, last_name, class_name, mission_name FROM telemetry').all();
+const rows = db.prepare(`
+  SELECT id, first_name, last_name, class_name, mission_name, action_type, action_log,
+         student_class, course_slug, lesson_id, level_number,
+         stage_current, stage_total, wave_number
+  FROM telemetry
+`).all();
 
 const updateStmt = db.prepare(`
-  UPDATE telemetry 
-  SET student_class = ?, course_slug = ?, lesson_id = ?, level_number = ? 
+  UPDATE telemetry
+  SET student_class = ?,
+      course_slug = ?,
+      lesson_id = ?,
+      level_number = ?,
+      stage_current = ?,
+      stage_total = ?,
+      wave_number = ?
   WHERE id = ?
 `);
 
-console.log(`Starting migration for ${rows.length} rows...`);
+console.log(`Checking ${rows.length} rows for idempotent migration...`);
 
 const runMigration = db.transaction(() => {
   let updated = 0;
+  let stageBackfilled = 0;
+
   for (const r of rows) {
     const fn = (r.first_name || '').trim();
     const ln = (r.last_name || '').trim();
     const normKey = [fn.toLowerCase(), ln.toLowerCase()].sort().join(' ');
-    
-    // Student class
-    let sClass = studentPrimaryClass.get(normKey);
-    if (!sClass) {
-      sClass = r.class_name || 'Unknown';
+
+    // Preserve already populated student_class (unless empty or 'Unknown')
+    let nextStudentClass = (r.student_class && r.student_class !== 'Unknown') ? r.student_class : null;
+    if (!nextStudentClass) {
+      nextStudentClass = studentPrimaryClass.get(normKey) || r.class_name || 'Unknown';
     }
 
-    // Level, Lesson, Course
-    const lvlNum = parseLevel(r.mission_name);
-    const { lessonId, courseSlug } = parseLessonAndCourse(r.mission_name, r.class_name);
+    // Preserve already populated course_slug, lesson_id, level_number (including 0)
+    const parsedMeta = parseLessonAndCourse(r.mission_name, r.class_name);
+    const nextCourseSlug = (r.course_slug && r.course_slug !== 'Unknown') ? r.course_slug : parsedMeta.courseSlug;
+    const nextLessonId = (r.lesson_id && String(r.lesson_id).trim() !== '') ? String(r.lesson_id).trim() : parsedMeta.lessonId;
 
-    updateStmt.run(sClass, courseSlug, lessonId, lvlNum, r.id);
-    updated++;
+    const hasExistingLevel = r.level_number !== null && r.level_number !== undefined;
+    const nextLevelNumber = hasExistingLevel
+      ? r.level_number
+      : parseLevel(r.mission_name, r.action_type, r.action_log);
+
+    // Idempotent backfill of stage_current / stage_total / wave_number from historical action_log
+    const extracted = extractStageAndWaveFromLog(r.action_log, nextLevelNumber, r.action_type);
+    const nextStageCurrent = toPosInt(r.stage_current) ?? extracted.stageCurrent;
+    const nextStageTotal = toPosInt(r.stage_total) ?? extracted.stageTotal ?? (
+      nextStageCurrent ? defaultTotalStages(nextLevelNumber, nextStageCurrent, toPosInt(r.wave_number) ?? extracted.waveNumber) : null
+    );
+    const nextWaveNumber = toPosInt(r.wave_number) ?? extracted.waveNumber;
+
+    const changed =
+      nextStudentClass !== r.student_class ||
+      nextCourseSlug !== r.course_slug ||
+      nextLessonId !== r.lesson_id ||
+      nextLevelNumber !== r.level_number ||
+      nextStageCurrent !== r.stage_current ||
+      nextStageTotal !== r.stage_total ||
+      nextWaveNumber !== r.wave_number;
+
+    if (changed) {
+      updateStmt.run(
+        nextStudentClass,
+        nextCourseSlug,
+        nextLessonId,
+        nextLevelNumber,
+        nextStageCurrent,
+        nextStageTotal,
+        nextWaveNumber,
+        r.id
+      );
+      updated++;
+      if (
+        (r.stage_current === null && nextStageCurrent !== null) ||
+        (r.stage_total === null && nextStageTotal !== null) ||
+        (r.wave_number === null && nextWaveNumber !== null)
+      ) {
+        stageBackfilled++;
+      }
+    }
   }
-  return updated;
+  return { updated, stageBackfilled };
 });
 
-const count = runMigration();
-console.log(`Successfully migrated ${count} rows!`);
+const result = runMigration();
+console.log(`Migration complete: ${result.updated} rows updated (${result.stageBackfilled} rows stage/wave backfilled).`);
 
 // Step 5: Verification check
 const check = db.prepare(`
-  SELECT 
+  SELECT
     COUNT(*) as total,
     COUNT(student_class) as with_student_class,
     COUNT(course_slug) as with_course_slug,
     COUNT(lesson_id) as with_lesson_id,
-    COUNT(level_number) as with_level_number
+    COUNT(level_number) as with_level_number,
+    COUNT(stage_current) as with_stage_current,
+    COUNT(stage_total) as with_stage_total,
+    COUNT(wave_number) as with_wave_number
   FROM telemetry
 `).get();
 

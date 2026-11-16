@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS telemetry (
   attempt_id TEXT,
   attempt_number INTEGER DEFAULT 1,
   attempt_mode TEXT DEFAULT 'normal',
+  stage_current INTEGER,
+  stage_total INTEGER,
+  wave_number INTEGER,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -116,12 +119,12 @@ node scripts/migrate_telemetry.js
 ```
 
 ### Что делает скрипт миграции:
-1. Добавляет колонки `student_class`, `course_slug`, `lesson_id`, `level_number` в таблицу `telemetry` (если их еще нет).
-2. Создает композитные индексы `idx_telemetry_student_cohort` и `idx_telemetry_course_lesson`.
+1. Добавляет колонки `student_class`, `course_slug`, `lesson_id`, `level_number`, `attempt_id`, `attempt_number`, `attempt_mode`, `stage_current`, `stage_total`, `wave_number` в таблицу `telemetry` (если их еще нет).
+2. Создает композитные индексы `idx_telemetry_student_cohort`, `idx_telemetry_course_lesson`, `idx_telemetry_attempt`, `idx_telemetry_student_attempt` и `idx_telemetry_sprint`.
 3. Анализирует исторические логи и определяет постоянный класс (`student_class`) для каждого ученика на основе его профиля активности (исключая временные переключения классов).
-4. Разбирает существующие строки `mission_name` и сопоставляет темы с курсами (`courses.json`), извлекая номер урока и номер уровня.
-5. Выполняет пакетное обновление строк в единой транзакции SQLite.
-6. Выводит верификационную статистику обновленных записей.
+4. Идемпотентно дополняет пропущенные `course_slug`, `lesson_id` и `level_number` из `mission_name` и `courses.json` (сохраняя уже заполненные значения, включая `level_number = 0` для Лого-Шторма и Prince of Persia).
+5. Выполняет идемпотентный бэкфилл `stage_current`, `stage_total` и `wave_number` из исторических записей `action_log` (`phase`, `step`, `wave`, `stage`, текстовых меток `Phase N` / `Wave N`).
+6. Выполняет пакетное обновление изменённых строк в единой транзакции SQLite и выводит верификационную статистику.
 
 > **Резервная копия:** Перед выполнением миграции рекомендуется создать копию базы `telemetry.db.bak` (шаблон `*.bak` добавлен в `.gitignore`).
 
@@ -144,11 +147,35 @@ window.parent.postMessage({
     time_spent_sec: 45,            // Секунд с начала уровня
     attempts_count: 1,             // Количество попыток/ошибок
     success: true,                 // true только при успешном завершении уровня
+    stage: 3,                      // Текущая фаза/этап (1..total_stages)
+    total_stages: 3,               // Всего фаз/этапов на уровне
+    wave: 10,                      // Для Уровня 3: текущая волна
+    total_waves: 10,               // Для Уровня 3: всего волн
     action_log: [{ time: '...', action: 'step_done' }] // Опционально
 }, '*');
 ```
 
-> **Обогащение контекстом:** Платформа перехватывает сообщение, добавляет постоянный класс учащегося `student_class`, слаг курса `course_slug`, номер урока `lesson_id`, а также метаданные активной попытки: `attempt_id`, `attempt_number` и `attempt_mode`.
+> **Обогащение контекстом и активный таймер оболочки:** Платформа в `src/pages/lesson/[class]/[id].astro` перехватывает сообщение, добавляет `student_class`, `course_slug`, `lesson_id`, `attempt_id`, `attempt_number`, `attempt_mode`, а также управляет активным таймером вкладки. Отсчёт `active_tab`-времени уровня начинается **только после первого реального взаимодействия ученика внутри `iframe-N`** (`pointerdown` / `keydown` или первого игрового события), чтобы время чтения теории слева не попадало в Уровень 1.
+
+#### 4.1.1 Единый клиентский хелпер `public/static/lms-telemetry.js`
+Для стандартизации тренажёров и исключения дублирования логики времени в `TaskLayout.astro` автоматически подключается легковесный скрипт `/static/lms-telemetry.js`, экспортирующий `window.LMSTelemetry`:
+
+```javascript
+const telemetry = window.LMSTelemetry.create({
+  missionName: 'Урок 8 :: Логические операции (Уровень 3)',
+  level: 3,            // 1, 2 или 3
+  totalWaves: 10,      // Для Ур.1 по умолч. 3, для Ур.2 — 5, для Ур.3 — 10
+  onAfkStop: () => { /* опционально: пауза игры на экране «Повторить» */ },
+  onAfkRetry: () => { /* опционально: перезапуск волны 1 по кнопке «Повторить» */ }
+});
+```
+
+* **Отложенный `start_time`:** `start_time` фиксируется только при первом реальном действии (`pointerdown`/`keydown`) или явном вызове `telemetry.start()` — время скрытого монтажа `iframe` и чтения теории не учитывается.
+* **Методы прогресса и завершения:**
+  * `telemetry.advanceStage(nextStage)` / `telemetry.advanceWave(nextWave)` — обновляет этап/волну и отправляет `in_progress`.
+  * `telemetry.fail({ wave, isTimeout, actionType })` (алиасы `hardcoreReset`, `levelFail`) — увеличивает `attempts_count` и отправляет сброс/ошибку с текущей волной/этапом.
+  * `telemetry.complete()` — отправляет `level_complete` со встроенной защитой от повторной отправки.
+* **AFK-защита волны 1 (Уровень 3):** после 2 подряд таймаутов волны 1 (`isTimeout: true` без действий ученика) хелпер блокирует дальнейший спам `level_fail`/`hardcore_reset`, переводит игру в состояние паузы (`isAfkPaused`) и отображает кнопку **«Повторить»** (либо вызывает `onAfkStop`).
 
 ### 4.2 Событие «Лого-Шторм» (`action_type: 'sprint_complete'`)
 Отправляется клиентом урока по завершении скоростного набора ключевых терминов:
@@ -241,12 +268,17 @@ window.parent.postMessage({
   "attempt_id": "att_1728893120155_abc12",
   "attempt_number": 1,
   "attempt_mode": "normal",
+  "stage": 3,
+  "total_stages": 3,
+  "wave": null,
+  "total_waves": null,
   "action_log": []
 }
 ```
 
 **Особенности обработки бэкендом:**
 * Если `level_number` не передан явно, он автоматически парсится из `mission_name` (`Уровень 1` -> `1`, `Уровень 2` -> `2`, `Уровень 3` -> `3`).
+* Поля `stage_current` / `stage_total` / `wave_number` заполняются из `stage_current ?? stage ?? phase ?? step ?? wave`, `stage_total ?? total_stages ?? total_phases ?? total_waves` и `wave_number ?? wave`.
 * Если `lesson_id` не передан, он извлекается из регулярного выражения `Урок (\d+)`.
 * Если `course_slug` не передан, используется `student_class`.
 * В колонку `class_name` записывается `student_class` для сохранения совместимости.
