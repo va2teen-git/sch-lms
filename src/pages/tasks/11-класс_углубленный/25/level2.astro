@@ -215,9 +215,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (function() {
     // --- Состояние и метрики ---
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 25 :: Сложность вычислений (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
     let currentPhase = 1;
     let attemptsCount = 0;
-    let startTime = Date.now();
     let timerInterval = null;
     let isLocked = false;
 
@@ -225,7 +229,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function startTimer() {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const secs = String(elapsed % 60).padStart(2, '0');
             const el = document.getElementById('timer-display');
@@ -240,7 +244,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function triggerErrorReset(msg, callback) {
-        attemptsCount++;
+        telemetry.markActivity();
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttemptsDisplay();
         isLocked = true;
 
@@ -251,13 +257,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             fb.classList.remove('d-none');
         }
 
-        // Отправка сигнала телеметрии
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 25 :: Сложность вычислений (Уровень 2)',
-            action_type: 'hardcore_reset'
-        }, '*');
-
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
             isLocked = false;
@@ -267,7 +266,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     function completeLevel() {
         if (timerInterval) clearInterval(timerInterval);
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const evt = telemetry.complete({ stage: 5 });
+        const st = telemetry.getState();
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        attemptsCount = st.attemptsCount;
         const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
         const secs = String(elapsed % 60).padStart(2, '0');
 
@@ -282,15 +284,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const ft = document.getElementById('final-time');
         if (fa) fa.textContent = String(attemptsCount);
         if (ft) ft.textContent = `${mins}:${secs}`;
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 25 :: Сложность вычислений (Уровень 2)',
-            action_type: 'level_complete',
-            success: true,
-            attempts_count: attemptsCount,
-            time_spent_sec: elapsed
-        }, '*');
     }
 
     function setPhaseHeader(num, title) {
@@ -349,6 +342,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (val === p1TargetAnswer) {
             currentPhase = 2;
+            telemetry.advanceStage(2);
             setPhaseHeader(2, 'Определение асимптотики по структуре кода');
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
@@ -433,6 +427,7 @@ for i in range(n):
 
         if (matched) {
             currentPhase = 3;
+            telemetry.advanceStage(3);
             setPhaseHeader(3, 'Верификация теоретических предикатов сложности');
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
@@ -508,6 +503,7 @@ for i in range(n):
         const userVerdict = isTrueInput;
         if (userVerdict === p3CurrentStatement.isTrue) {
             currentPhase = 4;
+            telemetry.advanceStage(4);
             setPhaseHeader(4, 'Восстановление цепочки сводимости Ричарда Карпа');
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
@@ -571,6 +567,7 @@ for i in range(n):
 
         if (isMatch) {
             currentPhase = 5;
+            telemetry.advanceStage(5);
             setPhaseHeader(5, 'Оценка предела применимости суперкомпьютера');
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');

@@ -234,6 +234,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             const waveTimeLimit = ref(10.0);
             const waveTimeLeft = ref(10.0);
             let timerInterval = null;
+            let resetTimeout = null;
 
             // =================================================================
             // 8 ВОЛН СЛОЖНОСТИ (АРХЕТИП 1: CYBER MATRIX PROTOCOL BREACH)
@@ -353,6 +354,27 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
             ];
 
+            const totalWaves = waves.length;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: 'Урок 25 :: Сложность вычислений (Уровень 3)',
+                level: 3,
+                totalWaves: totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                    if (resetTimeout) clearTimeout(resetTimeout);
+                    errorMessage.value = '';
+                    isLocked.value = false;
+                },
+                onAfkRetry: () => {
+                    errorMessage.value = '';
+                    isLocked.value = false;
+                    currentWaveIndex.value = 0;
+                    telemetry.setWave(1, totalWaves);
+                    startWave();
+                }
+            });
+
             const currentWave = computed(() => waves[currentWaveIndex.value]);
 
             const timeLeftFormatted = computed(() => {
@@ -437,7 +459,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             function onCellClick(r, c) {
-                if (isLocked.value || !isCellClickable(r, c)) return;
+                if (isLocked.value || gameState.value !== 'playing' || telemetry.getState().isAfkPaused || !isCellClickable(r, c)) return;
 
                 const cell = matrix.value[r][c];
                 memoryBuffer.value.push(cell.token);
@@ -507,19 +529,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 if (currentWaveIndex.value + 1 < waves.length) {
                     currentWaveIndex.value++;
+                    telemetry.advanceWave(currentWaveIndex.value + 1);
                     startWave();
                 } else {
                     gameState.value = 'victory';
-                    totalElapsedSec.value = Math.floor((Date.now() - startTime.value) / 1000);
-
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: 'Урок 25 :: Сложность вычислений (Уровень 3)',
-                        action_type: 'level_complete',
-                        success: true,
-                        attempts_count: attemptsCount.value,
-                        time_spent_sec: totalElapsedSec.value
-                    }, '*');
+                    const evt = telemetry.complete({ wave: totalWaves });
+                    totalElapsedSec.value = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
                 }
             }
 
@@ -529,22 +544,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
             }
 
-            function triggerHardcoreReset(reason) {
+            function triggerHardcoreReset(reason, isTimeout = false) {
                 if (timerInterval) clearInterval(timerInterval);
+                if (resetTimeout) clearTimeout(resetTimeout);
+                const sent = telemetry.hardcoreReset({
+                    wave: currentWaveIndex.value + 1,
+                    isTimeout: Boolean(isTimeout)
+                });
+                attemptsCount.value = telemetry.getState().attemptsCount;
+                if (sent === false) {
+                    errorMessage.value = '';
+                    isLocked.value = false;
+                    return;
+                }
                 isLocked.value = true;
-                attemptsCount.value++;
                 errorMessage.value = reason;
 
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 25 :: Сложность вычислений (Уровень 3)',
-                    action_type: 'hardcore_reset'
-                }, '*');
-
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
+                    if (telemetry.getState().isAfkPaused) return;
                     errorMessage.value = '';
                     isLocked.value = false;
                     currentWaveIndex.value = 0;
+                    telemetry.setWave(1, totalWaves);
                     startWave();
                 }, 2200);
             }
@@ -553,30 +574,46 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 const wave = currentWave.value;
                 waveTimeLimit.value = wave.timeLimit;
                 waveTimeLeft.value = wave.timeLimit;
+                telemetry.setWave(currentWaveIndex.value + 1, totalWaves);
                 generateMatrix();
 
                 if (timerInterval) clearInterval(timerInterval);
+                if (resetTimeout) clearTimeout(resetTimeout);
                 const stepMs = 50;
                 timerInterval = setInterval(() => {
-                    if (isLocked.value) return;
+                    if (isLocked.value || gameState.value !== 'playing' || telemetry.getState().isAfkPaused) return;
                     waveTimeLeft.value -= stepMs / 1000;
                     if (waveTimeLeft.value <= 0) {
                         waveTimeLeft.value = 0;
                         clearInterval(timerInterval);
-                        triggerHardcoreReset('ВРЕМЯ ИСТЕКЛО: Экспоненциальный взрыв ядра!');
+                        triggerHardcoreReset('ВРЕМЯ ИСТЕКЛО: Экспоненциальный взрыв ядра!', true);
                     }
                 }, stepMs);
             }
 
             function startGame() {
+                if (resetTimeout) clearTimeout(resetTimeout);
                 gameState.value = 'playing';
                 currentWaveIndex.value = 0;
                 attemptsCount.value = 0;
+                errorMessage.value = '';
+                isLocked.value = false;
                 startTime.value = Date.now();
+                telemetry.reset({ allowRecomplete: true });
+                telemetry.start();
+                telemetry.markActivity();
+                telemetry.setWave(1, totalWaves);
+                telemetry.progress({
+                    wave: 1,
+                    total_waves: totalWaves,
+                    stage: 1,
+                    total_stages: totalWaves
+                });
                 startWave();
             }
 
             function handleKeyDown(e) {
+                if (telemetry.getState().isAfkPaused) return;
                 if (gameState.value === 'intro') {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -599,6 +636,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             onUnmounted(() => {
                 window.removeEventListener('keydown', handleKeyDown);
                 if (timerInterval) clearInterval(timerInterval);
+                if (resetTimeout) clearTimeout(resetTimeout);
+                telemetry.destroy();
             });
 
             return {

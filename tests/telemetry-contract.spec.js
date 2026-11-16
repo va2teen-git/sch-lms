@@ -58,7 +58,8 @@ test.describe('Telemetry & Database Contract Integrity', () => {
       action_log: [{ time: new Date().toISOString(), action: 'test_action' }]
     };
 
-    const res = await request.post('http://localhost:4321/api/telemetry', {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
+    const res = await request.post(`${baseUrl}/api/telemetry`, {
       data: payload,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -98,7 +99,8 @@ test.describe('Telemetry & Database Contract Integrity', () => {
       is_hardcore: true
     };
 
-    const res = await request.post('http://localhost:4321/api/telemetry', {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
+    const res = await request.post(`${baseUrl}/api/telemetry`, {
       data: payload,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -116,11 +118,12 @@ test.describe('Telemetry & Database Contract Integrity', () => {
   });
 
   test('POST /api/telemetry rejects invalid content type with 400 or 403', async ({ request }) => {
-    const res = await request.post('http://localhost:4321/api/telemetry', {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
+    const res = await request.post(`${baseUrl}/api/telemetry`, {
       data: 'plain text not json',
       headers: { 
         'Content-Type': 'text/plain',
-        'Origin': 'http://localhost:4321'
+        'Origin': baseUrl
       }
     });
     expect([400, 403]).toContain(res.status());
@@ -142,7 +145,8 @@ test.describe('Telemetry & Database Contract Integrity', () => {
       is_hardcore: true
     };
 
-    const res = await request.post('http://localhost:4321/api/telemetry', {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
+    const res = await request.post(`${baseUrl}/api/telemetry`, {
       data: payload,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -185,7 +189,8 @@ test.describe('Telemetry & Database Contract Integrity', () => {
       action_log: JSON.stringify(actionLog)
     };
 
-    const res = await request.post('http://localhost:4321/api/telemetry', {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:4321';
+    const res = await request.post(`${baseUrl}/api/telemetry`, {
       data: payload,
       headers: { 'Content-Type': 'application/json' }
     });

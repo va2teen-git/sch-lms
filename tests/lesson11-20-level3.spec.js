@@ -5,7 +5,7 @@ test.describe('Lesson 11-20 Level 3: Arcade Turing Kernel Defense', () => {
 
   test('should complete all 8 waves of Level 3 successfully', async ({ page }) => {
     // Navigate to the lesson page
-    await page.goto('http://localhost:4321/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
+    await page.goto('/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
     
     // Force show iframe-3
     await page.evaluate(() => {
@@ -52,7 +52,7 @@ test.describe('Lesson 11-20 Level 3: Arcade Turing Kernel Defense', () => {
   });
 
   test('should handle mistake with fatal error and reset to wave 1', async ({ page }) => {
-    await page.goto('http://localhost:4321/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
+    await page.goto('/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D1%83%D0%B3%D0%BB%D1%83%D0%B1%D0%BB%D0%B5%D0%BD%D0%BD%D1%8B%D0%B9/20');
     
     // Force show iframe-3
     await page.evaluate(() => {

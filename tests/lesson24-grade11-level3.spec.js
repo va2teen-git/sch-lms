@@ -21,10 +21,10 @@ test.describe('11th Grade Advanced Lesson 24: Level 3 Arcade Task Suite', () => 
     // Local countdown timer per wave
     expect(code).toMatch(/phaseTimeLeft|timerInterval/);
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 24');
 
     // Zero-style policy

@@ -293,6 +293,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     timerInterval: null,
                     sessionStartTime: null,
                     attempts: 0,
+                    telemetry: null,
+                    totalWaves: WAVES_DATA.length,
                     errorMessage: '',
                     failReason: ''
                 };
@@ -303,19 +305,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 },
                 formattedSessionTime() {
                     if (!this.sessionStartTime) return '0 сек';
-                    const sec = Math.max(1, Math.floor((Date.now() - this.sessionStartTime) / 1000));
+                    const sec = this.telemetry
+                        ? Math.max(1, this.telemetry.getTimeSpentSec())
+                        : Math.max(1, Math.floor((Date.now() - this.sessionStartTime) / 1000));
                     return `${sec} сек`;
                 }
             },
             methods: {
                 startGame() {
+                    const prevState = this.gameState;
                     this.gameState = 'playing';
                     this.currentWaveIdx = 0;
                     this.errorMessage = '';
                     this.failReason = '';
-                    if (!this.sessionStartTime) {
+                    if (!this.sessionStartTime || prevState === 'victory') {
                         this.sessionStartTime = Date.now();
-                        this.sendTelemetryEvent('in_progress');
+                        this.attempts = 0;
+                        if (this.telemetry) {
+                            this.telemetry.reset({ allowRecomplete: true });
+                        }
+                    }
+                    if (this.telemetry) {
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalWaves,
+                            stage: 1,
+                            total_stages: this.totalWaves
+                        });
                     }
                     this.startWave();
                 },
@@ -323,66 +342,70 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     clearInterval(this.timerInterval);
                     this.errorMessage = '';
                     this.phaseTimeLeft = this.currentWave.timeLimit;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(this.currentWaveIdx + 1, this.totalWaves);
+                    }
 
                     const stepMs = 100;
                     this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.phaseTimeLeft -= (stepMs / 1000);
                         if (this.phaseTimeLeft <= 0) {
                             this.phaseTimeLeft = 0;
                             clearInterval(this.timerInterval);
-                            this.triggerMeltdown('ВРЕМЯ ВОЛНЫ ИСТЕКЛО! Символьный поток переполнил буфер реактора.');
+                            this.triggerMeltdown('ВРЕМЯ ВОЛНЫ ИСТЕКЛО! Символьный поток переполнил буфер реактора.', true);
                         }
                     }, stepMs);
                 },
                 handleMorphAction(selectedIdx) {
-                    if (this.gameState !== 'playing') return;
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
 
                     if (selectedIdx === this.currentWave.correctIndex) {
                         // Успешная мутация
                         clearInterval(this.timerInterval);
                         if (this.currentWaveIdx < WAVES_DATA.length - 1) {
                             this.currentWaveIdx++;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(this.currentWaveIdx + 1);
+                            }
                             this.startWave();
                         } else {
                             // Победа над всеми 8 волнами
                             this.gameState = 'victory';
-                            this.sendTelemetryEvent('level_complete', true);
+                            if (this.telemetry) {
+                                this.telemetry.complete({ wave: this.totalWaves });
+                            }
                         }
                     } else {
                         // Фатальная ошибка мутации
                         clearInterval(this.timerInterval);
                         const chosenOpt = this.currentWave.options[selectedIdx];
-                        this.triggerMeltdown(`ОШИБКА МУТАЦИИ: [${chosenOpt.rulePatch}]. ${chosenOpt.description}`);
+                        this.triggerMeltdown(`ОШИБКА МУТАЦИИ: [${chosenOpt.rulePatch}]. ${chosenOpt.description}`, false);
                     }
                 },
-                triggerMeltdown(reason) {
-                    this.attempts++;
+                triggerMeltdown(reason, isTimeout = false) {
+                    clearInterval(this.timerInterval);
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentWaveIdx + 1,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.failReason = '';
+                            this.gameState = 'playing';
+                            return;
+                        }
+                    } else {
+                        this.attempts++;
+                    }
                     this.failReason = reason;
                     this.gameState = 'gameover';
-                    this.sendTelemetryEvent('hardcore_reset', false);
-                },
-                sendTelemetryEvent(actionType, isSuccess = false) {
-                    const timeSpent = this.sessionStartTime 
-                        ? Math.max(1, Math.floor((Date.now() - this.sessionStartTime) / 1000))
-                        : 1;
-
-                    const payload = {
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 3)',
-                        action_type: actionType,
-                        status: isSuccess ? 'completed' : (actionType === 'hardcore_reset' ? 'failed' : 'in_progress'),
-                        start_time: new Date(this.sessionStartTime || Date.now()).toISOString(),
-                        time_spent_sec: timeSpent,
-                        attempts_count: this.attempts,
-                        success: isSuccess
-                    };
-
-                    if (window.parent && window.parent !== window) {
-                        window.parent.postMessage(payload, '*');
-                    }
                 },
                 handleKeydown(e) {
-                    if (this.gameState !== 'playing') return;
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
                     if (e.key === '1') {
                         this.handleMorphAction(0);
                     } else if (e.key === '2') {
@@ -393,11 +416,35 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
             },
             mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: 'Урок 23 :: Нормальные алгорифмы Маркова (Уровень 3)',
+                    level: 3,
+                    totalWaves: this.totalWaves,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        clearInterval(this.timerInterval);
+                        this.failReason = '';
+                        this.gameState = 'playing';
+                    },
+                    onAfkRetry: () => {
+                        this.failReason = '';
+                        this.errorMessage = '';
+                        this.currentWaveIdx = 0;
+                        this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalWaves);
+                        }
+                        this.startWave();
+                    }
+                });
                 window.addEventListener('keydown', this.handleKeydown);
             },
             beforeUnmount() {
                 clearInterval(this.timerInterval);
                 window.removeEventListener('keydown', this.handleKeydown);
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
             }
         }).mount('#app');
     </script>

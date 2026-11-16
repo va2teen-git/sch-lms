@@ -146,6 +146,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     phaseTimeLeft: 10.0,
                     maxPhaseTime: 10.0,
                     timerInterval: null,
+                    resetTimeout: null,
+                    telemetry: null,
                     failMessage: '',
                     currentTask: {}
                 };
@@ -155,20 +157,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     return Math.max(0, this.phaseTimeLeft).toFixed(1);
                 }
             },
+            mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: this.missionName,
+                    level: 3,
+                    totalWaves: this.totalPhases,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        clearInterval(this.timerInterval);
+                        clearTimeout(this.resetTimeout);
+                        this.failMessage = '';
+                        this.gameState = 'playing';
+                    },
+                    onAfkRetry: () => {
+                        this.failMessage = '';
+                        this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalPhases);
+                        }
+                        this.startPhase(1);
+                    }
+                });
+            },
+            beforeUnmount() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
+            },
             methods: {
-                sendTelemetry(action_type, success = false) {
-                    const timeSpent = Math.floor((Date.now() - this.startTime) / 1000);
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: this.missionName,
-                        action_type: action_type,
-                        status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                        start_time: new Date(this.startTime).toISOString(),
-                        time_spent_sec: timeSpent,
-                        attempts_count: this.attempts,
-                        success: success
-                    }, '*');
-                },
                 rnd(min, max) {
                     return Math.floor(Math.random() * (max - min + 1)) + min;
                 },
@@ -181,49 +199,94 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     return a;
                 },
                 startGame() {
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                    this.startTime = Date.now();
                     this.attempts = 0;
                     this.currentPhase = 1;
                     this.gameState = 'playing';
-                    this.sendTelemetry('in_progress');
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalPhases);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalPhases,
+                            stage: 1,
+                            total_stages: this.totalPhases
+                        });
+                    }
                     this.startPhase(1);
                 },
                 startPhase(phaseNum) {
                     this.currentPhase = phaseNum;
                     this.phaseTimeLeft = this.maxPhaseTime;
                     this.currentTask = this.generateTask(phaseNum);
+                    if (this.telemetry) {
+                        this.telemetry.setWave(phaseNum, this.totalPhases);
+                    }
 
                     if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
                     this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.phaseTimeLeft -= 0.1;
                         if (this.phaseTimeLeft <= 0) {
-                            this.triggerFailure('Время вышло! Такт упущен, конвейер заблокирован.');
+                            this.phaseTimeLeft = 0;
+                            this.triggerFailure('Время вышло! Такт упущен, конвейер заблокирован.', true);
                         }
                     }, 100);
                 },
-                triggerFailure(reason) {
+                triggerFailure(reason, isTimeout = false) {
                     if (this.timerInterval) clearInterval(this.timerInterval);
-                    this.attempts++;
-                    this.sendTelemetry('hardcore_reset');
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentPhase,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.failMessage = '';
+                            this.gameState = 'playing';
+                            return;
+                        }
+                    } else {
+                        this.attempts++;
+                    }
                     this.failMessage = reason;
                     this.gameState = 'failed';
 
-                    setTimeout(() => {
+                    this.resetTimeout = setTimeout(() => {
+                        if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                         this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalPhases);
+                        }
                         this.startPhase(1);
                     }, 1500);
                 },
                 handleAction(actionIdx) {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
                     const action = this.currentTask.actions[actionIdx];
                     if (action.isCorrect) {
                         if (this.currentPhase < this.totalPhases) {
-                            this.startPhase(this.currentPhase + 1);
+                            const nextWave = this.currentPhase + 1;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(nextWave);
+                            }
+                            this.startPhase(nextWave);
                         } else {
                             if (this.timerInterval) clearInterval(this.timerInterval);
                             this.gameState = 'success';
-                            this.sendTelemetry('level_complete', true);
+                            if (this.telemetry) {
+                                this.telemetry.complete({ wave: this.totalPhases });
+                            }
                         }
                     } else {
-                        this.triggerFailure(action.failFeedback || 'Неверное действие! Произошла критическая ошибка.');
+                        this.triggerFailure(action.failFeedback || 'Неверное действие! Произошла критическая ошибка.', false);
                     }
                 },
                 generateTask(phase) {

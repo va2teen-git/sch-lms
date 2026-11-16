@@ -250,9 +250,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (function() {
     // --- Состояние игры и метрики ---
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 1)',
+        level: 1,
+        totalStages: 3
+    });
     let currentPhase = 1;
     let attemptsCount = 0;
-    let startTime = Date.now();
     let timerInterval = null;
     let isLocked = false;
 
@@ -260,7 +264,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function startTimer() {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const secs = String(elapsed % 60).padStart(2, '0');
             const el = document.getElementById('timer-display');
@@ -276,7 +280,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Телеметрия: Ошибка / Сброс
     function triggerErrorReset(msg, callback) {
-        attemptsCount++;
+        telemetry.markActivity();
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttemptsDisplay();
         isLocked = true;
 
@@ -286,13 +292,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             ft.textContent = msg;
             fb.classList.remove('d-none');
         }
-
-        // Отправка сигнала телеметрии hardcore_reset
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 1)',
-            action_type: 'hardcore_reset'
-        }, '*');
 
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
@@ -304,7 +303,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Телеметрия: Завершение уровня
     function completeLevel() {
         if (timerInterval) clearInterval(timerInterval);
-        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+        const evt = telemetry.complete({ stage: 3 });
+        const st = telemetry.getState();
+        const elapsedSec = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        attemptsCount = st.attemptsCount;
         const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
         const secs = String(elapsedSec % 60).padStart(2, '0');
 
@@ -315,17 +317,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         document.getElementById('final-attempts').textContent = String(attemptsCount);
         document.getElementById('final-time').textContent = `${mins}:${secs}`;
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 24 :: Алгоритмически неразрешимые задачи. Задача останова (Уровень 1)',
-            action_type: 'level_complete',
-            status: 'completed',
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: elapsedSec,
-            attempts_count: attemptsCount,
-            success: true
-        }, '*');
     }
 
     // =========================================================================
@@ -486,6 +477,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (syntaxErrors === 0 && semanticErrors === 0) {
             // Переход на Фазу 2
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
@@ -691,6 +683,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (!hasError) {
             // Переход на Фазу 3
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
@@ -945,9 +938,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Кнопка перезапуска уровня
     document.getElementById('btn-restart-level')?.addEventListener('click', () => {
+        telemetry.reset({ allowRecomplete: true });
         currentPhase = 1;
         attemptsCount = 0;
-        startTime = Date.now();
+        isLocked = false;
         startTimer();
         updateAttemptsDisplay();
 

@@ -18,10 +18,10 @@ test.describe('Lesson 11-23 Level 2: Markov Normal Algorithms Advanced Suite', (
     expect(code.includes('<style>')).toBe(false);
     expect(code.includes('<style ')).toBe(false);
 
-    // Telemetry and mission naming
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry and mission naming (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 23');
 
     // Must contain exactly 5 procedural phases according to Level 2 specification

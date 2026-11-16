@@ -66,10 +66,10 @@ test.describe('Curriculum & Architecture Linting Suite (Lesson 20)', () => {
     // TaskLayout component usage
     expect(code).toContain('import TaskLayout');
     expect(code).toContain('<TaskLayout');
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 20');
     // No forbidden style tags (must use Tailwind CSS)
     expect(code.includes('<style>')).toBe(false);
@@ -89,10 +89,10 @@ test.describe('Curriculum & Architecture Linting Suite (Lesson 20)', () => {
     expect(code).toContain('id="phase3"');
     expect(code).toContain('id="phase4"');
     expect(code).toContain('id="phase5"');
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 20');
     // No forbidden style tags
     expect(code.includes('<style>')).toBe(false);
@@ -111,10 +111,10 @@ test.describe('Curriculum & Architecture Linting Suite (Lesson 20)', () => {
     expect(code).toContain('Vue');
     // Local countdown timer per phase/wave
     expect(code).toMatch(/timer|timeleft|phaseTimeLeft/i);
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 20');
     // No forbidden style tags
     expect(code.includes('<style>')).toBe(false);
