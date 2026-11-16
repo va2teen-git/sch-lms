@@ -342,8 +342,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             methods: {
-                sendTelemetry(actionType, isSuccess = false) {
+                sendTelemetry(actionType, isSuccess = false, overrideWave = null) {
                     const timeSpent = Math.max(1, Math.round((Date.now() - (this.startTime || Date.now())) / 1000));
+                    const w = overrideWave || this.currentWave;
                     const payload = {
                         type: 'TELEMETRY_EVENT',
                         mission_name: 'Урок 8 :: Табличные модели (Уровень 3 / Аркада)',
@@ -353,10 +354,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         time_spent_sec: timeSpent,
                         attempts_count: this.attempts,
                         success: isSuccess,
+                        wave: w,
+                        total_waves: this.totalWaves,
                         action_log: [{
                             time: new Date().toISOString(),
                             action: actionType,
-                            wave: this.currentWave
+                            wave: w,
+                            total_waves: this.totalWaves
                         }]
                     };
                     try {
@@ -617,8 +621,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     if (this.currentWave >= this.totalWaves) {
                         this.finishLevel();
                     } else {
+                        const nextWave = this.currentWave + 1;
                         setTimeout(() => {
-                            this.initWave(this.currentWave + 1);
+                            this.initWave(nextWave);
+                            this.sendTelemetry('in_progress', false, nextWave);
                         }, 500);
                     }
                 },

@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import Database from 'better-sqlite3';
 import path from 'path';
 import coursesData from '../data/courses.json';
+import { computeTeacherStats } from '../lib/teacher-stats';
 
 const dbPath = path.join(process.cwd(), 'telemetry.db');
 let db: any;
@@ -12,6 +13,7 @@ let initialKpi = {
   totalStudents: 0,
   completedCount: 0,
   hardcoreCount: 0,
+  princeCount: 0,
   inProgressCount: 0,
   avgTimeSec: 0,
   totalErrors: 0
@@ -22,568 +24,13 @@ const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, 
 
 try {
   db = new Database(dbPath, { readonly: true });
-  
-  // Available dates
-  const dateRows = db.prepare(`SELECT DISTINCT DATE(timestamp) as d FROM telemetry ORDER BY d DESC LIMIT 30`).all();
-  availableDates = dateRows.map((r: any) => r.d).filter(Boolean);
-
-
-
-  // Default query: today's telemetry, excluding test users
-  const rows = db.prepare(`
-    SELECT id, first_name, last_name, class_name, mission_name, action_type,
-           time_spent_sec, attempts_count, success, status, action_log,
-           is_hardcore, student_class, course_slug, lesson_id, level_number,
-           attempt_id, attempt_number, attempt_mode, timestamp, start_time
-    FROM telemetry
-    WHERE DATE(timestamp) = ?
-      AND first_name NOT LIKE '%Unknown%' 
-      AND last_name NOT LIKE '%Unknown%' 
-      AND first_name NOT LIKE '%Тест%' 
-      AND last_name NOT LIKE '%Тест%' 
-      AND COALESCE(student_class, class_name) NOT LIKE '%Unknown%'
-      AND COALESCE(student_class, class_name) != '11-ИТ'
-    ORDER BY timestamp ASC
-  `).all(todayStr);
-
-  const studentsMap: Record<string, any> = {};
-
-  rows.forEach((r: any) => {
-    const fn = (r.first_name || '').trim();
-    const ln = (r.last_name || '').trim();
-    const cls = (r.student_class || r.class_name || 'Unknown').trim();
-    const nameWords = [fn.toLowerCase(), ln.toLowerCase()].sort();
-    const canonicalKey = `${cls}_${nameWords.join('_')}`;
-
-    if (!studentsMap[canonicalKey]) {
-      let disp = `${ln} ${fn}`;
-      if (fn.match(/(?:ов|ев|ин|ын|ский|цкий|ова|ева|ина|ына|ская|цкая)$/i) && !ln.match(/(?:ов|ев|ин|ын|ский|цкий|ова|ева|ина|ына|ская|цкая)$/i)) {
-        disp = `${fn} ${ln}`;
-      }
-
-      studentsMap[canonicalKey] = {
-        key: canonicalKey,
-        displayName: disp,
-        firstName: fn,
-        lastName: ln,
-        className: cls,
-        firstSeen: r.timestamp,
-        lastSeen: r.timestamp,
-        levels: {
-          1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, startTime: null },
-          2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, startTime: null },
-          3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: false, firstTs: null, startTime: null }
-        },
-        normalCompletedLevels: new Set<number>(),
-        allHardcoreCompletedLevels: new Set<number>(),
-        hardcoreStreakLevels: new Set<number>(),
-        hardcoreAttempted: false,
-        latestIsHardcore: 0,
-        hardcoreResetsCount: 0,
-        hardcoreLevelsConquered: 0,
-        totalActiveTimeSec: 0,
-        totalErrors: 0,
-        isHardcore: false,
-        isHardcoreLegend: false,
-        hardcoreStatus: 'none',
-        lessonStatus: 'not_started',
-        attemptsCount: 0,
-        normalAttemptsCount: 0,
-        hardcoreAttemptsCount: 0,
-        isNormalMastered: false,
-        bestNormalTimeSec: null,
-        bestHardcoreTimeSec: null,
-        bestSprintTimeSec: null,
-        sprintCpm: null,
-        sprintWpm: null,
-        sprintAccuracy: null,
-        princeCompleted: false,
-        princeBestTimeSec: null,
-        princeLevels: [],
-        currentAttempt: null,
-        attempts: [],
-        lastCourseSlug: null,
-        lastLessonId: null,
-        workedLessons: [],
-        recentEvents: [],
-        _attemptsMap: {},
-        _attemptOrder: [],
-        _legacyIdx: 1,
-        _lastHc: null,
-        _workedLessonsMap: {}
-      };
-    }
-
-    const s = studentsMap[canonicalKey];
-    s.lastSeen = r.timestamp;
-    s.latestIsHardcore = r.is_hardcore;
-    const rowCourse = r.course_slug ? String(r.course_slug).trim() : null;
-    const rowLesson = r.lesson_id ? String(r.lesson_id).trim() : null;
-    if (rowCourse) s.lastCourseSlug = rowCourse;
-    if (rowLesson) s.lastLessonId = rowLesson;
-    if (rowCourse && rowLesson) {
-      const wlKey = `${rowCourse}::${rowLesson}`;
-      if (s._workedLessonsMap[wlKey]) delete s._workedLessonsMap[wlKey];
-      s._workedLessonsMap[wlKey] = { courseSlug: rowCourse, lessonId: rowLesson };
-    }
-    const rTs = r.timestamp ? new Date(r.timestamp.replace(' ', 'T') + 'Z') : null;
-    const rStart = r.start_time ? new Date(r.start_time) : null;
-    const validStart = rStart && !isNaN(rStart.getTime()) ? rStart : null;
-
-    // Determine attempt
-    let attId = r.attempt_id;
-    let attNum = r.attempt_number ? parseInt(r.attempt_number, 10) : null;
-    let attMode: 'normal' | 'hardcore' = (r.attempt_mode === 'hardcore' || r.is_hardcore === 1) ? 'hardcore' : 'normal';
-
-    if (!attId) {
-      if (s._lastHc !== null && (r.is_hardcore !== s._lastHc || r.action_type === 'normal_reset' || (r.action_type === 'hardcore_reset' && s._lastHc === 1))) {
-        s._legacyIdx++;
-      }
-      s._lastHc = r.is_hardcore;
-      attId = `${canonicalKey}_att_${s._legacyIdx}`;
-      attNum = s._legacyIdx;
-      attMode = r.is_hardcore === 1 ? 'hardcore' : 'normal';
-    }
-
-    if (!s._attemptsMap[attId]) {
-      s._attemptOrder.push(attId);
-      s._attemptsMap[attId] = {
-        attemptId: attId,
-        attemptNumber: attNum || s._attemptOrder.length,
-        mode: attMode,
-        status: 'in_progress',
-        courseSlug: rowCourse,
-        lessonId: rowLesson,
-        startedAt: r.timestamp,
-        lastActiveAt: r.timestamp,
-        totalTimeSec: 0,
-        errorsCount: 0,
-        completedLevelsCount: 0,
-        levels: {
-          1: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null },
-          2: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null },
-          3: { status: 'not_started', rawTimeSpentSec: 0, timeSpentSec: 0, errors: 0, attempts: 0, completed: false, hardcore: attMode === 'hardcore', firstTs: null, startTime: null }
-        },
-        sprintCpm: null,
-        sprintWpm: null,
-        sprintTimeSec: null,
-        princeCompleted: false,
-        princeBestTimeSec: null
-      };
-    }
-
-    const att = s._attemptsMap[attId];
-    att.lastActiveAt = r.timestamp;
-    if (!att.courseSlug && rowCourse) att.courseSlug = rowCourse;
-    if (!att.lessonId && rowLesson) att.lessonId = rowLesson;
-
-    const mNameStr = String(r.mission_name || '');
-    const isPrinceRow = mNameStr.includes('Prince of Persia') || r.action_type === 'prince_complete';
-
-    if (isPrinceRow && (r.action_type === 'level_complete' || r.action_type === 'prince_complete') && r.success !== 0) {
-      s.princeCompleted = true;
-      att.princeCompleted = true;
-      const pMatch = mNameStr.match(/Уровень\s*(\d+)/i);
-      if (pMatch) {
-        const pLvl = parseInt(pMatch[1], 10);
-        if (!s.princeLevels.includes(pLvl)) s.princeLevels.push(pLvl);
-      }
-      if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > 0) {
-        if (s.princeBestTimeSec === null || r.time_spent_sec < s.princeBestTimeSec) {
-          s.princeBestTimeSec = r.time_spent_sec;
-        }
-        if (att.princeBestTimeSec === null || r.time_spent_sec < att.princeBestTimeSec) {
-          att.princeBestTimeSec = r.time_spent_sec;
-        }
-      }
-    }
-
-    let lvlNum: 1 | 2 | 3 | null = null;
-    if (!isPrinceRow) {
-      if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) lvlNum = r.level_number as 1 | 2 | 3;
-      else if (mNameStr.includes('Уровень 1')) lvlNum = 1;
-      else if (mNameStr.includes('Уровень 2')) lvlNum = 2;
-      else if (mNameStr.includes('Уровень 3')) lvlNum = 3;
-    }
-
-    const isError = r.action_type === 'hardcore_reset' || r.action_type === 'level_fail' || (r.action_log && r.action_log.includes('Error'));
-
-    if (isError) {
-      s.totalErrors++;
-      att.errorsCount++;
-    }
-    if (r.is_hardcore === 1) s.hardcoreAttempted = true;
-
-    if (r.action_type === 'hardcore_reset' && r.is_hardcore === 1) {
-      s.hardcoreStreakLevels.clear();
-      s.hardcoreResetsCount++;
-      att.status = 'failed';
-    }
-    if (r.action_type === 'normal_reset' && r.is_hardcore === 0) {
-      s.normalCompletedLevels.clear();
-    }
-
-    if (r.action_type === 'sprint_complete' && typeof r.time_spent_sec === 'number') {
-      let logCpm = null;
-      let logWpm = null;
-      let logAcc = null;
-      try {
-        const logData = typeof r.action_log === 'string' ? JSON.parse(r.action_log) : r.action_log;
-        if (logData && typeof logData === 'object') {
-          const rawCpm = logData.cpm ?? logData.CPM ?? logData.speed_cpm;
-          if (rawCpm !== undefined && rawCpm !== null && !isNaN(Number(rawCpm))) {
-            logCpm = Math.round(Number(rawCpm));
-          } else {
-            const chars = logData.charsCount ?? logData.chars_count;
-            if (typeof chars === 'number' && r.time_spent_sec > 0) {
-              logCpm = Math.round((chars / (r.time_spent_sec / 60)));
-            }
-          }
-
-          const rawWpm = logData.wpm ?? logData.WPM ?? logData.speed_wpm;
-          if (rawWpm !== undefined && rawWpm !== null && !isNaN(Number(rawWpm))) {
-            logWpm = Math.round(Number(rawWpm));
-          } else if (logCpm !== null) {
-            logWpm = Math.round(logCpm / 5);
-          }
-
-          const rawAcc = logData.accuracy ?? logData.acc;
-          if (rawAcc !== undefined && rawAcc !== null && !isNaN(Number(rawAcc))) {
-            logAcc = Math.round(Number(rawAcc) * 10) / 10;
-          }
-        }
-      } catch (e) {}
-
-      const currentBestCpm = s.sprintCpm ?? null;
-      let isBetter = false;
-
-      if (currentBestCpm === null) {
-        if (logCpm !== null) {
-          isBetter = true;
-        } else if (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec) {
-          isBetter = true;
-        }
-      } else if (logCpm !== null) {
-        if (logCpm > currentBestCpm) {
-          isBetter = true;
-        } else if (logCpm === currentBestCpm && (s.bestSprintTimeSec === null || r.time_spent_sec < s.bestSprintTimeSec)) {
-          isBetter = true;
-        }
-      }
-
-      if (isBetter) {
-        s.bestSprintTimeSec = r.time_spent_sec;
-        if (logCpm !== null) s.sprintCpm = logCpm;
-        if (logWpm !== null) s.sprintWpm = logWpm;
-        if (logAcc !== null) s.sprintAccuracy = logAcc;
-      }
-
-      if (logCpm !== null && (!att.sprintCpm || logCpm > att.sprintCpm)) {
-        att.sprintCpm = logCpm;
-        att.sprintWpm = logWpm;
-        att.sprintTimeSec = r.time_spent_sec;
-      }
-    }
-
-    if (lvlNum) {
-      const aLvl = att.levels[lvlNum];
-      aLvl.attempts++;
-      if (aLvl.firstTs === null && rTs) aLvl.firstTs = rTs;
-      if (validStart && (!aLvl.startTime || (typeof r.time_spent_sec === 'number' && r.time_spent_sec >= (aLvl.rawTimeSpentSec || 0)))) {
-        aLvl.startTime = validStart;
-      }
-      if (isError) aLvl.errors++;
-      if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (aLvl.rawTimeSpentSec || 0)) {
-        aLvl.rawTimeSpentSec = r.time_spent_sec;
-      }
-      if (r.action_type === 'level_complete') {
-        aLvl.completed = true;
-        aLvl.status = 'completed';
-      } else if (r.action_type === 'hardcore_reset') {
-        if (!aLvl.completed) {
-          aLvl.status = att.mode === 'hardcore' ? 'reset' : ((aLvl.rawTimeSpentSec || 0) > 0 || aLvl.errors > 0 ? 'in_progress' : 'not_started');
-        }
-      } else if (r.action_type === 'level_fail') {
-        if (!aLvl.completed) {
-          aLvl.status = 'in_progress';
-        }
-      } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
-        if (!aLvl.completed && (r.time_spent_sec > 0 || (aLvl.rawTimeSpentSec || 0) > 0)) {
-          aLvl.status = 'in_progress';
-        }
-      }
-
-      const lvl = s.levels[lvlNum];
-      lvl.attempts++;
-      if (lvl.firstTs === null && rTs) {
-        lvl.firstTs = rTs;
-      }
-      if (validStart && (!lvl.startTime || (typeof r.time_spent_sec === 'number' && r.time_spent_sec >= (lvl.rawTimeSpentSec || 0)))) {
-        lvl.startTime = validStart;
-      }
-      if (isError) lvl.errors++;
-
-      if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > (lvl.rawTimeSpentSec || 0)) {
-        lvl.rawTimeSpentSec = r.time_spent_sec;
-      }
-
-      if (r.action_type === 'level_complete') {
-        lvl.completed = true;
-        lvl.status = 'completed';
-        if (r.is_hardcore === 1) {
-          s.allHardcoreCompletedLevels.add(lvlNum);
-          s.hardcoreStreakLevels.add(lvlNum);
-        } else {
-          s.normalCompletedLevels.add(lvlNum);
-        }
-      } else if (r.action_type === 'hardcore_reset') {
-        if (!lvl.completed) {
-          lvl.status = r.is_hardcore === 1 ? 'reset' : ((lvl.rawTimeSpentSec || 0) > 0 || lvl.errors > 0 ? 'in_progress' : 'not_started');
-        }
-      } else if (r.action_type === 'level_fail') {
-        if (!lvl.completed) {
-          lvl.status = 'in_progress';
-        }
-      } else if (r.action_type === 'in_progress' || r.status === 'in_progress') {
-        if (!lvl.completed && (r.time_spent_sec > 0 || (lvl.rawTimeSpentSec || 0) > 0)) {
-          lvl.status = 'in_progress';
-        }
-      }
-    }
-
-    s.recentEvents.push({
-      id: r.id,
-      mission: r.mission_name,
-      course_slug: rowCourse,
-      lesson_id: rowLesson,
-      action_type: r.action_type,
-      timestamp: r.timestamp,
-      time_spent: r.time_spent_sec,
-      log: r.action_log
-    });
-    if (s.recentEvents.length > 20) s.recentEvents.shift();
+  const stats = computeTeacherStats(db, {
+    dateFilter: 'today',
+    excludeTests: true
   });
-
-  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-
-  initialStudents = Object.values(studentsMap).map(s => {
-    s._attemptOrder.forEach((id: string) => {
-      const att = s._attemptsMap[id];
-      const a1Raw = att.levels[1].rawTimeSpentSec || 0;
-      const a2Raw = att.levels[2].rawTimeSpentSec || 0;
-      const a3Raw = att.levels[3].rawTimeSpentSec || 0;
-
-      let a1Pure = a1Raw;
-      let a2Pure = a2Raw;
-      let a3Pure = a3Raw;
-
-      const a1Start = att.levels[1].startTime;
-      const a2Start = att.levels[2].startTime;
-      const a3Start = att.levels[3].startTime;
-
-      // Level 2 deduplication:
-      // Level 2 is cumulative with Level 1 if they started concurrently (start_time within 60s, or missing start_time within the same attempt)
-      const isConcurrent12 = (a1Start && a2Start) ? Math.abs(a2Start.getTime() - a1Start.getTime()) < 60000 : true;
-      if (isConcurrent12 && a1Raw > 0 && a2Raw >= a1Raw) {
-        a2Pure = a2Raw - a1Raw;
-      }
-
-      // Level 3 deduplication:
-      // Level 3 is cumulative with prior levels if started concurrently.
-      // It accumulates over Level 2 (if present) or Level 1.
-      const isConcurrent13 = (a1Start && a3Start)
-        ? Math.abs(a3Start.getTime() - a1Start.getTime()) < 60000
-        : ((a2Start && a3Start) ? Math.abs(a3Start.getTime() - a2Start.getTime()) < 60000 : true);
-      if (isConcurrent13) {
-        const prevCumulative = a2Raw > 0 ? a2Raw : a1Raw;
-        if (prevCumulative > 0 && a3Raw >= prevCumulative) {
-          a3Pure = a3Raw - prevCumulative;
-        }
-      }
-
-      att.levels[1].timeSpentSec = a1Pure;
-      att.levels[2].timeSpentSec = a2Pure;
-      att.levels[3].timeSpentSec = a3Pure;
-      att.totalTimeSec = a1Pure + a2Pure + a3Pure;
-
-      ([1, 2, 3] as const).forEach(n => {
-        const l = att.levels[n];
-        if (l.completed) {
-          l.status = 'completed';
-        } else if (l.status === 'reset' && att.mode === 'hardcore') {
-          l.status = 'reset';
-        } else if (l.timeSpentSec > 0 || l.errors > 0) {
-          l.status = 'in_progress';
-        } else {
-          l.status = 'not_started';
-        }
-      });
-
-      const compCount = ([1, 2, 3] as const).filter(num => att.levels[num].completed).length;
-      att.completedLevelsCount = compCount;
-      if (compCount >= 3) {
-        att.status = 'completed';
-      }
-    });
-
-    // FILTER OUT GHOST/EMPTY ATTEMPTS:
-    // An attempt is real if it has active time > 0, errors > 0, completed levels > 0, or is completed/failed.
-    const allAttempts = s._attemptOrder.map((id: string) => s._attemptsMap[id]);
-    const realAttempts = allAttempts.filter((a: any) =>
-      a.totalTimeSec > 0 || a.errorsCount > 0 || a.completedLevelsCount > 0 || a.status === 'completed' || a.status === 'failed'
-    );
-    // If no attempts passed filter (e.g. brand new user with 0s), keep the latest 1 attempt
-    s.attempts = realAttempts.length > 0 ? realAttempts : (allAttempts.length > 0 ? [allAttempts[allAttempts.length - 1]] : []);
-
-    s.attemptsCount = s.attempts.length;
-    s.normalAttemptsCount = s.attempts.filter((a: any) => a.mode === 'normal').length;
-    s.hardcoreAttemptsCount = s.attempts.filter((a: any) => a.mode === 'hardcore').length;
-
-    const completedNormals = s.attempts.filter((a: any) => a.mode === 'normal' && a.status === 'completed');
-    const completedHardcores = s.attempts.filter((a: any) => a.mode === 'hardcore' && a.status === 'completed');
-
-    s.isNormalMastered = completedNormals.length > 0;
-    s.isHardcoreLegend = completedHardcores.length > 0;
-
-    s.bestNormalTimeSec = completedNormals.length > 0 ? Math.min(...completedNormals.map((a: any) => a.totalTimeSec)) : null;
-    s.bestHardcoreTimeSec = completedHardcores.length > 0 ? Math.min(...completedHardcores.map((a: any) => a.totalTimeSec)) : null;
-
-    s.currentAttempt = s.attempts.length > 0 ? s.attempts[s.attempts.length - 1] : null;
-
-    const attemptsTotalTime = s.attempts.reduce((sum: number, a: any) => sum + a.totalTimeSec, 0);
-
-    const l1Raw = s.levels[1].rawTimeSpentSec || 0;
-    const l2Raw = s.levels[2].rawTimeSpentSec || 0;
-    const l3Raw = s.levels[3].rawTimeSpentSec || 0;
-
-    let l1Pure = l1Raw;
-    let l2Pure = l2Raw;
-    let l3Pure = l3Raw;
-
-    const l1Start = s.levels[1].startTime;
-    const l2Start = s.levels[2].startTime;
-    const l3Start = s.levels[3].startTime;
-
-    const isConcurrentL12 = (l1Start && l2Start) ? Math.abs(l2Start.getTime() - l1Start.getTime()) < 60000 : true;
-    if (isConcurrentL12 && l1Raw > 0 && l2Raw >= l1Raw) {
-      l2Pure = l2Raw - l1Raw;
-    }
-
-    const isConcurrentL13 = (l1Start && l3Start)
-      ? Math.abs(l3Start.getTime() - l1Start.getTime()) < 60000
-      : ((l2Start && l3Start) ? Math.abs(l3Start.getTime() - l2Start.getTime()) < 60000 : true);
-    if (isConcurrentL13) {
-      const prevCum = l2Raw > 0 ? l2Raw : l1Raw;
-      if (prevCum > 0 && l3Raw >= prevCum) {
-        l3Pure = l3Raw - prevCum;
-      }
-    }
-
-    // Sync s.levels[n].timeSpentSec:
-    // If student has real attempts, pick pure times from completed attempt or latest attempt
-    if (s.attempts.length > 0) {
-      ([1, 2, 3] as const).forEach(n => {
-        const compAtt = s.attempts.find((a: any) => a.levels[n].completed) || s.attempts.find((a: any) => a.levels[n].timeSpentSec > 0);
-        if (compAtt && compAtt.levels[n].timeSpentSec > 0) {
-          s.levels[n].timeSpentSec = compAtt.levels[n].timeSpentSec;
-        } else {
-          s.levels[n].timeSpentSec = (n === 1 ? l1Pure : (n === 2 ? l2Pure : l3Pure));
-        }
-      });
-    } else {
-      s.levels[1].timeSpentSec = l1Pure;
-      s.levels[2].timeSpentSec = l2Pure;
-      s.levels[3].timeSpentSec = l3Pure;
-    }
-
-    ([1, 2, 3] as const).forEach(n => {
-      const l = s.levels[n];
-      if (l.completed) {
-        l.status = 'completed';
-      } else if (l.status === 'reset' && (s.isHardcoreLegend || s.hardcoreAttemptsCount > 0)) {
-        l.status = 'reset';
-      } else if (l.timeSpentSec > 0 || l.errors > 0) {
-        l.status = 'in_progress';
-      } else {
-        l.status = 'not_started';
-      }
-    });
-
-    s.totalActiveTimeSec = Math.max(attemptsTotalTime, s.levels[1].timeSpentSec + s.levels[2].timeSpentSec + s.levels[3].timeSpentSec);
-    
-    const isHardcoreCompleted = s.isHardcoreLegend || s.hardcoreStreakLevels.size >= 3;
-    const isNormalCompleted = s.isNormalMastered || s.normalCompletedLevels.size >= 3;
-    s.hardcoreLevelsConquered = s.allHardcoreCompletedLevels.size;
-
-    ([1, 2, 3] as const).forEach(num => {
-      s.levels[num].hardcore = s.allHardcoreCompletedLevels.has(num);
-    });
-
-    if (isHardcoreCompleted) {
-      s.lessonStatus = 'hardcore_completed';
-      s.isHardcoreLegend = true;
-      s.hardcoreStatus = 'completed';
-    } else if (isNormalCompleted) {
-      s.lessonStatus = 'completed';
-      s.isHardcoreLegend = false;
-      const realHcAttempts = s.attempts.filter((a: any) => a.mode === 'hardcore');
-      if (realHcAttempts.length > 0) {
-        const lastHc = realHcAttempts[realHcAttempts.length - 1];
-        s.hardcoreStatus = lastHc.status === 'failed' ? 'failed' : (lastHc.status === 'completed' ? 'completed' : 'attempting');
-      } else {
-        s.hardcoreStatus = 'none';
-      }
-    } else if (s.normalCompletedLevels.size > 0 || s.hardcoreStreakLevels.size > 0 || s.levels[1].status !== 'not_started' || s.levels[2].status !== 'not_started' || s.levels[3].status !== 'not_started') {
-      s.lessonStatus = 'in_progress';
-      s.isHardcoreLegend = false;
-      const realHcAttempts = s.attempts.filter((a: any) => a.mode === 'hardcore');
-      if (realHcAttempts.length > 0) {
-        const lastHc = realHcAttempts[realHcAttempts.length - 1];
-        s.hardcoreStatus = lastHc.status === 'failed' ? 'failed' : 'attempting';
-      } else {
-        s.hardcoreStatus = 'none';
-      }
-    } else {
-      s.lessonStatus = 'not_started';
-      s.isHardcoreLegend = false;
-      s.hardcoreStatus = 'none';
-    }
-
-    s.isHardcore = isHardcoreCompleted;
-    s.isActiveNow = !!(s.lastSeen && (new Date(s.lastSeen.replace(' ', 'T') + 'Z').toISOString() >= fifteenMinutesAgo));
-    s.recentEvents.reverse();
-
-    s.normalCompletedLevels = Array.from(s.normalCompletedLevels);
-    s.allHardcoreCompletedLevels = Array.from(s.allHardcoreCompletedLevels);
-    s.hardcoreStreakLevels = Array.from(s.hardcoreStreakLevels);
-
-    s.workedLessons = Object.values(s._workedLessonsMap).reverse();
-
-    delete s._attemptsMap;
-    delete s._attemptOrder;
-    delete s._legacyIdx;
-    delete s._lastHc;
-    delete s._workedLessonsMap;
-
-    return s;
-  });
-
-  initialStudents.sort((a, b) => {
-    const timeA = a.lastSeen ? new Date(a.lastSeen + 'Z').getTime() : 0;
-    const timeB = b.lastSeen ? new Date(b.lastSeen + 'Z').getTime() : 0;
-    return timeB - timeA;
-  });
-
-  const completed = initialStudents.filter(s => s.lessonStatus === 'completed' || s.lessonStatus === 'hardcore_completed');
-  initialKpi = {
-    totalStudents: initialStudents.length,
-    completedCount: completed.length,
-    hardcoreCount: initialStudents.filter(s => s.lessonStatus === 'hardcore_completed').length,
-    inProgressCount: initialStudents.filter(s => s.lessonStatus === 'in_progress').length,
-    avgTimeSec: completed.length > 0 ? Math.round(completed.reduce((acc, s) => acc + s.totalActiveTimeSec, 0) / completed.length) : 0,
-    totalErrors: initialStudents.reduce((acc, s) => acc + s.totalErrors, 0)
-  };
-
+  initialStudents = stats.students;
+  availableDates = stats.availableDates;
+  initialKpi = stats.kpi;
 } catch (e) {
   console.error('Teacher SSR error:', e);
 } finally {
@@ -605,6 +52,18 @@ function getAttemptsWord(count: number): string {
   if (mod10 === 1) return 'забег';
   if (mod10 >= 2 && mod10 <= 4) return 'забега';
   return 'забегов';
+}
+
+function getStarsParts(lvl: any) {
+  if (!lvl || !lvl.currentStage || !lvl.totalStages) return null;
+  const total = Math.max(1, lvl.totalStages);
+  const filled = Math.max(0, Math.min(total, lvl.currentStage));
+  const empty = Math.max(0, total - filled);
+  return {
+    filledStr: '★'.repeat(filled),
+    emptyStr: '☆'.repeat(empty),
+    title: `Этап ${lvl.currentStage} из ${total}`
+  };
 }
 ---
 
@@ -895,62 +354,52 @@ function getAttemptsWord(count: number): string {
                       </button>
                     </td>
                     
-                    <!-- Level 1 Badge -->
-                    <td class="p-3 text-center">
-                      {s.levels[1].completed ? (
-                        <span class={`inline-block px-2 py-1 text-xs border ${s.levels[1].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                          {s.levels[1].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[1].timeSpentSec)} • {s.levels[1].errors} ош.
-                        </span>
-                      ) : s.levels[1].status === 'in_progress' ? (
-                        <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                          ⏳ {formatSec(s.levels[1].timeSpentSec)}
-                        </span>
-                      ) : s.levels[1].status === 'reset' ? (
-                        <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                          ❌ Сброс
-                        </span>
-                      ) : (
-                        <span class="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
-
-                    <!-- Level 2 Badge -->
-                    <td class="p-3 text-center">
-                      {s.levels[2].completed ? (
-                        <span class={`inline-block px-2 py-1 text-xs border ${s.levels[2].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                          {s.levels[2].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[2].timeSpentSec)} • {s.levels[2].errors} ош.
-                        </span>
-                      ) : s.levels[2].status === 'in_progress' ? (
-                        <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                          ⏳ {formatSec(s.levels[2].timeSpentSec)}
-                        </span>
-                      ) : s.levels[2].status === 'reset' ? (
-                        <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                          ❌ Сброс
-                        </span>
-                      ) : (
-                        <span class="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
-
-                    <!-- Level 3 Badge -->
-                    <td class="p-3 text-center">
-                      {s.levels[3].completed ? (
-                        <span class={`inline-block px-2 py-1 text-xs border ${s.levels[3].hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                          {s.levels[3].hardcore ? '💀 ' : ''}✓ {formatSec(s.levels[3].timeSpentSec)} • {s.levels[3].errors} ош.
-                        </span>
-                      ) : s.levels[3].status === 'in_progress' ? (
-                        <span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                          ⏳ {formatSec(s.levels[3].timeSpentSec)}
-                        </span>
-                      ) : s.levels[3].status === 'reset' ? (
-                        <span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                          ❌ Сброс
-                        </span>
-                      ) : (
-                        <span class="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
+                    <!-- Levels 1-3 Badges -->
+                    {[1, 2, 3].map((lvlNum) => {
+                      const lvl = s.levels[lvlNum];
+                      const stars = getStarsParts(lvl);
+                      const resetWaveText = lvlNum === 3 && lvl?.lastResetWave ? ` • В.${lvl.lastResetWave}` : '';
+                      const errText = lvl?.errors > 0 ? ` • ${lvl.errors} ош.` : '';
+                      return (
+                        <td class="p-3 text-center">
+                          {lvl?.completed ? (
+                            <span
+                              class={`inline-block px-2 py-1 text-xs border ${lvl.hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}
+                              title={lvlNum === 3 && lvl.lastResetWave ? `Последний сброс был на волне ${lvl.lastResetWave}` : undefined}
+                            >
+                              {lvl.hardcore ? '💀 ' : ''}✓ {formatSec(lvl.timeSpentSec)} • {lvl.errors} ош.
+                            </span>
+                          ) : lvl?.status === 'in_progress' ? (
+                            <div class="inline-flex flex-col items-center gap-0.5 px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              <span>⏳ {formatSec(lvl.timeSpentSec)}{errText}</span>
+                              {(stars || (lvlNum === 3 && lvl.lastResetWave)) && (
+                                <span class="inline-flex items-center gap-1 text-[10px] leading-none">
+                                  {stars && (
+                                    <span title={stars.title} class="tracking-tighter">
+                                      <span class="text-amber-500">{stars.filledStr}</span><span class="text-gray-300">{stars.emptyStr}</span>
+                                    </span>
+                                  )}
+                                  {lvlNum === 3 && lvl.lastResetWave && (
+                                    <span class="text-red-600 font-semibold" title={`Последний сброс на волне ${lvl.lastResetWave}`}>
+                                      ↩ В.{lvl.lastResetWave}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          ) : lvl?.status === 'reset' ? (
+                            <span
+                              class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200"
+                              title={lvlNum === 3 && lvl.lastResetWave ? `Сброс на волне ${lvl.lastResetWave}` : undefined}
+                            >
+                              ❌ Сброс{resetWaveText}{errText}
+                            </span>
+                          ) : (
+                            <span class="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
 
                     <!-- Logo-Storm Sprint Speed -->
                     <td class="p-3 text-center whitespace-nowrap">
@@ -1026,57 +475,45 @@ function getAttemptsWord(count: number): string {
                         <td class="p-2.5 text-center text-[11px] text-gray-600 font-mono font-medium">
                           {att.completedLevelsCount}/3 ур.
                         </td>
-                        <td class="p-2.5 text-center">
-                          {att.levels[1]?.completed ? (
-                            <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                              ✓ {formatSec(att.levels[1].timeSpentSec)} • {att.levels[1].errors} ош.
-                            </span>
-                          ) : att.levels[1]?.status === 'in_progress' ? (
-                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                              ⏳ {formatSec(att.levels[1].timeSpentSec)}
-                            </span>
-                          ) : att.levels[1]?.status === 'reset' ? (
-                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
-                              ❌ Сброс
-                            </span>
-                          ) : (
-                            <span class="text-gray-300 text-[11px]">—</span>
-                          )}
-                        </td>
-                        <td class="p-2.5 text-center">
-                          {att.levels[2]?.completed ? (
-                            <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                              ✓ {formatSec(att.levels[2].timeSpentSec)} • {att.levels[2].errors} ош.
-                            </span>
-                          ) : att.levels[2]?.status === 'in_progress' ? (
-                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                              ⏳ {formatSec(att.levels[2].timeSpentSec)}
-                            </span>
-                          ) : att.levels[2]?.status === 'reset' ? (
-                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
-                              ❌ Сброс
-                            </span>
-                          ) : (
-                            <span class="text-gray-300 text-[11px]">—</span>
-                          )}
-                        </td>
-                        <td class="p-2.5 text-center">
-                          {att.levels[3]?.completed ? (
-                            <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
-                              ✓ {formatSec(att.levels[3].timeSpentSec)} • {att.levels[3].errors} ош.
-                            </span>
-                          ) : att.levels[3]?.status === 'in_progress' ? (
-                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                              ⏳ {formatSec(att.levels[3].timeSpentSec)}
-                            </span>
-                          ) : att.levels[3]?.status === 'reset' ? (
-                            <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
-                              ❌ Сброс
-                            </span>
-                          ) : (
-                            <span class="text-gray-300 text-[11px]">—</span>
-                          )}
-                        </td>
+                        {[1, 2, 3].map((lvlNum) => {
+                          const lvl = att.levels[lvlNum];
+                          const stars = getStarsParts(lvl);
+                          const resetWaveText = lvlNum === 3 && lvl?.lastResetWave ? ` • В.${lvl.lastResetWave}` : '';
+                          const errText = lvl?.errors > 0 ? ` • ${lvl.errors} ош.` : '';
+                          return (
+                            <td class="p-2.5 text-center">
+                              {lvl?.completed ? (
+                                <span class={`inline-block px-1.5 py-0.5 text-[11px] border ${isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium'}`}>
+                                  ✓ {formatSec(lvl.timeSpentSec)} • {lvl.errors} ош.
+                                </span>
+                              ) : lvl?.status === 'in_progress' ? (
+                                <div class="inline-flex flex-col items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                  <span>⏳ {formatSec(lvl.timeSpentSec)}{errText}</span>
+                                  {(stars || (lvlNum === 3 && lvl.lastResetWave)) && (
+                                    <span class="inline-flex items-center gap-1 text-[9px] leading-none">
+                                      {stars && (
+                                        <span title={stars.title} class="tracking-tighter">
+                                          <span class="text-amber-500">{stars.filledStr}</span><span class="text-gray-300">{stars.emptyStr}</span>
+                                        </span>
+                                      )}
+                                      {lvlNum === 3 && lvl.lastResetWave && (
+                                        <span class="text-red-600 font-semibold" title={`Последний сброс на волне ${lvl.lastResetWave}`}>
+                                          ↩ В.{lvl.lastResetWave}
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : lvl?.status === 'reset' ? (
+                                <span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                                  ❌ Сброс{resetWaveText}{errText}
+                                </span>
+                              ) : (
+                                <span class="text-gray-300 text-[11px]">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td class="p-2.5 text-center whitespace-nowrap">
                           {att.sprintCpm ? (
                             <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[11px] font-semibold bg-cyan-100 text-cyan-800 border border-cyan-300" title={`Лого-Шторм: скорость ${att.sprintCpm} зн/мин (${att.sprintWpm || Math.round(att.sprintCpm / 5)} сл/мин)${att.sprintTimeSec ? `, время ${formatSec(att.sprintTimeSec)}` : ''}`}>
@@ -1587,18 +1024,38 @@ function getAttemptsWord(count: number): string {
         `;
       }
 
-      function levelBadge(lvl) {
+      function renderStageStarsHtml(lvl, small = false) {
+        if (!lvl || !lvl.currentStage || !lvl.totalStages) return '';
+        const total = Math.max(1, lvl.totalStages);
+        const filled = Math.max(0, Math.min(total, lvl.currentStage));
+        const empty = Math.max(0, total - filled);
+        const sz = small ? 'text-[9px]' : 'text-[10px]';
+        return `<span class="tracking-tighter leading-none ${sz}" title="Этап ${lvl.currentStage} из ${total}"><span class="text-amber-500">${'★'.repeat(filled)}</span><span class="text-gray-300">${'☆'.repeat(empty)}</span></span>`;
+      }
+
+      function levelBadge(lvl, lvlNum) {
         if (!lvl) return '<span class="text-gray-300 text-xs">—</span>';
+        const resetWaveText = lvlNum === 3 && lvl.lastResetWave ? ` • В.${lvl.lastResetWave}` : '';
+        const errText = lvl.errors > 0 ? ` • ${lvl.errors} ош.` : '';
         if (lvl.completed) {
           const hc = lvl.hardcore ? '💀 ' : '';
           const hcClass = lvl.hardcore ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium';
-          return `<span class="inline-block px-2 py-1 text-xs ${hcClass} border">${hc}✓ ${formatTime(lvl.timeSpentSec)} • ${lvl.errors} ош.</span>`;
+          const titleAttr = lvlNum === 3 && lvl.lastResetWave ? ` title="Последний сброс был на волне ${lvl.lastResetWave}"` : '';
+          return `<span class="inline-block px-2 py-1 text-xs ${hcClass} border"${titleAttr}>${hc}✓ ${formatTime(lvl.timeSpentSec)} • ${lvl.errors} ош.</span>`;
         }
         if (lvl.status === 'in_progress') {
-          return `<span class="inline-block px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">⏳ ${formatTime(lvl.timeSpentSec)}</span>`;
+          const starsHtml = renderStageStarsHtml(lvl, false);
+          const resetSub = lvlNum === 3 && lvl.lastResetWave
+            ? `<span class="text-red-600 font-semibold" title="Последний сброс на волне ${lvl.lastResetWave}">↩ В.${lvl.lastResetWave}</span>`
+            : '';
+          const subLine = (starsHtml || resetSub)
+            ? `<span class="inline-flex items-center gap-1 leading-none">${starsHtml}${resetSub}</span>`
+            : '';
+          return `<div class="inline-flex flex-col items-center gap-0.5 px-2 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><span>⏳ ${formatTime(lvl.timeSpentSec)}${errText}</span>${subLine}</div>`;
         }
         if (lvl.status === 'reset') {
-          return `<span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">❌ Сброс</span>`;
+          const titleAttr = lvlNum === 3 && lvl.lastResetWave ? ` title="Сброс на волне ${lvl.lastResetWave}"` : '';
+          return `<span class="inline-block px-2 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200"${titleAttr}>❌ Сброс${resetWaveText}${errText}</span>`;
         }
         return '<span class="text-gray-300 text-xs">—</span>';
       }
@@ -1627,9 +1084,9 @@ function getAttemptsWord(count: number): string {
           <td class="p-3 text-xs text-gray-600">${s.className}</td>
           <td class="p-3 text-center"><div class="inline-flex flex-col items-center gap-0.5">${statusBadge}${princeBadgeHtml}${workedPillsHtml}</div></td>
           <td class="p-3 text-center">${attemptsBadge}</td>
-          <td class="p-3 text-center">${levelBadge(s.levels[1])}</td>
-          <td class="p-3 text-center">${levelBadge(s.levels[2])}</td>
-          <td class="p-3 text-center">${levelBadge(s.levels[3])}</td>
+          <td class="p-3 text-center">${levelBadge(s.levels[1], 1)}</td>
+          <td class="p-3 text-center">${levelBadge(s.levels[2], 2)}</td>
+          <td class="p-3 text-center">${levelBadge(s.levels[3], 3)}</td>
           <td class="p-3 text-center whitespace-nowrap">${sprintBadge}</td>
           <td class="p-3 text-center font-mono font-semibold text-gray-800">${formatTime(s.totalActiveTimeSec)}</td>
           <td class="p-3 text-center"><span class="inline-block px-2 py-0.5 text-xs font-bold ${errClass}">${s.totalErrors}</span></td>
@@ -1656,18 +1113,27 @@ function getAttemptsWord(count: number): string {
             attStatusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">⏳ В процессе</span>';
           }
 
-          function subLevelBadge(lvl) {
+          function subLevelBadge(lvl, lvlNum) {
             if (!lvl) return '<span class="text-gray-300 text-[11px]">—</span>';
+            const resetWaveText = lvlNum === 3 && lvl.lastResetWave ? ` • В.${lvl.lastResetWave}` : '';
+            const errText = lvl.errors > 0 ? ` • ${lvl.errors} ош.` : '';
             if (lvl.completed) {
               const hc = isHc ? '💀 ' : '';
               const hcClass = isHc ? 'bg-red-50 text-red-700 border-red-200 font-semibold' : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium';
               return `<span class="inline-block px-1.5 py-0.5 text-[11px] ${hcClass} border">${hc}✓ ${formatTime(lvl.timeSpentSec)} • ${lvl.errors} ош.</span>`;
             }
             if (lvl.status === 'in_progress') {
-              return `<span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">⏳ ${formatTime(lvl.timeSpentSec)}</span>`;
+              const starsHtml = renderStageStarsHtml(lvl, true);
+              const resetSub = lvlNum === 3 && lvl.lastResetWave
+                ? `<span class="text-red-600 font-semibold" title="Последний сброс на волне ${lvl.lastResetWave}">↩ В.${lvl.lastResetWave}</span>`
+                : '';
+              const subLine = (starsHtml || resetSub)
+                ? `<span class="inline-flex items-center gap-1 leading-none">${starsHtml}${resetSub}</span>`
+                : '';
+              return `<div class="inline-flex flex-col items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200"><span>⏳ ${formatTime(lvl.timeSpentSec)}${errText}</span>${subLine}</div>`;
             }
             if (lvl.status === 'reset') {
-              return `<span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">❌ Сброс</span>`;
+              return `<span class="inline-block px-1.5 py-0.5 text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">❌ Сброс${resetWaveText}${errText}</span>`;
             }
             return '<span class="text-gray-300 text-[11px]">—</span>';
           }
@@ -1693,9 +1159,9 @@ function getAttemptsWord(count: number): string {
               <td class="p-2.5 text-center text-[11px] text-gray-500">${(att.courseSlug || att.lessonId) ? renderCourseLessonPill(att.courseSlug, att.lessonId, s.className) : '<span class="text-gray-400 font-mono">—</span>'}</td>
               <td class="p-2.5 text-center">${attStatusBadge}</td>
               <td class="p-2.5 text-center text-[11px] text-gray-600 font-mono font-medium">${att.completedLevelsCount}/3 ур.</td>
-              <td class="p-2.5 text-center">${subLevelBadge(att.levels[1])}</td>
-              <td class="p-2.5 text-center">${subLevelBadge(att.levels[2])}</td>
-              <td class="p-2.5 text-center">${subLevelBadge(att.levels[3])}</td>
+              <td class="p-2.5 text-center">${subLevelBadge(att.levels[1], 1)}</td>
+              <td class="p-2.5 text-center">${subLevelBadge(att.levels[2], 2)}</td>
+              <td class="p-2.5 text-center">${subLevelBadge(att.levels[3], 3)}</td>
               <td class="p-2.5 text-center whitespace-nowrap">${attSprintBadge}</td>
               <td class="p-2.5 text-center font-mono font-medium text-gray-800 text-xs">${formatTime(att.totalTimeSec)}</td>
               <td class="p-2.5 text-center"><span class="inline-block px-1.5 py-0.2 text-[11px] font-bold ${attErrClass}">${att.errorsCount}</span></td>
@@ -1754,11 +1220,18 @@ function getAttemptsWord(count: number): string {
       const l = student.levels[lvlNum];
       const statusText = l.completed ? '✓ Сдан' : l.status === 'in_progress' ? '⏳ В работе' : l.status === 'reset' ? '❌ Сброс' : '⚪ Не начат';
       const color = l.completed ? 'border-green-300 bg-green-50 text-green-900' : l.status === 'in_progress' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-gray-200 bg-gray-50 text-gray-600';
+      const stars = l.status === 'in_progress' && l.currentStage && l.totalStages
+        ? `<div class="text-xs mt-1 tracking-tighter"><span class="text-amber-500">${'★'.repeat(Math.min(l.totalStages, l.currentStage))}</span><span class="text-gray-300">${'☆'.repeat(Math.max(0, l.totalStages - l.currentStage))}</span></div>`
+        : '';
+      const resetWave = lvlNum === 3 && l.lastResetWave
+        ? `<div class="text-[11px] text-red-700 font-semibold mt-0.5">Последний сброс: Волна ${l.lastResetWave}</div>`
+        : '';
       cardsHtml += `
         <div class="border p-2.5 ${color}">
           <div class="text-xs font-bold uppercase">Уровень ${lvlNum}</div>
           <div class="text-sm font-semibold mt-1">${statusText}</div>
           <div class="text-xs opacity-75 mt-0.5">Время: ${formatTime(l.timeSpentSec)} • Ошибки: ${l.errors}</div>
+          ${stars}${resetWave}
         </div>
       `;
     });
@@ -1812,7 +1285,11 @@ function getAttemptsWord(count: number): string {
           function miniLvl(l, num) {
             if (!l) return `<span class="text-[11px] text-gray-400">Ур.${num}: —</span>`;
             const icon = l.completed ? '✓' : l.status === 'reset' ? '❌' : l.status === 'in_progress' ? '⏳' : '—';
-            return `<span class="text-[11px] text-gray-700">Ур.${num}: <strong>${icon} ${formatTime(l.timeSpentSec)}</strong></span>`;
+            const waveHint = num === 3 && l.lastResetWave ? ` <span class="text-red-600">(В.${l.lastResetWave})</span>` : '';
+            const stageHint = l.status === 'in_progress' && l.currentStage && l.totalStages
+              ? ` <span class="text-amber-500 tracking-tighter">${'★'.repeat(Math.min(l.totalStages, l.currentStage))}</span>`
+              : '';
+            return `<span class="text-[11px] text-gray-700">Ур.${num}: <strong>${icon} ${formatTime(l.timeSpentSec)}</strong>${stageHint}${waveHint}</span>`;
           }
 
           attHtml += `
