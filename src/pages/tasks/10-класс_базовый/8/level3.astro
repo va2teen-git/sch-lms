@@ -232,6 +232,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     createApp({
         data() {
             return {
+                missionName: 'Урок 8 :: Подходы к измерению информации (Уровень 3)',
                 gameState: 'intro', // 'intro', 'playing', 'victory'
                 currentWave: 1,
                 totalWaves: 10,
@@ -243,6 +244,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 timeLeft: 8.0,
                 currentWaveDuration: 8.0,
                 waveTimerId: null,
+                resetTimeoutId: null,
+                telemetry: null,
                 
                 showErrorAlert: false,
                 errorMessage: '',
@@ -263,21 +266,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 return `${m}:${s}`;
             },
 
-            sendTelemetry(actionType, isSuccess) {
-                const spent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 8 :: Подходы к измерению информации (Уровень 3)',
-                    action_type: actionType,
-                    status: isSuccess ? 'completed' : 'in_progress',
-                    start_time: new Date(this.startTime).toISOString(),
-                    time_spent_sec: spent,
-                    attempts_count: this.attempts,
-                    success: isSuccess
-                }, '*');
-            },
-
             startGame() {
+                if (this.resetTimeoutId) clearTimeout(this.resetTimeoutId);
                 this.startTime = Date.now();
                 this.sessionTime = 0;
                 this.attempts = 0;
@@ -285,13 +275,27 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.showErrorAlert = false;
                 this.gameState = 'playing';
 
-                this.sendTelemetry('in_progress', false);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalWaves);
+                    this.telemetry.progress({
+                        wave: 1,
+                        total_waves: this.totalWaves,
+                        stage: 1,
+                        total_stages: this.totalWaves
+                    });
+                }
 
                 if (this.sessionTimerId) clearInterval(this.sessionTimerId);
                 this.sessionTimerId = setInterval(() => {
-                    this.sessionTime = Math.floor((Date.now() - this.startTime) / 1000);
+                    this.sessionTime = this.telemetry
+                        ? this.telemetry.getTimeSpentSec()
+                        : Math.floor((Date.now() - this.startTime) / 1000);
                 }, 1000);
 
+                window.removeEventListener('keydown', this.handleKeyDown);
                 window.addEventListener('keydown', this.handleKeyDown);
                 this.loadWave(1);
             },
@@ -504,7 +508,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     if (this.timeLeft <= 0) {
                         this.timeLeft = 0;
                         clearInterval(this.waveTimerId);
-                        this.triggerHardcoreReset('Время такта истекло! Шлюз заблокирован.');
+                        this.triggerHardcoreReset('Время такта истекло! Шлюз заблокирован.', true);
                     }
                 }, tickInterval);
             },
@@ -512,12 +516,20 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             handleGateChoice(choice) {
                 if (this.gameState !== 'playing') return;
                 if (this.showErrorAlert) return;
+                if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+                if (this.telemetry) {
+                    this.telemetry.markActivity();
+                }
 
                 if (choice === this.currentPacket.isSufficient) {
                     // Верное решение
                     playSuccessChime();
                     if (this.currentWave < this.totalWaves) {
-                        this.loadWave(this.currentWave + 1);
+                        const nextWave = this.currentWave + 1;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(nextWave);
+                        }
+                        this.loadWave(nextWave);
                     } else {
                         this.finishGame();
                     }
@@ -527,7 +539,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     const reason = this.currentPacket.isSufficient 
                         ? 'Емкость была ДЕЙСТВИТЕЛЬНО достаточна! Ложная отбраковка.' 
                         : 'Входящий объем превышал лимит! Допущен сбой переполнения.';
-                    this.triggerHardcoreReset(reason);
+                    this.triggerHardcoreReset(reason, false);
                 }
             },
 
@@ -545,28 +557,51 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
             },
 
-            triggerHardcoreReset(msg) {
+            triggerHardcoreReset(msg, isTimeout = false) {
                 if (this.waveTimerId) clearInterval(this.waveTimerId);
+                if (this.resetTimeoutId) clearTimeout(this.resetTimeoutId);
                 playAlarmSiren();
 
-                this.attempts++;
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: this.currentWave,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        this.showErrorAlert = false;
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
+
                 this.errorMessage = msg;
                 this.showErrorAlert = true;
-                this.sendTelemetry('hardcore_reset', false);
 
-                setTimeout(() => {
+                this.resetTimeoutId = setTimeout(() => {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.showErrorAlert = false;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
                     this.loadWave(1);
                 }, 1600);
             },
 
             finishGame() {
+                if (this.gameState === 'victory') return;
                 if (this.waveTimerId) clearInterval(this.waveTimerId);
                 if (this.sessionTimerId) clearInterval(this.sessionTimerId);
+                if (this.resetTimeoutId) clearTimeout(this.resetTimeoutId);
                 window.removeEventListener('keydown', this.handleKeyDown);
 
                 this.gameState = 'victory';
-                this.sendTelemetry('level_complete', true);
+                if (this.telemetry) {
+                    this.telemetry.complete({ wave: this.totalWaves, stage: this.totalWaves });
+                }
             },
 
             restartGame() {
@@ -574,6 +609,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
         },
         mounted() {
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: this.missionName,
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    if (this.waveTimerId) clearInterval(this.waveTimerId);
+                    if (this.resetTimeoutId) clearTimeout(this.resetTimeoutId);
+                    this.showErrorAlert = false;
+                },
+                onAfkRetry: () => {
+                    this.showErrorAlert = false;
+                    if (this.gameState === 'playing') {
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.loadWave(1);
+                    }
+                }
+            });
             window.__DEV_LEVEL3_STATE__ = {
                 getCurrentWave: () => this.currentWave,
                 getAttempts: () => this.attempts,
@@ -589,7 +642,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         beforeUnmount() {
             if (this.waveTimerId) clearInterval(this.waveTimerId);
             if (this.sessionTimerId) clearInterval(this.sessionTimerId);
+            if (this.resetTimeoutId) clearTimeout(this.resetTimeoutId);
             window.removeEventListener('keydown', this.handleKeyDown);
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
         }
     }).mount('#vue-app');
 </script>

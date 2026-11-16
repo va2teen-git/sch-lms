@@ -202,36 +202,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
     document.addEventListener('DOMContentLoaded', () => {
-        const startTime = Date.now();
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 7 :: Двоичное кодирование (Уровень 1)',
+            level: 1,
+            totalStages: 3
+        });
         let attempts = 0;
         let currentPhase = 1;
         let selectedItem = null;
+        let isProcessing = false;
+        let isLevelCompleted = false;
 
-        // Таймер
+        // Таймер (отсчёт идёт с первого реального действия)
         const timerDisplay = document.getElementById('timer-display');
         setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const s = String(elapsed % 60).padStart(2, '0');
             if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
         }, 1000);
-
-        // Телеметрия
-        function sendTelemetry(actionType, isSuccess) {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: 'Урок 7 :: Двоичное кодирование (Уровень 1)',
-                action_type: actionType,
-                status: isSuccess ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attempts,
-                success: isSuccess
-            }, '*');
-        }
-
-        sendTelemetry('in_progress', false);
 
         // Уведомление об ошибке
         const feedbackBox = document.getElementById('feedback-box');
@@ -239,14 +228,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const attemptsDisplay = document.getElementById('attempts-display');
 
         function triggerError(msg, callback) {
-            attempts++;
+            if (isProcessing || isLevelCompleted) return;
+            isProcessing = true;
+            telemetry.hardcoreReset({ stage: currentPhase });
+            attempts = telemetry.getState().attemptsCount;
             if (attemptsDisplay) attemptsDisplay.textContent = attempts;
             if (feedbackText) feedbackText.textContent = msg;
             if (feedbackBox) feedbackBox.classList.remove('d-none');
-            sendTelemetry('hardcore_reset', false);
 
             setTimeout(() => {
                 if (feedbackBox) feedbackBox.classList.add('d-none');
+                isProcessing = false;
                 if (callback) callback();
             }, 1200);
         }
@@ -319,7 +311,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 card.addEventListener('dragend', () => card.classList.remove('opacity-50'));
 
                 // Click-to-move support
-                card.addEventListener('click', () => {
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     if (selectedItem === card) {
                         card.classList.remove('border-warning');
                         selectedItem = null;
@@ -333,54 +326,58 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 pool.appendChild(card);
             });
 
-            // Настройка дроп-зон
-            buckets.forEach(bucket => {
-                const slot = bucket.querySelector('.bucket-slot');
-                
-                bucket.addEventListener('dragover', (e) => e.preventDefault());
-                bucket.addEventListener('drop', (e) => {
+            // Настройка дроп-зон (однократная привязка, чтобы избежать дублирования слушателей при сбросе)
+            if (!pool.dataset.bound) {
+                pool.dataset.bound = '1';
+
+                buckets.forEach(bucket => {
+                    const slot = bucket.querySelector('.bucket-slot');
+                    
+                    bucket.addEventListener('dragover', (e) => e.preventDefault());
+                    bucket.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const cardId = e.dataTransfer.getData('text/plain');
+                        const card = document.querySelector(`[data-id="${cardId}"]`);
+                        if (card) {
+                            slot.appendChild(card);
+                            updateBucketCounters();
+                            checkP1Readiness();
+                        }
+                    });
+
+                    bucket.addEventListener('click', () => {
+                        if (selectedItem) {
+                            slot.appendChild(selectedItem);
+                            selectedItem.classList.remove('border-warning');
+                            selectedItem = null;
+                            updateBucketCounters();
+                            checkP1Readiness();
+                        }
+                    });
+                });
+
+                // Пул тоже может принимать карточки обратно
+                pool.addEventListener('dragover', (e) => e.preventDefault());
+                pool.addEventListener('drop', (e) => {
                     e.preventDefault();
                     const cardId = e.dataTransfer.getData('text/plain');
                     const card = document.querySelector(`[data-id="${cardId}"]`);
                     if (card) {
-                        slot.appendChild(card);
+                        pool.appendChild(card);
                         updateBucketCounters();
                         checkP1Readiness();
                     }
                 });
-
-                bucket.addEventListener('click', () => {
+                pool.addEventListener('click', () => {
                     if (selectedItem) {
-                        slot.appendChild(selectedItem);
+                        pool.appendChild(selectedItem);
                         selectedItem.classList.remove('border-warning');
                         selectedItem = null;
                         updateBucketCounters();
                         checkP1Readiness();
                     }
                 });
-            });
-
-            // Пул тоже может принимать карточки обратно
-            pool.addEventListener('dragover', (e) => e.preventDefault());
-            pool.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const cardId = e.dataTransfer.getData('text/plain');
-                const card = document.querySelector(`[data-id="${cardId}"]`);
-                if (card) {
-                    pool.appendChild(card);
-                    updateBucketCounters();
-                    checkP1Readiness();
-                }
-            });
-            pool.addEventListener('click', () => {
-                if (selectedItem) {
-                    pool.appendChild(selectedItem);
-                    selectedItem.classList.remove('border-warning');
-                    selectedItem = null;
-                    updateBucketCounters();
-                    checkP1Readiness();
-                }
-            });
+            }
 
             resetBtn.onclick = () => {
                 document.querySelectorAll('.draggable-item').forEach(c => pool.appendChild(c));
@@ -499,7 +496,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 });
                 tok.addEventListener('dragend', () => tok.classList.remove('opacity-50'));
 
-                tok.addEventListener('click', () => {
+                tok.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     if (selectedItem === tok) {
                         tok.classList.remove('border-warning');
                         selectedItem = null;
@@ -546,24 +544,27 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 checkP2Readiness();
             }
 
-            pool.addEventListener('dragover', (e) => e.preventDefault());
-            pool.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const tokId = e.dataTransfer.getData('text/plain');
-                const tok = document.querySelector(`[data-token-id="${tokId}"]`);
-                if (tok) {
-                    pool.appendChild(tok);
-                    checkP2Readiness();
-                }
-            });
-            pool.addEventListener('click', () => {
-                if (selectedItem && selectedItem.classList.contains('p2-token')) {
-                    pool.appendChild(selectedItem);
-                    selectedItem.classList.remove('border-warning');
-                    selectedItem = null;
-                    checkP2Readiness();
-                }
-            });
+            if (!pool.dataset.bound) {
+                pool.dataset.bound = '1';
+                pool.addEventListener('dragover', (e) => e.preventDefault());
+                pool.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const tokId = e.dataTransfer.getData('text/plain');
+                    const tok = document.querySelector(`[data-token-id="${tokId}"]`);
+                    if (tok) {
+                        pool.appendChild(tok);
+                        checkP2Readiness();
+                    }
+                });
+                pool.addEventListener('click', () => {
+                    if (selectedItem && selectedItem.classList.contains('p2-token')) {
+                        pool.appendChild(selectedItem);
+                        selectedItem.classList.remove('border-warning');
+                        selectedItem = null;
+                        checkP2Readiness();
+                    }
+                });
+            }
 
             resetBtn.onclick = () => {
                 document.querySelectorAll('.p2-token').forEach(t => pool.appendChild(t));
@@ -640,7 +641,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 });
                 badge.addEventListener('dragend', () => badge.classList.remove('opacity-50'));
 
-                badge.addEventListener('click', () => {
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     if (selectedItem === badge) {
                         badge.classList.remove('border-warning');
                         selectedItem = null;
@@ -747,24 +749,27 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 checkP3Readiness();
             }
 
-            pool.addEventListener('dragover', (e) => e.preventDefault());
-            pool.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const symId = e.dataTransfer.getData('text/plain');
-                const sym = document.querySelector(`[data-sym-id="${symId}"]`);
-                if (sym) {
-                    pool.appendChild(sym);
-                    checkP3Readiness();
-                }
-            });
-            pool.addEventListener('click', () => {
-                if (selectedItem && selectedItem.classList.contains('p3-sym-token')) {
-                    pool.appendChild(selectedItem);
-                    selectedItem.classList.remove('border-warning');
-                    selectedItem = null;
-                    checkP3Readiness();
-                }
-            });
+            if (!pool.dataset.bound) {
+                pool.dataset.bound = '1';
+                pool.addEventListener('dragover', (e) => e.preventDefault());
+                pool.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const symId = e.dataTransfer.getData('text/plain');
+                    const sym = document.querySelector(`[data-sym-id="${symId}"]`);
+                    if (sym) {
+                        pool.appendChild(sym);
+                        checkP3Readiness();
+                    }
+                });
+                pool.addEventListener('click', () => {
+                    if (selectedItem && selectedItem.classList.contains('p3-sym-token')) {
+                        pool.appendChild(selectedItem);
+                        selectedItem.classList.remove('border-warning');
+                        selectedItem = null;
+                        checkP3Readiness();
+                    }
+                });
+            }
 
             function checkP3Readiness() {
                 const placed = document.querySelectorAll('.tree-slot .p3-sym-token').length;
@@ -812,6 +817,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         // ==========================================
         function goToPhase2() {
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase1-container').classList.add('d-none');
             document.getElementById('phase2-container').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
@@ -822,6 +828,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         function goToPhase3() {
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase2-container').classList.add('d-none');
             document.getElementById('phase3-container').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
@@ -831,7 +838,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         function finishLevel() {
-            const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
+            if (isLevelCompleted) return;
+            isLevelCompleted = true;
+            const timeSpent = Math.max(1, telemetry.getTimeSpentSec());
             const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
             const s = String(timeSpent % 60).padStart(2, '0');
 
@@ -845,7 +854,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('final-time').textContent = `${m}:${s}`;
             document.getElementById('final-attempts').textContent = attempts + 1;
 
-            sendTelemetry('level_complete', true);
+            telemetry.complete({ stage: 3 });
 
             document.getElementById('restart-level-btn').onclick = () => {
                 location.reload();
@@ -854,5 +863,5 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         // Старт с 1 фазы
         initPhase1();
-    });
+    }, { once: true });
 </script>

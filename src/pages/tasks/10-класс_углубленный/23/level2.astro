@@ -203,33 +203,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (() => {
     const MISSION_NAME = 'Урок 23 :: Шифрование данных (Уровень 2)';
-    const startTime = Date.now();
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 2,
+        totalStages: 5
+    });
     let attemptsCount = 0;
     let currentPhase = 1;
+    let isLevelCompleted = false;
 
-    // Таймер
+    // Таймер (отсчёт идёт с первого реального действия)
     setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         const el = document.getElementById('timer-display');
         if (el) el.textContent = `${m}:${s}`;
     }, 1000);
 
-    // Первичная телеметрия
-    window.parent.postMessage({
-        type: 'TELEMETRY_EVENT',
-        mission_name: MISSION_NAME,
-        action_type: 'in_progress',
-        status: 'in_progress',
-        start_time: new Date(startTime).toISOString(),
-        time_spent_sec: 0,
-        attempts_count: 0,
-        success: false
-    }, '*');
-
     function notifyError(msg) {
-        attemptsCount++;
+        if (isLevelCompleted) return;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         const attEl = document.getElementById('attempts-display');
         if (attEl) attEl.textContent = attemptsCount;
 
@@ -240,34 +235,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             fb.classList.remove('d-none');
         }
 
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: MISSION_NAME,
-            action_type: 'hardcore_reset',
-            status: 'in_progress',
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: Math.floor((Date.now() - startTime) / 1000),
-            attempts_count: attemptsCount,
-            success: false
-        }, '*');
-
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
         }, 2000);
     }
 
     function notifyComplete() {
-        const totalSec = Math.floor((Date.now() - startTime) / 1000);
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: MISSION_NAME,
-            action_type: 'level_complete',
-            status: 'completed',
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: totalSec,
-            attempts_count: attemptsCount,
-            success: true
-        }, '*');
+        if (isLevelCompleted) return;
+        isLevelCompleted = true;
+        telemetry.complete({ stage: 5 });
 
         for (let i = 1; i <= 5; i++) {
             document.getElementById(`phase${i}`)?.classList.add('d-none');
@@ -283,6 +259,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function switchPhase(next) {
         document.getElementById(`phase${currentPhase}`)?.classList.add('d-none');
         currentPhase = next;
+        telemetry.advanceStage(next);
         document.getElementById(`phase${currentPhase}`)?.classList.remove('d-none');
 
         const badge = document.getElementById('level-badge');
