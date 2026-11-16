@@ -328,8 +328,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script is:inline>
         const { createApp } = Vue;
         const missionName = 'Урок 27 :: Непрерывные и дискретные сигналы (Уровень 3)';
-        let sessionStartTime = Date.now();
-        let attemptsCount = 0;
+        const TOTAL_WAVES = 10;
 
         // Звуковой синтезатор на базе Web Audio API
         let audioCtx = null;
@@ -359,25 +358,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 osc.start();
                 osc.stop(ctx.currentTime + duration);
             } catch(e) {}
-        }
-
-        // Отправка телеметрии
-        function sendTelemetry(actionType, successStatus, statusStr) {
-            const payload = {
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: actionType,
-                status: statusStr,
-                start_time: new Date(sessionStartTime).toISOString(),
-                time_spent_sec: Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000)),
-                attempts_count: attemptsCount,
-                success: successStatus
-            };
-            try {
-                window.parent.postMessage(payload, '*');
-            } catch(e) {
-                console.error('Telemetry postMessage error:', e);
-            }
         }
 
         // Данные 10 волн
@@ -575,6 +555,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     resetCountdown: 2,
                     resetInterval: null,
                     totalTimeText: '00:00',
+                    telemetry: null,
 
                     // Опции селекторов
                     dividerOptions: [
@@ -607,6 +588,24 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: missionName,
+                    level: 3,
+                    totalWaves: TOTAL_WAVES,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        clearInterval(this.timerInterval);
+                        clearInterval(this.resetInterval);
+                    },
+                    onAfkRetry: () => {
+                        if (this.gameState === 'playing' || this.gameState === 'failed') {
+                            if (this.telemetry) {
+                                this.telemetry.setWave(1, TOTAL_WAVES);
+                            }
+                            this.resetToWave1();
+                        }
+                    }
+                });
                 // Глобальный биндинг горячих клавиш
                 window.addEventListener('keydown', this.handleKeyDown);
                 // Запуск циклов анимации
@@ -619,10 +618,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 if (this.oscAnimId) cancelAnimationFrame(this.oscAnimId);
                 clearInterval(this.timerInterval);
                 clearInterval(this.resetInterval);
+                if (this.telemetry) this.telemetry.destroy();
             },
 
             methods: {
                 handleKeyDown(e) {
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                     if (this.gameState !== 'playing') {
                         if (this.gameState === 'intro' && (e.key === ' ' || e.key === 'Enter')) {
                             this.startGame();
@@ -681,12 +682,23 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 },
 
                 startGame() {
+                    clearInterval(this.resetInterval);
                     this.gameState = 'playing';
                     this.currentPhase = 1;
                     this.combo = 0;
                     this.score = 0;
-                    sessionStartTime = Date.now();
-                    attemptsCount = 0;
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, TOTAL_WAVES);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: TOTAL_WAVES,
+                            stage: 1,
+                            total_stages: TOTAL_WAVES
+                        });
+                    }
                     this.loadWave(1);
                     this.$nextTick(() => {
                         this.startOscilloscopeLoop();
@@ -710,7 +722,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         this.phaseTimeLeft -= dt;
                         if (this.phaseTimeLeft <= 0) {
                             clearInterval(this.timerInterval);
-                            this.handleFailure('Тайм-аут такта: сигнал рассеялся в аналоговом тракте до момента стробирования!');
+                            this.handleFailure('Тайм-аут такта: сигнал рассеялся в аналоговом тракте до момента стробирования!', true);
                         }
                     }, dt * 1000);
                 },
@@ -718,45 +730,43 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 triggerStrobe() {
                     if (this.gameState !== 'playing') return;
 
-                    attemptsCount++;
-
                     // 1. Проверка фазового окна апертуры (Rhythm Window)
                     if (!this.isApertureOpen) {
-                        this.handleFailure(`Фазовый джиттер! Строб произведен на фазе ${(this.clockPhase * 100).toFixed(0)}% вне апертурного окна (требуется 70%–100%)!`);
+                        this.handleFailure(`Фазовый джиттер! Строб произведен на фазе ${(this.clockPhase * 100).toFixed(0)}% вне апертурного окна (требуется 70%–100%)!`, false);
                         return;
                     }
 
                     // 2. Проверка Узла 1: Делитель частоты Котельникова
                     if (this.selectedUnit1 === null) {
-                        this.handleFailure('Узел 1 не сконфигурирован! Не выставлен режим частоты дискретизации Котельникова.');
+                        this.handleFailure('Узел 1 не сконфигурирован! Не выставлен режим частоты дискретизации Котельникова.', false);
                         return;
                     }
                     if (this.selectedUnit1 !== this.currentTask.targetUnit1) {
                         if (this.currentTask.hasNoise && this.selectedUnit1 !== 2) {
-                            this.handleFailure('Катастрофический алиасинг: высокочастотная помеха проникла в спектр из-за отключенного фильтра антиалиасинга!');
+                            this.handleFailure('Катастрофический алиасинг: высокочастотная помеха проникла в спектр из-за отключенного фильтра антиалиасинга!', false);
                         } else {
-                            this.handleFailure('Нарушение теоремы Котельникова: неверно согласована частота оцифровки со спектром!');
+                            this.handleFailure('Нарушение теоремы Котельникова: неверно согласована частота оцифровки со спектром!', false);
                         }
                         return;
                     }
 
                     // 3. Проверка Узла 2: Квантователь и SQNR
                     if (this.selectedUnit2 === null) {
-                        this.handleFailure('Узел 2 не сконфигурирован! Не выбрана разрядность квантователя.');
+                        this.handleFailure('Узел 2 не сконфигурирован! Не выбрана разрядность квантователя.', false);
                         return;
                     }
                     if (this.selectedUnit2 !== this.currentTask.targetUnit2) {
-                        this.handleFailure('Недопустимый шум квантования: динамический диапазон SQNR не соответствует требованиям тракта!');
+                        this.handleFailure('Недопустимый шум квантования: динамический диапазон SQNR не соответствует требованиям тракта!', false);
                         return;
                     }
 
                     // 4. Проверка Узла 3: Кодер тракта
                     if (this.selectedUnit3 === null) {
-                        this.handleFailure('Узел 3 не сконфигурирован! Не выбран схемотехнический кодер.');
+                        this.handleFailure('Узел 3 не сконфигурирован! Не выбран схемотехнический кодер.', false);
                         return;
                     }
                     if (this.selectedUnit3 !== this.currentTask.targetUnit3) {
-                        this.handleFailure('Коллизия кодирования: неверная полярность кода напряжения или отсутствие защиты от скачков бит!');
+                        this.handleFailure('Коллизия кодирования: неверная полярность кода напряжения или отсутствие защиты от скачков бит!', false);
                         return;
                     }
 
@@ -773,16 +783,22 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     clearInterval(this.timerInterval);
 
-                    if (this.currentPhase < 10) {
-                        this.loadWave(this.currentPhase + 1);
+                    if (this.currentPhase < TOTAL_WAVES) {
+                        const nextWave = this.currentPhase + 1;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(nextWave);
+                        }
+                        this.loadWave(nextWave);
                     } else {
                         // Победа на 10 волне!
                         this.gameState = 'success';
-                        const totalSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+                        const totalSec = this.telemetry ? this.telemetry.getTimeSpentSec() : 1;
                         const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                         const s = String(totalSec % 60).padStart(2, '0');
                         this.totalTimeText = `${m}:${s}`;
-                        sendTelemetry('level_complete', true, 'completed');
+                        if (this.telemetry) {
+                            this.telemetry.complete({ wave: TOTAL_WAVES, stage: TOTAL_WAVES });
+                        }
                         playSound(523.25, 'sine', 0.25, 0.2);
                         setTimeout(() => playSound(659.25, 'sine', 0.25, 0.2), 150);
                         setTimeout(() => playSound(783.99, 'sine', 0.25, 0.2), 300);
@@ -790,24 +806,38 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     }
                 },
 
-                handleFailure(reason) {
+                handleFailure(reason, isTimeout = false) {
                     clearInterval(this.timerInterval);
+                    clearInterval(this.resetInterval);
+
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentPhase,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.totalResets = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            return;
+                        }
+                    } else {
+                        this.totalResets++;
+                    }
+
                     this.failReason = reason;
                     this.gameState = 'failed';
                     this.combo = 0;
-                    this.totalResets++;
 
                     // Сирена аварии
                     playSound(160, 'sawtooth', 0.45, 0.25);
                     setTimeout(() => playSound(120, 'sawtooth', 0.5, 0.25), 200);
 
-                    // Отправка hardcore_reset в телеметрию
-                    sendTelemetry('hardcore_reset', false, 'in_progress');
-
                     // Автосброс через 2 секунды
                     this.resetCountdown = 2;
-                    clearInterval(this.resetInterval);
                     this.resetInterval = setInterval(() => {
+                        if (this.telemetry && this.telemetry.getState().isAfkPaused) {
+                            clearInterval(this.resetInterval);
+                            return;
+                        }
                         this.resetCountdown--;
                         if (this.resetCountdown <= 0) {
                             clearInterval(this.resetInterval);
@@ -818,7 +848,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 resetToWave1() {
                     clearInterval(this.resetInterval);
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                     this.gameState = 'playing';
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, TOTAL_WAVES);
+                    }
                     this.loadWave(1);
                     this.$nextTick(() => {
                         this.startOscilloscopeLoop();

@@ -337,7 +337,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 currentWaveIdx: 0,
                 phaseTimeLeft: 10.0,
                 timerInterval: null,
-                sessionStartTime: 0,
+                resetTimeout: null,
+                telemetry: null,
+                keydownHandler: null,
                 attempts: 0,
                 failMessage: ''
             };
@@ -348,8 +350,30 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
         },
         mounted() {
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
+                level: 3,
+                totalWaves: WAVE_CONFIGS.length,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                },
+                onAfkRetry: () => {
+                    if (this.gameState === 'playing' || this.gameState === 'failed') {
+                        this.currentWaveIdx = 0;
+                        this.gameState = 'playing';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, WAVE_CONFIGS.length);
+                        }
+                        this.startWave();
+                    }
+                }
+            });
+
             // Горячие клавиши 1, 2, 3, 4
-            window.addEventListener('keydown', (e) => {
+            this.keydownHandler = (e) => {
+                if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                 if (this.gameState !== 'playing') return;
                 const key = e.key;
                 if (['1', '2', '3', '4'].includes(key)) {
@@ -358,25 +382,32 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         this.selectCandidate(idx);
                     }
                 }
-            });
-
-            // Первичная телеметрия
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
-                action_type: 'in_progress',
-                status: 'in_progress',
-                start_time: new Date().toISOString(),
-                time_spent_sec: 0,
-                attempts_count: 0,
-                success: false
-            }, '*');
+            };
+            window.addEventListener('keydown', this.keydownHandler);
+        },
+        beforeUnmount() {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            if (this.resetTimeout) clearTimeout(this.resetTimeout);
+            if (this.keydownHandler) window.removeEventListener('keydown', this.keydownHandler);
+            if (this.telemetry) this.telemetry.destroy();
         },
         methods: {
             startGame() {
+                if (this.resetTimeout) clearTimeout(this.resetTimeout);
                 this.currentWaveIdx = 0;
                 this.gameState = 'playing';
-                this.sessionStartTime = Date.now();
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, WAVE_CONFIGS.length);
+                    this.telemetry.progress({
+                        wave: 1,
+                        total_waves: WAVE_CONFIGS.length,
+                        stage: 1,
+                        total_stages: WAVE_CONFIGS.length
+                    });
+                }
                 this.startWave();
             },
             startWave() {
@@ -401,6 +432,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     // Успех на рубеже
                     if (this.currentWaveIdx < WAVE_CONFIGS.length - 1) {
                         this.currentWaveIdx++;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(this.currentWaveIdx + 1);
+                        }
                         this.startWave();
                     } else {
                         this.handleVictory();
@@ -408,49 +442,56 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 } else {
                     // Ошибка: тотальный хардкор-сброс
                     const err = `СБОЙ ДЕТЕКТОРА НА РУБЕЖЕ ${this.currentWaveIdx + 1}: ${this.currentWave.explanation}`;
-                    this.triggerHardcoreFailure(err);
+                    this.triggerHardcoreFailure(err, false);
                 }
             },
             handleTimeout() {
                 if (this.timerInterval) clearInterval(this.timerInterval);
-                this.triggerHardcoreFailure(`ТАЙМ-АУТ ДЕТЕКТОРА: Время на анализ рубежа ${this.currentWaveIdx + 1} истекло! Защитный шлюз заблокировал сессию!`);
+                this.triggerHardcoreFailure(`ТАЙМ-АУТ ДЕТЕКТОРА: Время на анализ рубежа ${this.currentWaveIdx + 1} истекло! Защитный шлюз заблокировал сессию!`, true);
             },
-            triggerHardcoreFailure(msg) {
+            triggerHardcoreFailure(msg, isTimeout = false) {
                 if (this.timerInterval) clearInterval(this.timerInterval);
-                this.attempts++;
+                if (this.resetTimeout) clearTimeout(this.resetTimeout);
+                const waveNum = this.currentWaveIdx + 1;
+
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: waveNum,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
+
                 this.failMessage = msg;
                 this.gameState = 'failed';
 
-                // Телеметрия: hardcore_reset
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
-                    action_type: 'hardcore_reset'
-                }, '*');
-
                 // Автоматический тотальный сброс на Волну 1 через 1.6 сек
-                setTimeout(() => {
+                this.resetTimeout = setTimeout(() => {
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
                     this.currentWaveIdx = 0;
                     this.gameState = 'playing';
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, WAVE_CONFIGS.length);
+                    }
                     this.startWave();
                 }, 1600);
             },
             handleVictory() {
                 if (this.timerInterval) clearInterval(this.timerInterval);
+                if (this.resetTimeout) clearTimeout(this.resetTimeout);
                 this.gameState = 'success';
-                const elapsedSec = Math.floor((Date.now() - this.sessionStartTime) / 1000);
 
-                // Телеметрия: level_complete
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 3)',
-                    action_type: 'level_complete',
-                    status: 'completed',
-                    start_time: new Date(this.sessionStartTime).toISOString(),
-                    time_spent_sec: elapsedSec,
-                    attempts_count: this.attempts,
-                    success: true
-                }, '*');
+                if (this.telemetry) {
+                    this.telemetry.complete({
+                        wave: WAVE_CONFIGS.length,
+                        stage: WAVE_CONFIGS.length
+                    });
+                }
             },
             getMetricBadgeClass(c) {
                 if (c.metricLabel.includes('MATCH')) return 'border-success text-success bg-black';

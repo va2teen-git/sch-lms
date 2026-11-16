@@ -250,22 +250,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script src="/static/vue.global.js" is:inline></script>
     <script is:inline>
         const missionName = 'Урок 26 :: Информация, данные и знания. Информационные процессы в природе, технике и обществе (Уровень 3)';
-        const startTime = Date.now();
-        let attemptsCount = 0;
-
-        function sendTelemetry(action_type, success = false) {
-            const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: action_type,
-                status: action_type === 'level_complete' ? 'completed' : 'in_progress',
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: timeSpent,
-                attempts_count: attemptsCount,
-                success: success
-            }, '*');
-        }
+        const TOTAL_WAVES = 10;
 
         function pickRandom(arr) {
             return arr[Math.floor(Math.random() * arr.length)];
@@ -498,11 +483,20 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 });
 
                 let timerId = null;
+                let resetTimeoutId = null;
+                let telemetry = null;
 
                 function stopTimer() {
                     if (timerId) {
                         clearInterval(timerId);
                         timerId = null;
+                    }
+                }
+
+                function clearResetTimeout() {
+                    if (resetTimeoutId) {
+                        clearTimeout(resetTimeoutId);
+                        resetTimeoutId = null;
                     }
                 }
 
@@ -513,15 +507,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         phaseTimeLeft.value = Number((phaseTimeLeft.value - 0.1).toFixed(1));
                         if (phaseTimeLeft.value <= 0) {
                             phaseTimeLeft.value = 0;
-                            triggerHardcoreReset('Несущая волна затухла до замыкания контура (Тайм-аут)!');
+                            triggerHardcoreReset('Несущая волна затухла до замыкания контура (Тайм-аут)!', true);
                         }
                     }, 100);
                 }
 
                 function startGame() {
+                    clearResetTimeout();
                     alarmActive.value = false;
                     currentWave.value = 0;
                     gameState.value = 'playing';
+                    if (telemetry) {
+                        telemetry.reset({ allowRecomplete: true });
+                        telemetry.start();
+                        telemetry.markActivity();
+                        telemetry.setWave(1, TOTAL_WAVES);
+                        telemetry.progress({
+                            wave: 1,
+                            total_waves: TOTAL_WAVES,
+                            stage: 1,
+                            total_stages: TOTAL_WAVES
+                        });
+                    }
                     generateWave(0);
                     startWaveTimer();
                 }
@@ -533,18 +540,38 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     if (which === 3) node3.value = (node3.value + 1) % 3;
                 }
 
-                function triggerHardcoreReset(reason) {
+                function triggerHardcoreReset(reason, isTimeout = false) {
                     if (alarmActive.value) return;
                     stopTimer();
+                    clearResetTimeout();
+                    const waveNum = currentWave.value + 1;
+
+                    if (telemetry) {
+                        const sent = telemetry.hardcoreReset({
+                            wave: waveNum,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        attempts.value = telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            alarmActive.value = false;
+                            return;
+                        }
+                    } else {
+                        attempts.value++;
+                    }
+
                     alarmActive.value = true;
                     alarmReason.value = reason;
-                    attempts.value++;
-                    attemptsCount = attempts.value;
-                    sendTelemetry('hardcore_reset', false);
 
-                    setTimeout(() => {
+                    resetTimeoutId = setTimeout(() => {
+                        if (gameState.value !== 'playing' || (telemetry && telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         alarmActive.value = false;
                         currentWave.value = 0;
+                        if (telemetry) {
+                            telemetry.setWave(1, TOTAL_WAVES);
+                        }
                         generateWave(0);
                         startWaveTimer();
                     }, 1400);
@@ -562,22 +589,29 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         if (!ok1) details.push('Узел 1 (Канал Шеннона)');
                         if (!ok2) details.push('Узел 2 (Энтропийный шлюз)');
                         if (!ok3) details.push('Узел 3 (Контур ООС Винера)');
-                        triggerHardcoreReset(`Рассинхронизация шлюзов: ${details.join(', ')}!`);
+                        triggerHardcoreReset(`Рассинхронизация шлюзов: ${details.join(', ')}!`, false);
                         return;
                     }
 
                     // Успешный такт волны
-                    if (currentWave.value + 1 >= 10) {
+                    if (currentWave.value + 1 >= TOTAL_WAVES) {
                         stopTimer();
+                        clearResetTimeout();
                         gameState.value = 'success';
-                        sendTelemetry('level_complete', true);
+                        if (telemetry) {
+                            telemetry.complete({ wave: TOTAL_WAVES, stage: TOTAL_WAVES });
+                        }
                     } else {
                         currentWave.value++;
+                        if (telemetry) {
+                            telemetry.advanceWave(currentWave.value + 1);
+                        }
                         generateWave(currentWave.value);
                     }
                 }
 
                 function handleKeydown(e) {
+                    if (telemetry && telemetry.getState().isAfkPaused) return;
                     if (gameState.value === 'intro') {
                         if (e.key === 'Enter') {
                             e.preventDefault();
@@ -603,13 +637,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
 
                 onMounted(() => {
-                    sendTelemetry('in_progress', false);
+                    telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            stopTimer();
+                            clearResetTimeout();
+                            alarmActive.value = false;
+                        },
+                        onAfkRetry: () => {
+                            alarmActive.value = false;
+                            if (gameState.value === 'playing') {
+                                currentWave.value = 0;
+                                if (telemetry) {
+                                    telemetry.setWave(1, TOTAL_WAVES);
+                                }
+                                generateWave(0);
+                                startWaveTimer();
+                            }
+                        }
+                    });
                     window.addEventListener('keydown', handleKeydown);
                 });
 
                 onUnmounted(() => {
                     stopTimer();
+                    clearResetTimeout();
                     window.removeEventListener('keydown', handleKeydown);
+                    if (telemetry) telemetry.destroy();
                 });
 
                 return {

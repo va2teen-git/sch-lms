@@ -215,8 +215,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Состояние игры
     let currentPhase = 1;
     let attemptsCount = 0;
-    const startTime = Date.now();
+    let isProcessingError = false;
     let timerInterval = null;
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 30 :: Условие Фано. Построение однозначно декодируемых кодов с помощью дерева. Граф Ал. А. Маркова (Уровень 1)',
+        level: 1,
+        totalStages: 3
+    });
 
     // DOM-элементы
     const attemptsDisplay = document.getElementById('attempts-display');
@@ -228,42 +234,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
     }, 1000);
 
-    // Телеметрия
-    function sendTelemetry(actionType, successStatus, statusStr) {
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 30 :: Условие Фано. Построение однозначно декодируемых кодов с помощью дерева. Граф Ал. А. Маркова (Уровень 1)',
-            action_type: actionType,
-            status: statusStr,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
-            attempts_count: attemptsCount,
-            success: successStatus
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch(e) {
-            console.error('Telemetry error:', e);
-        }
-    }
-
     // Обработка ошибки и сброс текущей фазы
     function triggerFailure(message, resetCallback) {
-        attemptsCount++;
+        if (isProcessingError) return;
+        isProcessingError = true;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         if (attemptsDisplay) attemptsDisplay.textContent = attemptsCount;
         if (feedbackText) feedbackText.textContent = message;
         if (feedbackBox) feedbackBox.classList.remove('d-none');
 
-        sendTelemetry('hardcore_reset', false, 'in_progress');
-
         setTimeout(() => {
             if (feedbackBox) feedbackBox.classList.add('d-none');
+            isProcessingError = false;
             if (typeof resetCallback === 'function') resetCallback();
         }, 1300);
     }
@@ -543,10 +532,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         // Успех Фазы 1!
-        sendTelemetry('in_progress', false, 'in_progress');
+        currentPhase = 2;
+        telemetry.advanceStage(2);
         document.getElementById('phase1').classList.add('d-none');
         document.getElementById('phase2').classList.remove('d-none');
-        currentPhase = 2;
         phaseBadge.textContent = 'Шаг 2 из 3';
         phaseTitle.textContent = 'Коммутация графа Ал. А. Маркова (Markov Wiring)';
         initPhase2();
@@ -787,10 +776,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         submitBtn.classList.remove('d-none');
 
         submitBtn.onclick = () => {
-            sendTelemetry('in_progress', false, 'in_progress');
+            currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
-            currentPhase = 3;
             phaseBadge.textContent = 'Шаг 3 из 3';
             phaseTitle.textContent = 'Поточная демаркация битового сообщения (Stream Carver)';
             initPhase3();
@@ -975,7 +964,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (finalAttempts) finalAttempts.textContent = attemptsCount;
         if (finalTime && timerDisplay) finalTime.textContent = timerDisplay.textContent;
 
-        sendTelemetry('level_complete', true, 'completed');
+        telemetry.complete({ stage: 3 });
     }
 
     // Старт с фазы 1

@@ -24,10 +24,11 @@ test.describe('10th Grade Advanced Lesson 30: Level 3 Arcade Task Suite', () => 
     expect(code).toContain('btn-gate-collision');
     expect(code).toContain('keydown');
 
-    // Hardcore reset & Alarm Box
+    // Hardcore reset & Alarm Box (LMSTelemetry)
     expect(code).toContain('alarm-box');
-    expect(code).toContain('hardcore_reset');
-    expect(code).toContain('level_complete');
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.hardcoreReset(');
+    expect(code).toContain('.complete(');
     expect(code).toContain('Урок 30');
 
     // Dev test hook

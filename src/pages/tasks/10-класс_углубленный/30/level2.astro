@@ -195,8 +195,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 (function() {
     let currentPhase = 1;
     let attemptsCount = 0;
-    const startTime = Date.now();
+    let isProcessingError = false;
     let timerInterval = null;
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 30 :: Условие Фано. Построение однозначно декодируемых кодов с помощью дерева. Граф Ал. А. Маркова (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
 
     // DOM-элементы
     const attemptsDisplay = document.getElementById('attempts-display');
@@ -208,7 +214,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
@@ -220,34 +226,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return parseFloat(normalized);
     }
 
-    function sendTelemetry(actionType, successStatus, statusStr) {
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 30 :: Условие Фано. Построение однозначно декодируемых кодов с помощью дерева. Граф Ал. А. Маркова (Уровень 2)',
-            action_type: actionType,
-            status: statusStr,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
-            attempts_count: attemptsCount,
-            success: successStatus
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch(e) {
-            console.error('Telemetry error:', e);
-        }
-    }
-
     function triggerFailure(message, resetCallback) {
-        attemptsCount++;
+        if (isProcessingError) return;
+        isProcessingError = true;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         if (attemptsDisplay) attemptsDisplay.textContent = attemptsCount;
         if (feedbackText) feedbackText.textContent = message;
         if (feedbackBox) feedbackBox.classList.remove('d-none');
 
-        sendTelemetry('hardcore_reset', false, 'in_progress');
-
         setTimeout(() => {
             if (feedbackBox) feedbackBox.classList.add('d-none');
+            isProcessingError = false;
             if (typeof resetCallback === 'function') resetCallback();
         }, 1300);
     }
@@ -325,10 +315,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        sendTelemetry('in_progress', false, 'in_progress');
+        currentPhase = 2;
+        telemetry.advanceStage(2);
         document.getElementById('phase1').classList.add('d-none');
         document.getElementById('phase2').classList.remove('d-none');
-        currentPhase = 2;
         phaseBadge.textContent = 'Шаг 2 из 5';
         phaseTitle.textContent = 'Средняя длина кода и объем в байтах';
         initPhase2();
@@ -407,10 +397,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        sendTelemetry('in_progress', false, 'in_progress');
+        currentPhase = 3;
+        telemetry.advanceStage(3);
         document.getElementById('phase2').classList.add('d-none');
         document.getElementById('phase3').classList.remove('d-none');
-        currentPhase = 3;
         phaseBadge.textContent = 'Шаг 3 из 5';
         phaseTitle.textContent = 'Обратная задача докодирования по Фано';
         initPhase3();
@@ -496,10 +486,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        sendTelemetry('in_progress', false, 'in_progress');
+        currentPhase = 4;
+        telemetry.advanceStage(4);
         document.getElementById('phase3').classList.add('d-none');
         document.getElementById('phase4').classList.remove('d-none');
-        currentPhase = 4;
         phaseBadge.textContent = 'Шаг 4 из 5';
         phaseTitle.textContent = 'Емкость дерева и инвариант Крафта';
         initPhase4();
@@ -583,10 +573,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        sendTelemetry('in_progress', false, 'in_progress');
+        currentPhase = 5;
+        telemetry.advanceStage(5);
         document.getElementById('phase4').classList.add('d-none');
         document.getElementById('phase5').classList.remove('d-none');
-        currentPhase = 5;
         phaseBadge.textContent = 'Шаг 5 из 5';
         phaseTitle.textContent = 'Дешифровка коллизии графа Маркова';
         initPhase5();
@@ -684,7 +674,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (finalAttempts) finalAttempts.textContent = attemptsCount;
         if (finalTime && timerDisplay) finalTime.textContent = timerDisplay.textContent;
 
-        sendTelemetry('level_complete', true, 'completed');
+        telemetry.complete({ stage: 5 });
     }
 
     // Экспорт для верификации тестами

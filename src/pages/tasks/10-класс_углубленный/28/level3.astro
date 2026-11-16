@@ -311,9 +311,34 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 playerBuffer: [],
                 maxBufferSize: 4,
                 failMessage: '',
-                startTime: null,
-                attemptsCount: 0
+                attemptsCount: 0,
+                telemetry: null
             };
+        },
+
+        mounted() {
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: MISSION_NAME,
+                level: 3,
+                totalWaves: this.totalPhases,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                },
+                onAfkRetry: () => {
+                    this.currentPhase = 1;
+                    this.gameState = 'playing';
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalPhases);
+                    }
+                    this.loadWave(1);
+                }
+            });
+        },
+
+        beforeUnmount() {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            if (this.telemetry) this.telemetry.destroy();
         },
 
         computed: {
@@ -327,30 +352,22 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         methods: {
             startGame() {
-                this.startTime = Date.now();
                 this.currentPhase = 1;
                 this.gameState = 'playing';
 
-                this.sendTelemetry('in_progress', false, 'in_progress');
-                this.loadWave(1);
-            },
-
-            sendTelemetry(actionType, successStatus, statusStr) {
-                const payload = {
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: MISSION_NAME,
-                    action_type: actionType,
-                    status: statusStr,
-                    start_time: new Date(this.startTime || Date.now()).toISOString(),
-                    time_spent_sec: Math.max(1, Math.round((Date.now() - (this.startTime || Date.now())) / 1000)),
-                    attempts_count: this.attemptsCount,
-                    success: successStatus
-                };
-                try {
-                    window.parent.postMessage(payload, '*');
-                } catch(e) {
-                    console.error('Telemetry postMessage error:', e);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalPhases);
+                    this.telemetry.progress({
+                        wave: 1,
+                        total_waves: this.totalPhases,
+                        stage: 1,
+                        total_stages: this.totalPhases
+                    });
                 }
+                this.loadWave(1);
             },
 
             loadWave(phase) {
@@ -419,7 +436,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     this.phaseTimeLeft -= 0.1;
                     if (this.phaseTimeLeft <= 0) {
                         clearInterval(this.timerInterval);
-                        this.handleFailure('Время на анализ матрицы истекло! Контур заблокирован.');
+                        this.handleFailure('Время на анализ матрицы истекло! Контур заблокирован.', true);
                     }
                 }, 100);
             },
@@ -490,9 +507,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         // Полная победа!
                         clearInterval(this.timerInterval);
                         this.gameState = 'success';
-                        this.sendTelemetry('level_complete', true, 'completed');
+                        if (this.telemetry) {
+                            this.telemetry.complete({ wave: this.totalPhases, stage: this.totalPhases });
+                        }
                     } else {
                         this.currentPhase++;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(this.currentPhase);
+                        }
                         this.loadWave(this.currentPhase);
                     }
                     return;
@@ -500,18 +522,27 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 // Если буфер заполнен, но цель не достигнута -> сбой!
                 if (this.playerBuffer.length >= this.maxBufferSize) {
-                    this.handleFailure('Буфер памяти переполнен! Не удалось собрать целевую последовательность.');
+                    this.handleFailure('Буфер памяти переполнен! Не удалось собрать целевую последовательность.', false);
                 }
             },
 
-            handleFailure(msg) {
+            handleFailure(msg, isTimeout = false) {
                 if (this.timerInterval) clearInterval(this.timerInterval);
-                this.attemptsCount++;
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: this.currentPhase,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attemptsCount = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        return;
+                    }
+                } else {
+                    this.attemptsCount++;
+                }
                 this.failMessage = msg;
                 this.gameState = 'failed';
                 playSound(150, 'sawtooth', 0.4, 0.2);
-
-                this.sendTelemetry('hardcore_reset', false, 'in_progress');
             }
         }
     }).mount('#app');
