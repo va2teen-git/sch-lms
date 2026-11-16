@@ -260,8 +260,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Состояние сессии
     let currentPhase = 1;
     let attemptsCount = 0;
-    const startTime = Date.now();
+    let isProcessingError = false;
     let timerInterval = null;
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 27 :: Непрерывные и дискретные сигналы (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
 
     // Элементы индикации
     const attemptsDisplay = document.getElementById('attempts-display');
@@ -273,7 +279,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
@@ -286,37 +292,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return parseFloat(normalized);
     }
 
-    // Отправка телеметрии
-    function sendTelemetry(actionType, successStatus, statusStr) {
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 27 :: Непрерывные и дискретные сигналы (Уровень 2)',
-            action_type: actionType,
-            status: statusStr,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
-            attempts_count: attemptsCount,
-            success: successStatus
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch(e) {
-            console.error('Telemetry postMessage error:', e);
-        }
-    }
-
     // Обработка ошибки и сброс текущей фазы
     function triggerFailure(message, resetCallback) {
-        attemptsCount++;
+        if (isProcessingError) return;
+        isProcessingError = true;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         if (attemptsDisplay) attemptsDisplay.textContent = attemptsCount;
         if (feedbackText) feedbackText.textContent = message;
         if (feedbackBox) feedbackBox.classList.remove('d-none');
 
-        // Отправка hardcore_reset в телеметрию
-        sendTelemetry('hardcore_reset', false, 'in_progress');
-
         setTimeout(() => {
             if (feedbackBox) feedbackBox.classList.add('d-none');
+            isProcessingError = false;
             if (typeof resetCallback === 'function') resetCallback();
         }, 1200);
     }
@@ -364,6 +352,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (Math.abs(fdVal - p1TargetFd) < 0.01 && Math.abs(dtVal - p1TargetDtMs) < 0.01) {
                 // Переход к Шагу 2
                 currentPhase = 2;
+                telemetry.advanceStage(2);
                 document.getElementById('phase1').classList.add('d-none');
                 document.getElementById('phase2').classList.remove('d-none');
                 if (phaseBadge) phaseBadge.textContent = 'Шаг 2 из 5';
@@ -420,6 +409,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (Math.abs(nVal - p2TargetN) < 0.1 && Math.abs(duVal - p2TargetDuMv) < 0.01) {
                 // Переход к Шагу 3
                 currentPhase = 3;
+                telemetry.advanceStage(3);
                 document.getElementById('phase2').classList.add('d-none');
                 document.getElementById('phase3').classList.remove('d-none');
                 if (phaseBadge) phaseBadge.textContent = 'Шаг 3 из 5';
@@ -476,6 +466,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (Math.abs(errVal - p3TargetErrMv) < 0.01 && Math.abs(sqnrVal - p3TargetSqnr) < 0.1) {
                 // Переход к Шагу 4
                 currentPhase = 4;
+                telemetry.advanceStage(4);
                 document.getElementById('phase3').classList.add('d-none');
                 document.getElementById('phase4').classList.remove('d-none');
                 if (phaseBadge) phaseBadge.textContent = 'Шаг 4 из 5';
@@ -541,6 +532,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             if (rateOk && volOk) {
                 // Переход к Шагу 5
                 currentPhase = 5;
+                telemetry.advanceStage(5);
                 document.getElementById('phase4').classList.add('d-none');
                 document.getElementById('phase5').classList.remove('d-none');
                 if (phaseBadge) phaseBadge.textContent = 'Шаг 5 из 5';
@@ -605,7 +597,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
                 if (phaseTitle) phaseTitle.textContent = 'Уровень 2 полностью пройден!';
 
-                const totalSec = Math.floor((Date.now() - startTime) / 1000);
+                const totalSec = telemetry.getTimeSpentSec();
                 const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const s = String(totalSec % 60).padStart(2, '0');
                 const resTime = document.getElementById('res-time');
@@ -614,7 +606,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 if (resAttempts) resAttempts.textContent = attemptsCount;
 
                 // Отправка победной телеметрии
-                sendTelemetry('level_complete', true, 'completed');
+                telemetry.complete({ stage: 5 });
             } else {
                 triggerFailure('Неверно вычислена частота Найквиста f_N или паразитная гармоника алиаса f_alias!', initPhase5);
             }

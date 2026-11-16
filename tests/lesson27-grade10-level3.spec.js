@@ -39,10 +39,10 @@ test.describe('10th Grade Advanced Lesson 27: Level 3 Task Suite (Archetype 6: C
     expect(code).toContain('clockPhase');
     expect(code).toContain('id="strobe-btn"');
 
-    // 7. Telemetry integration
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // 7. Telemetry integration (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 27');
 
     // 8. Screens and state controls

@@ -217,8 +217,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Состояние сессии
     let currentPhase = 1;
     let attemptsCount = 0;
-    const startTime = Date.now();
+    let isProcessingError = false;
     let timerInterval = null;
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 28 :: Двоичное кодирование. Равномерные и неравномерные коды (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
 
     // Элементы индикации
     const attemptsDisplay = document.getElementById('attempts-display');
@@ -230,7 +236,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
@@ -243,36 +249,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return parseFloat(normalized);
     }
 
-    // Отправка телеметрии
-    function sendTelemetry(actionType, successStatus, statusStr) {
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 28 :: Двоичное кодирование. Равномерные и неравномерные коды (Уровень 2)',
-            action_type: actionType,
-            status: statusStr,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
-            attempts_count: attemptsCount,
-            success: successStatus
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch(e) {
-            console.error('Telemetry postMessage error:', e);
-        }
-    }
-
     // Обработка ошибки и сброс текущей фазы
     function triggerFailure(message, resetCallback) {
-        attemptsCount++;
+        if (isProcessingError) return;
+        isProcessingError = true;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         if (attemptsDisplay) attemptsDisplay.textContent = attemptsCount;
         if (feedbackText) feedbackText.textContent = message;
         if (feedbackBox) feedbackBox.classList.remove('d-none');
 
-        sendTelemetry('hardcore_reset', false, 'in_progress');
-
         setTimeout(() => {
             if (feedbackBox) feedbackBox.classList.add('d-none');
+            isProcessingError = false;
             if (typeof resetCallback === 'function') resetCallback();
         }, 1200);
     }
@@ -321,6 +310,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             currentPhase = 2;
+            telemetry.advanceStage(2);
             phaseBadge.textContent = 'Шаг 2 из 5';
             phaseTitle.textContent = 'Расчет средней длины кода Хаффмана';
             initPhase2();
@@ -400,6 +390,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             currentPhase = 3;
+            telemetry.advanceStage(3);
             phaseBadge.textContent = 'Шаг 3 из 5';
             phaseTitle.textContent = 'Пик 1: Обратная задача на прямое условие Фано';
             initPhase3();
@@ -456,6 +447,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase3').classList.add('d-none');
             document.getElementById('phase4').classList.remove('d-none');
             currentPhase = 4;
+            telemetry.advanceStage(4);
             phaseBadge.textContent = 'Шаг 4 из 5';
             phaseTitle.textContent = 'Долина консолидации: Неравенство Крафта — Макмиллана';
             initPhase4();
@@ -512,6 +504,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase4').classList.add('d-none');
             document.getElementById('phase5').classList.remove('d-none');
             currentPhase = 5;
+            telemetry.advanceStage(5);
             phaseBadge.textContent = 'Шаг 5 из 5';
             phaseTitle.textContent = 'Кульминация: Сквозное декодирование битового потока';
             initPhase5();
@@ -581,7 +574,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             phaseTitle.textContent = 'Уровень 2 успешно сдан!';
 
             clearInterval(timerInterval);
-            sendTelemetry('level_complete', true, 'completed');
+            telemetry.complete({ stage: 5 });
         } else {
             triggerFailure(`Ошибка декодирования! Слово "${userText}", длина ${userCount}. Проверьте префиксы слева направо.`, initPhase5);
         }
@@ -589,6 +582,5 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Запуск первого шага
     initPhase1();
-    sendTelemetry('in_progress', false, 'in_progress');
 })();
 </script>

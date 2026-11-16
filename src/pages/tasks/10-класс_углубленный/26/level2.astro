@@ -232,14 +232,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // СОСТОЯНИЕ И ТЕЛЕМЕТРИЯ
     // ----------------------------------------------------
     const MISSION_NAME = 'Урок 26 :: Информация, данные и знания. Информационные процессы в природе, технике и обществе (Уровень 2)';
-    const startTime = Date.now();
     let attemptsCount = 0;
     let currentPhase = 1;
     let isProcessingError = false;
 
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 2,
+        totalStages: 5
+    });
+
     // Таймер
-    setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+    const timerInterval = setInterval(() => {
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         const el = document.getElementById('timer-display');
@@ -251,31 +256,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (el) el.textContent = String(attemptsCount);
     }
 
-    function sendTelemetry(actionType, status, success) {
-        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-        if (window.parent) {
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: MISSION_NAME,
-                action_type: actionType,
-                status: status,
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: elapsedSec,
-                attempts_count: attemptsCount,
-                success: success
-            }, '*');
-        }
-    }
-
-    // Первичная телеметрия
-    sendTelemetry('in_progress', 'in_progress', false);
-
     function triggerError(msg, callback) {
         if (isProcessingError) return;
         isProcessingError = true;
-        attemptsCount++;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttempts();
-        sendTelemetry('hardcore_reset', 'in_progress', false);
 
         const fb = document.getElementById('feedback-box');
         const ft = document.getElementById('feedback-text');
@@ -317,12 +303,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (phaseNum <= 5) {
             if (badge) badge.textContent = `Шаг ${phaseNum} из 5`;
             if (title) title.textContent = titles[phaseNum - 1];
+            if (phaseNum > 1) {
+                telemetry.advanceStage(phaseNum);
+            }
         } else {
+            clearInterval(timerInterval);
             if (badge) badge.textContent = 'Победа!';
             if (title) title.textContent = 'Уровень 2 завершен';
             const screen = document.getElementById('success-screen');
             if (screen) screen.classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete({ stage: 5 });
         }
     }
 

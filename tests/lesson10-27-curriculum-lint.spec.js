@@ -58,10 +58,10 @@ test.describe('Curriculum & Architecture Linting Suite (10th Grade Advanced - Le
     expect(code).toContain('import TaskLayout');
     expect(code).toContain('<TaskLayout level={1}');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 27');
 
     // 3 phases
@@ -95,10 +95,10 @@ test.describe('Curriculum & Architecture Linting Suite (10th Grade Advanced - Le
     expect(code).toContain('import TaskLayout');
     expect(code).toContain('<TaskLayout level={2}');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 27');
 
     // 5 phases
@@ -132,10 +132,10 @@ test.describe('Curriculum & Architecture Linting Suite (10th Grade Advanced - Le
     expect(code).toContain('import TaskLayout');
     expect(code).toContain('<TaskLayout level={3}');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 27');
 
     // Zero-Style Policy (no <style> tags)

@@ -19,10 +19,10 @@ test.describe('10th Grade Advanced Lesson 30: Level 1 Task Suite', () => {
     expect(code).toContain('id="phase2"');
     expect(code).toContain('id="phase3"');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 30');
 
     // Zero-Style policy

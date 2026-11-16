@@ -200,8 +200,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Состояние тренажера
     let currentPhase = 1;
     let attemptsCount = 0;
-    const startTime = Date.now();
+    let isProcessingError = false;
     let timerInterval = null;
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 28 :: Двоичное кодирование. Равномерные и неравномерные коды (Уровень 1)',
+        level: 1,
+        totalStages: 3
+    });
 
     // DOM-элементы
     const attemptsDisplay = document.getElementById('attempts-display');
@@ -213,42 +219,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const sec = telemetry.getTimeSpentSec();
         const m = String(Math.floor(sec / 60)).padStart(2, '0');
         const s = String(sec % 60).padStart(2, '0');
         if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
     }, 1000);
 
-    // Телеметрия
-    function sendTelemetry(actionType, successStatus, statusStr) {
-        const payload = {
-            type: 'TELEMETRY_EVENT',
-            mission_name: 'Урок 28 :: Двоичное кодирование. Равномерные и неравномерные коды (Уровень 1)',
-            action_type: actionType,
-            status: statusStr,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
-            attempts_count: attemptsCount,
-            success: successStatus
-        };
-        try {
-            window.parent.postMessage(payload, '*');
-        } catch(e) {
-            console.error('Telemetry postMessage error:', e);
-        }
-    }
-
     // Обработка ошибки и сброс текущей фазы
     function triggerFailure(message, resetCallback) {
-        attemptsCount++;
+        if (isProcessingError) return;
+        isProcessingError = true;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         if (attemptsDisplay) attemptsDisplay.textContent = attemptsCount;
         if (feedbackText) feedbackText.textContent = message;
         if (feedbackBox) feedbackBox.classList.remove('d-none');
 
-        sendTelemetry('hardcore_reset', false, 'in_progress');
-
         setTimeout(() => {
             if (feedbackBox) feedbackBox.classList.add('d-none');
+            isProcessingError = false;
             if (typeof resetCallback === 'function') resetCallback();
         }, 1300);
     }
@@ -419,6 +408,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase1').classList.add('d-none');
             document.getElementById('phase2').classList.remove('d-none');
             currentPhase = 2;
+            telemetry.advanceStage(2);
             phaseBadge.textContent = 'Шаг 2 из 3';
             phaseBadge.className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
             phaseTitle.textContent = 'Конструирование префиксного дерева (Slot & Snap)';
@@ -628,6 +618,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             document.getElementById('phase2').classList.add('d-none');
             document.getElementById('phase3').classList.remove('d-none');
             currentPhase = 3;
+            telemetry.advanceStage(3);
             phaseBadge.textContent = 'Шаг 3 из 3';
             phaseBadge.className = 'badge bg-danger text-light rounded-0 fs-6 me-2';
             phaseTitle.textContent = 'Прямая интерактивная нарезка битового потока (Stream Carver)';
@@ -784,7 +775,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             phaseTitle.textContent = 'Уровень 1 успешно сдан!';
 
             clearInterval(timerInterval);
-            sendTelemetry('level_complete', true, 'completed');
+            telemetry.complete({ stage: 3 });
         } else {
             triggerFailure(`Декодированное слово "${wordDisplay}" не совпадает с переданным сообщением!`, initPhase3);
         }
@@ -792,6 +783,5 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Запуск первой фазы
     initPhase1();
-    sendTelemetry('in_progress', false, 'in_progress');
 })();
 </script>

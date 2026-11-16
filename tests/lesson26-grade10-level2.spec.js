@@ -23,10 +23,10 @@ test.describe('10th Grade Advanced Lesson 26: Level 2 Task Suite', () => {
     expect(code.includes('<style>'), 'Forbidden <style> tags found! Use utility classes instead.').toBe(false);
     expect(code.includes('<style '), 'Forbidden <style ...> tags found! Use utility classes instead.').toBe(false);
 
-    // 4. Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // 4. Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 26');
 
     // 5. Must contain exactly 5 procedural phases with unique IDs
@@ -69,7 +69,7 @@ test.describe('10th Grade Advanced Lesson 26: Level 2 Task Suite', () => {
     expect(code).toContain('P5_AMINO_COUNTS');
 
     // Error handling & hardcore reset
-    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('triggerError');
   });
 });

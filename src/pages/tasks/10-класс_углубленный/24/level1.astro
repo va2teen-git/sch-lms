@@ -277,14 +277,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // СОСТОЯНИЕ И ТЕЛЕМЕТРИЯ
     // ----------------------------------------------------
     const MISSION_NAME = 'Урок 24 :: Алгоритм шифрования RSA. Стеганография (Уровень 1)';
-    const startTime = Date.now();
     let attempts = 0;
     let currentPhase = 1;
     let isProcessingError = false;
 
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 1,
+        totalStages: 3
+    });
+
     // Таймер
-    setInterval(() => {
-        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+    const timerInterval = setInterval(() => {
+        const elapsedSec = telemetry.getTimeSpentSec();
         const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
         const secs = String(elapsedSec % 60).padStart(2, '0');
         const el = document.getElementById('timer-display');
@@ -296,31 +301,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (el) el.textContent = String(attempts);
     }
 
-    function sendTelemetry(actionType, status, success) {
-        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-        if (window.parent) {
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: MISSION_NAME,
-                action_type: actionType,
-                status: status,
-                start_time: new Date(startTime).toISOString(),
-                time_spent_sec: elapsedSec,
-                attempts_count: attempts,
-                success: success
-            }, '*');
-        }
-    }
-
-    // Инициализация при загрузке
-    sendTelemetry('in_progress', 'in_progress', false);
-
     function triggerError(msg, callback) {
         if (isProcessingError) return;
         isProcessingError = true;
-        attempts++;
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attempts = telemetry.getState().attemptsCount;
         updateAttempts();
-        sendTelemetry('hardcore_reset', 'in_progress', false);
 
         const feedbackBox = document.getElementById('feedback-box');
         const feedbackText = document.getElementById('feedback-text');
@@ -356,15 +342,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         } else if (phaseNum === 2) {
             if (badge) badge.textContent = 'Шаг 2 из 3';
             if (title) title.textContent = 'Интерактивная LSB-лента пикселей';
+            telemetry.advanceStage(2);
         } else if (phaseNum === 3) {
             if (badge) badge.textContent = 'Шаг 3 из 3';
             if (title) title.textContent = 'Классификация механизмов защиты по бакетам';
+            telemetry.advanceStage(3);
         } else if (phaseNum === 4) {
+            clearInterval(timerInterval);
             if (badge) badge.textContent = 'Победа!';
             if (title) title.textContent = 'Уровень 1 завершен';
             const screen = document.getElementById('success-screen');
             if (screen) screen.classList.remove('d-none');
-            sendTelemetry('level_complete', 'completed', true);
+            telemetry.complete({ stage: 3 });
         }
     }
 
@@ -388,11 +377,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     ];
 
     let p1SelectedBlock = null;
+    let p1ListenersBound = false;
 
     function initPhase1() {
         const pool = document.getElementById('p1-blocks-pool');
         if (!pool) return;
         pool.innerHTML = '';
+        p1SelectedBlock = null;
 
         // Очистить слоты
         document.querySelectorAll('#phase1 .pipeline-slot').forEach(slot => {
@@ -450,53 +441,56 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             pool.appendChild(card);
         });
 
-        // Настройка слотов как дропзон
-        document.querySelectorAll('#phase1 .pipeline-slot').forEach(slot => {
-            slot.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                slot.classList.add('border-white');
+        if (!p1ListenersBound) {
+            p1ListenersBound = true;
+            // Настройка слотов как дропзон
+            document.querySelectorAll('#phase1 .pipeline-slot').forEach(slot => {
+                slot.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    slot.classList.add('border-white');
+                });
+
+                slot.addEventListener('dragleave', () => {
+                    slot.classList.remove('border-white');
+                });
+
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    slot.classList.remove('border-white');
+                    const blockId = e.dataTransfer.getData('text/plain');
+                    const blockEl = document.getElementById(blockId);
+                    if (blockEl) {
+                        placeBlockInSlot(blockEl, slot);
+                    }
+                });
+
+                slot.addEventListener('click', () => {
+                    if (p1SelectedBlock) {
+                        placeBlockInSlot(p1SelectedBlock, slot);
+                        p1SelectedBlock.classList.remove('border-warning', 'border-2');
+                        p1SelectedBlock = null;
+                    }
+                });
             });
 
-            slot.addEventListener('dragleave', () => {
-                slot.classList.remove('border-white');
-            });
-
-            slot.addEventListener('drop', (e) => {
+            // Дропзона пула для возврата
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
                 e.preventDefault();
-                slot.classList.remove('border-white');
                 const blockId = e.dataTransfer.getData('text/plain');
                 const blockEl = document.getElementById(blockId);
                 if (blockEl) {
-                    placeBlockInSlot(blockEl, slot);
+                    returnBlockToPool(blockEl);
                 }
             });
-
-            slot.addEventListener('click', () => {
-                if (p1SelectedBlock) {
-                    placeBlockInSlot(p1SelectedBlock, slot);
+            pool.addEventListener('click', () => {
+                if (p1SelectedBlock && p1SelectedBlock.parentElement !== pool) {
+                    returnBlockToPool(p1SelectedBlock);
                     p1SelectedBlock.classList.remove('border-warning', 'border-2');
                     p1SelectedBlock = null;
                 }
             });
-        });
-
-        // Дропзона пула для возврата
-        pool.addEventListener('dragover', (e) => e.preventDefault());
-        pool.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const blockId = e.dataTransfer.getData('text/plain');
-            const blockEl = document.getElementById(blockId);
-            if (blockEl) {
-                returnBlockToPool(blockEl);
-            }
-        });
-        pool.addEventListener('click', () => {
-            if (p1SelectedBlock && p1SelectedBlock.parentElement !== pool) {
-                returnBlockToPool(p1SelectedBlock);
-                p1SelectedBlock.classList.remove('border-warning', 'border-2');
-                p1SelectedBlock = null;
-            }
-        });
+        }
     }
 
     function placeBlockInSlot(blockEl, slot) {
@@ -736,11 +730,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     ];
 
     let p3SelectedCard = null;
+    let p3ListenersBound = false;
 
     function initPhase3() {
         const pool = document.getElementById('p3-cards-pool');
         if (!pool) return;
         pool.innerHTML = '';
+        p3SelectedCard = null;
 
         // Очистить бакеты
         document.querySelectorAll('#phase3 .bucket-slot').forEach(slot => {
@@ -796,57 +792,60 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             pool.appendChild(card);
         });
 
-        // Навешивание событий на бакеты
-        document.querySelectorAll('#phase3 .target-bucket').forEach(bucket => {
-            const slot = bucket.querySelector('.bucket-slot');
+        if (!p3ListenersBound) {
+            p3ListenersBound = true;
+            // Навешивание событий на бакеты
+            document.querySelectorAll('#phase3 .target-bucket').forEach(bucket => {
+                const slot = bucket.querySelector('.bucket-slot');
 
-            bucket.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                bucket.classList.add('border-white');
+                bucket.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    bucket.classList.add('border-white');
+                });
+                bucket.addEventListener('dragleave', () => {
+                    bucket.classList.remove('border-white');
+                });
+                bucket.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    bucket.classList.remove('border-white');
+                    const cardId = e.dataTransfer.getData('text/plain');
+                    const cardEl = document.getElementById(cardId);
+                    if (cardEl && slot) {
+                        slot.appendChild(cardEl);
+                        updateBucketCounts();
+                    }
+                });
+
+                bucket.addEventListener('click', () => {
+                    if (p3SelectedCard && slot) {
+                        slot.appendChild(p3SelectedCard);
+                        p3SelectedCard.classList.remove('border-warning', 'border-2');
+                        p3SelectedCard = null;
+                        updateBucketCounts();
+                    }
+                });
             });
-            bucket.addEventListener('dragleave', () => {
-                bucket.classList.remove('border-white');
-            });
-            bucket.addEventListener('drop', (e) => {
+
+            // Дропзона пула для возврата
+            pool.addEventListener('dragover', (e) => e.preventDefault());
+            pool.addEventListener('drop', (e) => {
                 e.preventDefault();
-                bucket.classList.remove('border-white');
                 const cardId = e.dataTransfer.getData('text/plain');
                 const cardEl = document.getElementById(cardId);
-                if (cardEl && slot) {
-                    slot.appendChild(cardEl);
+                if (cardEl) {
+                    pool.appendChild(cardEl);
                     updateBucketCounts();
                 }
             });
-
-            bucket.addEventListener('click', () => {
-                if (p3SelectedCard && slot) {
-                    slot.appendChild(p3SelectedCard);
+            pool.addEventListener('click', () => {
+                if (p3SelectedCard && p3SelectedCard.parentElement !== pool) {
+                    pool.appendChild(p3SelectedCard);
                     p3SelectedCard.classList.remove('border-warning', 'border-2');
                     p3SelectedCard = null;
                     updateBucketCounts();
                 }
             });
-        });
-
-        // Дропзона пула для возврата
-        pool.addEventListener('dragover', (e) => e.preventDefault());
-        pool.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const cardId = e.dataTransfer.getData('text/plain');
-            const cardEl = document.getElementById(cardId);
-            if (cardEl) {
-                pool.appendChild(cardEl);
-                updateBucketCounts();
-            }
-        });
-        pool.addEventListener('click', () => {
-            if (p3SelectedCard && p3SelectedCard.parentElement !== pool) {
-                pool.appendChild(p3SelectedCard);
-                p3SelectedCard.classList.remove('border-warning', 'border-2');
-                p3SelectedCard = null;
-                updateBucketCounts();
-            }
-        });
+        }
     }
 
     function updateBucketCounts() {

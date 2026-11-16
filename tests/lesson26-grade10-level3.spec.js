@@ -34,13 +34,13 @@ test.describe('10th Grade Advanced Lesson 26: Level 3 Arcade Task Suite', () => 
     expect(code).toMatch(/resonancePercent/);
 
     // 6. Hardcore reset (any error or timeout resets to wave 1 / index 0)
-    expect(code).toContain('hardcore_reset');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('currentWave.value = 0');
     expect(code).toContain('triggerHardcoreReset');
 
-    // 7. Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
+    // 7. Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
     expect(code).toContain('Урок 26');
   });
 
