@@ -1,0 +1,555 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 5 :: Государственные электронные сервисы :: Уровень 3';
+---
+
+<TaskLayout title="Уровень 3 — Шлюз СМЭВ (Маршрутизатор)" level={3} bodyClass="font-monospace">
+    <Fragment slot="head">
+        <script src="/static/vue.global.js" is:inline></script>
+    </Fragment>
+
+    <div id="app" v-cloak class="container-fluid px-2 px-md-3 my-3">
+        <div class="card bg-black border border-danger border-2 rounded-0 p-3 p-md-4">
+            <!-- Intro screen -->
+            <div v-if="!started && !gameWon" id="startScreen" class="text-center mx-auto py-3" style="max-width: 660px;">
+                <h1 class="h2 text-danger fw-bold mb-3 text-uppercase">ШЛЮЗ СМЭВ: КОНВЕЙЕР ГОСУСЛУГ</h1>
+                <div class="text-start text-light lh-base mb-4 fs-6">
+                    <p>Вы — оператор сервисной шины <strong class="text-white">СМЭВ (ESB)</strong>. Через коммутационную матрицу 3×3 поступают запросы граждан.</p>
+                    <p>Кликайте по узлам маршрутизатора, чтобы поворачивать каналы связи и соединить <strong class="text-info">ВХОДНОЙ ПОТОК</strong> слева с нужным <strong class="text-success">ВЕДОМСТВОМ</strong> справа (обходя заблокированные узлы), затем нажмите <kbd class="bg-dark border border-secondary">ПРОБЕЛ</kbd> или кнопку пуска.</p>
+                    <div class="alert alert-danger bg-dark text-white border border-danger rounded-0 mb-0">
+                        <strong class="text-danger">ХАРДКОР-СБРОС:</strong> Доставка в неверное ведомство, обрыв цепи или истечение TTL сбрасывают прогресс на Волну 1. Всего 10 волн.
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-danger text-white rounded-0 fs-5 fw-bold px-4 py-3 w-100 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    [ ЗАПУСТИТЬ ШЛЮЗ СМЭВ ]
+                </button>
+            </div>
+
+            <!-- Active game -->
+            <div v-if="started && !gameWon">
+                <div class="d-flex gap-1 mb-3">
+                    <div
+                        v-for="idx in totalWaves"
+                        :key="idx"
+                        class="flex-fill"
+                        style="height: 6px;"
+                        :class="idx < wave ? 'bg-success' : (idx === wave ? 'bg-danger' : 'bg-secondary')"
+                    ></div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 flex-wrap gap-2">
+                    <span class="badge bg-dark border border-danger text-white rounded-0 fs-6 px-3 py-2">
+                        ВОЛНА <span v-text="wave"></span> / <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="badge rounded-0 fs-6 px-3 py-2" :class="timerSec <= 4 ? 'bg-danger text-white' : 'bg-dark border border-warning text-warning'">
+                        TTL: <span v-text="timerSec"></span> с
+                    </span>
+                </div>
+
+                <div class="progress rounded-0 bg-dark border border-secondary mb-3" style="height: 12px;">
+                    <div
+                        class="progress-bar"
+                        role="progressbar"
+                        :class="timerPercent < 30 ? 'bg-danger' : (timerPercent < 60 ? 'bg-warning' : 'bg-info')"
+                        :style="{ width: timerPercent + '%' }"
+                    ></div>
+                </div>
+
+                <div class="bg-dark border border-info p-3 mb-3">
+                    <div class="text-info small fw-bold text-uppercase mb-1">ВХОДЯЩИЙ ЗАПРОС (Шина СМЭВ):</div>
+                    <div class="fs-5 text-white fw-bold" v-text="currentWaveData.intent"></div>
+                </div>
+
+                <!-- Pipeline Router Matrix (Entry -> 3x3 Switches -> Exit Ports) -->
+                <div class="d-flex flex-column gap-2 mb-3">
+                    <div v-for="r in 3" :key="r" class="row g-2 align-items-stretch">
+                        <div class="col-3 d-flex align-items-center">
+                            <div
+                                class="w-100 h-100 d-flex align-items-center justify-content-center p-2 border rounded-0 text-center fw-bold small"
+                                :class="(r - 1) === currentWaveData.entryRow ? 'bg-info text-dark border-info' : 'bg-dark text-secondary border-secondary opacity-50'"
+                                style="min-height: 58px;"
+                            >
+                                <span v-if="(r - 1) === currentWaveData.entryRow">ВХОД ▶</span>
+                                <span v-else>—</span>
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <div class="row g-2 h-100">
+                                <div v-for="c in 3" :key="c" class="col-4">
+                                    <button
+                                        type="button"
+                                        class="btn rounded-0 w-100 h-100 p-1 fw-bold d-flex flex-column align-items-center justify-content-center"
+                                        :data-row="r - 1"
+                                        :data-col="c - 1"
+                                        :data-lit="grid[r - 1][c - 1].lit ? '1' : '0'"
+                                        :data-blocked="grid[r - 1][c - 1].blocked ? '1' : '0'"
+                                        :class="tileBtnClass(grid[r - 1][c - 1])"
+                                        :disabled="grid[r - 1][c - 1].blocked"
+                                        style="min-height: 58px;"
+                                        @click="rotateTile(r - 1, c - 1)"
+                                    >
+                                        <span class="fs-4 lh-1" v-text="tileGlyph(grid[r - 1][c - 1])"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-3 d-flex align-items-center">
+                            <div
+                                class="w-100 h-100 d-flex align-items-center justify-content-center p-1 p-sm-2 border rounded-0 text-center fw-bold"
+                                :data-exit-row="r - 1"
+                                :class="exitBoxClass(r - 1)"
+                                style="min-height: 58px; word-break: break-word; font-size: clamp(0.65rem, 1.6vw, 0.85rem);"
+                            >
+                                <span v-text="currentWaveData.exits[r - 1]"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    id="launchBtn"
+                    class="btn rounded-0 fw-bold fs-5 w-100 py-3 text-uppercase"
+                    :class="reachedExitRow !== null ? 'btn-success text-dark' : 'btn-outline-danger text-white'"
+                    style="min-height: 52px;"
+                    @click="launchPacket"
+                >
+                    <span v-if="reachedExitRow !== null">ОТПРАВИТЬ ПАКЕТ В «<span v-text="currentWaveData.exits[reachedExitRow]"></span>» [ПРОБЕЛ]</span>
+                    <span v-else>ТРАССА НЕ ЗАМКНУТА (ПУСК [ПРОБЕЛ])</span>
+                </button>
+            </div>
+
+            <!-- Victory -->
+            <div v-if="gameWon" id="successArea" class="text-center py-5">
+                <div class="alert alert-success bg-success text-dark rounded-0 border-0 fw-bold py-5">
+                    <h2 class="h2 fw-bold text-uppercase mb-3">ШЛЮЗ СМЭВ СТАБИЛЕН</h2>
+                    <p class="fs-5 mb-0">Все 10 пакетов госуслуг маршрутизированы без потерь.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure overlay -->
+        <div v-if="failVisible" id="failOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-danger text-white text-center p-4" style="z-index: 1050;">
+            <h1 class="display-5 fw-bold text-uppercase mb-2">СБОЙ МАРШРУТИЗАЦИИ</h1>
+            <p class="fs-4 mb-0" v-text="failReason"></p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+            const TOTAL_WAVES = 10;
+
+            const ROUTING_BANK = [
+                { intent: 'Оформление загранпаспорта нового образца', target: 'МВД России', distractors: ['ФНС', 'Росреестр', 'СФР', 'Минздрав'] },
+                { intent: 'Оплата транспортного налога и регистрация ИП', target: 'ФНС России', distractors: ['МВД России', 'СФР', 'ГИБДД', 'Росреестр'] },
+                { intent: 'Запись к врачу по ОМС (ЕМИАС)', target: 'Минздрав', distractors: ['ФНС России', 'СФР', 'Росреестр', 'МВД России'] },
+                { intent: 'Регистрация права собственности на квартиру', target: 'Росреестр', distractors: ['МВД России', 'ФНС России', 'СФР', 'ЗАГС'] },
+                { intent: 'Оформление выписки о материнском капитале', target: 'Соцфонд (СФР)', distractors: ['ФНС России', 'Росреестр', 'ЗАГС', 'МВД России'] },
+                { intent: 'Проверка штрафов за нарушение ПДД', target: 'ГИБДД', distractors: ['ФНС России', 'Росреестр', 'СФР', 'Минздрав'] },
+                { intent: 'Подача заявления о регистрации брака', target: 'Органы ЗАГС', distractors: ['МВД России', 'Росреестр', 'СФР', 'ФНС России'] },
+                { intent: 'Оплата квитанции за электроэнергию и воду', target: 'ГИС ЖКХ', distractors: ['Росреестр', 'ФНС России', 'СФР', 'МВД России'] },
+                { intent: 'Оформление электронной цифровой подписи', target: 'Удост. центр', distractors: ['ГИБДД', 'Минздрав', 'Росреестр', 'ЗАГС'] },
+                { intent: 'Передача показаний счётчиков воды', target: 'ГИС ЖКХ', distractors: ['МВД России', 'ГИБДД', 'ФНС России', 'СФР'] },
+                { intent: 'Получение справки об отсутствии судимости', target: 'МВД России', distractors: ['ЗАГС', 'Росреестр', 'Минздрав', 'ФНС России'] },
+                { intent: 'Покупка билета на поезд Сапсан', target: 'РЖД', distractors: ['ГИБДД', 'МВД России', 'СФР', 'ЗАГС'] },
+                { intent: 'Проверка оценок за четверть в школе', target: 'Эл. дневник', distractors: ['ФНС России', 'МВД России', 'Росреестр', 'ГИБДД'] },
+                { intent: 'Проверка налоговой задолженности физического лица', target: 'ФНС России', distractors: ['МВД России', 'Минздрав', 'РЖД', 'ГИС ЖКХ'] }
+            ];
+
+            const DIRS = ['N', 'E', 'S', 'W'];
+            const OPPOSITE = { N: 'S', S: 'N', E: 'W', W: 'E' };
+            const DR = { N: -1, E: 0, S: 1, W: 0 };
+            const DC = { N: 0, E: 1, S: 0, W: -1 };
+
+            function getOpenings(type, rot) {
+                if (type === 'blocked') return [];
+                const r = ((rot % 4) + 4) % 4;
+                if (type === 'straight') {
+                    return r % 2 === 0 ? ['W', 'E'] : ['N', 'S'];
+                }
+                const base = ['W', 'S'];
+                return base.map(d => DIRS[(DIRS.indexOf(d) + r) % 4]);
+            }
+
+            function glyphFor(type, rot) {
+                if (type === 'blocked') return '✖';
+                const opens = getOpenings(type, rot).slice().sort().join('');
+                const map = {
+                    'EW': '━━',
+                    'NS': '┃',
+                    'ES': '┏━',
+                    'SW': '━┓',
+                    'NW': '━┛',
+                    'EN': '┗━'
+                };
+                return map[opens] || '╋';
+            }
+
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function buildPath(entryRow, targetRow) {
+                const midRow = Math.floor(Math.random() * 3);
+                const coords = [];
+                let r = entryRow;
+                coords.push([r, 0]);
+                while (r !== midRow) {
+                    r += r < midRow ? 1 : -1;
+                    coords.push([r, 0]);
+                }
+                r = midRow;
+                coords.push([r, 1]);
+                while (r !== targetRow) {
+                    r += r < targetRow ? 1 : -1;
+                    coords.push([r, 1]);
+                }
+                coords.push([targetRow, 2]);
+                return coords;
+            }
+
+            function dirBetween(a, b) {
+                if (b[0] === a[0] - 1) return 'N';
+                if (b[0] === a[0] + 1) return 'S';
+                if (b[1] === a[1] + 1) return 'E';
+                return 'W';
+            }
+
+            function findCorrectRotation(type, needA, needB) {
+                const setNeed = new Set([needA, needB]);
+                for (let rot = 0; rot < 4; rot++) {
+                    const ops = getOpenings(type, rot);
+                    if (ops.length === 2 && setNeed.has(ops[0]) && setNeed.has(ops[1])) {
+                        return rot;
+                    }
+                }
+                return 0;
+            }
+
+            function createWaveBoard(waveNum, scenario) {
+                const entryRow = Math.floor(Math.random() * 3);
+                const targetRow = Math.floor(Math.random() * 3);
+                const distractors = shuffle(scenario.distractors).slice(0, 2);
+                const exits = ['', '', ''];
+                exits[targetRow] = scenario.target;
+                let dIdx = 0;
+                for (let i = 0; i < 3; i++) {
+                    if (i !== targetRow) exits[i] = distractors[dIdx++];
+                }
+
+                const path = buildPath(entryRow, targetRow);
+                const pathMap = new Map();
+                for (let i = 0; i < path.length; i++) {
+                    const [r, c] = path[i];
+                    const prevDir = i === 0 ? 'W' : OPPOSITE[dirBetween(path[i - 1], path[i])];
+                    const nextDir = i === path.length - 1 ? 'E' : dirBetween(path[i], path[i + 1]);
+                    const isStraight = OPPOSITE[prevDir] === nextDir;
+                    const type = isStraight ? 'straight' : 'corner';
+                    const solvedRot = findCorrectRotation(type, prevDir, nextDir);
+                    pathMap.set(`${r},${c}`, { type, solvedRot });
+                }
+
+                const board = [];
+                const offPathCoords = [];
+                for (let r = 0; r < 3; r++) {
+                    const rowArr = [];
+                    for (let c = 0; c < 3; c++) {
+                        const key = `${r},${c}`;
+                        if (pathMap.has(key)) {
+                            const info = pathMap.get(key);
+                            const delta = info.type === 'straight' ? 1 : (1 + Math.floor(Math.random() * 3));
+                            rowArr.push({
+                                type: info.type,
+                                rot: (info.solvedRot + delta) % 4,
+                                blocked: false,
+                                lit: false
+                            });
+                        } else {
+                            offPathCoords.push([r, c]);
+                            const t = Math.random() > 0.5 ? 'straight' : 'corner';
+                            rowArr.push({
+                                type: t,
+                                rot: Math.floor(Math.random() * 4),
+                                blocked: false,
+                                lit: false
+                            });
+                        }
+                    }
+                    board.push(rowArr);
+                }
+
+                if (waveNum >= 3 && offPathCoords.length > 0) {
+                    const shuffledOff = shuffle(offPathCoords);
+                    const [br, bc] = shuffledOff[0];
+                    board[br][bc] = { type: 'blocked', rot: 0, blocked: true, lit: false };
+                }
+
+                return {
+                    intent: scenario.intent,
+                    entryRow,
+                    targetRow,
+                    exits,
+                    board
+                };
+            }
+
+            createApp({
+                setup() {
+                    const started = ref(false);
+                    const gameWon = ref(false);
+                    const wave = ref(1);
+                    const totalWaves = TOTAL_WAVES;
+                    const grid = ref([[], [], []]);
+                    const currentWaveData = ref({ intent: '', entryRow: 0, targetRow: 0, exits: ['', '', ''] });
+                    const reachedExitRow = ref(null);
+                    const timeRemainingMs = ref(19000);
+                    const waveDurationMs = ref(19000);
+                    const failVisible = ref(false);
+                    const failReason = ref('');
+
+                    const timerPercent = computed(() => {
+                        if (waveDurationMs.value <= 0) return 0;
+                        return Math.max(0, Math.min(100, (timeRemainingMs.value / waveDurationMs.value) * 100));
+                    });
+                    const timerSec = computed(() => Math.max(0, Math.ceil(timeRemainingMs.value / 1000)));
+
+                    let queue = [];
+                    let timerInterval = null;
+                    let resetTimeout = null;
+                    let lastTick = 0;
+                    const actionLog = [];
+
+                    const telemetry = window.LMSTelemetry.create({
+                        missionName: missionName,
+                        level: 3,
+                        totalWaves: TOTAL_WAVES,
+                        showAfkOverlay: true,
+                        onAfkStop: () => {
+                            clearInterval(timerInterval);
+                            clearTimeout(resetTimeout);
+                            timerInterval = null;
+                            failVisible.value = false;
+                        },
+                        onAfkRetry: () => {
+                            failVisible.value = false;
+                            restartFromWave1();
+                        }
+                    });
+
+                    function recomputeFlow() {
+                        const b = grid.value;
+                        for (let r = 0; r < 3; r++) {
+                            for (let c = 0; c < 3; c++) {
+                                b[r][c].lit = false;
+                            }
+                        }
+                        reachedExitRow.value = null;
+
+                        let r = currentWaveData.value.entryRow;
+                        let c = 0;
+                        let incomingDir = 'W';
+                        const visited = new Set();
+
+                        while (r >= 0 && r < 3 && c >= 0 && c < 3) {
+                            const key = `${r},${c}`;
+                            if (visited.has(key)) break;
+                            visited.add(key);
+
+                            const cell = b[r][c];
+                            if (cell.blocked) break;
+
+                            const opens = getOpenings(cell.type, cell.rot);
+                            if (!opens.includes(incomingDir)) break;
+
+                            cell.lit = true;
+                            const outDir = opens.find(d => d !== incomingDir);
+                            if (!outDir) break;
+
+                            if (c === 2 && outDir === 'E') {
+                                reachedExitRow.value = r;
+                                break;
+                            }
+
+                            const nr = r + DR[outDir];
+                            const nc = c + DC[outDir];
+                            if (nr < 0 || nr >= 3 || nc < 0 || nc >= 3) break;
+
+                            r = nr;
+                            c = nc;
+                            incomingDir = OPPOSITE[outDir];
+                        }
+                    }
+
+                    function getWaveDurationMs(w) {
+                        return Math.max(11000, 19000 - (w - 1) * 800);
+                    }
+
+                    function startWave(w) {
+                        clearInterval(timerInterval);
+                        wave.value = w;
+                        telemetry.setWave(w, TOTAL_WAVES);
+
+                        const scenario = queue[w - 1];
+                        const built = createWaveBoard(w, scenario);
+                        currentWaveData.value = {
+                            intent: built.intent,
+                            entryRow: built.entryRow,
+                            targetRow: built.targetRow,
+                            exits: built.exits
+                        };
+                        grid.value = built.board;
+                        recomputeFlow();
+
+                        const dur = getWaveDurationMs(w);
+                        waveDurationMs.value = dur;
+                        timeRemainingMs.value = dur;
+                        lastTick = Date.now();
+
+                        timerInterval = setInterval(() => {
+                            const now = Date.now();
+                            const delta = now - lastTick;
+                            lastTick = now;
+                            timeRemainingMs.value -= delta;
+                            if (timeRemainingMs.value <= 0) {
+                                failLevel('TTL ПАКЕТА ИСТЁК', true);
+                            }
+                        }, 100);
+                    }
+
+                    function restartFromWave1() {
+                        queue = shuffle(ROUTING_BANK).slice(0, TOTAL_WAVES);
+                        startWave(1);
+                    }
+
+                    function startGame() {
+                        clearTimeout(resetTimeout);
+                        started.value = true;
+                        gameWon.value = false;
+                        failVisible.value = false;
+                        telemetry.start();
+                        telemetry.progress({ wave: 1, total_waves: TOTAL_WAVES, stage: 1, total_stages: TOTAL_WAVES });
+                        restartFromWave1();
+                    }
+
+                    function rotateTile(r, c) {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        const cell = grid.value[r][c];
+                        if (cell.blocked) return;
+                        telemetry.markActivity();
+                        cell.rot = (cell.rot + 1) % 4;
+                        recomputeFlow();
+                    }
+
+                    function failLevel(reason, isTimeout) {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        const failedWave = wave.value;
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${failedWave}_fail_${reason}` });
+
+                        const sent = telemetry.fail({
+                            wave: failedWave,
+                            isTimeout: Boolean(isTimeout),
+                            action_log: actionLog
+                        });
+
+                        if (sent === false) {
+                            return;
+                        }
+
+                        failReason.value = `${reason}. Сброс на Волну 1...`;
+                        failVisible.value = true;
+                        resetTimeout = setTimeout(() => {
+                            failVisible.value = false;
+                            if (started.value && !gameWon.value && !telemetry.getState().isAfkPaused) {
+                                restartFromWave1();
+                            }
+                        }, 1500);
+                    }
+
+                    function launchPacket() {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        clearInterval(timerInterval);
+                        telemetry.markActivity();
+                        actionLog.push({ time: new Date().toISOString(), action: `wave_${wave.value}_launch_exit_${reachedExitRow.value}` });
+
+                        if (reachedExitRow.value === currentWaveData.value.targetRow) {
+                            if (wave.value >= TOTAL_WAVES) {
+                                gameWon.value = true;
+                                telemetry.complete({ wave: TOTAL_WAVES, action_log: actionLog });
+                            } else {
+                                const nextWave = wave.value + 1;
+                                telemetry.advanceWave(nextWave, { action_log: actionLog });
+                                startWave(nextWave);
+                            }
+                        } else {
+                            failLevel(reachedExitRow.value === null ? 'ТРАССА ОБОРВАНА' : 'НЕВЕРНОЕ ВЕДОМСТВО', false);
+                        }
+                    }
+
+                    function tileGlyph(cell) {
+                        return glyphFor(cell.type, cell.rot);
+                    }
+
+                    function tileBtnClass(cell) {
+                        if (cell.blocked) return 'btn-danger bg-danger bg-opacity-25 text-danger border-danger';
+                        if (cell.lit) return 'btn-info bg-info bg-opacity-25 text-info border-info';
+                        return 'btn-outline-secondary bg-dark text-light border-secondary';
+                    }
+
+                    function exitBoxClass(rowIdx) {
+                        if (reachedExitRow.value === rowIdx) {
+                            return 'bg-success text-dark border-success';
+                        }
+                        return 'bg-dark text-white border-secondary';
+                    }
+
+                    function onKeyDown(e) {
+                        if (!started.value || gameWon.value || failVisible.value || telemetry.getState().isAfkPaused) return;
+                        if (e.code === 'Space' || e.key === 'Enter') {
+                            e.preventDefault();
+                            launchPacket();
+                        }
+                    }
+
+                    onMounted(() => {
+                        window.addEventListener('keydown', onKeyDown);
+                    });
+
+                    onUnmounted(() => {
+                        clearInterval(timerInterval);
+                        clearTimeout(resetTimeout);
+                        window.removeEventListener('keydown', onKeyDown);
+                    });
+
+                    return {
+                        started,
+                        gameWon,
+                        wave,
+                        totalWaves,
+                        grid,
+                        currentWaveData,
+                        reachedExitRow,
+                        timerPercent,
+                        timerSec,
+                        failVisible,
+                        failReason,
+                        startGame,
+                        rotateTile,
+                        launchPacket,
+                        tileGlyph,
+                        tileBtnClass,
+                        exitBoxClass
+                    };
+                }
+            }).mount('#app');
+        })();
+    </script>
+</TaskLayout>

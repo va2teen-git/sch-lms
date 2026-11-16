@@ -90,7 +90,7 @@ export const GET: APIRoute = async ({ request }) => {
         continue;
       }
 
-      if (aType === 'level_complete') {
+      if (aType === 'level_complete' || aType === 'task_completed') {
         entry.hasActivity = true;
         let lvlKey = mName;
         if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {

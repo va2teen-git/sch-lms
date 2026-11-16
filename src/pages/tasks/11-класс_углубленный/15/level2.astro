@@ -1,0 +1,351 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+const missionName = 'Урок 15 :: Деревья :: Уровень 2';
+---
+
+<TaskLayout title="Уровень 2 — Парсер деревьев выражений" level={2} bodyClass="font-monospace">
+    <div class="container-fluid px-2 px-md-3 my-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2 flex-wrap gap-2">
+            <h2 class="h5 m-0 text-warning fw-bold text-uppercase" id="phaseTitle">Этап 1 из 5: Деревья выражений</h2>
+            <span class="badge bg-black border border-secondary text-light rounded-0 fs-6 px-3 py-2">
+                Ошибки: <span id="errorsCount">0</span>
+            </span>
+        </div>
+
+        <div class="progress rounded-0 bg-black border border-warning mb-3" style="height: 12px;">
+            <div class="progress-bar bg-warning" id="progressBar" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div id="pasteNotice" class="alert alert-warning bg-black text-warning border border-warning rounded-0 d-none mb-3">
+            <span class="fw-bold">АНТИ-СПИСЫВАНИЕ:</span> Вставка из буфера обмена заблокирована. Введите ответ вручную.
+        </div>
+
+        <div class="card bg-dark border-warning rounded-0" id="gameArea">
+            <div class="card-header border-warning text-warning fw-bold text-uppercase">
+                Синтаксический анализатор AST (Abstract Syntax Tree)
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <div class="fs-5 text-white fw-bold mb-3" id="questionText">Инициализация...</div>
+
+                <div class="bg-black border border-secondary p-2 mb-3 text-center">
+                    <svg id="exprSvg" viewBox="0 0 560 230" class="w-100" style="max-height: 230px;"></svg>
+                </div>
+
+                <label for="answerInput" class="form-label text-light small mb-2" id="inputHint">Введите результат:</label>
+                <div class="input-group w-100" style="max-width: 580px;">
+                    <input type="text" id="answerInput" class="form-control bg-black text-warning border-warning rounded-0 fs-5 font-monospace" placeholder="Ответ..." autocomplete="off" spellcheck="false" />
+                    <button type="button" id="checkBtn" class="btn btn-warning text-dark rounded-0 fw-bold px-4 fs-5" style="min-height: 48px;">ПРОВЕРИТЬ</button>
+                </div>
+
+                <div id="feedbackMsg" class="alert alert-danger bg-danger text-white rounded-0 border-0 fw-bold mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="successArea" class="alert alert-warning bg-warning text-dark rounded-0 border-0 text-center py-5 mt-3 d-none">
+            <h3 class="fw-bold text-uppercase mb-2">ПАРСЕР ОТКАЛИБРОВАН</h3>
+            <p class="fs-5 mb-0 fw-semibold">УРОВЕНЬ 2 ПРОЙДЕН. Все деревья выражений и структурные метрики вычислены верно.</p>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ missionName }}>
+        (function () {
+            const TOTAL_PHASES = 5;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 2,
+                totalStages: TOTAL_PHASES
+            });
+
+            function rnd(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function drawBinaryTree(nodes, edges) {
+                let html = '';
+                for (const [a, b] of edges) {
+                    html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ffc107" stroke-width="2" />`;
+                }
+                for (const n of nodes) {
+                    const isOp = ['+', '-', '*', '/'].includes(String(n.label));
+                    const fill = isOp ? '#332701' : '#111111';
+                    const stroke = isOp ? '#ffc107' : '#0dcaf0';
+                    const textCol = isOp ? '#ffc107' : '#ffffff';
+                    html += `<rect x="${n.x - 22}" y="${n.y - 20}" width="44" height="40" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
+                    html += `<text x="${n.x}" y="${n.y + 6}" fill="${textCol}" font-size="18" font-weight="bold" font-family="monospace" text-anchor="middle">${n.label}</text>`;
+                }
+                return html;
+            }
+
+            function buildPhase1() {
+                const a = rnd(2, 9), b = rnd(2, 9), c = rnd(2, 6);
+                const leftBranch = Math.random() > 0.5;
+                const op1 = Math.random() > 0.5 ? '+' : '-';
+                const op2 = '*';
+                const innerVal = op1 === '+' ? a + b : a - b;
+                const total = leftBranch ? innerVal * c : a * (op1 === '+' ? b + c : b - c);
+
+                const root = { x: 280, y: 36, label: op2 };
+                const left = { x: 160, y: 112, label: leftBranch ? op1 : a };
+                const right = { x: 400, y: 112, label: leftBranch ? c : op1 };
+                const nodes = [root, left, right];
+                const edges = [[root, left], [root, right]];
+                if (leftBranch) {
+                    const ll = { x: 95, y: 192, label: a };
+                    const lr = { x: 225, y: 192, label: b };
+                    nodes.push(ll, lr);
+                    edges.push([left, ll], [left, lr]);
+                } else {
+                    const rl = { x: 335, y: 192, label: b };
+                    const rr = { x: 465, y: 192, label: c };
+                    nodes.push(rl, rr);
+                    edges.push([right, rl], [right, rr]);
+                }
+
+                return {
+                    question: 'Вычислите итоговое числовое значение в корне дерева выражения:',
+                    hint: 'Введите целое число (например: 24).',
+                    placeholder: 'Число...',
+                    svg: drawBinaryTree(nodes, edges),
+                    check: (val) => parseInt(val.trim(), 10) === total
+                };
+            }
+
+            function buildPhase2() {
+                const varSets = [
+                    ['A', 'B', 'C'],
+                    ['X', 'Y', 'Z'],
+                    ['M', 'N', 'K'],
+                    ['P', 'Q', 'R']
+                ];
+                const [v1, v2, v3] = varSets[rnd(0, varSets.length - 1)];
+                const lowOp = Math.random() > 0.5 ? '+' : '-';
+                const highOp = Math.random() > 0.5 ? '*' : '/';
+                const leftSub = Math.random() > 0.5;
+
+                const root = { x: 280, y: 36, label: highOp };
+                const left = { x: 160, y: 112, label: leftSub ? lowOp : v1 };
+                const right = { x: 400, y: 112, label: leftSub ? v3 : lowOp };
+                const nodes = [root, left, right];
+                const edges = [[root, left], [root, right]];
+
+                let expected = '';
+                if (leftSub) {
+                    const ll = { x: 95, y: 192, label: v1 };
+                    const lr = { x: 225, y: 192, label: v2 };
+                    nodes.push(ll, lr);
+                    edges.push([left, ll], [left, lr]);
+                    expected = `(${v1}${lowOp}${v2})${highOp}${v3}`;
+                } else {
+                    const rl = { x: 335, y: 192, label: v2 };
+                    const rr = { x: 465, y: 192, label: v3 };
+                    nodes.push(rl, rr);
+                    edges.push([right, rl], [right, rr]);
+                    expected = `${v1}${highOp}(${v2}${lowOp}${v3})`;
+                }
+
+                return {
+                    question: 'Запишите инфиксное арифметическое выражение, представленное на дереве (с необходимыми скобками):',
+                    hint: `Пример формата: (${v1}${lowOp}${v2})${highOp}${v3} (пробелы не важны).`,
+                    placeholder: 'Выражение...',
+                    svg: drawBinaryTree(nodes, edges),
+                    check: (val) => val.replace(/\s+/g, '').toUpperCase() === expected.toUpperCase()
+                };
+            }
+
+            function buildPhase3() {
+                const a = rnd(3, 9), b = rnd(1, 6), c = rnd(2, 8), d = rnd(1, 5);
+                const opL = Math.random() > 0.5 ? '+' : '-';
+                const opR = Math.random() > 0.5 ? '+' : '-';
+                const opRoot = '*';
+                const valL = opL === '+' ? a + b : a - b;
+                const valR = opR === '+' ? c + d : c - d;
+                const total = valL * valR;
+
+                const root = { x: 280, y: 36, label: opRoot };
+                const l = { x: 150, y: 110, label: opL };
+                const r = { x: 410, y: 110, label: opR };
+                const ll = { x: 80, y: 192, label: a };
+                const lr = { x: 220, y: 192, label: b };
+                const rl = { x: 340, y: 192, label: c };
+                const rr = { x: 480, y: 192, label: d };
+
+                const nodes = [root, l, r, ll, lr, rl, rr];
+                const edges = [[root, l], [root, r], [l, ll], [l, lr], [r, rl], [r, rr]];
+
+                return {
+                    question: 'Вычислите значение 3-уровневого дерева выражения в корне:',
+                    hint: 'Сначала вычислите левое и правое поддеревья, затем выполните операцию в корне.',
+                    placeholder: 'Число...',
+                    svg: drawBinaryTree(nodes, edges),
+                    check: (val) => parseInt(val.trim(), 10) === total
+                };
+            }
+
+            function buildPhase4() {
+                const askHeight = Math.random() > 0.5;
+                // Generate a tree of 7 nodes (A..G) with clear height (2 or 3) and degree (2 or 3)
+                const isHeight3 = Math.random() > 0.5;
+                const coords = isHeight3
+                    ? {
+                        A: { x: 280, y: 32 },
+                        B: { x: 160, y: 92 }, C: { x: 400, y: 92 },
+                        D: { x: 100, y: 152 }, E: { x: 220, y: 152 }, F: { x: 400, y: 152 },
+                        G: { x: 100, y: 206 }
+                    }
+                    : {
+                        A: { x: 280, y: 36 },
+                        B: { x: 120, y: 112 }, C: { x: 280, y: 112 }, D: { x: 440, y: 112 },
+                        E: { x: 80, y: 192 }, F: { x: 160, y: 192 }, G: { x: 440, y: 192 }
+                    };
+                const edgePairs = isHeight3
+                    ? [['A', 'B'], ['A', 'C'], ['B', 'D'], ['B', 'E'], ['C', 'F'], ['D', 'G']]
+                    : [['A', 'B'], ['A', 'C'], ['A', 'D'], ['B', 'E'], ['B', 'F'], ['D', 'G']];
+
+                let html = '';
+                for (const [p, c] of edgePairs) {
+                    html += `<line x1="${coords[p].x}" y1="${coords[p].y}" x2="${coords[c].x}" y2="${coords[c].y}" stroke="#ffc107" stroke-width="2" />`;
+                }
+                for (const [name, pt] of Object.entries(coords)) {
+                    html += `<rect x="${pt.x - 18}" y="${pt.y - 16}" width="36" height="32" fill="#111111" stroke="#0dcaf0" stroke-width="2" />`;
+                    html += `<text x="${pt.x}" y="${pt.y + 5}" fill="#ffffff" font-size="16" font-weight="bold" font-family="monospace" text-anchor="middle">${name}</text>`;
+                }
+
+                const heightAns = isHeight3 ? 3 : 2;
+                const degreeAns = isHeight3 ? 2 : 3;
+                const ans = askHeight ? heightAns : degreeAns;
+
+                return {
+                    question: askHeight
+                        ? 'Определите ВЫСОТУ данного дерева (максимальную глубину среди всех узлов; корень на глубине 0):'
+                        : 'Определите СТЕПЕНЬ данного дерева (максимальное число потомков среди всех узлов):',
+                    hint: 'Введите одно целое число.',
+                    placeholder: 'Число...',
+                    svg: html,
+                    check: (val) => parseInt(val.trim(), 10) === ans
+                };
+            }
+
+            function buildPhase5() {
+                const xVal = rnd(2, 12);
+                const a = rnd(2, 9);
+                const b = rnd(2, 6);
+                const op1 = Math.random() > 0.5 ? '+' : '-';
+                const inner = op1 === '+' ? xVal + a : xVal - a;
+                const target = inner * b;
+
+                const root = { x: 280, y: 36, label: '*' };
+                const left = { x: 160, y: 112, label: op1 };
+                const right = { x: 400, y: 112, label: b };
+                const ll = { x: 95, y: 192, label: 'X' };
+                const lr = { x: 225, y: 192, label: a };
+
+                return {
+                    question: `Значение в корне дерева выражения равно ${target}. Найдите неизвестный лист X:`,
+                    hint: `Решите обратную задачу по дереву: (X ${op1} ${a}) * ${b} = ${target}. Введите целое значение X.`,
+                    placeholder: 'X = ...',
+                    svg: drawBinaryTree([root, left, right, ll, lr], [[root, left], [root, right], [left, ll], [left, lr]]),
+                    check: (val) => parseInt(val.trim(), 10) === xVal
+                };
+            }
+
+            const builders = [buildPhase1, buildPhase2, buildPhase3, buildPhase4, buildPhase5];
+            let currentPhase = 1;
+            let errorsCount = 0;
+            let locked = false;
+            let currentTask = null;
+            const actionLog = [];
+
+            const phaseTitleEl = document.getElementById('phaseTitle');
+            const progressBarEl = document.getElementById('progressBar');
+            const errorsCountEl = document.getElementById('errorsCount');
+            const questionTextEl = document.getElementById('questionText');
+            const inputHintEl = document.getElementById('inputHint');
+            const exprSvgEl = document.getElementById('exprSvg');
+            const inputEl = document.getElementById('answerInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const feedbackEl = document.getElementById('feedbackMsg');
+            const pasteNoticeEl = document.getElementById('pasteNotice');
+            const gameAreaEl = document.getElementById('gameArea');
+            const successAreaEl = document.getElementById('successArea');
+
+            function initPhase() {
+                locked = false;
+                currentTask = builders[currentPhase - 1]();
+
+                phaseTitleEl.textContent = `Этап ${currentPhase} из ${TOTAL_PHASES}: Деревья выражений`;
+                progressBarEl.style.width = `${((currentPhase - 1) / TOTAL_PHASES) * 100}%`;
+                questionTextEl.textContent = currentTask.question;
+                inputHintEl.textContent = currentTask.hint;
+                exprSvgEl.innerHTML = currentTask.svg;
+
+                inputEl.value = '';
+                inputEl.placeholder = currentTask.placeholder;
+                inputEl.disabled = false;
+                checkBtn.disabled = false;
+                inputEl.classList.remove('border-danger', 'bg-danger', 'text-white');
+                inputEl.classList.add('border-warning', 'bg-black', 'text-warning');
+                feedbackEl.classList.add('d-none');
+                feedbackEl.textContent = '';
+
+                inputEl.focus();
+                actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_started` });
+            }
+
+            function checkAnswer() {
+                if (locked || !currentTask) return;
+                telemetry.start();
+                const raw = inputEl.value.trim();
+                if (!raw) return;
+
+                if (currentTask.check(raw)) {
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_passed` });
+                    if (currentPhase < TOTAL_PHASES) {
+                        currentPhase += 1;
+                        telemetry.advanceStage(currentPhase, { action_log: actionLog });
+                        initPhase();
+                    } else {
+                        locked = true;
+                        progressBarEl.style.width = '100%';
+                        phaseTitleEl.textContent = 'АНАЛИЗ ЗАВЕРШЁН';
+                        gameAreaEl.classList.add('d-none');
+                        successAreaEl.classList.remove('d-none');
+                        telemetry.complete({ stage: TOTAL_PHASES, action_log: actionLog });
+                    }
+                } else {
+                    locked = true;
+                    errorsCount += 1;
+                    errorsCountEl.textContent = String(errorsCount);
+                    actionLog.push({ time: new Date().toISOString(), action: `phase_${currentPhase}_failed` });
+
+                    inputEl.classList.remove('border-warning', 'bg-black', 'text-warning');
+                    inputEl.classList.add('border-danger', 'bg-danger', 'text-white');
+                    inputEl.disabled = true;
+                    checkBtn.disabled = true;
+                    feedbackEl.textContent = 'ОШИБКА: Неверное значение! Перегенерация дерева...';
+                    feedbackEl.classList.remove('d-none');
+
+                    telemetry.hardcoreReset({ stage: currentPhase, action_log: actionLog });
+                    setTimeout(() => initPhase(), 1100);
+                }
+            }
+
+            inputEl.addEventListener('paste', (e) => {
+                e.preventDefault();
+                pasteNoticeEl.classList.remove('d-none');
+                setTimeout(() => pasteNoticeEl.classList.add('d-none'), 3000);
+            });
+            inputEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+            });
+            checkBtn.addEventListener('click', checkAnswer);
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            initPhase();
+        })();
+    </script>
+</TaskLayout>
