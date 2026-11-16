@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:4321';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:4321';
 const CLASS_PATH = '11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D0%B1%D0%B0%D0%B7%D0%BE%D0%B2%D1%8B%D0%B9';
 const LESSON_ID = '6';
 
@@ -9,15 +9,15 @@ async function executeCommand(page, command) {
   await page.press('#cmd-input', 'Enter');
 }
 
-test.describe('Lesson 19: Information Security (Advanced)', () => {
+test.describe('Lesson 6 (11th Grade Basic): Information Security', () => {
 
   // Test 1: Theory page
   test('1. Theory page loads successfully and contains all blocks', async ({ page }) => {
     await page.goto(`${BASE_URL}/lesson/${CLASS_PATH}/${LESSON_ID}`);
     await expect(page.locator('h1').first()).toContainText('Техногенные и экономические угрозы');
-    await expect(page.locator('text=Практика: Уровень 1')).toBeVisible();
-    await expect(page.locator('text=Практика: Уровень 2')).toBeVisible();
-    await expect(page.locator('text=Практика: Уровень 3')).toBeVisible();
+    await expect(page.locator('[data-target="iframe-1"]')).toBeVisible();
+    await expect(page.locator('[data-target="iframe-2"]')).toBeVisible();
+    await expect(page.locator('[data-target="iframe-3"]')).toBeVisible();
   });
 
   // Test 2: Terminal Basic Mechanics
@@ -26,7 +26,7 @@ test.describe('Lesson 19: Information Security (Advanced)', () => {
     await page.waitForSelector('#terminal-output');
     
     await executeCommand(page, 'help');
-    await expect(page.locator('#terminal-output')).toContainText('Available commands: help, clear, pwd');
+    await expect(page.locator('#terminal-output')).toContainText('Доступные команды симуляции');
     
     await executeCommand(page, 'pwd');
     await expect(page.locator('#terminal-output')).toContainText('/');

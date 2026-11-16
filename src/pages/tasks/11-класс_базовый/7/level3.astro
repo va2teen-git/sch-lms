@@ -65,10 +65,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             <!-- Прогресс-бар убывающего таймера -->
             <div class="progress mb-3 bg-dark border border-secondary rounded-0" style="height: 10px;">
-                <div class="progress-bar transition-none"
+                <div class="progress-bar"
                      :class="phaseTimeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
                      role="progressbar"
-                     :style="progressBarStyle">
+                     :style="{ ...progressBarStyle, transition: 'none' }">
                 </div>
             </div>
 
@@ -123,7 +123,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     <!-- 1. РЕБРА СЕТИ (СВЯЗИ) -->
                     <g id="edges-group">
-                        <g v-for="edge in currentWaveData.edges" :key="edge.id" :id="'edge-' + edge.id" class="cursor-pointer" style="pointer-events: all; cursor: pointer;" @click="toggleEdge(edge)">
+                        <g v-for="edge in currentWaveData.edges" :key="edge.id" :id="'edge-' + edge.id" style="pointer-events: all; cursor: pointer;" @click="toggleEdge(edge)">
                             <!-- Фоновая невидимая широкая линия для надежного клика мышью (36px) -->
                             <line :x1="getNode(edge.from).x" :y1="getNode(edge.from).y"
                                   :x2="getNode(edge.to).x" :y2="getNode(edge.to).y"
@@ -135,7 +135,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                   :stroke="getEdgeColor(edge)"
                                   :stroke-width="edge.status === 'cut' ? 2 : 4"
                                   :stroke-dasharray="edge.status === 'cut' ? '4 4' : (edge.status === 'infected' ? '8 4' : 'none')"
-                                  :class="{ 'pulse-line': edge.status === 'infected' }"
                                   style="pointer-events: stroke; cursor: pointer;" />
 
                             <!-- Интерактивная плашка-переключатель VLAN в центре кабеля -->
@@ -159,13 +158,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     <g id="nodes-group">
                         <g v-for="node in currentWaveData.nodes" :key="node.id"
                            :id="'node-' + node.id"
-                           class="cursor-pointer"
+                           style="cursor: pointer;"
                            @click="selectOrToggleNode(node)">
                             
-                            <!-- Внешнее кольцо пульсации для зараженных узлов -->
+                            <!-- Внешнее кольцо выделения для зараженных узлов -->
                             <circle v-if="node.status === 'infected'"
                                     :cx="node.x" :cy="node.y" r="28"
-                                    fill="none" stroke="#dc3545" stroke-width="2" opacity="0.6" class="pulse-ring" />
+                                    fill="none" stroke="#dc3545" stroke-width="2" stroke-dasharray="4 3" opacity="0.65" />
 
                             <!-- Базовый круг узла -->
                             <circle :cx="node.x" :cy="node.y" r="22"
@@ -310,39 +309,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     </div>
 </TaskLayout>
 
-<style>
-    .transition-none {
-        transition: none !important;
-    }
-    .cursor-pointer {
-        cursor: pointer;
-    }
-    .pulse-ring {
-        animation: pulseRing 1.2s infinite;
-        transform-origin: center;
-    }
-    @keyframes pulseRing {
-        0% { r: 24; opacity: 0.9; }
-        50% { r: 32; opacity: 0.3; }
-        100% { r: 24; opacity: 0.9; }
-    }
-    .pulse-line {
-        animation: dash 1s linear infinite;
-    }
-    @keyframes dash {
-        to {
-            stroke-dashoffset: -24;
-        }
-    }
-    .animate-bounce {
-        animation: bounceBtn 0.8s infinite alternate;
-    }
-    @keyframes bounceBtn {
-        from { transform: scale(1); }
-        to { transform: scale(1.03); }
-    }
-</style>
-
 <script is:inline src="/static/vue.global.js"></script>
 
 <script is:inline>
@@ -351,17 +317,22 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     createApp({
         data() {
             return {
+                missionName: 'Урок 7 :: Вредоносное программное обеспечение (Уровень 3)',
                 gameState: 'intro', // 'intro', 'playing', 'victory'
                 currentWave: 1,
                 totalWaves: 8,
                 attempts: 0,
                 startTime: Date.now(),
+                finalTimeSec: 0,
                 phaseTimeLeft: 14.0,
                 maxPhaseTime: 14.0,
                 timerInterval: null,
                 wormInterval: null,
+                resetTimeout: null,
                 crashMessage: null,
                 selectedNode: null,
+                waveHasUserInput: false,
+                telemetry: null,
 
                 currentWaveData: {
                     threatTitle: '',
@@ -375,6 +346,38 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             };
         },
 
+        mounted() {
+            // Отправка TELEMETRY_EVENT (start_time, time_spent_sec, wave/total_waves, AFK guard) через LMSTelemetry
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: this.missionName,
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(this.timerInterval);
+                    clearInterval(this.wormInterval);
+                    clearTimeout(this.resetTimeout);
+                    this.crashMessage = null;
+                },
+                onAfkRetry: () => {
+                    this.crashMessage = null;
+                    if (this.gameState === 'playing') {
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.initWave(1);
+                    }
+                }
+            });
+        },
+
+        beforeUnmount() {
+            clearInterval(this.timerInterval);
+            clearInterval(this.wormInterval);
+            clearTimeout(this.resetTimeout);
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
+        },
+
         computed: {
             progressBarStyle() {
                 const pct = Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
@@ -382,7 +385,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             formattedFinalTime() {
-                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const totalSec = this.finalTimeSec > 0
+                    ? this.finalTimeSec
+                    : (this.telemetry ? this.telemetry.getTimeSpentSec() : Math.max(1, Math.floor((Date.now() - this.startTime) / 1000)));
                 const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const s = String(totalSec % 60).padStart(2, '0');
                 return `${m}:${s}`;
@@ -447,32 +452,37 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         },
 
         methods: {
-            sendTelemetry(actionType, status, isSuccess) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 7 :: Вредоносное программное обеспечение (Уровень 3)',
-                    action_type: actionType,
-                    status: status,
-                    time_spent: timeSpent,
-                    attempts: this.attempts,
-                    score: isSuccess ? 100 : Math.round((this.currentWave / this.totalWaves) * 80)
-                }, '*');
-            },
-
             startGame() {
+                clearTimeout(this.resetTimeout);
                 this.gameState = 'playing';
                 this.currentWave = 1;
+                this.attempts = 0;
+                this.finalTimeSec = 0;
                 this.startTime = Date.now();
-                this.sendTelemetry('in_progress', 'in_progress', false);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalWaves);
+                    this.telemetry.progress({
+                        wave: 1,
+                        total_waves: this.totalWaves,
+                        stage: 1,
+                        total_stages: this.totalWaves
+                    });
+                }
                 this.initWave(1);
             },
 
             restartGame() {
-                this.gameState = 'intro';
-                this.currentWave = 1;
                 clearInterval(this.timerInterval);
                 clearInterval(this.wormInterval);
+                clearTimeout(this.resetTimeout);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                }
+                this.gameState = 'intro';
+                this.currentWave = 1;
             },
 
             getNode(id) {
@@ -515,10 +525,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             selectOrToggleNode(node) {
+                this.waveHasUserInput = true;
+                if (this.telemetry) this.telemetry.markActivity();
                 this.selectedNode = node;
             },
 
             toggleNodeFortify(node) {
+                this.waveHasUserInput = true;
+                if (this.telemetry) this.telemetry.markActivity();
                 if (node.status === 'infected') return;
                 if (node.status === 'fortified') {
                     node.status = 'vulnerable';
@@ -528,12 +542,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             toggleEdge(edge) {
+                this.waveHasUserInput = true;
+                if (this.telemetry) this.telemetry.markActivity();
                 if (edge.status === 'cut') {
                     edge.status = 'normal';
                 } else {
                     edge.status = 'cut';
                 }
-                console.log('toggleEdge called on', edge.id, 'new status:', edge.status, 'isWormIsolated:', this.isWormIsolated);
             },
 
             stepWorm() {
@@ -563,7 +578,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                     // Критический прорыв к 3-2-1 хранилищу!
                                     targetNode.status = 'infected';
                                     edge.status = 'infected';
-                                    this.handleFailure('КРИТИЧЕСКИЙ ПРОРЫВ! Червь проник в Резервное хранилище 3-2-1 и зашифровал данные!');
+                                    this.handleFailure('КРИТИЧЕСКИЙ ПРОРЫВ! Червь проник в Резервное хранилище 3-2-1 и зашифровал данные!', !this.waveHasUserInput);
                                     return;
                                 }
 
@@ -581,7 +596,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             verifyAndContainWorm() {
-                console.log('verifyAndContainWorm called, isWormIsolated:', this.isWormIsolated, 'currentWave:', this.currentWave);
+                this.waveHasUserInput = true;
+                if (this.telemetry) this.telemetry.markActivity();
                 if (this.isWormIsolated) {
                     // Успех! Очаг полностью изолирован
                     clearInterval(this.timerInterval);
@@ -589,27 +605,53 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     if (this.currentWave >= this.totalWaves) {
                         this.gameState = 'victory';
-                        this.sendTelemetry('level_complete', 'completed', true);
+                        if (this.telemetry) {
+                            const payload = this.telemetry.complete({ wave: this.totalWaves });
+                            this.finalTimeSec = payload ? payload.time_spent_sec : this.telemetry.getTimeSpentSec();
+                        }
                     } else {
-                        this.initWave(this.currentWave + 1);
+                        const nextWave = this.currentWave + 1;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(nextWave);
+                        }
+                        this.initWave(nextWave);
                     }
                 } else {
                     // Игрок попытался досрочно запустить ликвидацию, но путь к цели открыт!
-                    this.handleFailure('ОШИБКА ИЗОЛЯЦИИ! Сетевой червь имеет открытый маршрут к Резервному хранилищу 3-2-1!');
+                    this.handleFailure('ОШИБКА ИЗОЛЯЦИИ! Сетевой червь имеет открытый маршрут к Резервному хранилищу 3-2-1!', false);
                 }
             },
 
-            handleFailure(reason) {
-                console.log('handleFailure called, reason:', reason, 'attempts:', this.attempts);
+            handleFailure(reason, isTimeout = false) {
                 clearInterval(this.timerInterval);
                 clearInterval(this.wormInterval);
-                this.attempts++;
-                this.crashMessage = reason;
-                this.sendTelemetry('hardcore_reset', 'failed', false);
+                clearTimeout(this.resetTimeout);
 
-                // Задержка 1.5 сек и полный сброс на волну 1!
-                setTimeout(() => {
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: this.currentWave,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        this.crashMessage = null;
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
+
+                this.crashMessage = reason;
+
+                // Задержка 1.6 сек и полный сброс на волну 1!
+                this.resetTimeout = setTimeout(() => {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.crashMessage = null;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
                     this.initWave(1);
                 }, 1600);
             },
@@ -617,9 +659,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             initWave(waveNum) {
                 clearInterval(this.timerInterval);
                 clearInterval(this.wormInterval);
+                clearTimeout(this.resetTimeout);
                 this.currentWave = waveNum;
                 this.crashMessage = null;
                 this.selectedNode = null;
+                this.waveHasUserInput = false;
+                if (this.telemetry) {
+                    this.telemetry.setWave(waveNum, this.totalWaves);
+                }
 
                 // Генератор 8 волн нарастающей сложности по топологиям сетей
                 switch (waveNum) {
@@ -840,15 +887,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 // Запуск убывающего таймера
                 this.timerInterval = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.crashMessage || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.phaseTimeLeft -= 0.1;
                     if (this.phaseTimeLeft <= 0) {
                         this.phaseTimeLeft = 0;
-                        this.handleFailure('ВРЕМЯ ИСТЕКЛО! Червь перегрузил полосу пропускания и захватил контроль над сегментом!');
+                        this.handleFailure('ВРЕМЯ ИСТЕКЛО! Червь перегрузил полосу пропускания и захватил контроль над сегментом!', true);
                     }
                 }, 100);
 
                 // Запуск тактов распространения червя
                 this.wormInterval = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.crashMessage || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.stepWorm();
                 }, this.currentWaveData.wormStepInterval * 1000);
             }

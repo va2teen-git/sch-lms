@@ -10,7 +10,7 @@ test.describe('Grade 11 Basic Lesson 7: Malware & Antivirus Level 3 (Archetype 7
     const radios = await page.locator('input[type="radio"]').count();
     expect(radios).toBe(0);
 
-    const selects = await page.locator('select').count();
+    const selects = await page.evaluate(() => document.querySelectorAll('select').length);
     expect(selects).toBe(0);
   });
 

@@ -288,27 +288,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
-    const startTime = Date.now();
+    // Отправка TELEMETRY_EVENT (start_time, time_spent_sec, stage/total_stages) через LMSTelemetry
     let currentPhase = 1;
     let attemptsCount = 0;
     let selectedCardElement = null;
     let selectedTokenElement = null;
 
     const missionName = 'Урок 8 :: Организация личного архива информации (Уровень 1)';
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success
-        }, '*');
-    }
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function showFeedback(message) {
         const box = document.getElementById('feedback-box');
@@ -419,7 +410,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return card;
     }
 
+    let p1ListenersAttached = false;
     function setupDragAndDropPhase1() {
+        if (p1ListenersAttached) return;
+        p1ListenersAttached = true;
+
         const pool = document.getElementById('p1-cards-pool');
         const buckets = document.querySelectorAll('.bucket-zone');
 
@@ -520,8 +515,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (allLosslessCorrect && allLossyCorrect && losslessCards.length === 2 && lossyCards.length === 2) {
             // Успех Фазы 1
-            sendTelemetry('in_progress', 'phase1_complete', true);
             currentPhase = 2;
+            telemetry.advanceStage(2, { status: 'phase1_complete', attempts_count: attemptsCount });
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
             document.getElementById('phase-title').textContent = 'Топология архива 3-2-1-1-0: Размещение накопителей';
             document.getElementById('phase-1-container').classList.add('d-none');
@@ -529,7 +524,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             setupPhase2();
         } else {
             // Ошибка Фазы 1
-            sendTelemetry('hardcore_reset', 'phase1_error', false);
+            telemetry.hardcoreReset({ stage: currentPhase, status: 'phase1_error', attempts_count: attemptsCount, incrementAttempts: false });
             showFeedback('Неверное распределение форматов! Файлы долгосрочного хранения требуют Lossless-сжатия.');
             setTimeout(() => {
                 setupPhase1();
@@ -608,7 +603,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return token;
     }
 
+    let p2ListenersAttached = false;
     function setupDragAndDropPhase2() {
+        if (p2ListenersAttached) return;
+        p2ListenersAttached = true;
+
         const slots = document.querySelectorAll('.slot-target');
         const pool = document.getElementById('p2-tokens-pool');
 
@@ -718,8 +717,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (allCorrect) {
             // Успех Фазы 2
-            sendTelemetry('in_progress', 'phase2_complete', true);
             currentPhase = 3;
+            telemetry.advanceStage(3, { status: 'phase2_complete', attempts_count: attemptsCount });
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
             document.getElementById('phase-title').textContent = 'Регламент архивации и ЭЦП: Калибровка параметров';
             document.getElementById('phase-2-container').classList.add('d-none');
@@ -727,7 +726,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             setupPhase3();
         } else {
             // Ошибка Фазы 2
-            sendTelemetry('hardcore_reset', 'phase2_error', false);
+            telemetry.hardcoreReset({ stage: currentPhase, status: 'phase2_error', attempts_count: attemptsCount, incrementAttempts: false });
             showFeedback('Ошибка топологии! Использованы дистракторы или нарушено правило 3-2-1-1-0.');
             setTimeout(() => {
                 setupPhase2();
@@ -862,12 +861,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (isOk) {
             // Финал Уровня 1!
-            sendTelemetry('level_complete', 'passed', true);
+            telemetry.complete({ stage: 3, status: 'passed', attempts_count: attemptsCount });
             document.getElementById('phase-3-container').classList.add('d-none');
             document.getElementById('final-screen').classList.remove('d-none');
             document.getElementById('final-attempts').textContent = attemptsCount;
         } else {
-            sendTelemetry('hardcore_reset', 'phase3_error', false);
+            telemetry.hardcoreReset({ stage: currentPhase, status: 'phase3_error', attempts_count: attemptsCount, incrementAttempts: false });
             showFeedback('Регламент не соответствует требованиям надежности! Проверьте индикаторы.');
         }
     });

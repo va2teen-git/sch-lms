@@ -251,28 +251,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
-    const startTime = Date.now();
-    let attemptsCount = 0;
+    // Отправка TELEMETRY_EVENT (start_time, time_spent_sec, stage/total_stages) через LMSTelemetry
+    let currentPhase = 1;
     const missionName = 'Урок 8 :: Организация личного архива информации (Уровень 2)';
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success
-        }, '*');
-    }
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
 
     function recordError(msg, retryFn) {
-        attemptsCount++;
-        document.getElementById('attempts-display').textContent = attemptsCount;
-        sendTelemetry('hardcore_reset', 'failed', false);
+        telemetry.hardcoreReset({ stage: currentPhase });
+        document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
         const fb = document.getElementById('error-feedback');
         if (msg) document.getElementById('error-msg').textContent = msg;
         fb.classList.remove('d-none');
@@ -283,6 +273,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function advancePhase(currNum, nextNum, nextSetupFn, nextTitle) {
+        currentPhase = nextNum;
+        telemetry.advanceStage(nextNum, { status: `phase${currNum}_complete` });
         document.getElementById(`phase${currNum}`).classList.add('d-none');
         document.getElementById(`phase${nextNum}`).classList.remove('d-none');
         document.getElementById('level-badge').textContent = `Шаг ${nextNum} из 5`;
@@ -331,7 +323,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         if (userK === p1ExpectedK && (userPct === p1ExpectedPercent || Math.abs(userPct - p1ExpectedPercent) <= 1)) {
-            sendTelemetry('in_progress', 'phase1_complete', true);
             advancePhase(1, 2, setupPhase2, 'Стратегии резервного копирования: Расчет объемов');
         } else {
             recordError('Неверный расчет коэффициента или процента экономии!', setupPhase1);
@@ -374,7 +365,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         if (userDiff === p2ExpectedDiff && userIncr === p2ExpectedIncr) {
-            sendTelemetry('in_progress', 'phase2_complete', true);
             advancePhase(2, 3, setupPhase3, 'Пик инверсии: Расчет аварийного RTO и канала');
         } else {
             recordError('Неверный расчет объемов Differential или Incremental архивов!', setupPhase2);
@@ -418,7 +408,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         if (userMbs === p3ExpectedMbs && userMbits === p3ExpectedMbits) {
-            sendTelemetry('in_progress', 'phase3_complete', true);
             advancePhase(3, 4, setupPhase4, 'Контроль целостности: Аудит хеш-сумм SHA-256');
         } else {
             recordError('Неверная скорость передачи данных или пропускная способность канала!', setupPhase3);
@@ -477,7 +466,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         if (userVol === p4DamagedVolume && userBits === 256) {
-            sendTelemetry('in_progress', 'phase4_complete', true);
             advancePhase(4, 5, setupPhase5, 'Кульминация: Полный бюджет хранилища «3-2-1»');
         } else {
             recordError('Неверный номер поврежденного тома или разрядность хеша!', setupPhase4);
@@ -525,10 +513,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         if (userNas === p5ExpectedNas && userCloud === p5ExpectedCloud && userTotal === p5ExpectedTotal) {
-            sendTelemetry('level_complete', 'passed', true);
+            telemetry.complete({ stage: 5, status: 'passed' });
             document.getElementById('phase5').classList.add('d-none');
             document.getElementById('final-screen').classList.remove('d-none');
-            document.getElementById('final-attempts').textContent = attemptsCount;
+            document.getElementById('final-attempts').textContent = telemetry.getState().attemptsCount;
         } else {
             recordError('Ошибка в расчете емкости дисков NAS, облака или суммарного объема!', setupPhase5);
         }

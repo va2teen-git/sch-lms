@@ -380,28 +380,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
-    // --- Состояние сессии и телеметрия ---
-    const startTime = Date.now();
+    // --- Состояние сессии и телеметрия (TELEMETRY_EVENT через LMSTelemetry) ---
     let currentPhase = 1;
-    let attemptsCount = 0;
     let selectedTokenElement = null;
     let selectedIncidentCard = null;
 
     const missionName = 'Урок 7 :: Вредоносное программное обеспечение (Уровень 1)';
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success
-        }, '*');
-    }
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function showFeedback(message) {
         const box = document.getElementById('feedback-box');
@@ -622,15 +611,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (allCorrect) {
             // Переход на фазу 2
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase-1-container').classList.add('d-none');
             document.getElementById('phase-2-container').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
             document.getElementById('phase-title').textContent = 'Слот-пазл: Конструирование антивирусного движка';
             setupPhase2();
         } else {
-            attemptsCount++;
-            document.getElementById('attempts-display').textContent = attemptsCount;
-            sendTelemetry('hardcore_reset', 'failed', false);
+            telemetry.hardcoreReset({ stage: currentPhase });
+            document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
             showFeedback('Неверная таксономия угроз! Перекалибровка инцидентов...');
             setTimeout(setupPhase1, 1200);
         }
@@ -824,15 +813,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (allCorrect) {
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase-2-container').classList.add('d-none');
             document.getElementById('phase-3-container').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
             document.getElementById('phase-title').textContent = 'Калибратор политики «3-2-1» и привилегий';
             setupPhase3();
         } else {
-            attemptsCount++;
-            document.getElementById('attempts-display').textContent = attemptsCount;
-            sendTelemetry('hardcore_reset', 'failed', false);
+            telemetry.hardcoreReset({ stage: currentPhase });
+            document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
             showFeedback('Неверная конфигурация модулей антивируса! Перекалибровка токенов...');
             setTimeout(setupPhase2, 1200);
         }
@@ -954,20 +943,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (isCopiesOk && isMediaOk && isOfflineOk && isAccountOk && isAutorunOk) {
             // Успех всего Уровня 1!
+            const completePayload = telemetry.complete({ stage: 3 });
+            const totalTime = completePayload ? completePayload.time_spent_sec : telemetry.getTimeSpentSec();
             document.getElementById('phase-3-container').classList.add('d-none');
             document.getElementById('victory-screen').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Финиш';
             document.getElementById('phase-title').textContent = 'Уровень 1 успешно завершен';
 
-            const totalTime = Math.max(1, Math.round((Date.now() - startTime) / 1000));
             document.getElementById('final-time').textContent = totalTime;
-            document.getElementById('final-errors').textContent = attemptsCount;
-
-            sendTelemetry('level_complete', 'completed', true);
+            document.getElementById('final-errors').textContent = telemetry.getState().attemptsCount;
         } else {
-            attemptsCount++;
-            document.getElementById('attempts-display').textContent = attemptsCount;
-            sendTelemetry('hardcore_reset', 'failed', false);
+            telemetry.hardcoreReset({ stage: currentPhase });
+            document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
             showFeedback('Сбой политики безопасности! Неверная конфигурация параметров «3-2-1» или привилегий.');
             setTimeout(setupPhase3, 1200);
         }
