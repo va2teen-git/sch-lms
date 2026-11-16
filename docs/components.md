@@ -187,3 +187,5 @@ window.parent.postMessage({
 }, '*');
 ```
 Компонент `PrinceEmulator.astro` автоматически перехватывает его и транслирует в формат `TELEMETRY_EVENT` платформы LMS.
+
+На странице урока (`src/pages/lesson/[class]/[id].astro`) при получении `PRINCE_EVENT` с `action: 'level_complete'` отправляется запись в `POST /api/telemetry` с `level_number: 0`, `action_type: 'level_complete'` и `mission_name: "... :: Prince of Persia (Уровень X)"`. События Prince of Persia изолированы от расчёта уровней `1..3` урока и отображаются как достижение **`⚔️`** в матрице уроков (`/courses`) и бейдж **`⚔️ Принц Персии`** на дашборде учителя (`/teacher`).
