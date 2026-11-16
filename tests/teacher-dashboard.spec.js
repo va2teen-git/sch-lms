@@ -551,4 +551,166 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     await expect(page.locator('#modal-level-cards')).toContainText('Prince of Persia (1989)');
     await expect(page.locator('#modal-level-cards')).toContainText('Покорен');
   });
+
+  test('Teacher dashboard renders stage stars (*****), Level 3 reset wave, active_tab time, and accurate error counts', async ({ page, request }) => {
+    const uid = Date.now();
+    const fName = `Этап_${uid}`;
+    const lName = 'Волнов';
+    const sClass = '9-класс';
+    const attId = `att_stage_${uid}`;
+
+    const postEvent = async (payload) => {
+      const res = await request.post(`${baseUrl}/api/telemetry`, {
+        data: {
+          student_firstName: fName,
+          student_lastName: lName,
+          student_class: sClass,
+          course_slug: sClass,
+          lesson_id: '8',
+          attempt_id: attId,
+          attempt_number: 1,
+          attempt_mode: 'normal',
+          is_hardcore: false,
+          ...payload
+        },
+        headers: { 'Content-Type': 'application/json' }
+      });
+      expect(res.ok()).toBeTruthy();
+    };
+
+    // Level 1 completed with active_tab pure time 45s and cumulative "Error:" string in action_log (must NOT count as error!)
+    await postEvent({
+      level_number: 1,
+      mission_name: 'Урок 8 :: Табличные модели (Уровень 1)',
+      action_type: 'level_complete',
+      status: 'completed',
+      time_spent_sec: 45,
+      timer_mode: 'active_tab',
+      stage: 3,
+      total_stages: 3,
+      success: true,
+      action_log: ['Error: old log entry', 'Correct: final']
+    });
+
+    // Level 2 in progress at stage 3 of 5 with 2 real errors (burst duplicate should collapse to 1 + 1 = 2)
+    await postEvent({
+      level_number: 2,
+      mission_name: 'Урок 8 :: Табличные модели (Уровень 2)',
+      action_type: 'level_fail',
+      status: 'in_progress',
+      time_spent_sec: 20,
+      timer_mode: 'active_tab',
+      stage: 2,
+      total_stages: 5,
+      attempts_count: 1
+    });
+    // Burst duplicate within same second and same attempts_count -> ignored
+    await postEvent({
+      level_number: 2,
+      mission_name: 'Урок 8 :: Табличные модели (Уровень 2)',
+      action_type: 'level_fail',
+      status: 'in_progress',
+      time_spent_sec: 20,
+      timer_mode: 'active_tab',
+      stage: 2,
+      total_stages: 5,
+      attempts_count: 1
+    });
+    // Second distinct error + stage 3 heartbeat
+    await postEvent({
+      level_number: 2,
+      mission_name: 'Урок 8 :: Табличные модели (Уровень 2)',
+      action_type: 'level_fail',
+      status: 'in_progress',
+      time_spent_sec: 55,
+      timer_mode: 'active_tab',
+      stage: 3,
+      total_stages: 5,
+      attempts_count: 2
+    });
+
+    // Level 3 in progress: reached wave 6, got reset on wave 6, now at wave 2/10, pure active_tab time 70s (> L2 55s, must NOT be deducted!)
+    await postEvent({
+      level_number: 3,
+      mission_name: 'Урок 8 :: Табличные модели (Уровень 3)',
+      action_type: 'level_fail',
+      status: 'failed',
+      time_spent_sec: 50,
+      timer_mode: 'active_tab',
+      wave: 6,
+      total_waves: 10,
+      attempts_count: 1
+    });
+    await postEvent({
+      level_number: 3,
+      mission_name: 'Урок 8 :: Табличные модели (Уровень 3)',
+      action_type: 'in_progress',
+      status: 'in_progress',
+      time_spent_sec: 70,
+      timer_mode: 'active_tab',
+      wave: 2,
+      total_waves: 10,
+      attempts_count: 1
+    });
+
+    // Manual lesson reset with level_number: null must NOT inflate totalErrors
+    await postEvent({
+      level_number: null,
+      mission_name: 'Урок 8 :: Табличные модели',
+      action_type: 'hardcore_reset',
+      is_hardcore: true,
+      is_manual_reset: true,
+      attempt_id: `att_hc_${uid}`,
+      attempt_number: 2,
+      attempt_mode: 'hardcore'
+    });
+
+    // Verify API contract
+    const res = await request.get(`${baseUrl}/api/teacher/stats?date=today&exclude_tests=0&search=${encodeURIComponent(fName)}`);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    const s = body.students.find(st => st.firstName === fName);
+    expect(s).toBeDefined();
+
+    // Pure times preserved without cross-level deduction
+    expect(s.levels[1].timeSpentSec).toBe(45);
+    expect(s.levels[2].timeSpentSec).toBe(55);
+    expect(s.levels[3].timeSpentSec).toBe(70);
+    expect(s.totalActiveTimeSec).toBe(170);
+
+    // Accurate error count: 0 (L1) + 2 (L2, duplicate collapsed) + 1 (L3) = 3 (manual reset & action_log 'Error:' ignored)
+    expect(s.levels[1].errors).toBe(0);
+    expect(s.levels[2].errors).toBe(2);
+    expect(s.levels[3].errors).toBe(1);
+    expect(s.totalErrors).toBe(3);
+
+    // Stages and Level 3 reset wave
+    expect(s.levels[2].currentStage).toBe(3);
+    expect(s.levels[2].totalStages).toBe(5);
+    expect(s.levels[3].currentStage).toBe(2);
+    expect(s.levels[3].totalStages).toBe(10);
+    expect(s.levels[3].lastResetWave).toBe(6);
+
+    // Verify UI rendering on /teacher
+    await page.goto(`${baseUrl}/teacher?date=today`);
+    await page.locator('#filter-exclude-tests').uncheck();
+    await page.fill('#filter-search', fName);
+
+    const row = page.locator('.student-row', { hasText: fName });
+    await expect(row).toBeVisible();
+
+    // Level 2 cell: time + errors + 3 filled / 2 empty stars (★★★☆☆)
+    const l2Cell = row.locator('td:nth-child(7)');
+    await expect(l2Cell).toContainText('55с');
+    await expect(l2Cell).toContainText('2 ош.');
+    await expect(l2Cell).toContainText('★★★');
+    await expect(l2Cell).toContainText('☆☆');
+
+    // Level 3 cell: time + errors + wave stars + last reset wave (↩ В.6)
+    const l3Cell = row.locator('td:nth-child(8)');
+    await expect(l3Cell).toContainText('1м 10с');
+    await expect(l3Cell).toContainText('1 ош.');
+    await expect(l3Cell).toContainText('★★');
+    await expect(l3Cell).toContainText('↩ В.6');
+  });
 });

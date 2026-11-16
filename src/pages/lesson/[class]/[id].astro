@@ -675,6 +675,7 @@ const tasks = [
     if (btn) btn.innerHTML = 'Сброс...';
     
     const nextAttempt = getOrCreateAttempt(true, isHardcore ? 'hardcore' : 'normal');
+    resetActiveLevelTimers();
 
     fetch('/api/telemetry', {
         method: 'POST',
@@ -686,10 +687,12 @@ const tasks = [
           course_slug: classSlug,
           lesson_id: lessonId,
           is_hardcore: isHardcore,
+          is_manual_reset: true,
           attempt_id: nextAttempt.id,
           attempt_number: nextAttempt.number,
           attempt_mode: nextAttempt.mode,
           action_type: isHardcore ? 'hardcore_reset' : 'normal_reset',
+          action_log: [{ action: 'manual_reset' }],
           mission_name: fullTitle
         })
     }).then(() => {
@@ -697,9 +700,231 @@ const tasks = [
     });
   });
 
+  // --- Active Tab Timer & Stage/Wave Telemetry Enrichment ---
+  let activeTabLevel = null;
+  let levelActiveMs = { 1: 0, 2: 0, 3: 0 };
+  let levelTabEntered = { 1: false, 2: false, 3: false };
+  let levelStartIso = { 1: null, 2: null, 3: null };
+  let levelCompletedFlags = { 1: false, 2: false, 3: false };
+  let lastTickAt = null;
+  let lastReportedStage = { 1: null, 2: null, 3: null };
+  let l3UserActivityFlag = true;
+  let l3AfkWave1Streak = 0;
+
+  function isOverlayBlockingLevel() {
+    const sprintOpen = document.getElementById('sprint-overlay') && !document.getElementById('sprint-overlay').classList.contains('hidden');
+    const princeOpen = document.getElementById('prince-overlay') && !document.getElementById('prince-overlay').classList.contains('hidden');
+    const compOpen = document.getElementById('completion-screen') && !document.getElementById('completion-screen').classList.contains('hidden');
+    return !!(sprintOpen || princeOpen || compOpen);
+  }
+
+  function flushActiveTimer() {
+    const nowMs = Date.now();
+    if (
+      lastTickAt !== null &&
+      activeTabLevel &&
+      activeTabLevel <= currentUnlockedLevel &&
+      !levelCompletedFlags[activeTabLevel] &&
+      document.visibilityState === 'visible' &&
+      !isOverlayBlockingLevel()
+    ) {
+      const delta = Math.max(0, Math.min(10000, nowMs - lastTickAt));
+      levelActiveMs[activeTabLevel] += delta;
+    }
+    lastTickAt = nowMs;
+  }
+
+  function resetActiveLevelTimers() {
+    levelActiveMs = { 1: 0, 2: 0, 3: 0 };
+    levelTabEntered = { 1: false, 2: false, 3: false };
+    levelStartIso = { 1: null, 2: null, 3: null };
+    levelCompletedFlags = { 1: false, 2: false, 3: false };
+    lastReportedStage = { 1: null, 2: null, 3: null };
+    lastTickAt = Date.now();
+    l3UserActivityFlag = true;
+    l3AfkWave1Streak = 0;
+  }
+
+  function getActiveLevelSec(lvl) {
+    flushActiveTimer();
+    return Math.round((levelActiveMs[lvl] || 0) / 1000);
+  }
+
+  setInterval(() => {
+    flushActiveTimer();
+    if (
+      activeTabLevel &&
+      activeTabLevel <= currentUnlockedLevel &&
+      !levelCompletedFlags[activeTabLevel] &&
+      document.visibilityState === 'visible' &&
+      !isOverlayBlockingLevel()
+    ) {
+      const targetIframe = document.getElementById(`iframe-${activeTabLevel}`);
+      const detected = detectIframeStage(targetIframe, activeTabLevel);
+      if (detected && detected.stage) {
+        const prev = lastReportedStage[activeTabLevel];
+        if (prev === null) {
+          lastReportedStage[activeTabLevel] = detected.stage;
+        } else if (detected.stage !== prev && detected.stage > 1) {
+          lastReportedStage[activeTabLevel] = detected.stage;
+          const activeSec = getActiveLevelSec(activeTabLevel);
+          if (activeSec > 0) {
+            fetch('/api/telemetry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                student_firstName: localStorage.getItem('student_firstName'),
+                student_lastName: localStorage.getItem('student_lastName'),
+                student_class: localStorage.getItem('student_class'),
+                course_slug: classSlug,
+                lesson_id: lessonId,
+                level_number: activeTabLevel,
+                mission_name: `${fullTitle} (Уровень ${activeTabLevel})`,
+                action_type: 'in_progress',
+                status: 'in_progress',
+                start_time: levelStartIso[activeTabLevel] || new Date().toISOString(),
+                time_spent_sec: activeSec,
+                timer_mode: 'active_tab',
+                stage: detected.stage,
+                total_stages: detected.totalStages,
+                wave: detected.wave,
+                action_log: [{
+                  stage: detected.stage,
+                  total_stages: detected.totalStages,
+                  ...(detected.wave ? { wave: detected.wave } : {}),
+                  timerMode: 'active_tab'
+                }],
+                is_hardcore: isHardcore,
+                attempt_id: currentAttempt.id,
+                attempt_number: currentAttempt.number,
+                attempt_mode: currentAttempt.mode
+              })
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  }, 1500);
+
+  document.addEventListener('visibilitychange', () => {
+    flushActiveTimer();
+  });
+
+  function detectIframeStage(iframe, levelNum) {
+    if (!iframe) return null;
+    try {
+      const win = iframe.contentWindow;
+      const doc = iframe.contentDocument || win?.document;
+      if (levelNum === 3 && win && win.__DEV_LEVEL3_STATE__) {
+        const st = win.__DEV_LEVEL3_STATE__;
+        const wavesArr = typeof st.waves === 'function' ? st.waves() : st.waves;
+        const totalW = Array.isArray(wavesArr) && wavesArr.length > 0 ? wavesArr.length : null;
+        let curW = null;
+        if (typeof st.currentWave === 'number') curW = st.currentWave;
+        else if (typeof st.currentWaveIndex === 'function') curW = st.currentWaveIndex() + 1;
+        else if (typeof st.currentWaveIndex === 'number') curW = st.currentWaveIndex + 1;
+        if (curW && curW > 0) {
+          return { stage: curW, totalStages: totalW || Math.max(10, curW), wave: curW };
+        }
+      }
+      if (!doc) return null;
+
+      // Check badge/counter text like "Шаг 2 из 5", "Фаза 2 из 3", "ВОЛНА 4 ИЗ 10"
+      const badgeSelectors = ['#phase-badge', '#phase-counter', '#wave-badge', '.phase-badge', '.wave-counter'];
+      for (const sel of badgeSelectors) {
+        const el = doc.querySelector(sel);
+        if (el && el.textContent) {
+          const txt = el.textContent.trim();
+          const m = txt.match(/(?:Шаг|Фаза|Этап|Волна|Раунд)\s*(\d+)\s*(?:из|\/)\s*(\d+)/i);
+          if (m) {
+            const cur = parseInt(m[1], 10);
+            const tot = parseInt(m[2], 10);
+            if (cur > 0 && tot > 0) {
+              return { stage: cur, totalStages: tot, wave: levelNum === 3 ? cur : null };
+            }
+          }
+        }
+      }
+
+      // Check visible phase containers (#phase1..#phase5 or #phase-1-container..#phase-5-container)
+      let foundTotal = 0;
+      let visibleStage = null;
+      for (let i = 1; i <= 5; i++) {
+        const el = doc.getElementById(`phase${i}`) || doc.getElementById(`phase-${i}-container`);
+        if (el) {
+          foundTotal = i;
+          if (!el.classList.contains('d-none') && !el.classList.contains('hidden')) {
+            visibleStage = i;
+          }
+        }
+      }
+      if (visibleStage && foundTotal > 0) {
+        return { stage: visibleStage, totalStages: foundTotal, wave: null };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function extractStageMetaFromPayload(data, sourceIframe, levelNum) {
+    let stage = null;
+    let totalStages = null;
+    let wave = null;
+
+    const toPosInt = (v) => {
+      const n = parseInt(String(v), 10);
+      return !isNaN(n) && n > 0 ? n : null;
+    };
+
+    stage = toPosInt(data.stage ?? data.phase ?? data.step);
+    totalStages = toPosInt(data.total_stages ?? data.totalStages ?? data.total_phases ?? data.totalPhases ?? data.total_waves ?? data.totalWaves);
+    wave = toPosInt(data.wave ?? data.wave_number);
+    if (wave && !stage) stage = wave;
+
+    if ((!stage || !totalStages) && data.action_log) {
+      const items = Array.isArray(data.action_log) ? data.action_log : [data.action_log];
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+        if (!stage) {
+          if (item.stage) stage = toPosInt(item.stage);
+          else if (item.phase) stage = toPosInt(item.phase);
+          else if (item.step) {
+            const stNum = toPosInt(item.step);
+            const act = String(item.action || '');
+            stage = stNum ? (act.includes('_complete') ? stNum + 1 : stNum) : null;
+          }
+        }
+        if (!wave && item.wave) wave = toPosInt(item.wave);
+        if (wave && !stage) stage = wave;
+        if (!totalStages) {
+          totalStages = toPosInt(item.total_stages ?? item.totalStages ?? item.total_phases ?? item.total_waves);
+        }
+      }
+    }
+
+    if (!stage || !totalStages || (levelNum === 3 && !wave)) {
+      const domMeta = detectIframeStage(sourceIframe, levelNum);
+      if (domMeta) {
+        if (!stage && domMeta.stage) stage = domMeta.stage;
+        if (!totalStages && domMeta.totalStages) totalStages = domMeta.totalStages;
+        if (levelNum === 3 && !wave && domMeta.wave) wave = domMeta.wave;
+      }
+    }
+
+    return { stage, totalStages, wave };
+  }
+
   function switchTab(targetId) {
     const targetLevel = parseInt(targetId.replace('iframe-', ''), 10);
     if (targetLevel > currentUnlockedLevel) return; // Locked
+
+    flushActiveTimer();
+    activeTabLevel = (targetLevel >= 1 && targetLevel <= 3) ? targetLevel : null;
+    if (activeTabLevel) {
+      levelTabEntered[activeTabLevel] = true;
+      if (!levelStartIso[activeTabLevel]) {
+        levelStartIso[activeTabLevel] = new Date().toISOString();
+      }
+    }
 
     tabs.forEach(t => {
       t.classList.remove('bg-white', 'border-b-2', 'border-b-blue-600', 'text-blue-600');
@@ -834,10 +1059,10 @@ const tasks = [
         else if (data.mission_name.includes('Уровень 3')) levelNum = 3;
       }
 
-      // CRITICAL: Block automated 0-second in_progress heartbeats from locked background iframes!
-      // When page loads, locked levels mount in background and send 0s in_progress.
+      // CRITICAL: Block automated in_progress heartbeats from locked background iframes!
+      // When page loads, locked levels mount in background and may send 0s or 1s in_progress.
       // If the level is locked (levelNum > currentUnlockedLevel), we MUST NOT pollute telemetry!
-      if (levelNum && levelNum > currentUnlockedLevel && data.action_type === 'in_progress' && (!data.time_spent_sec || data.time_spent_sec === 0)) {
+      if (levelNum && levelNum > currentUnlockedLevel && data.action_type === 'in_progress') {
         return;
       }
 
@@ -853,8 +1078,35 @@ const tasks = [
         }
       }
 
-      // Preserve pure time spent from iframe if already provided; fallback to platform timer only if missing
-      if (typeof data.time_spent_sec !== 'number') {
+      // Extract stage & wave metadata (explicit payload or live DOM inspection fallback)
+      const stageMeta = extractStageMetaFromPayload(data, sourceIframe, levelNum);
+
+      // AFK Level 3 timeout guard: prevent runaway infinite wave-1 fail loops when student is AFK
+      const isFailLike = data.action_type === 'hardcore_reset' || data.action_type === 'level_fail';
+      if (levelNum === 3 && isFailLike && (!stageMeta.wave || stageMeta.wave === 1)) {
+        if (!l3UserActivityFlag) {
+          l3AfkWave1Streak++;
+          if (l3AfkWave1Streak >= 2) {
+            // Suppress AFK wave-1 spam and pause active timer until user interacts
+            return;
+          }
+        } else {
+          l3AfkWave1Streak = 0;
+          l3UserActivityFlag = false;
+        }
+      } else if (levelNum === 3 && (data.action_type === 'level_complete' || (stageMeta.wave && stageMeta.wave > 1))) {
+        l3AfkWave1Streak = 0;
+      }
+
+      // Use accurate active tab time if this level tab was actively opened by the student
+      if (levelNum && levelTabEntered[levelNum]) {
+        const activeSec = getActiveLevelSec(levelNum);
+        data.time_spent_sec = Math.max(activeSec, data.action_type === 'level_complete' ? 1 : 0);
+        data.timer_mode = 'active_tab';
+        if (levelStartIso[levelNum]) {
+          data.start_time = levelStartIso[levelNum];
+        }
+      } else if (typeof data.time_spent_sec !== 'number') {
         const mName = data.mission_name;
         if (!platformTimers[mName]) {
           platformTimers[mName] = Date.now();
@@ -862,10 +1114,18 @@ const tasks = [
         data.time_spent_sec = Math.floor((Date.now() - platformTimers[mName]) / 1000);
       }
 
+      if (stageMeta.stage) {
+        data.stage = stageMeta.stage;
+        if (levelNum) lastReportedStage[levelNum] = stageMeta.stage;
+      }
+      if (stageMeta.totalStages) data.total_stages = stageMeta.totalStages;
+      if (stageMeta.wave) data.wave = stageMeta.wave;
+
       if ((data.action_type === 'hardcore_reset' || data.action_type === 'level_fail') && isHardcore) {
         data.action_type = 'hardcore_reset';
         alert('💀 ОШИБКА В РЕЖИМЕ ХАРДКОРА! Прогресс сброшен!');
         currentUnlockedLevel = 1;
+        resetActiveLevelTimers();
         updateTabsState();
         switchTab('iframe-1');
 
@@ -881,6 +1141,7 @@ const tasks = [
       }
 
       if (data.action_type === 'level_complete') {
+        if (levelNum) levelCompletedFlags[levelNum] = true;
         if (sourceIframe) {
           const completedLevel = parseInt(sourceIframe.id.replace('iframe-', ''), 10);
           if (completedLevel === currentUnlockedLevel) {
@@ -943,6 +1204,16 @@ const tasks = [
       try {
         const doc = iframe.contentDocument || iframe.contentWindow?.document;
         if (doc) {
+          // Track real user activity inside Level 3 iframe to distinguish AFK timeout loops
+          if (iframe.id === 'iframe-3') {
+            ['pointerdown', 'keydown'].forEach(ev => {
+              doc.addEventListener(ev, () => {
+                l3UserActivityFlag = true;
+                l3AfkWave1Streak = 0;
+              }, { passive: true });
+            });
+          }
+
           // Запрет копирования/вставки в документе тренажера
           doc.addEventListener('copy', e => e.preventDefault());
           doc.addEventListener('paste', e => e.preventDefault());

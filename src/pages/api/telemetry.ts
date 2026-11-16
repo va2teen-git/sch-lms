@@ -57,6 +57,15 @@ try {
 try {
   db.exec("ALTER TABLE telemetry ADD COLUMN attempt_mode TEXT DEFAULT 'normal'");
 } catch(e) {}
+try {
+  db.exec("ALTER TABLE telemetry ADD COLUMN stage_current INTEGER");
+} catch(e) {}
+try {
+  db.exec("ALTER TABLE telemetry ADD COLUMN stage_total INTEGER");
+} catch(e) {}
+try {
+  db.exec("ALTER TABLE telemetry ADD COLUMN wave_number INTEGER");
+} catch(e) {}
 
 try {
   db.exec(`
@@ -83,9 +92,10 @@ export const POST: APIRoute = async ({ request }) => {
           first_name, last_name, class_name, mission_name, action_type,
           start_time, time_spent_sec, attempts_count, success, status, action_log, is_hardcore,
           student_class, course_slug, lesson_id, level_number,
-          attempt_id, attempt_number, attempt_mode
+          attempt_id, attempt_number, attempt_mode,
+          stage_current, stage_total, wave_number
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `);
       
@@ -100,7 +110,24 @@ export const POST: APIRoute = async ({ request }) => {
       const aCount = Math.max(0, parseInt(body.attempts_count, 10) || 0);
       const isSuccess = body.success ? 1 : 0;
       const curStatus = String(body.status || '');
-      const aLog = typeof body.action_log === 'string' ? body.action_log : JSON.stringify(body.action_log || []);
+
+      let rawLogArr: any = body.action_log;
+      if (typeof rawLogArr === 'string') {
+        try { rawLogArr = JSON.parse(rawLogArr); } catch (e) {}
+      }
+      if (body.timer_mode || body.is_manual_reset) {
+        const metaItem: Record<string, any> = {};
+        if (body.timer_mode) metaItem.timerMode = String(body.timer_mode);
+        if (body.is_manual_reset) metaItem.action = 'manual_reset';
+        if (Array.isArray(rawLogArr)) {
+          rawLogArr = [...rawLogArr, metaItem];
+        } else if (rawLogArr && typeof rawLogArr === 'object') {
+          rawLogArr = [rawLogArr, metaItem];
+        } else {
+          rawLogArr = [metaItem];
+        }
+      }
+      const aLog = typeof rawLogArr === 'string' ? rawLogArr : JSON.stringify(rawLogArr || []);
       const isHc = body.is_hardcore ? 1 : 0;
 
       let courseSlug = body.course_slug ? String(body.course_slug).trim() : null;
@@ -112,6 +139,15 @@ export const POST: APIRoute = async ({ request }) => {
       const attemptId = body.attempt_id ? String(body.attempt_id).trim() : null;
       const attemptNum = body.attempt_number ? Math.max(1, parseInt(body.attempt_number, 10) || 1) : 1;
       const attemptMode = body.attempt_mode ? String(body.attempt_mode).trim() : (isHc ? 'hardcore' : 'normal');
+
+      const parseOptInt = (v: any) => {
+        if (v === undefined || v === null || v === '') return null;
+        const n = parseInt(String(v), 10);
+        return !isNaN(n) && n > 0 ? n : null;
+      };
+      const stageCurrent = parseOptInt(body.stage_current ?? body.stage ?? body.phase ?? body.step ?? body.wave);
+      const stageTotal = parseOptInt(body.stage_total ?? body.total_stages ?? body.total_phases ?? body.total_waves);
+      const waveNumber = parseOptInt(body.wave_number ?? body.wave);
 
       if (levelNum === null && mName) {
         if (/Уровень\s*1/i.test(mName) || /Ур\s*1/i.test(mName)) levelNum = 1;
@@ -145,7 +181,10 @@ export const POST: APIRoute = async ({ request }) => {
         levelNum,
         attemptId,
         attemptNum,
-        attemptMode
+        attemptMode,
+        stageCurrent,
+        stageTotal,
+        waveNumber
       );
       
       return new Response(JSON.stringify({ success: true }), {

@@ -461,15 +461,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         }, '*');
                     } else {
                         // Переход к следующей волне
-                        this.loadWave(this.currentWave + 1);
+                        const nextWave = this.currentWave + 1;
+                        this.loadWave(nextWave);
 
                         window.parent.postMessage({
                             type: 'TELEMETRY_EVENT',
                             mission_name: missionName,
                             action_type: 'in_progress',
                             status: 'wave_complete',
-                            wave: this.currentWave,
-                            attempts_count: this.failCount
+                            wave: nextWave,
+                            total_waves: this.activeWaves.length,
+                            attempts_count: this.failCount,
+                            action_log: [{ wave: nextWave, total_waves: this.activeWaves.length, action: 'wave_complete' }]
                         }, '*');
                     }
                 } else {
@@ -485,6 +488,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.isAlarm = true;
                 this.alarmMessage = reason;
                 this.failCount++;
+                const failedWave = this.currentWave;
+                const totalW = this.activeWaves.length;
 
                 playAlarmSiren();
 
@@ -493,7 +498,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     mission_name: missionName,
                     action_type: 'hardcore_reset',
                     status: 'failed',
-                    attempts_count: this.failCount
+                    wave: failedWave,
+                    total_waves: totalW,
+                    attempts_count: this.failCount,
+                    action_log: [{ wave: failedWave, total_waves: totalW, action: 'hardcore_reset' }]
                 }, '*');
 
                 // Через 1.8 секунды тотальный сброс прогресса на Волну 1 с новой генерацией
