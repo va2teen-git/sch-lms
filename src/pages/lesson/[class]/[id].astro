@@ -704,6 +704,7 @@ const tasks = [
   let activeTabLevel = null;
   let levelActiveMs = { 1: 0, 2: 0, 3: 0 };
   let levelTabEntered = { 1: false, 2: false, 3: false };
+  let levelInteracted = { 1: false, 2: false, 3: false };
   let levelStartIso = { 1: null, 2: null, 3: null };
   let levelCompletedFlags = { 1: false, 2: false, 3: false };
   let lastTickAt = null;
@@ -724,6 +725,7 @@ const tasks = [
       lastTickAt !== null &&
       activeTabLevel &&
       activeTabLevel <= currentUnlockedLevel &&
+      levelInteracted[activeTabLevel] &&
       !levelCompletedFlags[activeTabLevel] &&
       document.visibilityState === 'visible' &&
       !isOverlayBlockingLevel()
@@ -734,9 +736,22 @@ const tasks = [
     lastTickAt = nowMs;
   }
 
+  function activateLevelInteraction(lvlNum) {
+    if (!lvlNum || lvlNum < 1 || lvlNum > 3) return;
+    if (lvlNum > currentUnlockedLevel || levelCompletedFlags[lvlNum]) return;
+    if (!levelInteracted[lvlNum]) {
+      flushActiveTimer();
+      levelInteracted[lvlNum] = true;
+      if (!levelStartIso[lvlNum]) {
+        levelStartIso[lvlNum] = new Date().toISOString();
+      }
+    }
+  }
+
   function resetActiveLevelTimers() {
     levelActiveMs = { 1: 0, 2: 0, 3: 0 };
     levelTabEntered = { 1: false, 2: false, 3: false };
+    levelInteracted = { 1: false, 2: false, 3: false };
     levelStartIso = { 1: null, 2: null, 3: null };
     levelCompletedFlags = { 1: false, 2: false, 3: false };
     lastReportedStage = { 1: null, 2: null, 3: null };
@@ -765,7 +780,7 @@ const tasks = [
         const prev = lastReportedStage[activeTabLevel];
         if (prev === null) {
           lastReportedStage[activeTabLevel] = detected.stage;
-        } else if (detected.stage !== prev && detected.stage > 1) {
+        } else if (detected.stage !== prev && detected.stage > 1 && levelInteracted[activeTabLevel]) {
           lastReportedStage[activeTabLevel] = detected.stage;
           const activeSec = getActiveLevelSec(activeTabLevel);
           if (activeSec > 0) {
@@ -921,9 +936,6 @@ const tasks = [
     activeTabLevel = (targetLevel >= 1 && targetLevel <= 3) ? targetLevel : null;
     if (activeTabLevel) {
       levelTabEntered[activeTabLevel] = true;
-      if (!levelStartIso[activeTabLevel]) {
-        levelStartIso[activeTabLevel] = new Date().toISOString();
-      }
     }
 
     tabs.forEach(t => {
@@ -1081,6 +1093,18 @@ const tasks = [
       // Extract stage & wave metadata (explicit payload or live DOM inspection fallback)
       const stageMeta = extractStageMetaFromPayload(data, sourceIframe, levelNum);
 
+      // Activate level timer on first real gameplay event if pointer/keyboard didn't trigger yet
+      const isGameplayEvent =
+        data.action_type === 'level_complete' ||
+        data.action_type === 'level_fail' ||
+        data.action_type === 'hardcore_reset' ||
+        (stageMeta.stage && stageMeta.stage > 1) ||
+        (stageMeta.wave && stageMeta.wave > 1) ||
+        data.status === 'wave_complete';
+      if (levelNum && isGameplayEvent) {
+        activateLevelInteraction(levelNum);
+      }
+
       // AFK Level 3 timeout guard: prevent runaway infinite wave-1 fail loops when student is AFK
       const isFailLike = data.action_type === 'hardcore_reset' || data.action_type === 'level_fail';
       if (levelNum === 3 && isFailLike && (!stageMeta.wave || stageMeta.wave === 1)) {
@@ -1199,38 +1223,48 @@ const tasks = [
   document.addEventListener('paste', e => e.preventDefault());
   
   // 2. Для всех интерактивных заданий (iframe)
-  iframes.forEach(iframe => {
-    iframe.addEventListener('load', () => {
-      try {
-        const doc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (doc) {
-          // Track real user activity inside Level 3 iframe to distinguish AFK timeout loops
-          if (iframe.id === 'iframe-3') {
-            ['pointerdown', 'keydown'].forEach(ev => {
-              doc.addEventListener(ev, () => {
-                l3UserActivityFlag = true;
-                l3AfkWave1Streak = 0;
-              }, { passive: true });
-            });
-          }
+  const boundIframeDocs = new WeakSet();
+  function bindIframeDocumentListeners(iframe) {
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc || boundIframeDocs.has(doc)) return;
+      boundIframeDocs.add(doc);
 
-          // Запрет копирования/вставки в документе тренажера
-          doc.addEventListener('copy', e => e.preventDefault());
-          doc.addEventListener('paste', e => e.preventDefault());
-          
-          // Жесткая блокировка вставки и перетаскивания (drag-and-drop текста) для всех полей ввода
-          const inputs = doc.querySelectorAll('input, textarea');
-          inputs.forEach(input => {
-            input.addEventListener('paste', e => e.preventDefault());
-            input.addEventListener('drop', e => e.preventDefault());
-            input.onpaste = () => false;
-            input.ondrop = () => false;
-          });
-        }
-      } catch (e) {
-        console.warn('CORS не позволяет модифицировать iframe, но так как мы отдаем статику локально, этого быть не должно.', e);
+      const lvlNum = parseInt(iframe.id.replace('iframe-', ''), 10) || null;
+      if (lvlNum >= 1 && lvlNum <= 3) {
+        ['pointerdown', 'keydown'].forEach(ev => {
+          doc.addEventListener(ev, () => {
+            activateLevelInteraction(lvlNum);
+            if (lvlNum === 3) {
+              l3UserActivityFlag = true;
+              l3AfkWave1Streak = 0;
+            }
+          }, { passive: true, capture: true });
+        });
       }
-    });
+
+      // Запрет копирования/вставки в документе тренажера
+      doc.addEventListener('copy', e => e.preventDefault());
+      doc.addEventListener('paste', e => e.preventDefault());
+
+      // Жесткая блокировка вставки и перетаскивания (drag-and-drop текста) для всех полей ввода
+      const inputs = doc.querySelectorAll('input, textarea');
+      inputs.forEach(input => {
+        input.addEventListener('paste', e => e.preventDefault());
+        input.addEventListener('drop', e => e.preventDefault());
+        input.onpaste = () => false;
+        input.ondrop = () => false;
+      });
+    } catch (e) {
+      console.warn('CORS не позволяет модифицировать iframe, но так как мы отдаем статику локально, этого быть не должно.', e);
+    }
+  }
+
+  iframes.forEach(iframe => {
+    iframe.addEventListener('load', () => bindIframeDocumentListeners(iframe));
+    if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+      bindIframeDocumentListeners(iframe);
+    }
   });
 
   // Интерактивное управление бонусным модулем Prince of Persia
