@@ -326,30 +326,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
-    const startTime = Date.now();
+    // Отправка TELEMETRY_EVENT (in_progress, hardcore_reset, level_complete) через LMSTelemetry
     let currentPhase = 1;
-    let attemptsCount = 0;
     let selectedCardElement = null;
     let selectedTokenElement = null;
 
     const missionName = 'Урок 9 :: Модели и моделирование (Уровень 1)';
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success
-        }, '*');
-    }
-
-    // Инициализирующий сигнал
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
 
     function showFeedback(message) {
         const box = document.getElementById('feedback-box');
@@ -362,10 +349,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function triggerFailure(message, phaseResetCallback) {
-        attemptsCount++;
-        document.getElementById('attempts-display').textContent = attemptsCount;
+        telemetry.hardcoreReset({ stage: currentPhase, status: 'in_progress' });
+        document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
         showFeedback(message);
-        sendTelemetry('hardcore_reset', 'in_progress', false);
         setTimeout(() => {
             phaseResetCallback();
         }, 1200);
@@ -471,7 +457,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return card;
     }
 
+    let p1ListenersAttached = false;
     function setupDragAndDropPhase1() {
+        if (p1ListenersAttached) return;
+        p1ListenersAttached = true;
+
         const buckets = [
             document.getElementById('bucket-material'),
             document.getElementById('bucket-static'),
@@ -543,13 +533,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         });
 
         if (isAllCorrect) {
-            sendTelemetry('in_progress', 'in_progress', false);
             // Переход на Фазу 2
+            currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase-1-container').classList.add('d-none');
             document.getElementById('phase-2-container').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
             document.getElementById('phase-title').textContent = 'Конструирование конвейера: Этапы компьютерного моделирования';
-            currentPhase = 2;
             setupPhase2();
         } else {
             triggerFailure('Некоторые модели отнесены не в свои сектора!', setupPhase1);
@@ -671,7 +661,11 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         return token;
     }
 
+    let p2ListenersAttached = false;
     function setupDragAndDropPhase2() {
+        if (p2ListenersAttached) return;
+        p2ListenersAttached = true;
+
         const slots = document.querySelectorAll('.slot-target');
         const pool = document.getElementById('p2-tokens-pool');
 
@@ -740,13 +734,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const isCorrect = (step1 === 'step1' && step2 === 'step2' && step3 === 'step3' && step4 === 'step4' && step5 === 'step5');
 
         if (isCorrect) {
-            sendTelemetry('in_progress', 'in_progress', false);
             // Переход на Фазу 3
+            currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase-2-container').classList.add('d-none');
             document.getElementById('phase-3-container').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
             document.getElementById('phase-title').textContent = 'Пульт аналитической калибровки: Представление результатов';
-            currentPhase = 3;
             setupPhase3();
         } else {
             triggerFailure('Нарушена логика конвейера или встроен псевдонаучный дистрактор!', setupPhase2);
@@ -942,17 +936,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (curFormat.valid && curAxis.valid && isDeltaValid && isStepValid) {
             // Финиш уровня
+            const completePayload = telemetry.complete({ stage: 3 });
+            const timeSpent = completePayload ? completePayload.time_spent_sec : telemetry.getTimeSpentSec();
             document.getElementById('phase-3-container').classList.add('d-none');
             document.getElementById('final-screen').classList.remove('d-none');
             document.getElementById('phase-badge').textContent = 'Завершено';
             document.getElementById('phase-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
             document.getElementById('phase-title').textContent = 'Уровень 1 успешно пройден';
 
-            const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
             document.getElementById('stat-time').textContent = `${timeSpent} с`;
-            document.getElementById('stat-attempts').textContent = attemptsCount;
-
-            sendTelemetry('level_complete', 'completed', true);
+            document.getElementById('stat-attempts').textContent = telemetry.getState().attemptsCount;
         } else {
             triggerFailure('Параметры аналитического представления не удовлетворяют критериям адекватности!', setupPhase3);
         }

@@ -119,9 +119,48 @@ const phases = [
     `
   }
 ];
+const missionName = '11-класс_базовый :: 6 :: Уровень 3';
+const totalWaves = phases.length;
 ---
 
 <TaskLayout level={3} bodyClass="vh-100 overflow-hidden d-flex flex-column m-0">
-    <Terminal missionName="11-класс_базовый :: 6 :: Уровень 3" phases={JSON.stringify(phases)} requireStart={true} theme="red" hardcoreReset={true} />
+    <div id="start-overlay" data-screen="intro" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-black p-4" style="z-index: 1050;">
+        <h1 class="text-danger mb-3 fw-bold text-uppercase text-center">ВНИМАНИЕ: HARDCORE РЕЖИМ</h1>
+        <p class="text-white mb-4 text-center fs-5" style="max-width: 620px;">
+            Инцидент нулевого дня: вам предстоит отразить {totalWaves} волн атак в реальном времени.<br />
+            Таймер первой волны запустится сразу после нажатия кнопки старта.
+        </p>
+        <button type="button" id="start-btn" class="btn btn-outline-danger btn-lg rounded-0 px-5 py-3 fw-bold text-uppercase" style="min-height: 54px;">
+            НАЧАТЬ СИМУЛЯЦИЮ
+        </button>
+    </div>
+
+    <script is:inline define:vars={{ missionName, totalWaves }}>
+        (function () {
+            let terminalCallbacks = {};
+            window.__lmsTerminalBindCallbacks = function (cb) {
+                terminalCallbacks = cb || {};
+            };
+            // Отправка TELEMETRY_EVENT (start_time, time_spent_sec, wave/total_waves) через LMSTelemetry
+            window.__lmsTerminalTracker = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 3,
+                totalWaves: totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: function () {
+                    if (typeof terminalCallbacks.onAfkStop === 'function') {
+                        terminalCallbacks.onAfkStop();
+                    }
+                },
+                onAfkRetry: function () {
+                    if (typeof terminalCallbacks.onAfkRetry === 'function') {
+                        terminalCallbacks.onAfkRetry();
+                    }
+                }
+            });
+        })();
+    </script>
+
+    <Terminal missionName={missionName} level={3} phases={JSON.stringify(phases)} requireStart={true} renderStartOverlay={false} theme="red" hardcoreReset={true} />
 </TaskLayout>
 

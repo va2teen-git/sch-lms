@@ -466,17 +466,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     createApp({
         data() {
             return {
+                missionName: 'Урок 9 :: Модели и моделирование (Уровень 3 / Аркада)',
                 gameState: 'intro', // 'intro', 'playing', 'victory'
                 currentWave: 1,
                 totalWaves: 10,
                 attempts: 0,
                 startTime: Date.now(),
+                finalTimeSec: 0,
                 phaseTimeLeft: 15.0,
                 maxPhaseTime: 15.0,
                 timerInterval: null,
+                resetTimeout: null,
                 alarmActive: false,
                 alarmMessage: '',
                 isActionBlocked: false,
+                telemetry: null,
 
                 // Текущие органы ввода
                 currentK: 50,
@@ -656,7 +660,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             formattedFinalTime() {
-                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const totalSec = this.finalTimeSec > 0
+                    ? this.finalTimeSec
+                    : (this.telemetry ? this.telemetry.getTimeSpentSec() : Math.max(1, Math.floor((Date.now() - this.startTime) / 1000)));
                 const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const s = String(totalSec % 60).padStart(2, '0');
                 return `${m}:${s}`;
@@ -725,6 +731,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         mounted() {
             window.addEventListener('keydown', this.handleKeydown);
 
+            // Отправка TELEMETRY_EVENT (in_progress, hardcore_reset, level_complete, AFK guard) через LMSTelemetry
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: this.missionName,
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    this.stopTimer();
+                    clearTimeout(this.resetTimeout);
+                    this.alarmActive = false;
+                    this.isActionBlocked = true;
+                },
+                onAfkRetry: () => {
+                    this.alarmActive = false;
+                    if (this.gameState === 'playing') {
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.generateWaves();
+                        this.loadWave(1);
+                    }
+                }
+            });
+
             // Экспорт тестового API для Playwright и E2E проверки
             const self = this;
             window.__DEV_LEVEL3_STATE__ = {
@@ -755,22 +783,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         beforeUnmount() {
             window.removeEventListener('keydown', this.handleKeydown);
             this.stopTimer();
+            clearTimeout(this.resetTimeout);
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
         },
 
         methods: {
-            sendTelemetry(actionType, status, success) {
-                const timeSpent = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 9 :: Модели и моделирование (Уровень 3 / Аркада)',
-                    action_type: actionType,
-                    status: status,
-                    start_time: new Date(this.startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: this.attempts,
-                    success: success
-                }, '*');
-            },
 
             // Процедурная генерация параметров 10 волн
             generateWaves() {
@@ -820,18 +839,37 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             startGame() {
+                clearTimeout(this.resetTimeout);
                 this.startTime = Date.now();
+                this.finalTimeSec = 0;
+                this.attempts = 0;
+                this.alarmActive = false;
                 this.currentWave = 1;
                 this.generateWaves();
                 this.loadWave(1);
                 this.gameState = 'playing';
-                this.sendTelemetry('in_progress', 'started', true);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalWaves);
+                    this.telemetry.progress({
+                        status: 'started',
+                        wave: 1,
+                        total_waves: this.totalWaves,
+                        stage: 1,
+                        total_stages: this.totalWaves
+                    });
+                }
             },
 
             loadWave(waveNum) {
                 this.currentWave = waveNum;
                 this.currentWaveData = this.activeWaves[waveNum - 1];
                 this.selectedFormat = null;
+                if (this.telemetry) {
+                    this.telemetry.setWave(waveNum, this.totalWaves);
+                }
 
                 // Случайное стартовое k со смещением от targetK, чтобы требовалась калибровка
                 if (!this.currentWaveData.isSanityAnomaly) {
@@ -853,11 +891,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.stopTimer();
                 const tickInterval = 100;
                 this.timerInterval = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.phaseTimeLeft -= tickInterval / 1000;
                     if (this.phaseTimeLeft <= 0) {
                         this.phaseTimeLeft = 0;
                         this.stopTimer();
-                        this.triggerHardcoreReset('Время ожидания модели истекло! Срыв синхронизации вычислителя.');
+                        this.triggerHardcoreReset('Время ожидания модели истекло! Срыв синхронизации вычислителя.', true);
                     }
                 }, tickInterval);
             },
@@ -871,16 +912,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             adjustK(delta) {
                 if (this.isActionBlocked || this.currentWaveData.isSanityAnomaly) return;
+                if (this.telemetry) this.telemetry.markActivity();
                 this.currentK = Math.max(10, Math.min(90, this.currentK + delta));
                 playTickSound();
             },
 
             onSliderInput() {
+                if (this.telemetry) this.telemetry.markActivity();
                 playTickSound();
             },
 
             selectFormat(format) {
                 if (this.isActionBlocked) return;
+                if (this.telemetry) this.telemetry.markActivity();
                 this.selectedFormat = format;
                 playTickSound();
             },
@@ -888,28 +932,29 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Утверждение модели в эксплуатацию
             commitModel() {
                 if (this.gameState !== 'playing' || this.isActionBlocked) return;
+                if (this.telemetry) this.telemetry.markActivity();
 
                 // Проверка 1: Если модель была с аномалией Sanity Check, ее утверждение — грубейшая ошибка!
                 if (this.currentWaveData.isSanityAnomaly) {
-                    this.triggerHardcoreReset('Грубая ошибка: утверждена физически абсурдная модель, нарушающая границы предметной области!');
+                    this.triggerHardcoreReset('Грубая ошибка: утверждена физически абсурдная модель, нарушающая границы предметной области!', false);
                     return;
                 }
 
                 // Проверка 2: Выбран ли формат визуализации?
                 if (!this.selectedFormat) {
-                    this.triggerHardcoreReset('Шлюз не скоммутирован: не выбран проектор представления данных!');
+                    this.triggerHardcoreReset('Шлюз не скоммутирован: не выбран проектор представления данных!', false);
                     return;
                 }
 
                 // Проверка 3: Соответствует ли формат структуре данных?
                 if (this.selectedFormat !== this.currentWaveData.targetFormat) {
-                    this.triggerHardcoreReset('Неверная коммутация: выбранный проектор не соответствует типу и структуре данных модели!');
+                    this.triggerHardcoreReset('Неверная коммутация: выбранный проектор не соответствует типу и структуре данных модели!', false);
                     return;
                 }
 
                 // Проверка 4: Достигнут ли резонанс сходимости (относительная погрешность delta <= 5.0%)?
                 if (this.currentDiscrepancy > 5.0) {
-                    this.triggerHardcoreReset(`Модель не откалибрована! Относительная погрешность δ = ${this.currentDiscrepancy.toFixed(1)}% превышает норматив 5.0%.`);
+                    this.triggerHardcoreReset(`Модель не откалибрована! Относительная погрешность δ = ${this.currentDiscrepancy.toFixed(1)}% превышает норматив 5.0%.`, false);
                     return;
                 }
 
@@ -920,13 +965,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Отклонение аномальной модели (Sanity Reject)
             rejectSanity() {
                 if (this.gameState !== 'playing' || this.isActionBlocked) return;
+                if (this.telemetry) this.telemetry.markActivity();
 
                 if (this.currentWaveData.isSanityAnomaly) {
                     // Верное выявление и отбраковка абсурдной модели
                     this.handleWaveSuccess();
                 } else {
                     // Ложная отбраковка корректной модели
-                    this.triggerHardcoreReset('Ложная отбраковка: отклонена корректная физическая модель!');
+                    this.triggerHardcoreReset('Ложная отбраковка: отклонена корректная физическая модель!', false);
                 }
             },
 
@@ -938,28 +984,56 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 if (this.currentWave >= this.totalWaves) {
                     // Финальная победа
                     this.gameState = 'victory';
-                    this.sendTelemetry('level_complete', 'passed', true);
+                    if (this.telemetry) {
+                        const payload = this.telemetry.complete({ status: 'passed', wave: this.totalWaves });
+                        this.finalTimeSec = payload ? payload.time_spent_sec : this.telemetry.getTimeSpentSec();
+                    }
                 } else {
-                    this.sendTelemetry('in_progress', `wave_${this.currentWave}_complete`, true);
+                    const nextWave = this.currentWave + 1;
+                    if (this.telemetry) {
+                        this.telemetry.advanceWave(nextWave, { status: `wave_${this.currentWave}_complete` });
+                    }
                     setTimeout(() => {
-                        this.loadWave(this.currentWave + 1);
+                        if (this.gameState === 'playing') {
+                            this.loadWave(nextWave);
+                        }
                     }, 300);
                 }
             },
 
-            triggerHardcoreReset(reason) {
+            triggerHardcoreReset(reason, isTimeout = false) {
                 this.stopTimer();
+                clearTimeout(this.resetTimeout);
                 this.isActionBlocked = true;
-                this.attempts++;
+
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: this.currentWave,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        this.alarmActive = false;
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
+
                 playErrorSound();
                 playAlarmSiren();
 
-                this.sendTelemetry('hardcore_reset', 'failed', false);
                 this.alarmMessage = reason;
                 this.alarmActive = true;
 
-                setTimeout(() => {
+                this.resetTimeout = setTimeout(() => {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.alarmActive = false;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
                     this.generateWaves();
                     this.loadWave(1);
                 }, 1700);
@@ -967,6 +1041,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             handleKeydown(e) {
                 if (this.gameState !== 'playing' || this.isActionBlocked) return;
+                if (this.telemetry) this.telemetry.markActivity();
 
                 if (e.key === '1' || e.code === 'Numpad1') {
                     this.selectFormat('timeseries');

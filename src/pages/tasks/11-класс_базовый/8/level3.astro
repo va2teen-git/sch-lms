@@ -231,17 +231,21 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     createApp({
         data() {
             return {
+                missionName: 'Урок 8 :: Организация личного архива информации (Уровень 3)',
                 gameState: 'intro', // 'intro', 'playing', 'victory'
                 currentWave: 1,
                 totalWaves: 10,
                 attempts: 0,
                 startTime: Date.now(),
+                finalTimeSec: 0,
                 phaseTimeLeft: 12.0,
                 maxPhaseTime: 12.0,
                 timerInterval: null,
+                resetTimeout: null,
                 alarmActive: false,
                 alarmMessage: '',
                 isActionBlocked: false,
+                telemetry: null,
 
                 // Банк шаблонов волн (10 сценариев)
                 wavesPool: [
@@ -387,7 +391,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 return Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
             },
             formattedFinalTime() {
-                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const totalSec = this.finalTimeSec > 0
+                    ? this.finalTimeSec
+                    : (this.telemetry ? this.telemetry.getTimeSpentSec() : Math.max(1, Math.floor((Date.now() - this.startTime) / 1000)));
                 const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const s = String(totalSec % 60).padStart(2, '0');
                 return `${m}:${s}`;
@@ -396,6 +402,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         mounted() {
             window.addEventListener('keydown', this.handleKeydown);
+
+            // Отправка TELEMETRY_EVENT (start_time, time_spent_sec, wave/total_waves, AFK guard) через LMSTelemetry
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: this.missionName,
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    this.stopTimer();
+                    clearTimeout(this.resetTimeout);
+                    this.alarmActive = false;
+                    this.isActionBlocked = true;
+                },
+                onAfkRetry: () => {
+                    this.alarmActive = false;
+                    if (this.gameState === 'playing') {
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.generateWaves();
+                        this.loadWave(1);
+                    }
+                }
+            });
 
             // Экспорт глобального объекта состояния для тестов
             window.__DEV_LEVEL3_STATE__ = {
@@ -416,23 +444,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         beforeUnmount() {
             window.removeEventListener('keydown', this.handleKeydown);
             this.stopTimer();
+            clearTimeout(this.resetTimeout);
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
         },
 
         methods: {
-            sendTelemetry(actionType, status, success) {
-                const timeSpent = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 8 :: Организация личного архива информации (Уровень 3)',
-                    action_type: actionType,
-                    status: status,
-                    start_time: new Date(this.startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: this.attempts,
-                    success: success
-                }, '*');
-            },
-
             genRandomSha256(isValid) {
                 const h = '0123456789abcdef';
                 let s = '';
@@ -450,17 +468,36 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             startGame() {
+                clearTimeout(this.resetTimeout);
                 this.startTime = Date.now();
+                this.finalTimeSec = 0;
+                this.attempts = 0;
                 this.currentWave = 1;
+                this.alarmActive = false;
                 this.generateWaves();
                 this.loadWave(1);
                 this.gameState = 'playing';
-                this.sendTelemetry('in_progress', 'started', true);
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalWaves);
+                    this.telemetry.progress({
+                        status: 'started',
+                        wave: 1,
+                        total_waves: this.totalWaves,
+                        stage: 1,
+                        total_stages: this.totalWaves
+                    });
+                }
             },
 
             loadWave(waveNum) {
                 this.currentWave = waveNum;
                 this.currentWaveData = this.activeWaves[waveNum - 1];
+                if (this.telemetry) {
+                    this.telemetry.setWave(waveNum, this.totalWaves);
+                }
 
                 // Динамическое сокращение времени таймера от 12.0 с до 5.5 с
                 // Волна 1: 12.0 с, Волна 10: 5.5 с
@@ -475,11 +512,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.stopTimer();
                 const tickInterval = 100;
                 this.timerInterval = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.phaseTimeLeft -= tickInterval / 1000;
                     if (this.phaseTimeLeft <= 0) {
                         this.phaseTimeLeft = 0;
                         this.stopTimer();
-                        this.triggerHardcoreReset('Время ожидания истекло! Переполнение буфера шлюза.');
+                        this.triggerHardcoreReset('Время ожидания истекло! Переполнение буфера шлюза.', true);
                     }
                 }, tickInterval);
             },
@@ -493,6 +533,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             handleAction(action) {
                 if (this.gameState !== 'playing' || this.isActionBlocked) return;
+                if (this.telemetry) this.telemetry.markActivity();
 
                 if (action === this.currentWaveData.correctAction) {
                     // Успех текущей волны
@@ -503,32 +544,60 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     if (this.currentWave >= this.totalWaves) {
                         // Победа в Уровне 3!
                         this.gameState = 'victory';
-                        this.sendTelemetry('level_complete', 'passed', true);
+                        if (this.telemetry) {
+                            const payload = this.telemetry.complete({ status: 'passed', wave: this.totalWaves });
+                            this.finalTimeSec = payload ? payload.time_spent_sec : this.telemetry.getTimeSpentSec();
+                        }
                     } else {
-                        this.sendTelemetry('in_progress', `wave_${this.currentWave}_complete`, true);
+                        const nextWave = this.currentWave + 1;
+                        if (this.telemetry) {
+                            this.telemetry.advanceWave(nextWave, { status: `wave_${this.currentWave}_complete` });
+                        }
                         setTimeout(() => {
-                            this.loadWave(this.currentWave + 1);
+                            if (this.gameState === 'playing') {
+                                this.loadWave(nextWave);
+                            }
                         }, 250);
                     }
                 } else {
                     // Ошибка действия
-                    this.triggerHardcoreReset(`Неверная маршрутизация блока! Выбран не тот шлюз.`);
+                    this.triggerHardcoreReset(`Неверная маршрутизация блока! Выбран не тот шлюз.`, false);
                 }
             },
 
-            triggerHardcoreReset(reason) {
+            triggerHardcoreReset(reason, isTimeout = false) {
                 this.stopTimer();
+                clearTimeout(this.resetTimeout);
                 this.isActionBlocked = true;
-                this.attempts++;
+
+                if (this.telemetry) {
+                    const sent = this.telemetry.hardcoreReset({
+                        wave: this.currentWave,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        this.alarmActive = false;
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
+
                 playErrorSound();
                 playAlarmSiren();
 
-                this.sendTelemetry('hardcore_reset', 'failed', false);
                 this.alarmMessage = reason;
                 this.alarmActive = true;
 
-                setTimeout(() => {
+                this.resetTimeout = setTimeout(() => {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
                     this.alarmActive = false;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
                     this.generateWaves();
                     this.loadWave(1);
                 }, 1600);
@@ -536,6 +605,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             handleKeydown(e) {
                 if (this.gameState !== 'playing' || this.isActionBlocked) return;
+                if (this.telemetry) this.telemetry.markActivity();
                 if (e.key === '1' || e.code === 'Numpad1') this.handleAction('worm');
                 else if (e.key === '2' || e.code === 'Numpad2') this.handleAction('media');
                 else if (e.key === '3' || e.code === 'Numpad3') this.handleAction('quarantine');

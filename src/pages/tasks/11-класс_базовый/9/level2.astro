@@ -338,31 +338,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
-    const startTime = Date.now();
-    let attemptsCount = 0;
+    // Отправка TELEMETRY_EVENT (in_progress, hardcore_reset, level_complete) через LMSTelemetry
+    let currentPhase = 1;
     const missionName = 'Урок 9 :: Модели и моделирование (Уровень 2)';
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success
-        }, '*');
-    }
-
-    // Инициализирующий сигнал
-    sendTelemetry('in_progress', 'in_progress', false);
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
 
     function recordError(msg, retryFn) {
-        attemptsCount++;
-        document.getElementById('attempts-display').textContent = attemptsCount;
-        sendTelemetry('hardcore_reset', 'failed', false);
+        telemetry.hardcoreReset({ stage: currentPhase });
+        document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
         const fb = document.getElementById('error-feedback');
         if (msg) document.getElementById('error-msg').textContent = msg;
         fb.classList.remove('d-none');
@@ -373,6 +360,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function advancePhase(currNum, nextNum, nextSetupFn, nextTitle) {
+        currentPhase = nextNum;
+        telemetry.advanceStage(nextNum);
         document.getElementById(`phase${currNum}`).classList.add('d-none');
         document.getElementById(`phase${nextNum}`).classList.remove('d-none');
         document.getElementById('level-badge').textContent = `Шаг ${nextNum} из 5`;
@@ -411,7 +400,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const userRel = parseCleanInt(document.getElementById('p1-input-rel').value);
 
         if (userAbs === p1Current.abs && userRel === p1Current.rel) {
-            sendTelemetry('in_progress', 'in_progress', false);
             advancePhase(1, 2, setupPhase2, 'Многошаговый расчет: Дискретизация и информационный объем модели');
         } else {
             recordError('Неверно вычислена абсолютная или относительная погрешность!', setupPhase1);
@@ -443,7 +431,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const userKb = parseCleanInt(document.getElementById('p2-input-kb').value);
 
         if (userSteps === p2Current.steps && userKb === p2Current.kb) {
-            sendTelemetry('in_progress', 'in_progress', false);
             advancePhase(2, 3, setupPhase3, 'Пик 1: Обратная задача и доверительный интервал адекватности');
         } else {
             recordError('Ошибка в подсчете числа шагов или конвертации байт в КБ!', setupPhase2);
@@ -476,7 +463,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const userEmax = parseCleanInt(document.getElementById('p3-input-emax').value);
 
         if (userDelta === p3Current.deltaMax && userEmin === p3Current.eMin && userEmax === p3Current.eMax) {
-            sendTelemetry('in_progress', 'in_progress', false);
             advancePhase(3, 4, setupPhase4, 'Долина консолидации: Линейная интерполяция промежуточных значений');
         } else {
             recordError('Неверно вычислен допуск Δ_max или границы доверительного интервала [E_min, E_max]!', setupPhase3);
@@ -510,7 +496,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const userTarget = parseCleanInt(document.getElementById('p4-input-target').value);
 
         if (userGrowth === p4Current.growth && userTarget === p4Current.vTarget) {
-            sendTelemetry('in_progress', 'in_progress', false);
             advancePhase(4, 5, setupPhase5, 'Кульминация: Экстраполяция, конус погрешности и потолочное квантование');
         } else {
             recordError('Ошибка в расчете годового прироста или интерполированного значения!', setupPhase4);
@@ -547,17 +532,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         if (userNom === p5Current.nom && userPeak === p5Current.peak && userRacks === p5Current.racks) {
             // Завершение Уровня 2
+            const completePayload = telemetry.complete({ stage: 5 });
+            const timeSpent = completePayload ? completePayload.time_spent_sec : telemetry.getTimeSpentSec();
             document.getElementById('phase5').classList.add('d-none');
             document.getElementById('final-screen').classList.remove('d-none');
             document.getElementById('level-badge').textContent = 'Завершено';
             document.getElementById('level-badge').className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
             document.getElementById('level-title').textContent = 'Уровень 2 успешно пройден';
 
-            const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
             document.getElementById('stat-time').textContent = `${timeSpent} с`;
-            document.getElementById('stat-attempts').textContent = attemptsCount;
-
-            sendTelemetry('level_complete', 'completed', true);
+            document.getElementById('stat-attempts').textContent = telemetry.getState().attemptsCount;
         } else {
             recordError('Ошибка в расчете номинала, пика с запасом или округлении числа полок вверх!', setupPhase5);
         }

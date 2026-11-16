@@ -220,28 +220,18 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
 <script is:inline>
 (function() {
-    const startTime = Date.now();
-    let attemptsCount = 0;
+    // Отправка TELEMETRY_EVENT (start_time, time_spent_sec, stage/total_stages) через LMSTelemetry
+    let currentPhase = 1;
     const missionName = 'Урок 7 :: Вредоносное программное обеспечение (Уровень 2)';
-
-    function sendTelemetry(actionType, status, success) {
-        const timeSpent = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: new Date(startTime).toISOString(),
-            time_spent_sec: timeSpent,
-            attempts_count: attemptsCount,
-            success: success
-        }, '*');
-    }
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
 
     function recordError(feedbackId, msg, retryFn) {
-        attemptsCount++;
-        document.getElementById('attempts-display').textContent = attemptsCount;
-        sendTelemetry('hardcore_reset', 'failed', false);
+        telemetry.hardcoreReset({ stage: currentPhase });
+        document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
         const fb = document.getElementById(feedbackId);
         if (msg) fb.textContent = msg;
         fb.classList.remove('d-none');
@@ -252,6 +242,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     }
 
     function advancePhase(currNum, nextNum, nextSetupFn, nextTitle) {
+        currentPhase = nextNum;
+        telemetry.advanceStage(nextNum);
         document.getElementById(`phase${currNum}`).classList.add('d-none');
         document.getElementById(`phase${nextNum}`).classList.remove('d-none');
         document.getElementById('level-badge').textContent = `Шаг ${nextNum} из 5`;
@@ -508,16 +500,15 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const val = parseInt(document.getElementById('p5-input').value.trim(), 10);
         if (val === p5CorrectAnswer) {
             // Успех всего Уровня 2!
+            const completePayload = telemetry.complete({ stage: 5 });
+            const totalTime = completePayload ? completePayload.time_spent_sec : telemetry.getTimeSpentSec();
             document.getElementById('phase5').classList.add('d-none');
             document.getElementById('victory-screen').classList.remove('d-none');
             document.getElementById('level-badge').textContent = 'Финиш';
             document.getElementById('level-title').textContent = 'Уровень 2 успешно завершен';
 
-            const totalTime = Math.max(1, Math.round((Date.now() - startTime) / 1000));
             document.getElementById('final-time').textContent = totalTime;
-            document.getElementById('final-errors').textContent = attemptsCount;
-
-            sendTelemetry('level_complete', 'completed', true);
+            document.getElementById('final-errors').textContent = telemetry.getState().attemptsCount;
         } else {
             recordError('p5-feedback', '[ОШИБКА РАСЧЕТА] Неверный расчет суммарного объема бэкапа! Пересчет...', setupPhase5);
         }
