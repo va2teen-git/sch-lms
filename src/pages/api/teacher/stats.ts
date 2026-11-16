@@ -38,6 +38,8 @@ export interface AttemptMetric {
   sprintCpm?: number | null;
   sprintWpm?: number | null;
   sprintTimeSec?: number | null;
+  princeCompleted?: boolean;
+  princeBestTimeSec?: number | null;
 }
 
 export interface StudentMetric {
@@ -79,6 +81,9 @@ export interface StudentMetric {
   sprintCpm?: number | null;
   sprintWpm?: number | null;
   sprintAccuracy?: number | null;
+  princeCompleted?: boolean;
+  princeBestTimeSec?: number | null;
+  princeLevels?: number[];
   currentAttempt?: AttemptMetric | null;
   attempts: AttemptMetric[];
   lastCourseSlug?: string | null;
@@ -256,6 +261,9 @@ export const GET: APIRoute = async ({ request }) => {
           sprintCpm: null,
           sprintWpm: null,
           sprintAccuracy: null,
+          princeCompleted: false,
+          princeBestTimeSec: null,
+          princeLevels: [],
           currentAttempt: null,
           attempts: [],
           lastCourseSlug: null,
@@ -323,7 +331,9 @@ export const GET: APIRoute = async ({ request }) => {
           },
           sprintCpm: null,
           sprintWpm: null,
-          sprintTimeSec: null
+          sprintTimeSec: null,
+          princeCompleted: false,
+          princeBestTimeSec: null
         };
       }
 
@@ -332,13 +342,38 @@ export const GET: APIRoute = async ({ request }) => {
       if (!att.courseSlug && rowCourse) att.courseSlug = rowCourse;
       if (!att.lessonId && rowLesson) att.lessonId = rowLesson;
 
-      // Extract Level Number
+      const mNameStr = String(r.mission_name || '');
+      const isPrinceRow = mNameStr.includes('Prince of Persia') || r.action_type === 'prince_complete';
+
+      if (isPrinceRow && (r.action_type === 'level_complete' || r.action_type === 'prince_complete') && r.success !== 0) {
+        s.princeCompleted = true;
+        att.princeCompleted = true;
+        const pMatch = mNameStr.match(/Уровень\s*(\d+)/i);
+        if (pMatch) {
+          const pLvl = parseInt(pMatch[1], 10);
+          if (s.princeLevels && !s.princeLevels.includes(pLvl)) {
+            s.princeLevels.push(pLvl);
+          }
+        }
+        if (typeof r.time_spent_sec === 'number' && r.time_spent_sec > 0) {
+          if (s.princeBestTimeSec === null || s.princeBestTimeSec === undefined || r.time_spent_sec < s.princeBestTimeSec) {
+            s.princeBestTimeSec = r.time_spent_sec;
+          }
+          if (att.princeBestTimeSec === null || att.princeBestTimeSec === undefined || r.time_spent_sec < att.princeBestTimeSec) {
+            att.princeBestTimeSec = r.time_spent_sec;
+          }
+        }
+      }
+
+      // Extract Level Number (exclude Prince of Persia bonus levels)
       let lvlNum: 1 | 2 | 3 | null = null;
-      if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
-        lvlNum = r.level_number as 1 | 2 | 3;
-      } else if (r.mission_name.includes('Уровень 1')) lvlNum = 1;
-      else if (r.mission_name.includes('Уровень 2')) lvlNum = 2;
-      else if (r.mission_name.includes('Уровень 3')) lvlNum = 3;
+      if (!isPrinceRow) {
+        if (r.level_number === 1 || r.level_number === 2 || r.level_number === 3) {
+          lvlNum = r.level_number as 1 | 2 | 3;
+        } else if (mNameStr.includes('Уровень 1')) lvlNum = 1;
+        else if (mNameStr.includes('Уровень 2')) lvlNum = 2;
+        else if (mNameStr.includes('Уровень 3')) lvlNum = 3;
+      }
 
       const isError = r.action_type === 'hardcore_reset' || r.action_type === 'level_fail' || (r.action_log && r.action_log.includes('Error'));
 
@@ -744,6 +779,7 @@ export const GET: APIRoute = async ({ request }) => {
     const hardcoreCount = filteredStudents.filter(s => s.lessonStatus === 'hardcore_completed').length;
     const inProgressCount = filteredStudents.filter(s => s.lessonStatus === 'in_progress').length;
     const totalErrors = filteredStudents.reduce((sum, s) => sum + s.totalErrors, 0);
+    const princeCount = filteredStudents.filter(s => s.princeCompleted).length;
 
     const avgTimeSec = completedCount > 0
       ? Math.round(completedStudents.reduce((sum, s) => sum + s.totalActiveTimeSec, 0) / completedCount)
@@ -767,6 +803,7 @@ export const GET: APIRoute = async ({ request }) => {
         totalStudents,
         completedCount,
         hardcoreCount,
+        princeCount,
         inProgressCount,
         avgTimeSec,
         totalErrors

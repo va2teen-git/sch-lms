@@ -174,7 +174,7 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     await expect(page.locator('#class-select-label')).toHaveText('Выбрано: 2 кл.');
 
     // Click outside to close menu
-    await page.locator('#progress-table').click();
+    await page.getByRole('heading', { name: 'Панель мониторинга урока' }).click();
     await expect(page.locator('#class-dropdown-menu')).toBeHidden();
 
     // Check that table rows contain the selected classes
@@ -389,5 +389,166 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     // Close modal
     await page.locator('#modal-close-btn').click();
     await expect(page.locator('#detail-modal')).toBeHidden();
+  });
+
+  test('Matrix displays level colors for incomplete lessons and achievement emojis (✅ 💀 ⚔️ ⚡) + Prince badge on /teacher', async ({ page, request }) => {
+    const uniq = Date.now();
+    const fName = `МатрицаСтатус${uniq}`;
+    const lName = 'Ученик';
+    const sClass = '11-класс_углубленный';
+
+    const postEvent = async (payload) => {
+      const r = await request.post(`${baseUrl}/api/telemetry`, { data: payload });
+      expect(r.status()).toBe(200);
+    };
+
+    // 1. 7-класс Урок 4 -> stopped at Level 1 (in_progress with time > 0)
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '4',
+      level_number: 1,
+      mission_name: 'Урок 4 :: Тест (Уровень 1)',
+      action_type: 'in_progress',
+      status: 'in_progress',
+      time_spent_sec: 15,
+      attempts_count: 1,
+      success: false,
+      is_hardcore: false
+    });
+
+    // 2. 7-класс Урок 5 -> stopped at Level 2 (Level 1 completed)
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '5',
+      level_number: 1,
+      mission_name: 'Урок 5 :: Тест (Уровень 1)',
+      action_type: 'level_complete',
+      status: 'completed',
+      time_spent_sec: 20,
+      attempts_count: 1,
+      success: true,
+      is_hardcore: false
+    });
+
+    // 3. 7-класс Урок 6 -> stopped at Level 3 (Levels 1 & 2 completed)
+    for (const lvl of [1, 2]) {
+      await postEvent({
+        student_firstName: fName,
+        student_lastName: lName,
+        student_class: sClass,
+        course_slug: '7-класс',
+        lesson_id: '6',
+        level_number: lvl,
+        mission_name: `Урок 6 :: Тест (Уровень ${lvl})`,
+        action_type: 'level_complete',
+        status: 'completed',
+        time_spent_sec: 20,
+        attempts_count: 1,
+        success: true,
+        is_hardcore: false
+      });
+    }
+
+    // 4. 7-класс Урок 7 -> completed in Hardcore + Prince of Persia + Logo-Storm
+    for (const lvl of [1, 2, 3]) {
+      await postEvent({
+        student_firstName: fName,
+        student_lastName: lName,
+        student_class: sClass,
+        course_slug: '7-класс',
+        lesson_id: '7',
+        level_number: lvl,
+        mission_name: `Урок 7 :: Тест (Уровень ${lvl})`,
+        action_type: 'level_complete',
+        status: 'completed',
+        time_spent_sec: 25,
+        attempts_count: 1,
+        success: true,
+        is_hardcore: true
+      });
+    }
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '7',
+      level_number: 0,
+      mission_name: 'Урок 7 :: Двоичное кодирование :: Prince of Persia (Уровень 1)',
+      action_type: 'level_complete',
+      status: 'completed',
+      time_spent_sec: 42,
+      attempts_count: 1,
+      success: true,
+      is_hardcore: true
+    });
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '7-класс',
+      lesson_id: '7',
+      level_number: 0,
+      mission_name: 'Урок 7 :: Лого-Шторм',
+      action_type: 'sprint_complete',
+      status: 'completed',
+      time_spent_sec: 18,
+      attempts_count: 1,
+      success: true,
+      action_log: JSON.stringify({ cpm: 240, wpm: 48, accuracy: 98 })
+    });
+
+    // Open /courses as this student
+    await page.goto(baseUrl);
+    await page.evaluate(({ fName, lName, sClass }) => {
+      localStorage.setItem('student_firstName', fName);
+      localStorage.setItem('student_lastName', lName);
+      localStorage.setItem('student_class', sClass);
+    }, { fName, lName, sClass });
+
+    await page.goto(`${baseUrl}/courses`);
+
+    const c4 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="4"]');
+    await expect(c4).toHaveAttribute('data-progress-state', 'stopped-1');
+    await expect(c4).toHaveClass(/bg-emerald-50/);
+    await expect(c4).toContainText('Ур.1');
+
+    const c5 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="5"]');
+    await expect(c5).toHaveAttribute('data-progress-state', 'stopped-2');
+    await expect(c5).toHaveClass(/bg-amber-50/);
+    await expect(c5).toContainText('Ур.2');
+
+    const c6 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="6"]');
+    await expect(c6).toHaveAttribute('data-progress-state', 'stopped-3');
+    await expect(c6).toHaveClass(/bg-red-50/);
+    await expect(c6).toContainText('Ур.3');
+
+    const c7 = page.locator('.lesson-card[data-course="7-класс"][data-lesson="7"]');
+    await expect(c7).toHaveAttribute('data-progress-state', 'completed');
+    const c7Badges = await c7.locator('.card-status-badges').textContent();
+    expect(c7Badges).toContain('✅');
+    expect(c7Badges).toContain('💀');
+    expect(c7Badges).toContain('⚔️');
+    expect(c7Badges).toContain('⚡');
+
+    // Verify /teacher shows Prince of Persia achievement badge and modal card
+    await page.goto(`${baseUrl}/teacher?date=today`);
+    await page.locator('#filter-exclude-tests').uncheck();
+    await page.locator('#filter-lesson').selectOption('7-класс::Урок 7');
+    await page.fill('#filter-search', fName);
+
+    const row = page.locator('.student-row', { hasText: fName });
+    await expect(row).toBeVisible();
+    await expect(row.locator('td:nth-child(4)')).toContainText('⚔️ Принц Персии');
+
+    await row.locator('.view-log-btn').click();
+    await expect(page.locator('#modal-level-cards')).toContainText('Prince of Persia (1989)');
+    await expect(page.locator('#modal-level-cards')).toContainText('Покорен');
   });
 });

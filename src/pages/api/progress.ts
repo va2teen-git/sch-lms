@@ -71,8 +71,17 @@ export const GET: APIRoute = async ({ request }) => {
 
     const normalLevels = new Set();
     const hardcoreLevels = new Set();
+    let princeCompleted = false;
 
     rows.forEach((row: any) => {
+      const mName = String(row.mission_name || '');
+      const isPrince = mName.includes('Prince of Persia') || row.action_type === 'prince_complete';
+      if (isPrince) {
+        if (row.action_type === 'level_complete' || row.action_type === 'prince_complete') {
+          princeCompleted = true;
+        }
+        return;
+      }
       if (row.action_type === 'hardcore_reset' && row.is_hardcore === 1) {
         hardcoreLevels.clear();
       }
@@ -98,7 +107,8 @@ export const GET: APIRoute = async ({ request }) => {
       unlockedNormal,
       unlockedHardcore,
       isNormalCompleted,
-      isHardcoreCompleted
+      isHardcoreCompleted,
+      princeCompleted
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

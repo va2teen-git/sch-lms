@@ -44,9 +44,23 @@ const matrixCourses = [...coursesData]
 <Layout title="Матрица уроков | Школьная Платформа">
   <div class="h-screen flex flex-col bg-gray-100 overflow-hidden">
     <header class="bg-white border-b border-gray-300 px-3 sm:px-4 py-2 flex items-center justify-between gap-3 shrink-0">
-      <div class="flex items-baseline gap-2 min-w-0">
-        <h1 class="text-base sm:text-lg font-bold tracking-tight text-gray-900 truncate">Матрица уроков</h1>
-        <span class="hidden md:inline text-xs text-gray-500">выберите класс и номер урока</span>
+      <div class="flex items-center gap-3 min-w-0">
+        <h1 class="text-base sm:text-lg font-bold tracking-tight text-gray-900 shrink-0">Матрица уроков</h1>
+        <div class="hidden lg:flex items-center gap-2.5 text-[11px] text-gray-600 border-l border-gray-300 pl-3 select-none">
+          <span class="inline-flex items-center gap-1" title="Остановился на Уровне 1">
+            <span class="w-2.5 h-2.5 bg-emerald-500 border border-emerald-700 inline-block"></span>Ур.1
+          </span>
+          <span class="inline-flex items-center gap-1" title="Остановился на Уровне 2">
+            <span class="w-2.5 h-2.5 bg-amber-500 border border-amber-700 inline-block"></span>Ур.2
+          </span>
+          <span class="inline-flex items-center gap-1" title="Остановился на Уровне 3">
+            <span class="w-2.5 h-2.5 bg-red-500 border border-red-700 inline-block"></span>Ур.3
+          </span>
+          <span title="Урок пройден">✅ Сдан</span>
+          <span title="Пройден в режиме Хардкор">💀 Хардкор</span>
+          <span title="Пройден бонусный уровень Prince of Persia">⚔️ Принц</span>
+          <span title="Пройден Лого-Шторм">⚡ Лого-Шторм</span>
+        </div>
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -76,17 +90,20 @@ const matrixCourses = [...coursesData]
                   href={`/lesson/${course.slug}/${lesson.id}`}
                   data-course={course.slug}
                   data-lesson={lesson.id}
+                  data-ready={lesson.ready ? '1' : '0'}
+                  data-base-title={`${course.name} • Урок ${lesson.id}: ${lesson.topic}`}
                   title={`${course.name} • Урок ${lesson.id}: ${lesson.topic}`}
                   class={
                     lesson.ready
-                      ? 'w-[132px] h-[58px] p-1.5 flex flex-col justify-between bg-white border border-gray-300 text-gray-900 hover:border-blue-600 hover:bg-blue-50/40 transition-colors shrink-0'
-                      : 'w-[132px] h-[58px] p-1.5 flex flex-col justify-between bg-gray-50 border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-700 hover:bg-white transition-colors shrink-0'
+                      ? 'lesson-card w-[144px] h-[60px] p-1.5 flex flex-col justify-between bg-white border border-gray-300 text-gray-900 hover:border-blue-600 hover:bg-blue-50/40 transition-colors shrink-0'
+                      : 'lesson-card w-[144px] h-[60px] p-1.5 flex flex-col justify-between bg-gray-50 border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-700 hover:bg-white transition-colors shrink-0'
                   }
                 >
                   <div class="flex items-center justify-between gap-1 text-[10px] leading-none">
-                    <span class={lesson.ready ? 'font-semibold text-gray-500 uppercase truncate' : 'font-medium text-gray-400 uppercase truncate'}>
+                    <span class={lesson.ready ? 'font-semibold text-gray-500 uppercase truncate shrink-0' : 'font-medium text-gray-400 uppercase truncate shrink-0'}>
                       {course.shortLabel}
                     </span>
+                    <span class="card-status-badges flex items-center gap-0.5 text-[10px] leading-none truncate"></span>
                     <span class={lesson.ready ? 'font-mono font-bold text-blue-700 shrink-0' : 'font-mono font-semibold text-gray-400 shrink-0'}>
                       №{lesson.id}
                     </span>
@@ -137,6 +154,92 @@ const matrixCourses = [...coursesData]
         { passive: false }
       );
     }
+
+    async function loadMatrixProgress() {
+      try {
+        const res = await fetch(
+          `/api/matrix-progress?firstName=${encodeURIComponent(firstName!)}&lastName=${encodeURIComponent(lastName!)}&className=${encodeURIComponent(studentClass!)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const lessons = data?.lessons || {};
+
+        const cards = document.querySelectorAll<HTMLAnchorElement>('.lesson-card');
+        cards.forEach((card) => {
+          const cSlug = card.dataset.course;
+          const lId = card.dataset.lesson;
+          if (!cSlug || !lId) return;
+
+          const info = lessons[`${cSlug}::${lId}`];
+          if (!info) return;
+
+          const badgesEl = card.querySelector('.card-status-badges');
+          const statusParts: string[] = [];
+
+          // Apply level color when stopped in progress, or completed style when finished
+          if (info.completed) {
+            card.className =
+              'lesson-card w-[144px] h-[60px] p-1.5 flex flex-col justify-between bg-sky-50 border-2 border-sky-600 text-gray-900 hover:bg-sky-100/70 transition-colors shrink-0';
+            card.dataset.progressState = 'completed';
+            statusParts.push('Урок сдан');
+          } else if (info.stoppedLevel === 1) {
+            card.className =
+              'lesson-card w-[144px] h-[60px] p-1.5 flex flex-col justify-between bg-emerald-50 border-2 border-emerald-500 text-emerald-950 hover:bg-emerald-100/70 transition-colors shrink-0';
+            card.dataset.progressState = 'stopped-1';
+            statusParts.push('Остановился на Уровне 1');
+          } else if (info.stoppedLevel === 2) {
+            card.className =
+              'lesson-card w-[144px] h-[60px] p-1.5 flex flex-col justify-between bg-amber-50 border-2 border-amber-500 text-amber-950 hover:bg-amber-100/70 transition-colors shrink-0';
+            card.dataset.progressState = 'stopped-2';
+            statusParts.push('Остановился на Уровне 2');
+          } else if (info.stoppedLevel === 3) {
+            card.className =
+              'lesson-card w-[144px] h-[60px] p-1.5 flex flex-col justify-between bg-red-50 border-2 border-red-500 text-red-950 hover:bg-red-100/70 transition-colors shrink-0';
+            card.dataset.progressState = 'stopped-3';
+            statusParts.push('Остановился на Уровне 3');
+          }
+
+          if (badgesEl) {
+            let badgesHtml = '';
+            if (info.completed) {
+              badgesHtml += '<span title="Урок пройден">✅</span>';
+            } else if (info.stoppedLevel > 0) {
+              const lvlBadgeColor =
+                info.stoppedLevel === 1
+                  ? 'bg-emerald-600 text-white'
+                  : info.stoppedLevel === 2
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-red-600 text-white';
+              badgesHtml += `<span class="px-1 py-0 text-[9px] font-bold ${lvlBadgeColor}" title="Текущий уровень">Ур.${info.stoppedLevel}</span>`;
+            }
+
+            if (info.hardcoreCompleted) {
+              badgesHtml += '<span title="Пройден в режиме Хардкор">💀</span>';
+              statusParts.push('💀 Хардкор');
+            }
+            if (info.princeCompleted) {
+              badgesHtml += '<span title="Пройден бонусный уровень Prince of Persia">⚔️</span>';
+              statusParts.push('⚔️ Prince of Persia');
+            }
+            if (info.sprintCompleted) {
+              badgesHtml += '<span title="Пройден Лого-Шторм">⚡</span>';
+              statusParts.push('⚡ Лого-Шторм');
+            }
+
+            badgesEl.innerHTML = badgesHtml;
+          }
+
+          const baseTitle = card.dataset.baseTitle || card.title;
+          if (statusParts.length > 0) {
+            card.title = `${baseTitle} [${statusParts.join(' • ')}]`;
+          }
+        });
+      } catch (e) {
+        console.warn('Matrix progress fetch failed:', e);
+      }
+    }
+
+    loadMatrixProgress();
 
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
