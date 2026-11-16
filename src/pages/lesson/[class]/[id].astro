@@ -17,7 +17,39 @@ if (!course || !lesson) {
   return Astro.redirect('/courses');
 }
 
-const princeBonusLevel = lesson?.princeBonusLevel ? parseInt(lesson.princeBonusLevel, 10) : null;
+const rawPrinceBonus = lesson?.princeBonusLevel;
+let princeBonusLevel: number | null = null;
+let princeMaxLevel: number | null = null;
+
+if (typeof rawPrinceBonus === 'number' && Number.isFinite(rawPrinceBonus) && rawPrinceBonus > 0) {
+  princeBonusLevel = rawPrinceBonus;
+  princeMaxLevel = rawPrinceBonus;
+} else if (typeof rawPrinceBonus === 'string' && rawPrinceBonus.trim()) {
+  const parts = rawPrinceBonus
+    .split(/[-–:]/)
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n) && n > 0);
+  if (parts.length === 1) {
+    princeBonusLevel = parts[0];
+    princeMaxLevel = parts[0];
+  } else if (parts.length >= 2) {
+    princeBonusLevel = Math.min(parts[0], parts[1]);
+    princeMaxLevel = Math.max(parts[0], parts[1]);
+  }
+} else if (rawPrinceBonus && typeof rawPrinceBonus === 'object') {
+  const startLvl = parseInt(String(rawPrinceBonus.start ?? rawPrinceBonus.level ?? ''), 10);
+  const endLvl = parseInt(String(rawPrinceBonus.end ?? rawPrinceBonus.maxLevel ?? startLvl), 10);
+  if (!isNaN(startLvl) && startLvl > 0) {
+    princeBonusLevel = startLvl;
+    princeMaxLevel = !isNaN(endLvl) && endLvl >= startLvl ? endLvl : startLvl;
+  }
+}
+
+const princeIframeSrc = princeBonusLevel
+  ? (princeMaxLevel && princeMaxLevel > princeBonusLevel
+      ? `/static/prince/index.html?level=${princeBonusLevel}&minLevel=${princeBonusLevel}&maxLevel=${princeMaxLevel}&skipTitle=true`
+      : `/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true&minLevel=${princeBonusLevel}`)
+  : '';
 
 // Попытка загрузить теорию и извлечь термины для Лого-Шторма
 interface SprintTermItem {
@@ -214,7 +246,7 @@ const tasks = [
                   <span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО
                 </span>
                 <span class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs px-2 py-0.5 font-mono font-bold">
-                  УРОВЕНЬ {princeBonusLevel}
+                  {princeMaxLevel && princeMaxLevel > princeBonusLevel ? (<>УРОВНИ {princeBonusLevel}–{princeMaxLevel}</>) : (<>УРОВЕНЬ {princeBonusLevel}</>)}
                 </span>
               </div>
               <div class="text-lg font-bold text-amber-300 font-mono mb-1">
@@ -224,13 +256,13 @@ const tasks = [
                 «О доблестный путник! За твою непреклонную стойкость и чистый разум падишах дарует тебе ключ от древней сокровищницы...»
               </p>
               <p class="text-xs text-gray-300 font-mono mb-4 leading-relaxed">
-                За безупречное прохождение режима «Хардкор» вам открыт секретный Уровень {princeBonusLevel} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!
+                За безупречное прохождение режима «Хардкор» вам открыт секретный {princeMaxLevel && princeMaxLevel > princeBonusLevel ? `блок уровней ${princeBonusLevel}–${princeMaxLevel}` : `Уровень ${princeBonusLevel}`} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!
               </p>
               <button 
                 id="open-prince-btn" 
                 class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-sm font-mono transition-colors flex items-center justify-center gap-2 rounded-0 shadow"
               >
-                <span>▶ ЗАПУСТИТЬ УРОВЕНЬ {princeBonusLevel}</span>
+                <span>▶ {princeMaxLevel && princeMaxLevel > princeBonusLevel ? `ЗАПУСТИТЬ УРОВНИ ${princeBonusLevel}–${princeMaxLevel}` : `ЗАПУСТИТЬ УРОВЕНЬ ${princeBonusLevel}`}</span>
               </button>
             </div>
           )}
@@ -244,7 +276,7 @@ const tasks = [
               <div class="flex items-center gap-2">
                 <span class="text-amber-400">⚔️</span>
                 <span class="font-bold text-amber-300">PRINCE OF PERSIA (1989)</span>
-                <span class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">УРОВЕНЬ {princeBonusLevel}</span>
+                <span class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">{princeMaxLevel && princeMaxLevel > princeBonusLevel ? `УРОВНИ ${princeBonusLevel}–${princeMaxLevel}` : `УРОВЕНЬ ${princeBonusLevel}`}</span>
               </div>
               <div class="flex items-center gap-2">
                 <button id="prince-reload-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="Перезапустить уровень">
@@ -265,7 +297,7 @@ const tasks = [
             <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
               <iframe 
                 id="prince-game-iframe"
-                src={`/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true`}
+                src={princeIframeSrc}
                 class="w-full h-full border-0 absolute inset-0"
                 title="Prince of Persia"
                 allow="fullscreen; gamepad; autoplay"
@@ -310,7 +342,7 @@ const tasks = [
 
                 <div class="border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-mono text-amber-300 my-4 flex items-center justify-center gap-2">
                   <span>🔒</span>
-                  <span>ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1</span>
+                  <span>ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // {princeMaxLevel && princeMaxLevel > princeBonusLevel ? `ДОСТУПНЫ УРОВНИ ${princeBonusLevel}–${princeMaxLevel}` : `ДОСТУПЕН ТОЛЬКО УРОВЕНЬ ${princeBonusLevel}`}</span>
                   <span>🔒</span>
                 </div>
 
@@ -502,7 +534,7 @@ const tasks = [
   </div>
 </Layout>
 
-<script define:vars={{ classSlug, lessonId, princeBonusLevel, sprintTerms }}>
+<script define:vars={{ classSlug, lessonId, princeBonusLevel, princeMaxLevel, sprintTerms }}>
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
@@ -729,21 +761,35 @@ const tasks = [
   });
 
   const platformTimers = {};
+  let princeStartTime = null;
+  let princeVictorySent = false;
 
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (data && data.type === 'PRINCE_EVENT') {
       console.log('Received Prince event:', data);
       if (data.action === 'level_complete') {
-        const victoryModal = document.getElementById('prince-victory-modal');
-        const victoryLevelSpan = document.getElementById('prince-victory-level');
-        if (victoryLevelSpan && data.completedLevel) {
-          victoryLevelSpan.textContent = String(data.completedLevel);
+        const completedLvl = Number(data.completedLevel) || princeBonusLevel;
+        const targetMax = princeMaxLevel || princeBonusLevel;
+        const isFinalWin = !targetMax || completedLvl >= targetMax || data.nextLevel === null;
+
+        if (isFinalWin) {
+          const victoryModal = document.getElementById('prince-victory-modal');
+          const victoryLevelSpan = document.getElementById('prince-victory-level');
+          if (victoryLevelSpan) {
+            victoryLevelSpan.textContent = targetMax && princeBonusLevel && targetMax > princeBonusLevel
+              ? `${princeBonusLevel}–${targetMax}`
+              : String(completedLvl);
+          }
+          if (victoryModal) {
+            victoryModal.classList.remove('hidden');
+            victoryModal.classList.add('flex');
+          }
+          if (princeVictorySent) return;
+          princeVictorySent = true;
         }
-        if (victoryModal) {
-          victoryModal.classList.remove('hidden');
-          victoryModal.classList.add('flex');
-        }
+
+        const timeSpentSec = princeStartTime ? Math.max(1, Math.floor((Date.now() - princeStartTime) / 1000)) : 1;
 
         // Send telemetry for Prince bonus level completion
         fetch('/api/telemetry', {
@@ -755,10 +801,10 @@ const tasks = [
             student_class: localStorage.getItem('student_class'),
             course_slug: classSlug,
             lesson_id: lessonId,
-            mission_name: `${fullTitle} :: Prince of Persia (Уровень ${data.completedLevel || princeBonusLevel})`,
+            mission_name: `${fullTitle} :: Prince of Persia (Уровень ${completedLvl})`,
             action_type: 'level_complete',
             status: 'completed',
-            time_spent_sec: 60,
+            time_spent_sec: timeSpentSec,
             attempts_count: 1,
             success: true,
             is_hardcore: isHardcore,
@@ -767,6 +813,10 @@ const tasks = [
             attempt_mode: currentAttempt.mode
           })
         }).catch(err => console.error('Prince telemetry error:', err));
+
+        if (!isFinalWin) {
+          princeStartTime = Date.now();
+        }
       }
       return;
     }
@@ -933,6 +983,9 @@ const tasks = [
 
   if (openPrinceBtn && princeOverlay) {
     openPrinceBtn.addEventListener('click', () => {
+      if (!princeStartTime) {
+        princeStartTime = Date.now();
+      }
       princeOverlay.classList.remove('hidden');
       princeOverlay.classList.add('flex');
 
@@ -1033,6 +1086,8 @@ const tasks = [
 
   if (princeReloadBtn && princeIframe) {
     princeReloadBtn.addEventListener('click', () => {
+      princeStartTime = Date.now();
+      princeVictorySent = false;
       if (princeVictoryModal) {
         princeVictoryModal.classList.remove('flex');
         princeVictoryModal.classList.add('hidden');
@@ -1044,6 +1099,8 @@ const tasks = [
 
   if (princeRetryBtn && princeIframe) {
     princeRetryBtn.addEventListener('click', () => {
+      princeStartTime = Date.now();
+      princeVictorySent = false;
       if (princeVictoryModal) {
         princeVictoryModal.classList.remove('flex');
         princeVictoryModal.classList.add('hidden');

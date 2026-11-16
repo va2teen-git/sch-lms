@@ -24,6 +24,9 @@ PrinceJS.SKIP_CUTSCENES = false;
 
 PrinceJS.Init = function () {
   PrinceJS.currentLevel = 1;
+  PrinceJS.initialLevel = 1;
+  PrinceJS.minLevel = null;
+  PrinceJS.maxLevel = null;
   PrinceJS.maxHealth = 3;
   PrinceJS.currentHealth = null;
   PrinceJS.minutes = 60;
