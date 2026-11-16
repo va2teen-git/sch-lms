@@ -98,12 +98,19 @@ function parseLevel(missionName, actionType, rawLog) {
       const items = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
       for (const item of items) {
         if (item && typeof item === 'object') {
-          const tl = toPosInt(item.task_level ?? item.level_number ?? item.level);
+          const nested = item.payload && typeof item.payload === 'object' ? item.payload : null;
+          const tl = toPosInt(
+            item.task_level ?? item.level_number ?? item.level ??
+            (nested ? (nested.task_level ?? nested.level_number ?? nested.level) : null)
+          );
           if (tl && tl >= 1 && tl <= 3) return tl;
         }
       }
     } catch (e) {}
   }
+
+  // Legacy monolithic task.html fallback ("Урок 17: Сетевое администрирование :: Interactive Task")
+  if (/Interactive\s+Task/i.test(m)) return 1;
 
   return null;
 }
@@ -152,7 +159,7 @@ function parseLessonAndCourse(missionName, recordedClassName) {
     } else if (/Вредоносн/i.test(m)) {
       courseSlug = '10-класс_базовый';
       lessonId = '20';
-    } else if (/Сетевое\s+администрирование/i.test(m)) {
+    } else if (/Сетевое\s+администрирование/i.test(m) || /g10_adv_16/i.test(m)) {
       courseSlug = '10-класс_углубленный';
       lessonId = '17';
     } else if (/Основы\s+теории\s+игр/i.test(m)) {
