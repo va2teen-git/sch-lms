@@ -286,6 +286,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     phaseTimeLeft: 14.0,
                     phaseTimeTotal: 14.0,
                     timerInterval: null,
+                    resetTimeout: null,
+                    waveTimeout: null,
+                    telemetry: null,
 
                     // Данные активной волны
                     currentWaveData: {
@@ -323,6 +326,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             mounted() {
                 window.addEventListener('keydown', this.handleKeydown);
 
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: 'Урок 8 :: Табличные модели (Уровень 3 / Аркада)',
+                    level: 3,
+                    totalWaves: this.totalWaves,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        this.stopTimer();
+                        this.clearPendingTimeouts();
+                        this.alarmActive = false;
+                        this.alarmReason = '';
+                    },
+                    onAfkRetry: () => {
+                        this.alarmActive = false;
+                        this.alarmReason = '';
+                        if (this.gameState === 'playing') {
+                            this.generateAllWaves();
+                            this.telemetry.setWave(1, this.totalWaves);
+                            this.initWave(1);
+                        }
+                    }
+                });
+
                 // Экспорт глобального тестового API
                 const self = this;
                 window.__DEV_LEVEL3_STATE__ = {
@@ -339,43 +364,45 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             beforeUnmount() {
                 window.removeEventListener('keydown', this.handleKeydown);
                 this.stopTimer();
+                this.clearPendingTimeouts();
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
             },
 
             methods: {
-                sendTelemetry(actionType, isSuccess = false, overrideWave = null) {
-                    const timeSpent = Math.max(1, Math.round((Date.now() - (this.startTime || Date.now())) / 1000));
-                    const w = overrideWave || this.currentWave;
-                    const payload = {
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: 'Урок 8 :: Табличные модели (Уровень 3 / Аркада)',
-                        action_type: actionType,
-                        status: isSuccess ? 'completed' : 'in_progress',
-                        start_time: new Date(this.startTime || Date.now()).toISOString(),
-                        time_spent_sec: timeSpent,
-                        attempts_count: this.attempts,
-                        success: isSuccess,
-                        wave: w,
-                        total_waves: this.totalWaves,
-                        action_log: [{
-                            time: new Date().toISOString(),
-                            action: actionType,
-                            wave: w,
-                            total_waves: this.totalWaves
-                        }]
-                    };
-                    try {
-                        window.parent.postMessage(payload, '*');
-                    } catch (e) {
-                        console.warn('Telemetry error:', e);
+                clearPendingTimeouts() {
+                    if (this.resetTimeout) {
+                        clearTimeout(this.resetTimeout);
+                        this.resetTimeout = null;
+                    }
+                    if (this.waveTimeout) {
+                        clearTimeout(this.waveTimeout);
+                        this.waveTimeout = null;
                     }
                 },
 
                 startGame() {
+                    this.stopTimer();
+                    this.clearPendingTimeouts();
                     this.startTime = Date.now();
                     this.attempts = 0;
+                    this.alarmActive = false;
+                    this.alarmReason = '';
                     this.generateAllWaves();
                     this.gameState = 'playing';
-                    this.sendTelemetry('in_progress');
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalWaves,
+                            stage: 1,
+                            total_stages: this.totalWaves
+                        });
+                    }
                     this.initWave(1);
                 },
 
@@ -410,9 +437,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 initWave(waveNum) {
                     this.stopTimer();
+                    this.clearPendingTimeouts();
                     this.alarmActive = false;
                     this.alarmReason = '';
                     this.currentWave = waveNum;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(waveNum, this.totalWaves);
+                    }
 
                     const cfg = this.wavesList[waveNum - 1] || this.wavesList[0];
                     this.currentWaveData = { ...cfg };
@@ -503,10 +534,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     this.stopTimer();
                     const intervalMs = 100;
                     this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.phaseTimeLeft -= (intervalMs / 1000);
                         if (this.phaseTimeLeft <= 0) {
                             this.phaseTimeLeft = 0;
-                            this.triggerHardcoreReset('Время сеанса связи истекло! Протокол прерван.');
+                            this.triggerHardcoreReset('Время сеанса связи истекло! Протокол прерван.', true);
                         }
                     }, intervalMs);
                 },
@@ -548,7 +582,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 },
 
                 handleCellClick(r, c) {
+                    if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
                     if (!this.isCellClickable(r, c)) return;
+                    if (this.telemetry) this.telemetry.markActivity();
 
                     playSound('click');
                     const cell = this.matrix[r][c];
@@ -572,7 +608,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     // Проверка переполнения буфера
                     if (this.playerBuffer.length >= this.currentWaveData.bufferLimit) {
-                        this.triggerHardcoreReset('Буфер памяти переполнен мусорными данными!');
+                        this.triggerHardcoreReset('Буфер памяти переполнен мусорными данными!', false);
                     }
                 },
 
@@ -616,46 +652,73 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 completeWave() {
                     this.stopTimer();
+                    this.clearPendingTimeouts();
                     playSound('wave_complete');
 
                     if (this.currentWave >= this.totalWaves) {
                         this.finishLevel();
                     } else {
                         const nextWave = this.currentWave + 1;
-                        setTimeout(() => {
+                        this.waveTimeout = setTimeout(() => {
+                            if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                                return;
+                            }
                             this.initWave(nextWave);
-                            this.sendTelemetry('in_progress', false, nextWave);
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(nextWave);
+                            }
                         }, 500);
                     }
                 },
 
-                triggerHardcoreReset(reason) {
+                triggerHardcoreReset(reason, isTimeout = false) {
                     this.stopTimer();
+                    this.clearPendingTimeouts();
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentWave,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.alarmActive = false;
+                            this.alarmReason = '';
+                            return;
+                        }
+                    } else {
+                        this.attempts++;
+                    }
                     playSound('alarm');
-                    this.attempts++;
                     this.alarmActive = true;
                     this.alarmReason = reason;
-
-                    this.sendTelemetry('hardcore_reset', false);
 
                     // Перегенерация всех волн для нового забега
                     this.generateAllWaves();
 
-                    setTimeout(() => {
+                    this.resetTimeout = setTimeout(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.alarmActive = false;
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalWaves);
+                        }
                         this.initWave(1);
                     }, 1400);
                 },
 
                 finishLevel() {
                     this.stopTimer();
+                    this.clearPendingTimeouts();
                     this.gameState = 'victory';
                     this.totalTimeSec = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
-                    this.sendTelemetry('level_complete', true);
+                    if (this.telemetry) {
+                        this.telemetry.complete({ wave: this.totalWaves });
+                    }
                 },
 
                 handleKeydown(e) {
-                    if (this.gameState !== 'playing' || this.alarmActive) return;
+                    if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
 
                     // Цифры 1..6 для быстрого выбора в строке/столбце
                     const keyNum = parseInt(e.key, 10);

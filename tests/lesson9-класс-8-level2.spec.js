@@ -21,10 +21,10 @@ test.describe('9th Grade Lesson 8: Level 2 Task Suite (Analytical Calculations)'
     expect(code).toContain('id="phase4"');
     expect(code).toContain('id="phase5"');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 8 :: Табличные модели (Уровень 2)');
 
     // Zero-Style policy

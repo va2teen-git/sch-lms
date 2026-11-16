@@ -183,7 +183,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     phaseTimeLeft: 10.0,
                     maxPhaseTime: 10.0,
                     timerInterval: null,
+                    resetTimeout: null,
                     crashMessage: null,
+                    telemetry: null,
 
                     // Матрица и буфер
                     matrix: [],
@@ -280,34 +282,64 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 }
             },
 
-            methods: {
-                sendTelemetry(actionType, isSuccess = false) {
-                    const timeSpent = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: this.missionName,
-                        action_type: actionType,
-                        status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                        start_time: new Date(this.startTime).toISOString(),
-                        time_spent_sec: timeSpent,
-                        attempts_count: this.attempts,
-                        success: isSuccess,
-                        action_log: [{ wave: this.currentWave, action: actionType, time: timeSpent }]
-                    }, '*');
-                },
+            mounted() {
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: this.missionName,
+                    level: 3,
+                    totalWaves: this.totalWaves,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        clearInterval(this.timerInterval);
+                        clearTimeout(this.resetTimeout);
+                        this.crashMessage = null;
+                    },
+                    onAfkRetry: () => {
+                        this.crashMessage = null;
+                        if (this.gameState === 'playing') {
+                            this.telemetry.setWave(1, this.totalWaves);
+                            this.initWave(1);
+                        }
+                    }
+                });
+            },
 
+            beforeUnmount() {
+                clearInterval(this.timerInterval);
+                clearTimeout(this.resetTimeout);
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
+            },
+
+            methods: {
                 startGame() {
+                    clearTimeout(this.resetTimeout);
                     this.startTime = Date.now();
                     this.attempts = 0;
                     this.gameState = 'playing';
-                    this.sendTelemetry('in_progress');
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalWaves,
+                            stage: 1,
+                            total_stages: this.totalWaves
+                        });
+                    }
                     this.initWave(1);
                 },
 
                 initWave(waveNum) {
                     clearInterval(this.timerInterval);
+                    clearTimeout(this.resetTimeout);
                     this.currentWave = waveNum;
                     this.crashMessage = null;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(waveNum, this.totalWaves);
+                    }
 
                     const cfg = this.wavesCatalog[waveNum - 1];
                     this.currentWaveData = { ...cfg };
@@ -328,10 +360,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                     // Запуск таймера убывания
                     this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || this.crashMessage || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.phaseTimeLeft -= 0.1;
                         if (this.phaseTimeLeft <= 0) {
                             this.phaseTimeLeft = 0;
-                            this.handleFailure('Таймер исчерпан! Канал нейроматрицы заблокирован.');
+                            this.handleFailure('Таймер исчерпан! Канал нейроматрицы заблокирован.', true);
                         }
                     }, 100);
                 },
@@ -421,7 +456,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 },
 
                 handleCellClick(r, c) {
+                    if (this.gameState !== 'playing' || this.crashMessage || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
                     if (!this.isCellClickable(r, c)) return;
+                    if (this.telemetry) this.telemetry.markActivity();
 
                     const cell = this.matrix[r][c];
                     this.usedCells[`${r},${c}`] = true;
@@ -434,16 +471,22 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                         if (this.currentWave >= this.totalWaves) {
                             // Финал хардкора!
                             this.gameState = 'victory';
-                            this.sendTelemetry('level_complete', true);
+                            if (this.telemetry) {
+                                this.telemetry.complete({ wave: this.totalWaves });
+                            }
                         } else {
-                            this.initWave(this.currentWave + 1);
+                            const nextWave = this.currentWave + 1;
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(nextWave);
+                            }
+                            this.initWave(nextWave);
                         }
                         return;
                     }
 
                     // Проверяем переполнение буфера
                     if (this.playerBuffer.length >= this.bufferLimit) {
-                        this.handleFailure('Буфер памяти переполнен мусорными токенами! Аварийный сброс.');
+                        this.handleFailure('Буфер памяти переполнен мусорными токенами! Аварийный сброс.', false);
                         return;
                     }
 
@@ -504,15 +547,33 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     return 0;
                 },
 
-                handleFailure(reason) {
+                handleFailure(reason, isTimeout = false) {
                     clearInterval(this.timerInterval);
-                    this.attempts++;
+                    clearTimeout(this.resetTimeout);
+                    if (this.telemetry) {
+                        const sent = this.telemetry.hardcoreReset({
+                            wave: this.currentWave,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.crashMessage = null;
+                            return;
+                        }
+                    } else {
+                        this.attempts++;
+                    }
                     this.crashMessage = reason;
-                    this.sendTelemetry('hardcore_reset', false);
 
                     // Задержка 1.5 сек и жесткий сброс на волну 1!
-                    setTimeout(() => {
+                    this.resetTimeout = setTimeout(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
                         this.crashMessage = null;
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalWaves);
+                        }
                         this.initWave(1);
                     }, 1500);
                 }

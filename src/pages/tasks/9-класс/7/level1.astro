@@ -133,27 +133,16 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     <script is:inline>
         (function() {
             const missionName = 'Урок 7 :: Модели и моделирование. Классификации моделей (Уровень 1)';
-            const startTime = Date.now();
-            let attempts = 0;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 1,
+                totalStages: 3
+            });
             let currentPhase = 1;
             let activeCardsData = [];
             let selectedCardElement = null;
-
-            // Телеметрия
-            function sendTelemetry(actionType, isSuccess = false) {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: actionType,
-                    status: actionType === 'level_complete' ? 'completed' : 'in_progress',
-                    start_time: new Date(startTime).toISOString(),
-                    time_spent_sec: timeSpent,
-                    attempts_count: attempts,
-                    success: isSuccess,
-                    action_log: [{ phase: currentPhase, action: actionType, time: timeSpent }]
-                }, '*');
-            }
+            let isResetting = false;
+            let isCompleted = false;
 
             // Банк заданий по трем фазам в соответствии с учебником Полякова
             const phaseConfigs = {
@@ -494,6 +483,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Валидация решения текущей фазы
             document.getElementById('verify-btn').addEventListener('click', () => {
+                if (isResetting || isCompleted) return;
+                telemetry.markActivity();
+
                 const b1Cards = Array.from(document.querySelector('#bucket-1 .bucket-slot').children);
                 const b2Cards = Array.from(document.querySelector('#bucket-2 .bucket-slot').children);
                 const b3Cards = Array.from(document.querySelector('#bucket-3 .bucket-slot').children);
@@ -509,7 +501,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     // Успешное завершение шага
                     if (currentPhase < 3) {
                         currentPhase++;
-                        sendTelemetry('in_progress');
+                        telemetry.advanceStage(currentPhase);
                         renderPhase(currentPhase);
                     } else {
                         // Завершение всех 3 фаз
@@ -517,9 +509,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     }
                 } else {
                     // Ошибка классификации
-                    attempts++;
-                    document.getElementById('attempts-display').textContent = attempts;
-                    sendTelemetry('hardcore_reset');
+                    isResetting = true;
+                    telemetry.hardcoreReset({ stage: currentPhase });
+                    document.getElementById('attempts-display').textContent = telemetry.getState().attemptsCount;
 
                     const feedbackBox = document.getElementById('feedback-box');
                     feedbackBox.classList.remove('d-none');
@@ -528,6 +520,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     // Задержка 1.2 сек и процедурная перегенерация текущего шага
                     setTimeout(() => {
                         feedbackBox.classList.add('d-none');
+                        isResetting = false;
                         renderPhase(currentPhase);
                     }, 1200);
                 }
@@ -535,11 +528,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
             // Финал уровня 1
             function finishLevel() {
-                const timeSpent = Math.max(1, Math.floor((Date.now() - startTime) / 1000));
-                sendTelemetry('level_complete', true);
+                if (isCompleted) return;
+                isCompleted = true;
+                const evt = telemetry.complete({ stage: 3 });
+                const st = telemetry.getState();
+                const timeSpent = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
 
                 document.getElementById('final-time').textContent = timeSpent;
-                document.getElementById('final-attempts').textContent = attempts;
+                document.getElementById('final-attempts').textContent = st.attemptsCount;
 
                 // Скрыть интерактивные блоки, показать экран успеха
                 document.getElementById('buckets-row').classList.add('d-none');
@@ -552,7 +548,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             setupDropZones();
             setupClickDelegation();
             renderPhase(1);
-            sendTelemetry('in_progress');
         })();
     </script>
 </TaskLayout>
