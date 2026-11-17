@@ -19,9 +19,11 @@ const sortedCourses = [...courses].sort(
 
 <Layout title="Вход | Школьная Платформа">
   <div class="flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 shadow-md w-full max-w-md border border-gray-300">
-      <h1 class="text-2xl font-bold mb-6 text-center">Вход в систему</h1>
-      
+    <div id="login-card" class="bg-white p-8 shadow-md w-full max-w-md border border-gray-300 transition-transform duration-300">
+      <h1 id="login-title" class="text-2xl font-bold mb-6 text-center select-none">Вход в систему</h1>
+
+      <div id="login-easter-banner" class="hidden mb-4 p-3 border text-sm font-mono"></div>
+
       <form id="login-form" class="space-y-4">
         <div>
           <label for="firstName" class="block text-sm font-medium text-gray-700">Имя</label>
@@ -43,28 +45,205 @@ const sortedCourses = [...courses].sort(
           </select>
         </div>
 
-        <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 hover:bg-blue-700 transition-colors">
+        <button id="login-submit" type="submit" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 hover:bg-blue-700 transition-colors">
           Войти
         </button>
       </form>
+
+      <p id="login-easter-hint" class="hidden mt-4 text-xs text-gray-500 text-center font-mono">
+        Пасхалка активна: некоторые имена и секретные комбинации вызывают особую реакцию системы...
+      </p>
     </div>
   </div>
+
+  <div id="screamer-overlay" class="hidden fixed inset-0 z-[99999] w-screen h-screen bg-black overflow-hidden select-none">
+    <img id="screamer-image" src="/static/screamer-face.jpg" alt="" class="w-full h-full object-cover object-center pointer-events-none select-none" />
+    <div id="screamer-flash" class="fixed inset-0 pointer-events-none opacity-0"></div>
+  </div>
+
+  <button
+    id="screamer-close"
+    type="button"
+    tabindex="-1"
+    aria-label="Закрыть"
+    class="hidden fixed top-0 right-0 z-[100000] w-14 h-14 flex items-center justify-center opacity-0 bg-transparent text-transparent border-0 p-0 m-0 cursor-default select-none focus:outline-none"
+  >
+    ×
+  </button>
 </Layout>
 
 <script>
-  const form = document.getElementById('login-form');
-  
+  import {
+    detectLoginEasterEgg,
+    playToneCue,
+    ScreamerController,
+  } from '../lib/login-easter-eggs';
+
+  const form = document.getElementById('login-form') as HTMLFormElement | null;
+  const loginCard = document.getElementById('login-card');
+  const loginTitle = document.getElementById('login-title');
+  const banner = document.getElementById('login-easter-banner');
+  const hint = document.getElementById('login-easter-hint');
+  const submitBtn = document.getElementById('login-submit') as HTMLButtonElement | null;
+
+  const screamerOverlay = document.getElementById('screamer-overlay');
+  const screamerImage = document.getElementById('screamer-image');
+  const screamerFlash = document.getElementById('screamer-flash');
+  const screamerClose = document.getElementById('screamer-close') as HTMLButtonElement | null;
+
+  const screamer =
+    screamerOverlay && screamerImage && screamerFlash && screamerClose
+      ? new ScreamerController({
+          overlay: screamerOverlay,
+          image: screamerImage,
+          flash: screamerFlash,
+          closeButton: screamerClose,
+        })
+      : null;
+
+  if (screamerClose && screamer) {
+    screamerClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      screamer.stop();
+    });
+  }
+
+  if (screamerOverlay) {
+    screamerOverlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  function showBanner(text: string, variant: 'danger' | 'matrix' | 'legend' | 'ai' | 'konami'): void {
+    if (!banner) return;
+    const styles: Record<typeof variant, string> = {
+      danger: 'mb-4 p-3 border border-red-500 bg-red-50 text-red-800 text-sm font-mono',
+      matrix: 'mb-4 p-3 border border-green-500 bg-black text-green-400 text-sm font-mono',
+      legend: 'mb-4 p-3 border border-amber-500 bg-amber-50 text-amber-900 text-sm font-mono',
+      ai: 'mb-4 p-3 border border-cyan-500 bg-cyan-50 text-cyan-900 text-sm font-mono',
+      konami: 'mb-4 p-3 border border-purple-500 bg-purple-50 text-purple-900 text-sm font-mono',
+    };
+    banner.className = styles[variant];
+    banner.textContent = text;
+  }
+
+  function shakeCard(): void {
+    if (!loginCard || typeof loginCard.animate !== 'function') return;
+    loginCard.animate(
+      [
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-10px)' },
+        { transform: 'translateX(10px)' },
+        { transform: 'translateX(-8px)' },
+        { transform: 'translateX(8px)' },
+        { transform: 'translateX(0)' },
+      ],
+      { duration: 320, easing: 'ease-in-out' }
+    );
+  }
+
+  // Secret 5-click hint on the login heading
+  let titleClicks = 0;
+  let titleResetTimer: number | null = null;
+  if (loginTitle && hint) {
+    loginTitle.addEventListener('click', () => {
+      titleClicks += 1;
+      if (titleResetTimer !== null) window.clearTimeout(titleResetTimer);
+      titleResetTimer = window.setTimeout(() => {
+        titleClicks = 0;
+      }, 1500);
+
+      if (titleClicks >= 5) {
+        titleClicks = 0;
+        hint.classList.remove('hidden');
+        shakeCard();
+      }
+    });
+  }
+
+  // Secret Konami code flips the login card upside down
+  const konamiSequence = [
+    'ArrowUp',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowLeft',
+    'ArrowRight',
+    'b',
+    'a',
+  ];
+  let konamiPos = 0;
+  window.addEventListener('keydown', (e) => {
+    if (screamer?.isActive()) return;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (key === konamiSequence[konamiPos]) {
+      konamiPos += 1;
+      if (konamiPos === konamiSequence.length) {
+        konamiPos = 0;
+        if (loginCard) {
+          const flipped = loginCard.classList.toggle('rotate-180');
+          showBanner(
+            flipped
+              ? 'Антигравитация активирована! Попробуй войти вверх ногами.'
+              : 'Гравитация восстановлена.',
+            'konami'
+          );
+        }
+      }
+    } else {
+      konamiPos = key === konamiSequence[0] ? 1 : 0;
+    }
+  });
+
   if (form) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const firstName = (document.getElementById('firstName') as HTMLInputElement).value.trim();
       const lastName = (document.getElementById('lastName') as HTMLInputElement).value.trim();
       const className = (document.getElementById('classSelect') as HTMLSelectElement).value.trim();
-      
+
+      const egg = detectLoginEasterEgg(firstName, lastName);
+
+      if (egg?.kind === 'screamer') {
+        screamer?.start();
+        return;
+      }
+
+      if (egg?.kind === 'blocked-admin') {
+        playToneCue('blocked');
+        showBanner(egg.message, 'danger');
+        shakeCard();
+        return;
+      }
+
       localStorage.setItem('student_firstName', firstName);
       localStorage.setItem('student_lastName', lastName);
       localStorage.setItem('student_class', className);
-      
+
+      if (egg) {
+        if (submitBtn) submitBtn.disabled = true;
+        if (egg.kind === 'matrix') {
+          playToneCue('matrix');
+          if (loginCard) {
+            loginCard.classList.remove('bg-white', 'border-gray-300');
+            loginCard.classList.add('bg-black', 'text-green-400', 'border-green-500');
+          }
+          showBanner(egg.message, 'matrix');
+        } else if (egg.kind === 'legend') {
+          playToneCue('legend');
+          showBanner(egg.message, 'legend');
+        } else if (egg.kind === 'ai-uprising') {
+          playToneCue('ai');
+          showBanner(egg.message, 'ai');
+        }
+        window.setTimeout(() => {
+          window.location.href = '/courses';
+        }, 1400);
+        return;
+      }
+
       window.location.href = '/courses';
     });
   }
