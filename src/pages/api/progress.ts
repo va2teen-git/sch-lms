@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import Database from 'better-sqlite3';
 import path from 'path';
+import { getLessonProgressSnapshot, getStudentPrinceProgress } from '../../lib/prince-progress';
 
 export const GET: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
@@ -17,109 +18,44 @@ export const GET: APIRoute = async ({ request }) => {
   let db;
   try {
     db = new Database(dbPath, { readonly: true });
-    
-    const courseSlug = url.searchParams.get('courseSlug');
-    const lessonId = url.searchParams.get('lessonId');
 
+    const courseSlug = url.searchParams.get('courseSlug')?.trim() || null;
+    const lessonId = url.searchParams.get('lessonId')?.trim() || null;
     const trimmedPrefix = lessonPrefix.trim();
-    let rows: any[];
-    if (courseSlug && lessonId) {
-      rows = db.prepare(`
-        SELECT action_type, mission_name, is_hardcore, level_number, status, success 
-        FROM telemetry 
-        WHERE (first_name = ? AND last_name = ?)
-          AND (student_class = ? OR class_name = ?)
-          AND (
-            (course_slug = ? AND lesson_id = ?)
-            OR (
-              (course_slug IS NULL OR course_slug = '')
-              AND (mission_name = ? OR mission_name LIKE ? OR mission_name LIKE ? OR mission_name LIKE ?)
-            )
-          )
-        ORDER BY timestamp ASC
-      `).all(
-        firstName.trim(),
-        lastName.trim(),
-        className.trim(),
-        className.trim(),
-        courseSlug.trim(),
-        lessonId.trim(),
-        trimmedPrefix,
-        `${trimmedPrefix} %`,
-        `${trimmedPrefix}:%`,
-        `%${trimmedPrefix} %`
-      );
-    } else {
-      rows = db.prepare(`
-        SELECT action_type, mission_name, is_hardcore, level_number, status, success 
-        FROM telemetry 
-        WHERE (first_name = ? AND last_name = ?)
-          AND (student_class = ? OR class_name = ?)
-          AND (mission_name = ? OR mission_name LIKE ? OR mission_name LIKE ? OR mission_name LIKE ?)
-        ORDER BY timestamp ASC
-      `).all(
-        firstName.trim(),
-        lastName.trim(),
-        className.trim(),
-        className.trim(),
-        trimmedPrefix,
-        `${trimmedPrefix} %`,
-        `${trimmedPrefix}:%`,
-        `%${trimmedPrefix} %`
-      );
-    }
 
-    const normalLevels = new Set();
-    const hardcoreLevels = new Set();
-    let princeCompleted = false;
-
-    rows.forEach((row: any) => {
-      const mName = String(row.mission_name || '');
-      const isPrince = mName.includes('Prince of Persia') || row.action_type === 'prince_complete';
-      if (isPrince) {
-        if (row.action_type === 'level_complete' || row.action_type === 'prince_complete') {
-          princeCompleted = true;
-        }
-        return;
-      }
-      if (row.action_type === 'hardcore_reset' && row.is_hardcore === 1) {
-        hardcoreLevels.clear();
-      }
-      if (row.action_type === 'normal_reset' && row.is_hardcore === 0) {
-        normalLevels.clear();
-      }
-      const isLegacyComplete = row.action_type === '' && row.status === 'completed' && row.success === 1;
-      if (row.action_type === 'level_complete' || row.action_type === 'task_completed' || isLegacyComplete) {
-        let lvlKey = mName;
-        if (row.level_number === 1 || row.level_number === 2 || row.level_number === 3) {
-          lvlKey = `lvl_${row.level_number}`;
-        } else if (/Уровень\s*1/i.test(mName) || /\(Базовый\)/i.test(mName)) {
-          lvlKey = 'lvl_1';
-        } else if (/Уровень\s*2/i.test(mName)) {
-          lvlKey = 'lvl_2';
-        } else if (/Уровень\s*3/i.test(mName) || /10\s*волн/i.test(mName)) {
-          lvlKey = 'lvl_3';
-        }
-        if (row.is_hardcore === 1) {
-          hardcoreLevels.add(lvlKey);
-        } else {
-          normalLevels.add(lvlKey);
-        }
-      }
+    const snapshot = getLessonProgressSnapshot(db, {
+      firstName,
+      lastName,
+      className,
+      courseSlug,
+      lessonId,
+      lessonPrefix: trimmedPrefix
     });
 
-    const isNormalCompleted = normalLevels.size >= 3;
-    const isHardcoreCompleted = hardcoreLevels.size >= 3;
-    
-    const unlockedNormal = Math.min(4, normalLevels.size + 1);
-    const unlockedHardcore = Math.min(4, hardcoreLevels.size + 1);
+    const parsedLessonId = trimmedPrefix.match(/Урок\s+(\d+)/i)?.[1] ?? null;
+    const effectiveCourseSlug = courseSlug || className.trim();
+    const effectiveLessonId = lessonId || parsedLessonId;
+
+    const princeProgress = getStudentPrinceProgress(db, {
+      firstName,
+      lastName,
+      className,
+      courseSlug: effectiveCourseSlug,
+      lessonId: effectiveLessonId,
+      eligibleForHardcoreBonus: snapshot.isHardcoreCompleted
+    });
+
+    const princeCompleted = Boolean(
+      snapshot.princeCompletedFromTelemetry || princeProgress.lessonStageCompleted !== null
+    );
 
     return new Response(JSON.stringify({
-      unlockedNormal,
-      unlockedHardcore,
-      isNormalCompleted,
-      isHardcoreCompleted,
-      princeCompleted
+      unlockedNormal: snapshot.unlockedNormal,
+      unlockedHardcore: snapshot.unlockedHardcore,
+      isNormalCompleted: snapshot.isNormalCompleted,
+      isHardcoreCompleted: snapshot.isHardcoreCompleted,
+      princeCompleted,
+      princeProgress
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

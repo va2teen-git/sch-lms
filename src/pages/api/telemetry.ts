@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import Database from 'better-sqlite3';
 import path from 'path';
+import { ensurePrinceProgressSchema, getLessonProgressSnapshot } from '../../lib/prince-progress';
+import { getNextCampaignStage, getTotalCampaignStages } from '../../lib/prince-campaign';
 
 // Initialize DB
 const dbPath = path.join(process.cwd(), 'telemetry.db');
@@ -82,6 +84,8 @@ try {
   // Indexes might already exist, ignore
 }
 
+ensurePrinceProgressSchema(db);
+
 export const POST: APIRoute = async ({ request }) => {
   if (request.headers.get('Content-Type') === 'application/json') {
     try {
@@ -160,6 +164,197 @@ export const POST: APIRoute = async ({ request }) => {
       }
       if (!courseSlug && sClass && sClass !== 'Unknown') {
         courseSlug = sClass;
+      }
+
+      const isPrinceCompletion =
+        (aType === 'prince_complete' && body.success !== false && body.success !== 0) ||
+        (mName.includes('Prince of Persia') &&
+          isSuccess === 1 &&
+          (aType === 'level_complete' || aType === 'prince_complete' || aType === 'task_completed' || aType === ''));
+
+      if (isPrinceCompletion) {
+        if (!courseSlug || !lessonId) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Missing course_slug or lesson_id for Prince completion' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const requestedStage = parseOptInt(body.stage_current ?? body.stage);
+        let requestedMapLevel = parseOptInt(body.map_level);
+        if (requestedMapLevel === null && levelNum !== null && !isNaN(levelNum) && levelNum > 0) {
+          requestedMapLevel = levelNum;
+        }
+        if (requestedMapLevel === null && requestedStage === null && mName) {
+          const lvlMatch = mName.match(/Prince of Persia\s*\(Уровень\s*(\d+)\)/i);
+          if (lvlMatch) {
+            requestedMapLevel = parseOptInt(lvlMatch[1]);
+          }
+        }
+
+        const handlePrinceTx = db.transaction(() => {
+          const snapshot = getLessonProgressSnapshot(db, {
+            firstName: fName,
+            lastName: lName,
+            className: sClass,
+            courseSlug,
+            lessonId
+          });
+
+          if (!snapshot.isHardcoreCompleted) {
+            return {
+              status: 403,
+              payload: { success: false, error: 'Hardcore mode not completed for this lesson' }
+            };
+          }
+
+          const progressRows = db.prepare(`
+            SELECT course_slug, lesson_id, stage, map_level
+            FROM prince_progress
+            WHERE first_name = ? AND last_name = ? AND student_class = ?
+            ORDER BY stage ASC
+          `).all(fName, lName, sClass) as Array<{
+            course_slug: string;
+            lesson_id: string;
+            stage: number;
+            map_level: number;
+          }>;
+
+          const existingLessonRow = progressRows.find(
+            (r) => r.course_slug === courseSlug && r.lesson_id === lessonId
+          );
+
+          if (existingLessonRow) {
+            const completedStage = Number(existingLessonRow.stage);
+            const completedMapLevel = Number(existingLessonRow.map_level);
+            if (requestedStage !== null && requestedStage !== completedStage) {
+              return {
+                status: 409,
+                payload: {
+                  success: false,
+                  error: 'Stage already completed for this lesson (1 lesson = 1 stage)',
+                  lessonStageCompleted: completedStage
+                }
+              };
+            }
+            if (requestedMapLevel !== null && requestedMapLevel !== completedMapLevel) {
+              return {
+                status: 409,
+                payload: {
+                  success: false,
+                  error: 'Stage already completed for this lesson (1 lesson = 1 stage)',
+                  lessonStageCompleted: completedStage,
+                  lessonMapLevel: completedMapLevel
+                }
+              };
+            }
+            return {
+              status: 200,
+              payload: {
+                success: true,
+                idempotent: true,
+                stage: completedStage,
+                mapLevel: completedMapLevel
+              }
+            };
+          }
+
+          const completedStages = progressRows.map((r) => Number(r.stage));
+          const expectedStage = getNextCampaignStage(completedStages);
+          if (!expectedStage) {
+            return {
+              status: 409,
+              payload: {
+                success: false,
+                error: 'All Prince campaign stages already completed',
+                campaignFinished: true
+              }
+            };
+          }
+
+          if (requestedStage !== null && requestedStage !== expectedStage.stage) {
+            return {
+              status: 409,
+              payload: {
+                success: false,
+                error: 'Unexpected stage for Prince campaign',
+                expectedStage: expectedStage.stage,
+                requestedStage
+              }
+            };
+          }
+
+          if (requestedMapLevel !== null && requestedMapLevel !== expectedStage.mapLevel) {
+            return {
+              status: 409,
+              payload: {
+                success: false,
+                error: 'Unexpected map_level for Prince campaign',
+                expectedStage: expectedStage.stage,
+                expectedMapLevel: expectedStage.mapLevel,
+                requestedMapLevel
+              }
+            };
+          }
+
+          const totalStages = getTotalCampaignStages();
+          insert.run(
+            fName,
+            lName,
+            cName,
+            mName || `Урок ${lessonId} :: Prince of Persia (Этап ${expectedStage.stage})`,
+            aType,
+            sTime,
+            tSpent,
+            aCount,
+            1,
+            curStatus || 'completed',
+            aLog,
+            isHc,
+            sClass,
+            courseSlug,
+            lessonId,
+            levelNum,
+            attemptId,
+            attemptNum,
+            attemptMode,
+            stageCurrent ?? expectedStage.stage,
+            stageTotal ?? totalStages,
+            waveNumber
+          );
+
+          db.prepare(`
+            INSERT INTO prince_progress (
+              first_name, last_name, student_class, course_slug, lesson_id,
+              stage, map_level, time_spent_sec
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            fName,
+            lName,
+            sClass,
+            courseSlug,
+            lessonId,
+            expectedStage.stage,
+            expectedStage.mapLevel,
+            tSpent
+          );
+
+          return {
+            status: 200,
+            payload: {
+              success: true,
+              idempotent: false,
+              stage: expectedStage.stage,
+              mapLevel: expectedStage.mapLevel
+            }
+          };
+        });
+
+        const txResult = handlePrinceTx();
+        return new Response(JSON.stringify(txResult.payload), {
+          status: txResult.status,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
       insert.run(
