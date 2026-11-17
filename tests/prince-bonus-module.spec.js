@@ -48,7 +48,8 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
 
     const content = fs.readFileSync(lessonPagePath, 'utf-8');
     expect(content).toContain('princeBonusLevel');
-    expect(content).toContain('maxLevel=${princeBonusLevel}');
+    expect(content).toContain('minLevel=${mapLevel}');
+    expect(content).toContain('maxLevel=${mapLevel}');
     expect(content).toContain('prince-bonus-card');
     expect(content).toContain('prince-overlay');
     expect(content).toContain('open-prince-btn');

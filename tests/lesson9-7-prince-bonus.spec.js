@@ -31,7 +31,7 @@ test.describe('Grade 9 Lesson 7 Prince of Persia Hardcore Bonus & Persian Victor
     // Overlay elements
     expect(content).toContain('id="prince-overlay"');
     expect(content).toContain('id="prince-game-iframe"');
-    expect(content).toContain('/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true');
+    expect(content).toContain('/static/prince/index.html?level=${mapLevel}&minLevel=${mapLevel}&maxLevel=${mapLevel}&skipTitle=true&skipCutscenes=');
 
     // Persian victory modal elements
     expect(content).toContain('id="prince-victory-modal"');
