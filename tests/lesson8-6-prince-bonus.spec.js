@@ -34,14 +34,14 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     expect(content).toContain('id="prince-bonus-card"');
     expect(content).toContain('id="open-prince-btn"');
     expect(content).toContain('РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО');
-    expect(content).toContain('УРОВЕНЬ {princeBonusLevel}');
+    expect(content).toContain('id="prince-card-level-badge"');
     expect(content).toContain('падишах дарует тебе ключ');
     expect(content).toContain('PRINCE OF PERSIA (1989)');
 
     // Overlay elements
     expect(content).toContain('id="prince-overlay"');
     expect(content).toContain('id="prince-game-iframe"');
-    expect(content).toContain('/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true');
+    expect(content).toContain('/static/prince/index.html?level=${mapLevel}&minLevel=${mapLevel}&maxLevel=${mapLevel}&skipTitle=true&skipCutscenes=');
     expect(content).toContain('id="prince-reload-btn"');
     expect(content).toContain('id="prince-fullscreen-btn"');
     expect(content).toContain('id="close-prince-btn"');
@@ -242,7 +242,7 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     // Verify telemetry dispatch
     const victoryEvent = telemetryEvents.find(e => e.mission_name && e.mission_name.includes('Prince of Persia'));
     expect(victoryEvent).toBeDefined();
-    expect(victoryEvent.action_type).toBe('level_complete');
+    expect(victoryEvent.action_type).toBe('prince_complete');
     expect(victoryEvent.status).toBe('completed');
     expect(victoryEvent.success).toBe(true);
     expect(victoryEvent.course_slug).toBe('8-класс');

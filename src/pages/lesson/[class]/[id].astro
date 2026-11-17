@@ -1,6 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import coursesData from '../../../data/courses.json';
+import { getCampaignStages, getTotalCampaignStages } from '../../../lib/prince-campaign';
 import fs from 'fs';
 import path from 'path';
 import { marked } from 'marked';
@@ -45,11 +46,8 @@ if (typeof rawPrinceBonus === 'number' && Number.isFinite(rawPrinceBonus) && raw
   }
 }
 
-const princeIframeSrc = princeBonusLevel
-  ? (princeMaxLevel && princeMaxLevel > princeBonusLevel
-      ? `/static/prince/index.html?level=${princeBonusLevel}&minLevel=${princeBonusLevel}&maxLevel=${princeMaxLevel}&skipTitle=true`
-      : `/static/prince/index.html?level=${princeBonusLevel}&maxLevel=${princeBonusLevel}&skipTitle=true&minLevel=${princeBonusLevel}`)
-  : '';
+const campaignStages = getCampaignStages();
+const totalCampaignStages = getTotalCampaignStages();
 
 // Попытка загрузить теорию и извлечь термины для Лого-Шторма
 interface SprintTermItem {
@@ -239,135 +237,132 @@ const tasks = [
           <h2 class="text-4xl font-bold mb-4" id="completion-title">🎉 Урок пройден!</h2>
           <p class="text-xl text-gray-600 mb-6" id="completion-subtitle">Вы успешно завершили все задания.</p>
           
-          {princeBonusLevel && (
-            <div id="prince-bonus-card" class="hidden mb-6 p-5 border-2 border-amber-500 bg-gray-900 text-left max-w-lg shadow-2xl rounded-0">
-              <div class="flex items-center justify-between border-b border-amber-600/40 pb-2 mb-3">
-                <span class="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold flex items-center gap-1.5">
-                  <span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО
-                </span>
-                <span class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs px-2 py-0.5 font-mono font-bold">
-                  {princeMaxLevel && princeMaxLevel > princeBonusLevel ? (<>УРОВНИ {princeBonusLevel}–{princeMaxLevel}</>) : (<>УРОВЕНЬ {princeBonusLevel}</>)}
-                </span>
-              </div>
-              <div class="text-lg font-bold text-amber-300 font-mono mb-1">
-                ⚔️ PRINCE OF PERSIA (1989)
-              </div>
-              <p class="text-xs text-amber-200/90 font-serif italic mb-2">
-                «О доблестный путник! За твою непреклонную стойкость и чистый разум падишах дарует тебе ключ от древней сокровищницы...»
-              </p>
-              <p class="text-xs text-gray-300 font-mono mb-4 leading-relaxed">
-                За безупречное прохождение режима «Хардкор» вам открыт секретный {princeMaxLevel && princeMaxLevel > princeBonusLevel ? `блок уровней ${princeBonusLevel}–${princeMaxLevel}` : `Уровень ${princeBonusLevel}`} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!
-              </p>
-              <button 
-                id="open-prince-btn" 
-                class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-sm font-mono transition-colors flex items-center justify-center gap-2 rounded-0 shadow"
-              >
-                <span>▶ {princeMaxLevel && princeMaxLevel > princeBonusLevel ? `ЗАПУСТИТЬ УРОВНИ ${princeBonusLevel}–${princeMaxLevel}` : `ЗАПУСТИТЬ УРОВЕНЬ ${princeBonusLevel}`}</span>
-              </button>
+          <div id="prince-bonus-card" class="hidden mb-6 p-5 border-2 border-amber-500 bg-gray-900 text-left max-w-lg shadow-2xl rounded-0">
+            <div class="flex items-center justify-between gap-2 border-b border-amber-600/40 pb-2 mb-3">
+              <span id="prince-card-status-badge" class="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold flex items-center gap-1.5">
+                <span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО
+              </span>
+              <span id="prince-card-level-badge" class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs px-2 py-0.5 font-mono font-bold shrink-0">
+                {princeBonusLevel ? `УРОВЕНЬ ${princeBonusLevel}` : 'УРОВЕНЬ 1'}
+              </span>
             </div>
-          )}
+            <div class="text-lg font-bold text-amber-300 font-mono mb-1">
+              ⚔️ PRINCE OF PERSIA (1989)
+            </div>
+            <div id="prince-card-stage-title" class="hidden text-sm font-bold text-amber-100 font-mono mb-2"></div>
+            <p id="prince-card-quote" class="text-xs text-amber-200/90 font-serif italic mb-2">
+              «О доблестный путник! За твою непреклонную стойкость и чистый разум падишах дарует тебе ключ от древней сокровищницы...»
+            </p>
+            <div id="prince-card-lock-notice" class="hidden mb-3 p-2.5 border border-amber-500/40 bg-amber-950/50 text-xs text-amber-200 font-mono leading-relaxed"></div>
+            <p id="prince-card-description" class="text-xs text-gray-300 font-mono mb-4 leading-relaxed">
+              За безупречное прохождение режима «Хардкор» вам открыт секретный уровень классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!
+            </p>
+            <button 
+              id="open-prince-btn" 
+              class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-sm font-mono transition-colors flex items-center justify-center gap-2 rounded-0 shadow cursor-pointer"
+            >
+              <span id="open-prince-btn-label">▶ ЗАПУСТИТЬ УРОВЕНЬ {princeBonusLevel || 1}</span>
+            </button>
+          </div>
 
           <button id="reset-lesson-btn" class="px-6 py-3 bg-blue-600 text-white rounded-0 font-bold hover:bg-blue-700 transition-colors">Пройти заново</button>
         </div>
 
-        {princeBonusLevel && (
-          <div id="prince-overlay" class="hidden absolute inset-0 bg-black flex-col z-20">
-            <div class="bg-gray-900 border-b border-gray-700 px-3 py-2 flex items-center justify-between shrink-0 text-white font-mono text-sm">
-              <div class="flex items-center gap-2">
-                <span class="text-amber-400">⚔️</span>
-                <span class="font-bold text-amber-300">PRINCE OF PERSIA (1989)</span>
-                <span class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">{princeMaxLevel && princeMaxLevel > princeBonusLevel ? `УРОВНИ ${princeBonusLevel}–${princeMaxLevel}` : `УРОВЕНЬ ${princeBonusLevel}`}</span>
+        <div id="prince-overlay" class="hidden absolute inset-0 bg-black flex-col z-20">
+          <div class="bg-gray-900 border-b border-gray-700 px-3 py-2 flex items-center justify-between shrink-0 text-white font-mono text-sm">
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400">⚔️</span>
+              <span class="font-bold text-amber-300">PRINCE OF PERSIA (1989)</span>
+              <span id="prince-overlay-stage-badge" class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">УРОВЕНЬ {princeBonusLevel || 1}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="prince-reload-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="Перезапустить уровень">
+                🔄 Рестарт
+              </button>
+              <button id="prince-fullscreen-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="На весь экран">
+                ⛶ На весь экран
+              </button>
+              <button id="close-prince-btn" class="px-3 py-1 bg-red-900 hover:bg-red-800 text-xs font-bold text-white border border-red-700 transition-colors">
+                ✖ Свернуть
+              </button>
+            </div>
+          </div>
+          <div class="bg-gray-950 text-gray-400 text-xs px-3 py-1.5 border-b border-gray-800 font-mono flex justify-between flex-wrap items-center gap-2">
+            <span>Управление: <strong>[← / →]</strong> Движение | <strong>[↑]</strong> Прыжок | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Меч/Шаг</span>
+            <span class="text-amber-400 font-bold bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 animate-pulse">💡 Кликните по экрану игры или нажмите Enter для старта</span>
+          </div>
+          <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+            <iframe 
+              id="prince-game-iframe"
+              class="w-full h-full border-0 absolute inset-0"
+              title="Prince of Persia"
+              allow="fullscreen; gamepad; autoplay"
+              tabindex="0"
+            ></iframe>
+          </div>
+
+          <!-- Persian Congratulations & Victory Modal -->
+          <div id="prince-victory-modal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-md z-30 flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            <div class="max-w-2xl w-full bg-gradient-to-b from-gray-950 via-gray-900 to-black border-2 border-amber-500 p-6 sm:p-8 text-center shadow-2xl relative rounded-0">
+              <div class="text-amber-500/80 font-mono text-xs tracking-widest uppercase mb-1">
+                ✦ ════════════════════════════════════════════════ ✦
               </div>
-              <div class="flex items-center gap-2">
-                <button id="prince-reload-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="Перезапустить уровень">
-                  🔄 Рестарт
-                </button>
-                <button id="prince-fullscreen-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="На весь экран">
-                  ⛶ На весь экран
-                </button>
-                <button id="close-prince-btn" class="px-3 py-1 bg-red-900 hover:bg-red-800 text-xs font-bold text-white border border-red-700 transition-colors">
-                  ✖ Свернуть
-                </button>
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <span class="text-2xl">👑</span>
+                <span class="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold bg-amber-500/10 border border-amber-500/30 px-3 py-1">
+                  СЕКРЕТНЫЙ РЕТРО-АРХИВ // ПОЛНЫЙ ТРИУМФ
+                </span>
+                <span class="text-2xl">👑</span>
               </div>
-            </div>
-            <div class="bg-gray-950 text-gray-400 text-xs px-3 py-1.5 border-b border-gray-800 font-mono flex justify-between flex-wrap items-center gap-2">
-              <span>Управление: <strong>[← / →]</strong> Движение | <strong>[↑]</strong> Прыжок | <strong>[↓]</strong> Присесть | <strong>[Shift]</strong> Меч/Шаг</span>
-              <span class="text-amber-400 font-bold bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 animate-pulse">💡 Кликните по экрану игры или нажмите Enter для старта</span>
-            </div>
-            <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-              <iframe 
-                id="prince-game-iframe"
-                src={princeIframeSrc}
-                class="w-full h-full border-0 absolute inset-0"
-                title="Prince of Persia"
-                allow="fullscreen; gamepad; autoplay"
-                tabindex="0"
-              ></iframe>
-            </div>
+              <h3 class="text-2xl sm:text-3xl font-bold text-amber-300 font-serif tracking-wide mb-2 uppercase">
+                ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ!
+              </h3>
+              <div class="text-xs font-mono text-amber-400 mb-4">
+                ДАР ВЕЛИКОГО ПАДИШАХА // УРОВЕНЬ <span id="prince-victory-level">{princeBonusLevel || 1}</span> ПОКОРЕН
+              </div>
 
-            <!-- Persian Congratulations & Victory Modal -->
-            <div id="prince-victory-modal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-md z-30 flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
-              <div class="max-w-2xl w-full bg-gradient-to-b from-gray-950 via-gray-900 to-black border-2 border-amber-500 p-6 sm:p-8 text-center shadow-2xl relative rounded-0">
-                <div class="text-amber-500/80 font-mono text-xs tracking-widest uppercase mb-1">
-                  ✦ ════════════════════════════════════════════════ ✦
-                </div>
-                <div class="flex items-center justify-center gap-2 mb-2">
-                  <span class="text-2xl">👑</span>
-                  <span class="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold bg-amber-500/10 border border-amber-500/30 px-3 py-1">
-                    СЕКРЕТНЫЙ РЕТРО-АРХИВ // ПОЛНЫЙ ТРИУМФ
-                  </span>
-                  <span class="text-2xl">👑</span>
-                </div>
-                <h3 class="text-2xl sm:text-3xl font-bold text-amber-300 font-serif tracking-wide mb-2 uppercase">
-                  ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ!
-                </h3>
-                <div class="text-xs font-mono text-amber-400 mb-4">
-                  ДАР ВЕЛИКОГО ПАДИШАХА // УРОВЕНЬ <span id="prince-victory-level">{princeBonusLevel}</span> ПОКОРЕН
-                </div>
+              <div class="border-t border-b border-amber-500/40 py-4 my-3 text-amber-100 text-sm sm:text-base leading-relaxed text-justify space-y-3 font-serif bg-black/50 p-4 max-h-[45vh] overflow-y-auto">
+                <p class="italic text-center font-semibold text-amber-300">
+                  «О солнцеподобный витязь, услада очей мудрецов и непревзойденный владыка кремниевых стихий!»
+                </p>
+                <p>
+                  Да осыплют небеса твой путь лепестками дамасских роз и сиянием неугасимых звезд семи небес! Твой ясный ум и непоколебимая доблесть рассекли мрак древних катакомб коварного визиря Джаффара, подобно сверкающему булатному клинку из благородной стали Исфахана.
+                </p>
+                <p>
+                  Ни бездонные пропасти, ни скрытые в плитах лезвия, ни коварные шипы не заставили дрогнуть твое благородное сердце. С грацией барса и терпением великого суфия ты прошел сквозь каменный лабиринт, явив миру величие истинного знания, силу духа и безупречность холодного расчета!
+                </p>
+                <p>
+                  Пусть же отныне звонкие струны ситара и сладкогласые поэты разносят весть о твоем подвиге по всем оазисам, базарам и караван-сараям Востока! Твое благословенное имя золотой вязью навечно вписано в скрижали славы, о светозарный повелитель алгоритмов и победитель Песков Времени!
+                </p>
+              </div>
 
-                <div class="border-t border-b border-amber-500/40 py-4 my-3 text-amber-100 text-sm sm:text-base leading-relaxed text-justify space-y-3 font-serif bg-black/50 p-4 max-h-[45vh] overflow-y-auto">
-                  <p class="italic text-center font-semibold text-amber-300">
-                    «О солнцеподобный витязь, услада очей мудрецов и непревзойденный владыка кремниевых стихий!»
-                  </p>
-                  <p>
-                    Да осыплют небеса твой путь лепестками дамасских роз и сиянием неугасимых звезд семи небес! Твой ясный ум и непоколебимая доблесть рассекли мрак древних катакомб коварного визиря Джаффара, подобно сверкающему булатному клинку из благородной стали Исфахана.
-                  </p>
-                  <p>
-                    Ни бездонные пропасти, ни скрытые в плитах лезвия, ни коварные шипы не заставили дрогнуть твое благородное сердце. С грацией барса и терпением великого суфия ты прошел сквозь каменный лабиринт, явив миру величие истинного знания, силу духа и безупречность холодного расчета!
-                  </p>
-                  <p>
-                    Пусть же отныне звонкие струны ситара и сладкогласые поэты разносят весть о твоем подвиге по всем оазисам, базарам и караван-сараям Востока! Твое благословенное имя золотой вязью навечно вписано в скрижали славы, о светозарный повелитель алгоритмов и победитель Песков Времени!
-                  </p>
-                </div>
+              <div class="border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-mono text-amber-300 my-4 flex items-center justify-center gap-2">
+                <span>🔒</span>
+                <span id="prince-victory-stage-notice">ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ДОСТУПЕН ТОЛЬКО ТЕКУЩИЙ ЭТАП</span>
+                <span>🔒</span>
+              </div>
 
-                <div class="border border-amber-500/40 bg-amber-500/10 p-3 text-xs font-mono text-amber-300 my-4 flex items-center justify-center gap-2">
-                  <span>🔒</span>
-                  <span>ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // {princeMaxLevel && princeMaxLevel > princeBonusLevel ? `ДОСТУПНЫ УРОВНИ ${princeBonusLevel}–${princeMaxLevel}` : `ДОСТУПЕН ТОЛЬКО УРОВЕНЬ ${princeBonusLevel}`}</span>
-                  <span>🔒</span>
-                </div>
+              <div class="text-amber-500/80 font-mono text-xs tracking-widest uppercase mb-5">
+                ✦ ════════════════════════════════════════════════ ✦
+              </div>
 
-                <div class="text-amber-500/80 font-mono text-xs tracking-widest uppercase mb-5">
-                  ✦ ════════════════════════════════════════════════ ✦
-                </div>
-
-                <div class="flex flex-col sm:flex-row gap-3 justify-center items-center font-mono">
-                  <button 
-                    id="prince-victory-close-btn"
-                    class="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-xs transition-colors rounded-0 shadow-lg cursor-pointer"
-                  >
-                    📜 Вернуться к уроку с почетом
-                  </button>
-                  <button 
-                    id="prince-retry-btn"
-                    class="w-full sm:w-auto px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-amber-300 border border-amber-500/50 font-bold uppercase tracking-wider text-xs transition-colors rounded-0 cursor-pointer"
-                  >
-                    🔄 Пройти Уровень 1 заново
-                  </button>
-                </div>
+              <div class="flex flex-col sm:flex-row gap-3 justify-center items-center font-mono">
+                <button 
+                  id="prince-victory-close-btn"
+                  class="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-xs transition-colors rounded-0 shadow-lg cursor-pointer"
+                >
+                  📜 Вернуться к уроку с почетом
+                </button>
+                <button 
+                  id="prince-retry-btn"
+                  class="w-full sm:w-auto px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-amber-300 border border-amber-500/50 font-bold uppercase tracking-wider text-xs transition-colors rounded-0 cursor-pointer"
+                >
+                  🔄 Пройти Уровень 1 заново
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </section>
     </main>
 
@@ -534,7 +529,7 @@ const tasks = [
   </div>
 </Layout>
 
-<script define:vars={{ classSlug, lessonId, princeBonusLevel, princeMaxLevel, sprintTerms }}>
+<script define:vars={{ classSlug, lessonId, princeBonusLevel, princeMaxLevel, campaignStages, totalCampaignStages, sprintTerms }}>
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
@@ -543,6 +538,8 @@ const tasks = [
   let currentUnlockedLevel = 1;
   let isHardcoreCompleted = false;
   let isNormalCompleted = false;
+  let princeProgressData = null;
+  let activePrinceStage = null;
 
   const fullTitle = document.querySelector('h1')?.textContent?.trim() || '';
   const lessonPrefix = fullTitle.split(':')[0].trim(); // 'Урок X'
@@ -581,6 +578,246 @@ const tasks = [
     }
   });
 
+  function buildPrinceIframeUrl(mapLevel, stageConfig) {
+    const skipCutscenes = stageConfig && typeof stageConfig.skipCutscenes === 'boolean'
+      ? stageConfig.skipCutscenes
+      : true;
+    let url = `/static/prince/index.html?level=${mapLevel}&minLevel=${mapLevel}&maxLevel=${mapLevel}&skipTitle=true&skipCutscenes=${skipCutscenes}`;
+    if (stageConfig && typeof stageConfig.health === 'number') {
+      url += `&health=${stageConfig.health}`;
+    }
+    if (stageConfig && typeof stageConfig.time === 'number') {
+      url += `&time=${stageConfig.time}`;
+    }
+    return url;
+  }
+
+  function renderPrinceBonusCard() {
+    const princeBonusCard = document.getElementById('prince-bonus-card');
+    const princeIframeEl = document.getElementById('prince-game-iframe');
+    if (!princeBonusCard) return;
+
+    if (!isHardcoreCompleted) {
+      princeBonusCard.classList.add('hidden');
+      activePrinceStage = null;
+      return;
+    }
+
+    const totalStages = princeProgressData?.totalStages || totalCampaignStages || (Array.isArray(campaignStages) ? campaignStages.length : 18);
+    const statusBadgeEl = document.getElementById('prince-card-status-badge');
+    const levelBadgeEl = document.getElementById('prince-card-level-badge');
+    const stageTitleEl = document.getElementById('prince-card-stage-title');
+    const lockNoticeEl = document.getElementById('prince-card-lock-notice');
+    const descEl = document.getElementById('prince-card-description');
+    const openBtnEl = document.getElementById('open-prince-btn');
+    const openBtnLabelEl = document.getElementById('open-prince-btn-label');
+    const overlayBadgeEl = document.getElementById('prince-overlay-stage-badge');
+
+    const stagesList = Array.isArray(campaignStages) ? campaignStages : [];
+    const fallbackMap = princeBonusLevel || 1;
+    const defaultStageCfg = stagesList.find((s) => s.mapLevel === fallbackMap) || stagesList[0] || {
+      stage: 1,
+      mapLevel: fallbackMap,
+      title: `Уровень ${fallbackMap}`,
+      health: 3,
+      time: 60,
+      skipCutscenes: true
+    };
+
+    const progress = princeProgressData || {
+      eligibleForHardcoreBonus: true,
+      lessonStageCompleted: null,
+      lessonMapLevel: null,
+      completedStages: [],
+      totalStages,
+      nextStage: {
+        stage: defaultStageCfg.stage,
+        mapLevel: defaultStageCfg.mapLevel,
+        title: defaultStageCfg.title
+      },
+      campaignFinished: false,
+      _legacyFallback: true
+    };
+
+    const isLegacy = Boolean(progress._legacyFallback);
+    const completedStages = Array.isArray(progress.completedStages) ? progress.completedStages : [];
+    const lessonStage = progress.lessonStageCompleted !== null && progress.lessonStageCompleted !== undefined
+      ? Number(progress.lessonStageCompleted)
+      : null;
+    const campaignFinished = Boolean(progress.campaignFinished);
+
+    const setLaunchEnabled = (enabled, labelText) => {
+      if (openBtnLabelEl) openBtnLabelEl.textContent = labelText;
+      if (!openBtnEl) return;
+      openBtnEl.disabled = !enabled;
+      if (enabled) {
+        openBtnEl.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-700', 'text-gray-300');
+        openBtnEl.classList.add('bg-amber-500', 'hover:bg-amber-400', 'text-black', 'cursor-pointer');
+      } else {
+        openBtnEl.classList.remove('bg-amber-500', 'hover:bg-amber-400', 'text-black', 'cursor-pointer');
+        openBtnEl.classList.add('bg-gray-700', 'text-gray-300', 'opacity-50', 'cursor-not-allowed');
+      }
+    };
+
+    const setTargetIframeUrl = (url) => {
+      if (!princeIframeEl) return;
+      if (url) {
+        princeIframeEl.dataset.targetSrc = url;
+        if (princeIframeEl.getAttribute('src') !== url) {
+          princeIframeEl.src = url;
+        }
+      } else {
+        delete princeIframeEl.dataset.targetSrc;
+        princeIframeEl.removeAttribute('src');
+      }
+    };
+
+    if (isLegacy) {
+      const mapLevel = Number(progress.nextStage?.mapLevel || fallbackMap);
+      const stageNum = Number(progress.nextStage?.stage || 1);
+      const stageCfg = stagesList.find((s) => s.mapLevel === mapLevel) || defaultStageCfg;
+      const targetUrl = buildPrinceIframeUrl(mapLevel, stageCfg);
+
+      activePrinceStage = {
+        stage: stageNum,
+        mapLevel,
+        title: stageCfg.title || `Уровень ${mapLevel}`,
+        isReplay: false,
+        _legacyFallback: true
+      };
+
+      if (statusBadgeEl) statusBadgeEl.innerHTML = '<span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО';
+      if (levelBadgeEl) levelBadgeEl.textContent = `УРОВЕНЬ ${mapLevel}`;
+      if (stageTitleEl) stageTitleEl.classList.add('hidden');
+      if (lockNoticeEl) lockNoticeEl.classList.add('hidden');
+      if (descEl) {
+        descEl.textContent = `За безупречное прохождение режима «Хардкор» вам открыт секретный Уровень ${mapLevel} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!`;
+      }
+      if (overlayBadgeEl) overlayBadgeEl.textContent = `УРОВЕНЬ ${mapLevel}`;
+      setLaunchEnabled(true, `▶ ЗАПУСТИТЬ УРОВЕНЬ ${mapLevel}`);
+      setTargetIframeUrl(targetUrl);
+      princeBonusCard.classList.remove('hidden');
+      return;
+    }
+
+    if (lessonStage !== null) {
+      const stageCfg = stagesList.find((s) => s.stage === lessonStage) || null;
+      const mapLevel = Number(progress.lessonMapLevel || stageCfg?.mapLevel || 1);
+      const title = stageCfg?.title || `Уровень ${mapLevel}`;
+      const targetUrl = buildPrinceIframeUrl(mapLevel, stageCfg);
+
+      activePrinceStage = {
+        stage: lessonStage,
+        mapLevel,
+        title,
+        isReplay: true,
+        _legacyFallback: false
+      };
+
+      if (statusBadgeEl) {
+        statusBadgeEl.innerHTML = campaignFinished
+          ? '<span>👑</span> КАМПАНИЯ ПРОЙДЕНА ПОЛНОСТЬЮ'
+          : `<span>✅</span> ЭТАП ${lessonStage} ПРОЙДЕН В ЭТОМ УРОКЕ`;
+      }
+      if (levelBadgeEl) levelBadgeEl.textContent = `ЭТАП ${lessonStage} ИЗ ${totalStages}`;
+      if (stageTitleEl) {
+        stageTitleEl.textContent = `Этап ${lessonStage} из ${totalStages}: ${title}`;
+        stageTitleEl.classList.remove('hidden');
+      }
+      if (lockNoticeEl) {
+        lockNoticeEl.textContent = campaignFinished
+          ? `👑 Поздравляем, Мастер! Вы прошли всю кампанию Prince of Persia (${totalStages} из ${totalStages} этапов)! В этом уроке был закрыт Этап ${lessonStage}.`
+          : `🔒 Этап ${lessonStage} пройден в этом уроке! Пройдите другой урок в режиме Хардкор, чтобы открыть Этап ${lessonStage + 1}.`;
+        lockNoticeEl.classList.remove('hidden');
+      }
+      if (descEl) {
+        descEl.textContent = campaignFinished
+          ? `Все испытания темниц Персии покорены! Вы можете перепройти Этап ${lessonStage} («${title}») для тренировки.`
+          : `Лимит «1 урок = 1 этап»: открыть следующий этап в этом уроке нельзя. Вы можете только перепройти Этап ${lessonStage} («${title}») без зачёта нового прогресса.`;
+      }
+      if (overlayBadgeEl) overlayBadgeEl.textContent = `ЭТАП ${lessonStage} ИЗ ${totalStages} • УРОВЕНЬ ${mapLevel}`;
+      setLaunchEnabled(true, `🔄 ПЕРЕПРОЙТИ ЭТАП ${lessonStage}: ${title}`);
+      setTargetIframeUrl(targetUrl);
+      princeBonusCard.classList.remove('hidden');
+      return;
+    }
+
+    if (campaignFinished || !progress.nextStage) {
+      activePrinceStage = null;
+      if (statusBadgeEl) statusBadgeEl.innerHTML = '<span>👑</span> КАМПАНИЯ ПРОЙДЕНА ПОЛНОСТЬЮ';
+      if (levelBadgeEl) levelBadgeEl.textContent = `МАСТЕР • ${completedStages.length}/${totalStages}`;
+      if (stageTitleEl) {
+        stageTitleEl.textContent = `Поздравляем, Мастер! Все ${totalStages} этапов пройдены!`;
+        stageTitleEl.classList.remove('hidden');
+      }
+      if (lockNoticeEl) {
+        lockNoticeEl.textContent = `👑 Великий триумф! Вы завершили всю сквозную кампанию Prince of Persia (${totalStages} из ${totalStages} этапов).`;
+        lockNoticeEl.classList.remove('hidden');
+      }
+      if (descEl) {
+        descEl.textContent = 'Все чертоги древнего дворца покорены, и принцесса спасена. Слава победителю Песков Времени!';
+      }
+      if (overlayBadgeEl) overlayBadgeEl.textContent = `МАСТЕР • ${totalStages}/${totalStages}`;
+      setLaunchEnabled(false, `👑 КАМПАНИЯ ЗАВЕРШЕНА (${totalStages}/${totalStages})`);
+      setTargetIframeUrl(null);
+      princeBonusCard.classList.remove('hidden');
+      return;
+    }
+
+    const nextStage = progress.nextStage;
+    const stageNum = Number(nextStage.stage);
+    const mapLevel = Number(nextStage.mapLevel);
+    const title = nextStage.title || `Уровень ${mapLevel}`;
+    const stageCfg = stagesList.find((s) => s.stage === stageNum) || null;
+    const targetUrl = buildPrinceIframeUrl(mapLevel, stageCfg);
+
+    activePrinceStage = {
+      stage: stageNum,
+      mapLevel,
+      title,
+      isReplay: false,
+      _legacyFallback: false
+    };
+
+    if (statusBadgeEl) statusBadgeEl.innerHTML = '<span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО';
+    if (levelBadgeEl) levelBadgeEl.textContent = `ЭТАП ${stageNum} ИЗ ${totalStages}`;
+    if (stageTitleEl) {
+      stageTitleEl.textContent = `Этап ${stageNum} из ${totalStages}: ${title}`;
+      stageTitleEl.classList.remove('hidden');
+    }
+    if (lockNoticeEl) lockNoticeEl.classList.add('hidden');
+    if (descEl) {
+      descEl.textContent = `За безупречное прохождение режима «Хардкор» вам открыт Этап ${stageNum} из ${totalStages}: ${title} (Уровень ${mapLevel}). Пройдите его, чтобы продвинуться по кампании!`;
+    }
+    if (overlayBadgeEl) overlayBadgeEl.textContent = `ЭТАП ${stageNum} ИЗ ${totalStages} • УРОВЕНЬ ${mapLevel}`;
+    setLaunchEnabled(true, `▶ ЗАПУСТИТЬ ЭТАП ${stageNum}: ${title}`);
+    setTargetIframeUrl(targetUrl);
+    princeBonusCard.classList.remove('hidden');
+  }
+
+  function applyLocalPrinceStageCompletion(stageNum, mapLevel) {
+    if (!princeProgressData || princeProgressData._legacyFallback) return;
+    if (princeProgressData.lessonStageCompleted === null || princeProgressData.lessonStageCompleted === undefined) {
+      princeProgressData.lessonStageCompleted = stageNum;
+      princeProgressData.lessonMapLevel = mapLevel;
+    }
+    if (!Array.isArray(princeProgressData.completedStages)) {
+      princeProgressData.completedStages = [];
+    }
+    if (!princeProgressData.completedStages.includes(stageNum)) {
+      princeProgressData.completedStages.push(stageNum);
+      princeProgressData.completedStages.sort((a, b) => a - b);
+    }
+    const completedSet = new Set(princeProgressData.completedStages);
+    const stagesList = Array.isArray(campaignStages) ? campaignStages : [];
+    const nextUncompleted = stagesList.find((s) => !completedSet.has(s.stage)) || null;
+    princeProgressData.nextStage = nextUncompleted
+      ? { stage: nextUncompleted.stage, mapLevel: nextUncompleted.mapLevel, title: nextUncompleted.title }
+      : null;
+    princeProgressData.campaignFinished = nextUncompleted === null;
+    renderPrinceBonusCard();
+  }
+
   async function syncProgress() {
     const fName = localStorage.getItem('student_firstName');
     const lName = localStorage.getItem('student_lastName');
@@ -594,6 +831,28 @@ const tasks = [
           isNormalCompleted = data.isNormalCompleted;
           isHardcoreCompleted = data.isHardcoreCompleted;
           currentUnlockedLevel = isHardcore ? data.unlockedHardcore : data.unlockedNormal;
+
+          if (data.princeProgress) {
+            princeProgressData = data.princeProgress;
+          } else {
+            const stagesList = Array.isArray(campaignStages) ? campaignStages : [];
+            const fallbackMap = princeBonusLevel || 1;
+            const fallbackStage = stagesList.find((s) => s.mapLevel === fallbackMap) || stagesList[0];
+            princeProgressData = {
+              eligibleForHardcoreBonus: Boolean(data.isHardcoreCompleted),
+              lessonStageCompleted: null,
+              lessonMapLevel: null,
+              completedStages: [],
+              totalStages: totalCampaignStages || stagesList.length || 18,
+              nextStage: {
+                stage: fallbackStage?.stage || 1,
+                mapLevel: fallbackMap,
+                title: fallbackStage?.title || `Уровень ${fallbackMap}`
+              },
+              campaignFinished: false,
+              _legacyFallback: true
+            };
+          }
         }
       } catch (e) {
         console.error(e);
@@ -606,7 +865,7 @@ const tasks = [
   }
 
   function checkCompletion() {
-    const displayHardcore = isHardcoreCompleted || (isHardcore && isNormalCompleted);
+    const displayHardcore = isHardcoreCompleted;
     
     if (currentUnlockedLevel > 3 || isHardcoreCompleted || (isNormalCompleted && !isHardcore)) {
       document.getElementById('lesson-content')?.classList.add('hidden');
@@ -625,11 +884,11 @@ const tasks = [
         }
       }
 
-      // Проверка разблокировки бонусного уровня Prince of Persia
+      // Проверка разблокировки бонусной кампании Prince of Persia
       const princeBonusCard = document.getElementById('prince-bonus-card');
       if (princeBonusCard) {
-        if (displayHardcore && princeBonusLevel) {
-          princeBonusCard.classList.remove('hidden');
+        if (displayHardcore) {
+          renderPrinceBonusCard();
         } else {
           princeBonusCard.classList.add('hidden');
         }
@@ -1006,17 +1265,35 @@ const tasks = [
     if (data && data.type === 'PRINCE_EVENT') {
       console.log('Received Prince event:', data);
       if (data.action === 'level_complete') {
-        const completedLvl = Number(data.completedLevel) || princeBonusLevel;
-        const targetMax = princeMaxLevel || princeBonusLevel;
-        const isFinalWin = !targetMax || completedLvl >= targetMax || data.nextLevel === null;
+        const stageObj = activePrinceStage;
+        const completedLvl = Number(data.completedLevel) || stageObj?.mapLevel || princeBonusLevel || 1;
+        const currentStage = stageObj?.stage || 1;
+        const totalStages = princeProgressData?.totalStages || totalCampaignStages || 18;
+        const isLegacy = Boolean(stageObj?._legacyFallback || princeProgressData?._legacyFallback);
+        const stageTitle = stageObj?.title || `Уровень ${completedLvl}`;
+        const isFinalWin = true;
 
         if (isFinalWin) {
           const victoryModal = document.getElementById('prince-victory-modal');
           const victoryLevelSpan = document.getElementById('prince-victory-level');
+          const victoryNoticeSpan = document.getElementById('prince-victory-stage-notice');
+          const retryBtnEl = document.getElementById('prince-retry-btn');
           if (victoryLevelSpan) {
-            victoryLevelSpan.textContent = targetMax && princeBonusLevel && targetMax > princeBonusLevel
-              ? `${princeBonusLevel}–${targetMax}`
-              : String(completedLvl);
+            victoryLevelSpan.textContent = String(completedLvl);
+          }
+          if (victoryNoticeSpan) {
+            if (isLegacy) {
+              victoryNoticeSpan.textContent = `ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ДОСТУПЕН ТОЛЬКО УРОВЕНЬ ${completedLvl}`;
+            } else if (currentStage >= totalStages) {
+              victoryNoticeSpan.textContent = `ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ПОКОРЕНЫ // ВСЕ ${totalStages} ЭТАПОВ КАМПАНИИ ПРОЙДЕНЫ!`;
+            } else {
+              victoryNoticeSpan.textContent = `ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ЭТАП ${currentStage} ИЗ ${totalStages} ПРОЙДЕН (ДОСТУПЕН ТОЛЬКО УРОВЕНЬ ${completedLvl})`;
+            }
+          }
+          if (retryBtnEl) {
+            retryBtnEl.textContent = isLegacy
+              ? `🔄 Пройти Уровень ${completedLvl} заново`
+              : `🔄 Пройти Этап ${currentStage} заново`;
           }
           if (victoryModal) {
             victoryModal.classList.remove('hidden');
@@ -1028,7 +1305,12 @@ const tasks = [
 
         const timeSpentSec = princeStartTime ? Math.max(1, Math.floor((Date.now() - princeStartTime) / 1000)) : 1;
 
-        // Send telemetry for Prince bonus level completion
+        // Immediately update card UI without waiting for page reload
+        if (!isLegacy) {
+          applyLocalPrinceStageCompletion(currentStage, completedLvl);
+        }
+
+        // Send telemetry for Prince campaign stage completion
         fetch('/api/telemetry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1038,9 +1320,14 @@ const tasks = [
             student_class: localStorage.getItem('student_class'),
             course_slug: classSlug,
             lesson_id: lessonId,
-            level_number: 0,
-            mission_name: `${fullTitle} :: Prince of Persia (Уровень ${completedLvl})`,
-            action_type: 'level_complete',
+            level_number: completedLvl,
+            map_level: completedLvl,
+            stage_current: currentStage,
+            stage_total: totalStages,
+            mission_name: isLegacy
+              ? `${fullTitle} :: Prince of Persia (Уровень ${completedLvl})`
+              : `${fullTitle} :: Prince of Persia (Этап ${currentStage}: ${stageTitle}, Уровень ${completedLvl})`,
+            action_type: 'prince_complete',
             status: 'completed',
             time_spent_sec: timeSpentSec,
             attempts_count: 1,
@@ -1175,8 +1462,14 @@ const tasks = [
               switchTab(`iframe-${currentUnlockedLevel}`);
             } else if (completedLevel === 3) {
               currentUnlockedLevel = 4;
-              if (isHardcore) isHardcoreCompleted = true;
-              else isNormalCompleted = true;
+              if (isHardcore) {
+                isHardcoreCompleted = true;
+                if (princeProgressData) {
+                  princeProgressData.eligibleForHardcoreBonus = true;
+                }
+              } else {
+                isNormalCompleted = true;
+              }
               updateTabsState();
             }
           }
@@ -1289,9 +1582,11 @@ const tasks = [
 
   if (openPrinceBtn && princeOverlay) {
     openPrinceBtn.addEventListener('click', () => {
+      if (openPrinceBtn.disabled || !activePrinceStage) return;
       if (!princeStartTime) {
         princeStartTime = Date.now();
       }
+      princeVictorySent = false;
       princeOverlay.classList.remove('hidden');
       princeOverlay.classList.add('flex');
 
@@ -1299,10 +1594,10 @@ const tasks = [
         // Если фрейм был предзагружен в скрытом состоянии (display: none),
         // перезапускаем его при первом открытии, чтобы Phaser CE построил канвас
         // с корректными реальными размерами контейнера и сразу запустил игровой цикл
-        if (!princeIframe.dataset.activated) {
+        const targetSrc = princeIframe.dataset.targetSrc || princeIframe.getAttribute('src');
+        if (targetSrc && (!princeIframe.dataset.activated || princeIframe.getAttribute('src') !== targetSrc)) {
           princeIframe.dataset.activated = 'true';
-          const currentSrc = princeIframe.src;
-          princeIframe.src = currentSrc;
+          princeIframe.src = targetSrc;
         }
 
         princeIframe.addEventListener('load', () => {
@@ -1398,7 +1693,8 @@ const tasks = [
         princeVictoryModal.classList.remove('flex');
         princeVictoryModal.classList.add('hidden');
       }
-      princeIframe.src = princeIframe.src;
+      const targetSrc = princeIframe.dataset.targetSrc || princeIframe.getAttribute('src');
+      if (targetSrc) princeIframe.src = targetSrc;
       princeIframe.addEventListener('load', () => setTimeout(focusPrince, 60), { once: true });
     });
   }
@@ -1411,7 +1707,8 @@ const tasks = [
         princeVictoryModal.classList.remove('flex');
         princeVictoryModal.classList.add('hidden');
       }
-      princeIframe.src = princeIframe.src;
+      const targetSrc = princeIframe.dataset.targetSrc || princeIframe.getAttribute('src');
+      if (targetSrc) princeIframe.src = targetSrc;
       princeIframe.addEventListener('load', () => setTimeout(focusPrince, 60), { once: true });
     });
   }

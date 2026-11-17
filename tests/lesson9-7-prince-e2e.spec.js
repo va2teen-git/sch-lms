@@ -138,7 +138,7 @@ test.describe('E2E Verification: Prince of Persia Bonus Unlock, Completion & Les
     // 7. Verify telemetry event was sent for the Prince victory
     const princeTelemetry = telemetryEvents.find(e => e.mission_name && e.mission_name.includes('Prince of Persia'));
     expect(princeTelemetry).toBeDefined();
-    expect(princeTelemetry.action_type).toBe('level_complete');
+    expect(princeTelemetry.action_type).toBe('prince_complete');
     expect(princeTelemetry.status).toBe('completed');
     expect(princeTelemetry.success).toBe(true);
 
