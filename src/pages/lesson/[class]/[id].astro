@@ -18,34 +18,6 @@ if (!course || !lesson) {
   return Astro.redirect('/courses');
 }
 
-const rawPrinceBonus = lesson?.princeBonusLevel;
-let princeBonusLevel: number | null = null;
-let princeMaxLevel: number | null = null;
-
-if (typeof rawPrinceBonus === 'number' && Number.isFinite(rawPrinceBonus) && rawPrinceBonus > 0) {
-  princeBonusLevel = rawPrinceBonus;
-  princeMaxLevel = rawPrinceBonus;
-} else if (typeof rawPrinceBonus === 'string' && rawPrinceBonus.trim()) {
-  const parts = rawPrinceBonus
-    .split(/[-–:]/)
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => !isNaN(n) && n > 0);
-  if (parts.length === 1) {
-    princeBonusLevel = parts[0];
-    princeMaxLevel = parts[0];
-  } else if (parts.length >= 2) {
-    princeBonusLevel = Math.min(parts[0], parts[1]);
-    princeMaxLevel = Math.max(parts[0], parts[1]);
-  }
-} else if (rawPrinceBonus && typeof rawPrinceBonus === 'object') {
-  const startLvl = parseInt(String(rawPrinceBonus.start ?? rawPrinceBonus.level ?? ''), 10);
-  const endLvl = parseInt(String(rawPrinceBonus.end ?? rawPrinceBonus.maxLevel ?? startLvl), 10);
-  if (!isNaN(startLvl) && startLvl > 0) {
-    princeBonusLevel = startLvl;
-    princeMaxLevel = !isNaN(endLvl) && endLvl >= startLvl ? endLvl : startLvl;
-  }
-}
-
 const campaignStages = getCampaignStages();
 const totalCampaignStages = getTotalCampaignStages();
 
@@ -243,7 +215,7 @@ const tasks = [
                 <span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО
               </span>
               <span id="prince-card-level-badge" class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs px-2 py-0.5 font-mono font-bold shrink-0">
-                {princeBonusLevel ? `УРОВЕНЬ ${princeBonusLevel}` : 'УРОВЕНЬ 1'}
+                ЭТАП 1 ИЗ {totalCampaignStages}
               </span>
             </div>
             <div class="text-lg font-bold text-amber-300 font-mono mb-1">
@@ -261,7 +233,7 @@ const tasks = [
               id="open-prince-btn" 
               class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-sm font-mono transition-colors flex items-center justify-center gap-2 rounded-0 shadow cursor-pointer"
             >
-              <span id="open-prince-btn-label">▶ ЗАПУСТИТЬ УРОВЕНЬ {princeBonusLevel || 1}</span>
+              <span id="open-prince-btn-label">▶ ЗАПУСТИТЬ ЭТАП 1</span>
             </button>
           </div>
 
@@ -273,7 +245,7 @@ const tasks = [
             <div class="flex items-center gap-2">
               <span class="text-amber-400">⚔️</span>
               <span class="font-bold text-amber-300">PRINCE OF PERSIA (1989)</span>
-              <span id="prince-overlay-stage-badge" class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">УРОВЕНЬ {princeBonusLevel || 1}</span>
+              <span id="prince-overlay-stage-badge" class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 border border-gray-600">ЭТАП 1 ИЗ {totalCampaignStages}</span>
             </div>
             <div class="flex items-center gap-2">
               <button id="prince-reload-btn" class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-600 transition-colors" title="Перезапустить уровень">
@@ -318,7 +290,7 @@ const tasks = [
                 ХВАЛА И СЛАВА ПОБЕДИТЕЛЮ ТЕМНИЦ ПЕРСИИ!
               </h3>
               <div class="text-xs font-mono text-amber-400 mb-4">
-                ДАР ВЕЛИКОГО ПАДИШАХА // УРОВЕНЬ <span id="prince-victory-level">{princeBonusLevel || 1}</span> ПОКОРЕН
+                ДАР ВЕЛИКОГО ПАДИШАХА // УРОВЕНЬ <span id="prince-victory-level">1</span> ПОКОРЕН
               </div>
 
               <div class="border-t border-b border-amber-500/40 py-4 my-3 text-amber-100 text-sm sm:text-base leading-relaxed text-justify space-y-3 font-serif bg-black/50 p-4 max-h-[45vh] overflow-y-auto">
@@ -529,7 +501,7 @@ const tasks = [
   </div>
 </Layout>
 
-<script define:vars={{ classSlug, lessonId, princeBonusLevel, princeMaxLevel, campaignStages, totalCampaignStages, sprintTerms }}>
+<script define:vars={{ classSlug, lessonId, campaignStages, totalCampaignStages, sprintTerms }}>
   const tabs = document.querySelectorAll('.tab-btn');
   const iframes = document.querySelectorAll('iframe');
 
@@ -614,11 +586,10 @@ const tasks = [
     const overlayBadgeEl = document.getElementById('prince-overlay-stage-badge');
 
     const stagesList = Array.isArray(campaignStages) ? campaignStages : [];
-    const fallbackMap = princeBonusLevel || 1;
-    const defaultStageCfg = stagesList.find((s) => s.mapLevel === fallbackMap) || stagesList[0] || {
+    const firstStageCfg = stagesList[0] || {
       stage: 1,
-      mapLevel: fallbackMap,
-      title: `Уровень ${fallbackMap}`,
+      mapLevel: 1,
+      title: 'Темницы Багдада',
       health: 3,
       time: 60,
       skipCutscenes: true
@@ -631,15 +602,13 @@ const tasks = [
       completedStages: [],
       totalStages,
       nextStage: {
-        stage: defaultStageCfg.stage,
-        mapLevel: defaultStageCfg.mapLevel,
-        title: defaultStageCfg.title
+        stage: firstStageCfg.stage,
+        mapLevel: firstStageCfg.mapLevel,
+        title: firstStageCfg.title
       },
-      campaignFinished: false,
-      _legacyFallback: true
+      campaignFinished: false
     };
 
-    const isLegacy = Boolean(progress._legacyFallback);
     const completedStages = Array.isArray(progress.completedStages) ? progress.completedStages : [];
     const lessonStage = progress.lessonStageCompleted !== null && progress.lessonStageCompleted !== undefined
       ? Number(progress.lessonStageCompleted)
@@ -672,34 +641,6 @@ const tasks = [
       }
     };
 
-    if (isLegacy) {
-      const mapLevel = Number(progress.nextStage?.mapLevel || fallbackMap);
-      const stageNum = Number(progress.nextStage?.stage || 1);
-      const stageCfg = stagesList.find((s) => s.mapLevel === mapLevel) || defaultStageCfg;
-      const targetUrl = buildPrinceIframeUrl(mapLevel, stageCfg);
-
-      activePrinceStage = {
-        stage: stageNum,
-        mapLevel,
-        title: stageCfg.title || `Уровень ${mapLevel}`,
-        isReplay: false,
-        _legacyFallback: true
-      };
-
-      if (statusBadgeEl) statusBadgeEl.innerHTML = '<span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО';
-      if (levelBadgeEl) levelBadgeEl.textContent = `УРОВЕНЬ ${mapLevel}`;
-      if (stageTitleEl) stageTitleEl.classList.add('hidden');
-      if (lockNoticeEl) lockNoticeEl.classList.add('hidden');
-      if (descEl) {
-        descEl.textContent = `За безупречное прохождение режима «Хардкор» вам открыт секретный Уровень ${mapLevel} классической игры Prince of Persia. Испытайте свои навыки в легендарном ретро-платформере!`;
-      }
-      if (overlayBadgeEl) overlayBadgeEl.textContent = `УРОВЕНЬ ${mapLevel}`;
-      setLaunchEnabled(true, `▶ ЗАПУСТИТЬ УРОВЕНЬ ${mapLevel}`);
-      setTargetIframeUrl(targetUrl);
-      princeBonusCard.classList.remove('hidden');
-      return;
-    }
-
     if (lessonStage !== null) {
       const stageCfg = stagesList.find((s) => s.stage === lessonStage) || null;
       const mapLevel = Number(progress.lessonMapLevel || stageCfg?.mapLevel || 1);
@@ -710,8 +651,7 @@ const tasks = [
         stage: lessonStage,
         mapLevel,
         title,
-        isReplay: true,
-        _legacyFallback: false
+        isReplay: true
       };
 
       if (statusBadgeEl) {
@@ -775,8 +715,7 @@ const tasks = [
       stage: stageNum,
       mapLevel,
       title,
-      isReplay: false,
-      _legacyFallback: false
+      isReplay: false
     };
 
     if (statusBadgeEl) statusBadgeEl.innerHTML = '<span>🏆</span> РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО';
@@ -796,7 +735,18 @@ const tasks = [
   }
 
   function applyLocalPrinceStageCompletion(stageNum, mapLevel) {
-    if (!princeProgressData || princeProgressData._legacyFallback) return;
+    if (!princeProgressData) {
+      const stagesList = Array.isArray(campaignStages) ? campaignStages : [];
+      princeProgressData = {
+        eligibleForHardcoreBonus: true,
+        lessonStageCompleted: null,
+        lessonMapLevel: null,
+        completedStages: [],
+        totalStages: totalCampaignStages || stagesList.length || 18,
+        nextStage: null,
+        campaignFinished: false
+      };
+    }
     if (princeProgressData.lessonStageCompleted === null || princeProgressData.lessonStageCompleted === undefined) {
       princeProgressData.lessonStageCompleted = stageNum;
       princeProgressData.lessonMapLevel = mapLevel;
@@ -836,8 +786,7 @@ const tasks = [
             princeProgressData = data.princeProgress;
           } else {
             const stagesList = Array.isArray(campaignStages) ? campaignStages : [];
-            const fallbackMap = princeBonusLevel || 1;
-            const fallbackStage = stagesList.find((s) => s.mapLevel === fallbackMap) || stagesList[0];
+            const firstStage = stagesList[0];
             princeProgressData = {
               eligibleForHardcoreBonus: Boolean(data.isHardcoreCompleted),
               lessonStageCompleted: null,
@@ -845,12 +794,11 @@ const tasks = [
               completedStages: [],
               totalStages: totalCampaignStages || stagesList.length || 18,
               nextStage: {
-                stage: fallbackStage?.stage || 1,
-                mapLevel: fallbackMap,
-                title: fallbackStage?.title || `Уровень ${fallbackMap}`
+                stage: firstStage?.stage || 1,
+                mapLevel: firstStage?.mapLevel || 1,
+                title: firstStage?.title || 'Темницы Багдада'
               },
-              campaignFinished: false,
-              _legacyFallback: true
+              campaignFinished: false
             };
           }
         }
@@ -1266,10 +1214,9 @@ const tasks = [
       console.log('Received Prince event:', data);
       if (data.action === 'level_complete') {
         const stageObj = activePrinceStage;
-        const completedLvl = Number(data.completedLevel) || stageObj?.mapLevel || princeBonusLevel || 1;
+        const completedLvl = Number(data.completedLevel) || stageObj?.mapLevel || 1;
         const currentStage = stageObj?.stage || 1;
         const totalStages = princeProgressData?.totalStages || totalCampaignStages || 18;
-        const isLegacy = Boolean(stageObj?._legacyFallback || princeProgressData?._legacyFallback);
         const stageTitle = stageObj?.title || `Уровень ${completedLvl}`;
         const isFinalWin = true;
 
@@ -1282,18 +1229,14 @@ const tasks = [
             victoryLevelSpan.textContent = String(completedLvl);
           }
           if (victoryNoticeSpan) {
-            if (isLegacy) {
-              victoryNoticeSpan.textContent = `ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ДОСТУПЕН ТОЛЬКО УРОВЕНЬ ${completedLvl}`;
-            } else if (currentStage >= totalStages) {
+            if (currentStage >= totalStages) {
               victoryNoticeSpan.textContent = `ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ПОКОРЕНЫ // ВСЕ ${totalStages} ЭТАПОВ КАМПАНИИ ПРОЙДЕНЫ!`;
             } else {
               victoryNoticeSpan.textContent = `ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ЭТАП ${currentStage} ИЗ ${totalStages} ПРОЙДЕН (ДОСТУПЕН ТОЛЬКО УРОВЕНЬ ${completedLvl})`;
             }
           }
           if (retryBtnEl) {
-            retryBtnEl.textContent = isLegacy
-              ? `🔄 Пройти Уровень ${completedLvl} заново`
-              : `🔄 Пройти Этап ${currentStage} заново`;
+            retryBtnEl.textContent = `🔄 Пройти Этап ${currentStage} заново`;
           }
           if (victoryModal) {
             victoryModal.classList.remove('hidden');
@@ -1306,9 +1249,7 @@ const tasks = [
         const timeSpentSec = princeStartTime ? Math.max(1, Math.floor((Date.now() - princeStartTime) / 1000)) : 1;
 
         // Immediately update card UI without waiting for page reload
-        if (!isLegacy) {
-          applyLocalPrinceStageCompletion(currentStage, completedLvl);
-        }
+        applyLocalPrinceStageCompletion(currentStage, completedLvl);
 
         // Send telemetry for Prince campaign stage completion
         fetch('/api/telemetry', {
@@ -1324,9 +1265,7 @@ const tasks = [
             map_level: completedLvl,
             stage_current: currentStage,
             stage_total: totalStages,
-            mission_name: isLegacy
-              ? `${fullTitle} :: Prince of Persia (Уровень ${completedLvl})`
-              : `${fullTitle} :: Prince of Persia (Этап ${currentStage}: ${stageTitle}, Уровень ${completedLvl})`,
+            mission_name: `${fullTitle} :: Prince of Persia (Этап ${currentStage}: ${stageTitle}, Уровень ${completedLvl})`,
             action_type: 'prince_complete',
             status: 'completed',
             time_spent_sec: timeSpentSec,

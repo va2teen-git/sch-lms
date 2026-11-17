@@ -174,9 +174,6 @@ import PrinceEmulator from '../../../components/PrinceEmulator.astro';
 * `time` (number) — лимит времени в минутах (`1`–`60`);
 * `skipCutscenes` (boolean) — пропуск сюжетных заставок между уровнями.
 
-#### Обратная совместимость (`princeBonusLevel` в `src/data/courses.json`):
-Для обратной совместимости в `src/data/courses.json` в описании отдельных уроков сохранён опциональный атрибут `princeBonusLevel` (число `1`–`14`, кастомный `>= 90` либо диапазон `"1-2"` / `{ "start": 1, "end": 2 }`). При наличии ответа `princeProgress` от `GET /api/progress` страница урока использует конфигурацию сквозной кампании `src/data/prince-campaign.json`, а `princeBonusLevel` служит fallback-значением.
-
 ### Управление в игре:
 * **Клавиатура:**
   * `←` / `→` — бег влево/вправо, отступление;

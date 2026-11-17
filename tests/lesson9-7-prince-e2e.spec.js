@@ -65,7 +65,7 @@ test.describe('E2E Verification: Prince of Persia Bonus Unlock, Completion & Les
     const bonusCard = page.locator('#prince-bonus-card');
     await expect(bonusCard).toBeVisible();
     await expect(bonusCard).toContainText('РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО');
-    await expect(bonusCard).toContainText('УРОВЕНЬ 1');
+    await expect(bonusCard).toContainText('ЭТАП 1 ИЗ 18');
     await expect(bonusCard).toContainText('падишах дарует тебе ключ');
     await expect(bonusCard).toContainText('PRINCE OF PERSIA (1989)');
 
@@ -117,7 +117,7 @@ test.describe('E2E Verification: Prince of Persia Bonus Unlock, Completion & Les
     await expect(victoryModal).toContainText('повелитель алгоритмов и победитель Песков Времени');
 
     // Verify Sealed Palace restriction banner
-    await expect(victoryModal).toContainText('ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1');
+    await expect(victoryModal).toContainText('ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ЭТАП 1 ИЗ 18 ПРОЙДЕН (ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1)');
 
     // Verify button to advance to level 2 DOES NOT exist
     const continueBtn = page.locator('#prince-continue-btn');
@@ -130,7 +130,7 @@ test.describe('E2E Verification: Prince of Persia Bonus Unlock, Completion & Les
 
     const retryBtn = page.locator('#prince-retry-btn');
     await expect(retryBtn).toBeVisible();
-    await expect(retryBtn).toContainText('Пройти Уровень 1 заново');
+    await expect(retryBtn).toContainText('Пройти Этап 1 заново');
 
     // Visual screenshot of Persian celebration modal
     await page.screenshot({ path: 'scratch/03_prince_persian_victory_modal.png' });

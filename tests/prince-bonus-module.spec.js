@@ -42,12 +42,12 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('prince-fs-btn');
   });
 
-  test('3. Lesson page template [id].astro integrates princeBonusLevel reward and Level 1 lock', () => {
+  test('3. Lesson page template [id].astro integrates cross-lesson Prince campaign reward and stage lock', () => {
     const lessonPagePath = path.join(rootDir, 'src', 'pages', 'lesson', '[class]', '[id].astro');
     expect(fs.existsSync(lessonPagePath)).toBeTruthy();
 
     const content = fs.readFileSync(lessonPagePath, 'utf-8');
-    expect(content).toContain('princeBonusLevel');
+    expect(content).toContain('getCampaignStages');
     expect(content).toContain('minLevel=${mapLevel}');
     expect(content).toContain('maxLevel=${mapLevel}');
     expect(content).toContain('prince-bonus-card');
@@ -64,52 +64,29 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     expect(content).toContain('PRINCE_EVENT');
   });
 
-  test('4. Curriculum catalog courses.json supports princeBonusLevel on lessons', () => {
+  test('4. Curriculum catalog courses.json has no legacy princeBonusLevel and campaign config is valid', () => {
     const coursesPath = path.join(rootDir, 'src', 'data', 'courses.json');
     const courses = JSON.parse(fs.readFileSync(coursesPath, 'utf-8'));
 
-    // Check that at least one lesson has princeBonusLevel configured
-    let hasPrinceLesson = false;
     for (const course of courses) {
       for (const lesson of course.lessons) {
-        if (lesson.princeBonusLevel !== undefined) {
-          hasPrinceLesson = true;
-          expect(typeof lesson.princeBonusLevel).toBe('number');
-          expect(lesson.princeBonusLevel).toBeGreaterThanOrEqual(1);
-          expect(lesson.princeBonusLevel).toBeLessThanOrEqual(14);
-          break;
-        }
+        expect(lesson.princeBonusLevel).toBeUndefined();
       }
-      if (hasPrinceLesson) break;
     }
-    expect(hasPrinceLesson).toBeTruthy();
 
-    // Verify specifically that 9th grade lesson 7 and 11th grade courses have princeBonusLevel === 1
-    const grade9Course = courses.find(c => c.slug === '9-класс');
-    expect(grade9Course).toBeDefined();
-    const lesson7 = grade9Course.lessons.find(l => l.id === '7');
-    expect(lesson7).toBeDefined();
-    expect(lesson7.princeBonusLevel).toBe(1);
-
-    const grade11Adv = courses.find(c => c.slug === '11-класс_углубленный');
-    expect(grade11Adv).toBeDefined();
-    const lesson33 = grade11Adv.lessons.find(l => l.id === '33');
-    expect(lesson33).toBeDefined();
-    expect(lesson33.princeBonusLevel).toBe(1);
-
-    const grade11Base = courses.find(c => c.slug === '11-класс_базовый');
-    expect(grade11Base).toBeDefined();
-    const baseLesson7 = grade11Base.lessons.find(l => l.id === '7');
-    expect(baseLesson7).toBeDefined();
-    expect(baseLesson7.princeBonusLevel).toBe(1);
+    const campaignPath = path.join(rootDir, 'src', 'data', 'prince-campaign.json');
+    const campaign = JSON.parse(fs.readFileSync(campaignPath, 'utf-8'));
+    expect(campaign.length).toBeGreaterThanOrEqual(15);
+    expect(campaign[0].stage).toBe(1);
+    expect(campaign[0].mapLevel).toBe(1);
   });
 
-  test('5. Documentation docs/components.md covers PrinceEmulator and hardcore unlock mechanism', () => {
+  test('5. Documentation docs/components.md covers PrinceEmulator, campaign config and hardcore unlock mechanism', () => {
     const docsPath = path.join(rootDir, 'docs', 'components.md');
     const content = fs.readFileSync(docsPath, 'utf-8');
 
     expect(content).toContain('PrinceEmulator.astro');
-    expect(content).toContain('princeBonusLevel');
+    expect(content).toContain('prince-campaign.json');
     expect(content).toContain('Zero-Dependency');
     expect(content).toContain('/static/prince/');
   });
@@ -161,7 +138,16 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
           unlockedNormal: 3,
           unlockedHardcore: 4,
           isNormalCompleted: true,
-          isHardcoreCompleted: true
+          isHardcoreCompleted: true,
+          princeProgress: {
+            eligibleForHardcoreBonus: true,
+            lessonStageCompleted: null,
+            lessonMapLevel: null,
+            completedStages: [],
+            totalStages: 18,
+            nextStage: { stage: 1, mapLevel: 1, title: 'Темницы Багдада' },
+            campaignFinished: false
+          }
         })
       });
     });
@@ -193,7 +179,7 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
 
     const bonusCard = page.locator('#prince-bonus-card');
     await expect(bonusCard).toBeVisible();
-    await expect(bonusCard).toContainText('УРОВЕНЬ 1');
+    await expect(bonusCard).toContainText('ЭТАП 1 ИЗ 18');
 
     await page.locator('#open-prince-btn').click();
     const iframe = page.locator('#prince-game-iframe');
@@ -215,9 +201,10 @@ test.describe('Prince of Persia Bonus Module & Integration Suite', () => {
     });
 
     await expect(page.locator('#prince-victory-modal')).toBeVisible();
-    await expect(page.locator('#prince-victory-modal')).toContainText('ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1');
+    await expect(page.locator('#prince-victory-modal')).toContainText('ЭТАП 1 ИЗ 18 ПРОЙДЕН (ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1)');
     expect(telemetryPayload).toBeTruthy();
-    expect(telemetryPayload.mission_name).toContain('Prince of Persia (Уровень 1)');
+    expect(telemetryPayload.action_type).toBe('prince_complete');
+    expect(telemetryPayload.mission_name).toContain('Prince of Persia (Этап 1:');
     expect(telemetryPayload.time_spent_sec).toBeGreaterThanOrEqual(1);
     expect(telemetryPayload.is_hardcore).toBe(true);
   });

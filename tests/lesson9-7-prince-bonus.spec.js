@@ -5,7 +5,7 @@ import path from 'path';
 test.describe('Grade 9 Lesson 7 Prince of Persia Hardcore Bonus & Persian Victory Suite', () => {
   const rootDir = process.cwd();
 
-  test('1. Curriculum configuration enables princeBonusLevel 1 for 9th grade lesson 7', () => {
+  test('1. Curriculum and campaign configuration support 9th grade lesson 7 without legacy princeBonusLevel', () => {
     const coursesPath = path.join(rootDir, 'src', 'data', 'courses.json');
     const courses = JSON.parse(fs.readFileSync(coursesPath, 'utf-8'));
 
@@ -15,7 +15,12 @@ test.describe('Grade 9 Lesson 7 Prince of Persia Hardcore Bonus & Persian Victor
     const lesson7 = grade9.lessons.find(l => l.id === '7');
     expect(lesson7).toBeDefined();
     expect(lesson7.topic).toContain('Модели и моделирование');
-    expect(lesson7.princeBonusLevel).toBe(1);
+    expect(lesson7.princeBonusLevel).toBeUndefined();
+
+    const campaignPath = path.join(rootDir, 'src', 'data', 'prince-campaign.json');
+    const campaign = JSON.parse(fs.readFileSync(campaignPath, 'utf-8'));
+    expect(campaign[0].stage).toBe(1);
+    expect(campaign[0].mapLevel).toBe(1);
   });
 
   test('2. Lesson page template contains Prince overlay and Persian Victory Celebration modal', () => {
