@@ -93,4 +93,59 @@ test.describe('Teacher Dashboard Logo-Storm Speed Metrics Suite', () => {
     const sprintText = await sprintCell.textContent();
     expect(sprintText.includes('зн/мин') || sprintText.trim() === '—').toBe(true);
   });
+
+  test('Logo-Storm column width matches level columns and speed card wraps cleanly across viewports', async ({ page }) => {
+    for (const vp of [
+      { width: 1366, height: 768, expectedMaxLines: 3 },
+      { width: 1920, height: 1080, expectedMaxLines: 2 },
+      { width: 2560, height: 1440, expectedMaxLines: 2 },
+    ]) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${baseUrl}/teacher`);
+      await page.selectOption('#filter-date', 'all');
+      await page.waitForSelector('#table-body tr.student-row td:nth-child(9) span.bg-cyan-100');
+
+      const metrics = await page.evaluate(() => {
+        const ths = Array.from(document.querySelectorAll('#progress-table thead th'));
+        const lvl1W = ths[5].getBoundingClientRect().width;
+        const lvl2W = ths[6].getBoundingClientRect().width;
+        const lvl3W = ths[7].getBoundingClientRect().width;
+        const sprintW = ths[8].getBoundingClientRect().width;
+
+        const badge = document.querySelector('#table-body tr.student-row td:nth-child(9) span.bg-cyan-100');
+        const cell = badge.closest('td');
+        const badgeRect = badge.getBoundingClientRect();
+        const cellRect = cell.getBoundingClientRect();
+        const leafSpans = Array.from(badge.querySelectorAll('span')).filter(s => s.children.length === 0);
+        const tops = leafSpans
+          .map(el => el.getBoundingClientRect().top)
+          .sort((a, b) => a - b);
+        const visualLines = [];
+        for (const t of tops) {
+          if (visualLines.length === 0 || Math.abs(t - visualLines[visualLines.length - 1]) > 4) {
+            visualLines.push(t);
+          }
+        }
+
+        return {
+          lvl1W,
+          lvl2W,
+          lvl3W,
+          sprintW,
+          fitsInCell: badgeRect.left >= cellRect.left - 1 && badgeRect.right <= cellRect.right + 1,
+          linesCount: visualLines.length,
+        };
+      });
+
+      expect(metrics.sprintW).toBeLessThanOrEqual(metrics.lvl1W + 1);
+      expect(metrics.sprintW).toBeLessThanOrEqual(metrics.lvl2W + 1);
+      expect(metrics.sprintW).toBeLessThanOrEqual(metrics.lvl3W + 1);
+      expect(Math.abs(metrics.sprintW - metrics.lvl1W)).toBeLessThanOrEqual(2);
+      expect(Math.abs(metrics.sprintW - metrics.lvl2W)).toBeLessThanOrEqual(2);
+      expect(Math.abs(metrics.sprintW - metrics.lvl3W)).toBeLessThanOrEqual(2);
+      expect(metrics.fitsInCell).toBe(true);
+      expect(metrics.linesCount).toBeGreaterThanOrEqual(2);
+      expect(metrics.linesCount).toBeLessThanOrEqual(vp.expectedMaxLines);
+    }
+  });
 });
