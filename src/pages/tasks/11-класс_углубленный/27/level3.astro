@@ -209,6 +209,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             // Таймер
             const waveTimeLeft = ref(12.0);
             let timerInterval = null;
+            let resetTimeout = null;
 
             // =================================================================
             // БАНК ИЗ 8 ВОЛН (АРХЕТИП 1: КИБЕР-МАТРИЦА РЕШЕТА ЭРАТОСФЕНА)
@@ -329,6 +330,30 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     ]
                 }
             ];
+
+            const totalWaves = waves.length;
+            const telemetry = window.LMSTelemetry.create({
+                missionName: 'Урок 27 :: Решето Эратосфена (Уровень 3)',
+                level: 3,
+                totalWaves: totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                    if (resetTimeout) clearTimeout(resetTimeout);
+                    isLocked.value = false;
+                    isErrorGlitch.value = false;
+                    errorMessage.value = '';
+                },
+                onAfkRetry: () => {
+                    if (resetTimeout) clearTimeout(resetTimeout);
+                    isLocked.value = false;
+                    isErrorGlitch.value = false;
+                    errorMessage.value = '';
+                    currentWaveIndex.value = 0;
+                    telemetry.setWave(1, totalWaves);
+                    startWave();
+                }
+            });
 
             const currentWave = computed(() => waves[currentWaveIndex.value]);
 
@@ -496,20 +521,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                 if (currentWaveIndex.value + 1 >= waves.length) {
                     // Победа в хардкоре!
-                    totalElapsedSec.value = Math.floor((Date.now() - startTime.value) / 1000);
+                    const evt = telemetry.complete({ wave: totalWaves, total_waves: totalWaves });
+                    totalElapsedSec.value = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+                    attemptsCount.value = telemetry.getState().attemptsCount;
                     gameState.value = 'victory';
-
-                    window.parent.postMessage({
-                        type: 'TELEMETRY_EVENT',
-                        mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 3)',
-                        action_type: 'level_complete',
-                        status: 'completed',
-                        success: true,
-                        attempts_count: attemptsCount.value,
-                        time_spent_sec: totalElapsedSec.value
-                    }, '*');
                 } else {
                     currentWaveIndex.value++;
+                    telemetry.advanceWave(currentWaveIndex.value + 1, { total_waves: totalWaves });
                     setTimeout(() => {
                         startWave();
                     }, 500);
@@ -520,23 +538,31 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 checkBufferStatus();
             }
 
-            function triggerHardcoreReset(reason) {
+            function triggerHardcoreReset(reason, isTimeout = false) {
                 if (timerInterval) clearInterval(timerInterval);
+                if (resetTimeout) clearTimeout(resetTimeout);
+                const sent = telemetry.hardcoreReset({
+                    wave: currentWaveIndex.value + 1,
+                    total_waves: totalWaves,
+                    isTimeout: Boolean(isTimeout)
+                });
+                attemptsCount.value = telemetry.getState().attemptsCount;
+                if (sent === false) {
+                    isLocked.value = false;
+                    isErrorGlitch.value = false;
+                    errorMessage.value = '';
+                    return;
+                }
                 isLocked.value = true;
                 isErrorGlitch.value = true;
-                attemptsCount.value++;
                 errorMessage.value = reason;
 
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: 'Урок 27 :: Решето Эратосфена (Уровень 3)',
-                    action_type: 'hardcore_reset'
-                }, '*');
-
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
+                    if (telemetry.getState().isAfkPaused) return;
                     isErrorGlitch.value = false;
                     errorMessage.value = '';
                     currentWaveIndex.value = 0; // Полный сброс на Волну 1!
+                    telemetry.setWave(1, totalWaves);
                     startWave();
                 }, 2000);
             }
@@ -545,24 +571,41 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 isLocked.value = false;
                 memoryBuffer.value = [];
                 waveTimeLeft.value = currentWave.value.timeLimit;
+                telemetry.setWave(currentWaveIndex.value + 1, totalWaves);
                 generateMatrix();
 
                 if (timerInterval) clearInterval(timerInterval);
+                if (resetTimeout) clearTimeout(resetTimeout);
                 const stepMs = 100;
                 timerInterval = setInterval(() => {
+                    if (isLocked.value || gameState.value !== 'playing' || telemetry.getState().isAfkPaused) return;
                     waveTimeLeft.value = Math.max(0, Math.round((waveTimeLeft.value - 0.1) * 10) / 10);
                     if (waveTimeLeft.value <= 0.05) {
                         waveTimeLeft.value = 0;
-                        triggerHardcoreReset('Превышено время раунда (Time-out)!');
+                        clearInterval(timerInterval);
+                        triggerHardcoreReset('Превышено время раунда (Time-out)!', true);
                     }
                 }, stepMs);
             }
 
             function startGame() {
+                if (resetTimeout) clearTimeout(resetTimeout);
                 gameState.value = 'playing';
                 currentWaveIndex.value = 0;
                 attemptsCount.value = 0;
+                isErrorGlitch.value = false;
+                errorMessage.value = '';
                 startTime.value = Date.now();
+                telemetry.reset({ allowRecomplete: true });
+                telemetry.start();
+                telemetry.markActivity();
+                telemetry.setWave(1, totalWaves);
+                telemetry.progress({
+                    wave: 1,
+                    total_waves: totalWaves,
+                    stage: 1,
+                    total_stages: totalWaves
+                });
                 startWave();
             }
 
@@ -585,6 +628,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             onUnmounted(() => {
                 window.removeEventListener('keydown', handleKeyDown);
                 if (timerInterval) clearInterval(timerInterval);
+                if (resetTimeout) clearTimeout(resetTimeout);
+                telemetry.destroy();
             });
 
             return {
