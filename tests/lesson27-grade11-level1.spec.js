@@ -19,9 +19,10 @@ test.describe('11th Grade Advanced Lesson 27: Level 1 Task Suite', () => {
     expect(code).toContain('id="phase2"');
     expect(code).toContain('id="phase3"');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.levelFail(');
     expect(code).toContain('Урок 27');
 
     // Zero-style policy

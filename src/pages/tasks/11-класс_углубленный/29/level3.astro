@@ -226,6 +226,30 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 (() => {
     const { createApp } = Vue;
     const missionName = 'Урок 29 :: Многоразрядные целые числа, задачи длинной арифметики (Уровень 3)';
+    let vm = null;
+    let resetTimeout = null;
+    const telemetry = window.LMSTelemetry.create({
+        missionName,
+        level: 3,
+        totalWaves: 10,
+        showAfkOverlay: true,
+        onAfkStop: () => {
+            if (!vm) return;
+            vm.stopWaveTimer();
+            if (resetTimeout) clearTimeout(resetTimeout);
+            vm.alarmActive = false;
+            vm.isActionBlocked = false;
+        },
+        onAfkRetry: () => {
+            if (!vm) return;
+            if (resetTimeout) clearTimeout(resetTimeout);
+            vm.alarmActive = false;
+            vm.isActionBlocked = false;
+            vm.activeWaves = generateWaves();
+            telemetry.setWave(1, vm.totalWaves);
+            vm.loadWave(1);
+        }
+    });
 
     // Синтезатор звука Web Audio API (Zero external assets)
     let audioCtx = null;
@@ -454,7 +478,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 currentWave: 1,
                 totalWaves: 10,
                 attempts: 0,
-                startTime: Date.now(),
+                totalSessionElapsed: 0,
                 phaseTimeLeft: 12.0,
                 maxPhaseTime: 12.0,
                 timerInterval: null,
@@ -471,7 +495,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 return Math.max(0, Math.min(100, (this.phaseTimeLeft / this.maxPhaseTime) * 100));
             },
             formattedFinalTime() {
-                const totalSec = Math.max(1, Math.floor((Date.now() - this.startTime) / 1000));
+                const totalSec = Math.max(1, this.totalSessionElapsed || telemetry.getTimeSpentSec());
                 const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const s = String(totalSec % 60).padStart(2, '0');
                 return `${m}:${s}`;
@@ -479,28 +503,25 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         },
 
         methods: {
-            sendTelemetry(actionType, status, success) {
-                const timeSpent = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: actionType,
-                    status: status,
-                    success: success,
-                    attempts_count: this.attempts,
-                    time_spent_sec: timeSpent
-                }, '*');
-            },
-
             startGame() {
                 getAudioContext();
+                if (resetTimeout) clearTimeout(resetTimeout);
                 this.gameState = 'playing';
                 this.currentWave = 1;
                 this.attempts = 0;
-                this.startTime = Date.now();
+                this.totalSessionElapsed = 0;
                 this.activeWaves = generateWaves();
+                telemetry.reset({ allowRecomplete: true });
+                telemetry.start();
+                telemetry.markActivity();
+                telemetry.setWave(1, this.totalWaves);
                 this.loadWave(1);
-                this.sendTelemetry('in_progress', 'in_progress', false);
+                telemetry.progress({
+                    wave: 1,
+                    total_waves: this.totalWaves,
+                    stage: 1,
+                    total_stages: this.totalWaves
+                });
             },
 
             restartGame() {
@@ -514,6 +535,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.phaseTimeLeft = this.currentWaveData.maxTime;
                 this.isActionBlocked = false;
                 this.alarmActive = false;
+                telemetry.setWave(waveNum, this.totalWaves);
 
                 this.startWaveTimer();
             },
@@ -522,11 +544,12 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.stopWaveTimer();
                 const stepMs = 50;
                 this.timerInterval = setInterval(() => {
+                    if (this.isActionBlocked || this.gameState !== 'playing' || telemetry.getState().isAfkPaused) return;
                     this.phaseTimeLeft -= (stepMs / 1000);
                     if (this.phaseTimeLeft <= 0) {
                         this.phaseTimeLeft = 0;
                         this.stopWaveTimer();
-                        this.triggerHardcoreReset('Время на обработку разряда истекло! Конвейер перегружен.');
+                        this.triggerHardcoreReset('Время на обработку разряда истекло! Конвейер перегружен.', true);
                     }
                 }, stepMs);
             },
@@ -542,6 +565,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 if (this.isActionBlocked || this.gameState !== 'playing') return;
                 this.isActionBlocked = true;
                 this.stopWaveTimer();
+                telemetry.markActivity();
 
                 const expected = this.currentWaveData.correctAction;
 
@@ -549,37 +573,53 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                     // Успех волны
                     playSuccessSound();
                     if (this.currentWave < this.totalWaves) {
+                        const nextWave = this.currentWave + 1;
+                        telemetry.advanceWave(nextWave, { total_waves: this.totalWaves });
                         setTimeout(() => {
-                            this.loadWave(this.currentWave + 1);
+                            this.loadWave(nextWave);
                         }, 250);
                     } else {
                         // Победа в хардкор-режиме
+                        const evt = telemetry.complete({ wave: this.totalWaves, total_waves: this.totalWaves });
+                        this.totalSessionElapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+                        this.attempts = telemetry.getState().attemptsCount;
                         this.gameState = 'victory';
-                        this.sendTelemetry('level_complete', 'completed', true);
                     }
                 } else {
                     // Ошибка вентиля -> Тотальный хардкор-сброс
                     let reason = `Неверный выбор вентиля! Ожидался [${expected.toUpperCase()}], выбран [${action.toUpperCase()}].`;
-                    this.triggerHardcoreReset(reason);
+                    this.triggerHardcoreReset(reason, false);
                 }
             },
 
-            triggerHardcoreReset(reason) {
+            triggerHardcoreReset(reason, isTimeout = false) {
                 this.stopWaveTimer();
+                if (resetTimeout) clearTimeout(resetTimeout);
+
+                const sent = telemetry.hardcoreReset({
+                    wave: this.currentWave,
+                    total_waves: this.totalWaves,
+                    isTimeout: Boolean(isTimeout)
+                });
+                this.attempts = telemetry.getState().attemptsCount;
+                if (sent === false) {
+                    this.alarmActive = false;
+                    this.isActionBlocked = false;
+                    return;
+                }
+
                 this.isActionBlocked = true;
                 this.alarmActive = true;
                 this.alarmMessage = reason;
-                this.attempts++;
 
                 playAlarmSiren();
                 playErrorSound();
 
-                // Телеметрия сбоя
-                this.sendTelemetry('hardcore_reset', 'failed', false);
-
                 // Через 1.8 секунды тотальный сброс прогресса на Волну 1
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
+                    if (telemetry.getState().isAfkPaused) return;
                     this.activeWaves = generateWaves();
+                    telemetry.setWave(1, this.totalWaves);
                     this.loadWave(1);
                 }, 1800);
             },
@@ -607,6 +647,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         },
 
         mounted() {
+            vm = this;
             window.addEventListener('keydown', this.handleKeydown);
 
             // Экспорт глобального тестового хука
@@ -628,6 +669,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         beforeUnmount() {
             window.removeEventListener('keydown', this.handleKeydown);
             this.stopWaveTimer();
+            if (resetTimeout) clearTimeout(resetTimeout);
+            telemetry.destroy();
         }
     }).mount('#vue-app');
 })();

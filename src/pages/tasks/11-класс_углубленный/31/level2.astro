@@ -272,9 +272,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (() => {
     const missionName = 'Урок 31 :: Словари (ассоциативные массивы, отображения). Хэш-таблицы (Уровень 2)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName,
+        level: 2,
+        totalStages: 5
+    });
     let currentPhase = 1;
     let attemptsCount = 0;
-    let startTime = Date.now();
     let timerInterval = null;
     let isLocked = false;
 
@@ -294,9 +298,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
         const timerDisplay = document.getElementById('timer-display');
         timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const secs = String(elapsed % 60).padStart(2, '0');
             if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
@@ -312,7 +317,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function triggerErrorReset(msg, callback) {
         if (isLocked) return;
         isLocked = true;
-        attemptsCount++;
+        telemetry.markActivity();
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttemptsDisplay();
 
         const fb = document.getElementById('feedback-box');
@@ -321,14 +328,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             ft.textContent = msg;
             fb.classList.remove('d-none');
         }
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'hardcore_reset',
-            status: 'failed',
-            attempts_count: attemptsCount
-        }, '*');
 
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
@@ -340,7 +339,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Завершение уровня
     function completeLevel() {
         if (timerInterval) clearInterval(timerInterval);
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const evt = telemetry.complete({ stage: 5 });
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        attemptsCount = telemetry.getState().attemptsCount;
         const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
         const secs = String(elapsed % 60).padStart(2, '0');
 
@@ -354,16 +355,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const ft = document.getElementById('final-time');
         if (fa) fa.textContent = String(attemptsCount);
         if (ft) ft.textContent = `${mins}:${secs}`;
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'level_complete',
-            status: 'completed',
-            success: true,
-            attempts_count: attemptsCount,
-            time_spent_sec: elapsed
-        }, '*');
     }
 
     // Блокировка вставки (Anti-Paste)
@@ -424,16 +415,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'in_progress',
-            status: 'phase_complete',
-            phase: 1,
-            attempts_count: attemptsCount
-        }, '*');
-
         currentPhase = 2;
+        telemetry.advanceStage(2);
         document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
         document.getElementById('phase-title').textContent = 'Многошаговый расчет структуры памяти (Separate Chaining)';
         document.getElementById('phase1').classList.add('d-none');
@@ -481,16 +464,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'in_progress',
-            status: 'phase_complete',
-            phase: 2,
-            attempts_count: attemptsCount
-        }, '*');
-
         currentPhase = 3;
+        telemetry.advanceStage(3);
         document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
         document.getElementById('phase-title').textContent = 'Пик 1: Инверсия открытой адресации';
         document.getElementById('phase2').classList.add('d-none');
@@ -539,16 +514,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'in_progress',
-            status: 'phase_complete',
-            phase: 3,
-            attempts_count: attemptsCount
-        }, '*');
-
         currentPhase = 4;
+        telemetry.advanceStage(4);
         document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
         document.getElementById('phase-title').textContent = 'Долина консолидации: Ранжирование частотного словаря';
         document.getElementById('phase3').classList.add('d-none');
@@ -617,16 +584,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'in_progress',
-            status: 'phase_complete',
-            phase: 4,
-            attempts_count: attemptsCount
-        }, '*');
-
         currentPhase = 5;
+        telemetry.advanceStage(5);
         document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
         document.getElementById('phase-title').textContent = 'Кульминация: Динамическое рехэширование потока';
         document.getElementById('phase4').classList.add('d-none');

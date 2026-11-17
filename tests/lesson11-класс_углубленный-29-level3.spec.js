@@ -26,10 +26,10 @@ test.describe('11th Grade Advanced Lesson 29: Level 3 Arcade Task Suite', () => 
     expect(code).toContain('phaseTimeLeft');
     expect(code).toContain('triggerHardcoreReset');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 29');
 
     // Zero multiple choice policy

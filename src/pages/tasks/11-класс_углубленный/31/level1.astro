@@ -201,9 +201,13 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (() => {
     const missionName = 'Урок 31 :: Словари (ассоциативные массивы, отображения). Хэш-таблицы (Уровень 1)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName,
+        level: 1,
+        totalStages: 3
+    });
     let currentPhase = 1;
     let attemptsCount = 0;
-    let startTime = Date.now();
     let timerInterval = null;
     let isLocked = false;
 
@@ -223,9 +227,10 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
     // Таймер
     function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
         const timerDisplay = document.getElementById('timer-display');
         timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = telemetry.getTimeSpentSec();
             const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const secs = String(elapsed % 60).padStart(2, '0');
             if (timerDisplay) timerDisplay.textContent = `${mins}:${secs}`;
@@ -241,7 +246,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     function triggerErrorReset(msg, callback) {
         if (isLocked) return;
         isLocked = true;
-        attemptsCount++;
+        telemetry.markActivity();
+        telemetry.hardcoreReset({ stage: currentPhase });
+        attemptsCount = telemetry.getState().attemptsCount;
         updateAttemptsDisplay();
 
         const fb = document.getElementById('feedback-box');
@@ -250,14 +257,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             ft.textContent = msg;
             fb.classList.remove('d-none');
         }
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'hardcore_reset',
-            status: 'failed',
-            attempts_count: attemptsCount
-        }, '*');
 
         setTimeout(() => {
             if (fb) fb.classList.add('d-none');
@@ -269,7 +268,9 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     // Завершение всего уровня
     function completeLevel() {
         if (timerInterval) clearInterval(timerInterval);
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const evt = telemetry.complete({ stage: 3 });
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        attemptsCount = telemetry.getState().attemptsCount;
         const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
         const secs = String(elapsed % 60).padStart(2, '0');
 
@@ -282,16 +283,6 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         const ft = document.getElementById('final-time');
         if (fa) fa.textContent = String(attemptsCount);
         if (ft) ft.textContent = `${mins}:${secs}`;
-
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: 'level_complete',
-            status: 'completed',
-            success: true,
-            attempts_count: attemptsCount,
-            time_spent_sec: elapsed
-        }, '*');
     }
 
     // =========================================================================
@@ -532,16 +523,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             // Успех Фазы 1!
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: 'in_progress',
-                status: 'phase_complete',
-                phase: 1,
-                attempts_count: attemptsCount
-            }, '*');
-
             currentPhase = 2;
+            telemetry.advanceStage(2);
             document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
             document.getElementById('phase-title').textContent = 'Открытая адресация и маркер «Надгробие» (Tombstone)';
             document.getElementById('phase1').classList.add('d-none');
@@ -770,16 +753,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             }
 
             // Успех Фазы 2!
-            window.parent.postMessage({
-                type: 'TELEMETRY_EVENT',
-                mission_name: missionName,
-                action_type: 'in_progress',
-                status: 'phase_complete',
-                phase: 2,
-                attempts_count: attemptsCount
-            }, '*');
-
             currentPhase = 3;
+            telemetry.advanceStage(3);
             document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
             document.getElementById('phase-title').textContent = 'Алфавитно-частотный словарь и двухкритериальный порядок';
             document.getElementById('phase2').classList.add('d-none');

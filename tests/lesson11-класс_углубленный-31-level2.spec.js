@@ -29,10 +29,10 @@ test.describe('11th Grade Advanced Lesson 31: Level 2 Task Suite', () => {
     // Anti-paste protection
     expect(code).toContain('onpaste="return false;"');
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 31');
 
     // Zero style policy

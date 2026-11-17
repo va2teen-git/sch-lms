@@ -26,10 +26,10 @@ test.describe('11th Grade Advanced Lesson 27: Level 2 Task Suite', () => {
     expect(code.includes('type="radio"')).toBe(false);
     expect(code.includes('<select')).toBe(false);
 
-    // Telemetry events
-    expect(code).toContain('TELEMETRY_EVENT');
-    expect(code).toContain('level_complete');
-    expect(code).toContain('hardcore_reset');
+    // Telemetry events (LMSTelemetry)
+    expect(code).toContain('LMSTelemetry');
+    expect(code).toContain('.complete(');
+    expect(code).toContain('.hardcoreReset(');
     expect(code).toContain('Урок 27');
   });
 

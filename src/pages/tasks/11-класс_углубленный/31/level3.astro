@@ -216,6 +216,30 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 (() => {
     const { createApp } = Vue;
     const missionName = 'Урок 31 :: Словари (ассоциативные массивы, отображения). Хэш-таблицы (Уровень 3)';
+    let vm = null;
+    let resetTimeout = null;
+    const telemetry = window.LMSTelemetry.create({
+        missionName,
+        level: 3,
+        totalWaves: 10,
+        showAfkOverlay: true,
+        onAfkStop: () => {
+            if (!vm) return;
+            vm.stopWaveTimer();
+            if (resetTimeout) clearTimeout(resetTimeout);
+            vm.isAlarm = false;
+            vm.isActionBlocked = false;
+        },
+        onAfkRetry: () => {
+            if (!vm) return;
+            if (resetTimeout) clearTimeout(resetTimeout);
+            vm.isAlarm = false;
+            vm.isActionBlocked = false;
+            vm.activeWaves = generateWaves();
+            telemetry.setWave(1, vm.activeWaves.length);
+            vm.loadWave(1);
+        }
+    });
 
     // Синтезатор звука Web Audio API (Zero external assets)
     let audioCtx = null;
@@ -501,14 +525,30 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
         methods: {
             startGame() {
+                if (resetTimeout) clearTimeout(resetTimeout);
                 this.gameState = 'playing';
                 this.sessionStartTime = Date.now();
+                this.totalSessionElapsed = 0;
                 this.failCount = 0;
                 this.activeWaves = generateWaves();
+                const totalW = this.activeWaves.length;
+                telemetry.reset({ allowRecomplete: true });
+                telemetry.start();
+                telemetry.markActivity();
+                telemetry.setWave(1, totalW);
+                telemetry.progress({
+                    wave: 1,
+                    total_waves: totalW,
+                    stage: 1,
+                    total_stages: totalW
+                });
                 this.loadWave(1);
             },
 
             restartGame() {
+                this.stopWaveTimer();
+                if (resetTimeout) clearTimeout(resetTimeout);
+                telemetry.reset({ allowRecomplete: true });
                 this.gameState = 'intro';
             },
 
@@ -517,12 +557,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 this.currentWave = waveNum;
                 this.isAlarm = false;
                 this.isActionBlocked = false;
+                telemetry.setWave(waveNum, this.activeWaves.length);
 
                 const waveData = this.currentWaveData;
                 this.timeLeft = waveData.maxTime;
 
                 // Запуск интервала таймера (дискретность 100 мс)
                 this.timerInterval = setInterval(() => {
+                    if (this.isActionBlocked || this.gameState !== 'playing' || telemetry.getState().isAfkPaused) return;
                     this.timeLeft = Math.max(0, this.timeLeft - 0.1);
                     if (this.timeLeft <= 0) {
                         this.handleTimeout();
@@ -538,73 +580,67 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             },
 
             handleTimeout() {
-                this.triggerHardcoreWipe('Время обработки транзакции истекло! Очередь шлюза переполнена.');
+                this.triggerHardcoreWipe('Время обработки транзакции истекло! Очередь шлюза переполнена.', true);
             },
 
             handleAction(action) {
                 if (this.isActionBlocked || this.gameState !== 'playing') return;
+                telemetry.markActivity();
 
                 const expected = this.currentWaveData.correctAction;
+                const totalW = this.activeWaves.length;
 
                 if (action === expected) {
                     // Успешный проход волны
                     playSuccessSound();
 
-                    if (this.currentWave >= 10) {
+                    if (this.currentWave >= totalW) {
                         // Финальная победа над боссом!
                         this.stopWaveTimer();
-                        this.totalSessionElapsed = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+                        const evt = telemetry.complete({ wave: totalW, total_waves: totalW });
+                        this.totalSessionElapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+                        this.failCount = telemetry.getState().attemptsCount;
                         this.gameState = 'victory';
-
-                        window.parent.postMessage({
-                            type: 'TELEMETRY_EVENT',
-                            mission_name: missionName,
-                            action_type: 'level_complete',
-                            status: 'completed',
-                            success: true,
-                            attempts_count: this.failCount,
-                            time_spent_sec: this.totalSessionElapsed
-                        }, '*');
                     } else {
                         // Переход к следующей волне
-                        this.loadWave(this.currentWave + 1);
-
-                        window.parent.postMessage({
-                            type: 'TELEMETRY_EVENT',
-                            mission_name: missionName,
-                            action_type: 'in_progress',
-                            status: 'wave_complete',
-                            wave: this.currentWave,
-                            attempts_count: this.failCount
-                        }, '*');
+                        const nextWave = this.currentWave + 1;
+                        this.loadWave(nextWave);
+                        telemetry.advanceWave(nextWave, { total_waves: totalW });
                     }
                 } else {
                     // Ошибка действия -> Тотальный вайп
                     const expReason = this.currentWaveData.errorExplanation || 'Неверное системное действие!';
-                    this.triggerHardcoreWipe(expReason);
+                    this.triggerHardcoreWipe(expReason, false);
                 }
             },
 
-            triggerHardcoreWipe(reason) {
+            triggerHardcoreWipe(reason, isTimeout = false) {
                 this.stopWaveTimer();
+                if (resetTimeout) clearTimeout(resetTimeout);
+                const totalW = this.activeWaves.length;
+                const sent = telemetry.hardcoreReset({
+                    wave: this.currentWave,
+                    total_waves: totalW,
+                    isTimeout: Boolean(isTimeout)
+                });
+                this.failCount = telemetry.getState().attemptsCount;
+                if (sent === false) {
+                    this.isAlarm = false;
+                    this.isActionBlocked = false;
+                    return;
+                }
+
                 this.isActionBlocked = true;
                 this.isAlarm = true;
                 this.alarmMessage = reason;
-                this.failCount++;
 
                 playAlarmSiren();
 
-                window.parent.postMessage({
-                    type: 'TELEMETRY_EVENT',
-                    mission_name: missionName,
-                    action_type: 'hardcore_reset',
-                    status: 'failed',
-                    attempts_count: this.failCount
-                }, '*');
-
                 // Через 1.8 секунды тотальный сброс прогресса на Волну 1 с новой генерацией
-                setTimeout(() => {
+                resetTimeout = setTimeout(() => {
+                    if (telemetry.getState().isAfkPaused) return;
                     this.activeWaves = generateWaves();
+                    telemetry.setWave(1, this.activeWaves.length);
                     this.loadWave(1);
                 }, 1800);
             },
@@ -635,6 +671,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         },
 
         mounted() {
+            vm = this;
             window.addEventListener('keydown', this.handleKeydown);
 
             // Экспорт глобального тестового хука
@@ -656,6 +693,8 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         beforeUnmount() {
             window.removeEventListener('keydown', this.handleKeydown);
             this.stopWaveTimer();
+            if (resetTimeout) clearTimeout(resetTimeout);
+            telemetry.destroy();
         }
     }).mount('#vue-app');
 })();
