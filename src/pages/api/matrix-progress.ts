@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import Database from 'better-sqlite3';
 import path from 'path';
+import { getNextCampaignStage, getTotalCampaignStages } from '../../lib/prince-campaign';
+import { hasPrinceProgressTable } from '../../lib/prince-progress';
 
 interface LessonAccum {
   normalLevels: Set<string>;
@@ -126,12 +128,36 @@ export const GET: APIRoute = async ({ request }) => {
       }
     }
 
+    const princeByLesson = new Map<string, number>();
+    const completedStages: number[] = [];
+
+    if (hasPrinceProgressTable(db)) {
+      const princeRows = db.prepare(`
+        SELECT course_slug, lesson_id, stage
+        FROM prince_progress
+        WHERE first_name = ? AND last_name = ? AND student_class = ?
+        ORDER BY stage ASC
+      `).all(firstName, lastName, className) as Array<{
+        course_slug: string;
+        lesson_id: string;
+        stage: number;
+      }>;
+
+      for (const pr of princeRows) {
+        const pKey = `${String(pr.course_slug).trim()}::${String(pr.lesson_id).trim()}`;
+        const stageNum = Number(pr.stage);
+        princeByLesson.set(pKey, stageNum);
+        completedStages.push(stageNum);
+      }
+    }
+
     const lessons: Record<
       string,
       {
         completed: boolean;
         hardcoreCompleted: boolean;
         princeCompleted: boolean;
+        princeStage: number | null;
         sprintCompleted: boolean;
         stoppedLevel: number;
       }
@@ -144,19 +170,43 @@ export const GET: APIRoute = async ({ request }) => {
         const doneCount = Math.max(entry.normalLevels.size, entry.hardcoreLevels.size);
         stoppedLevel = Math.min(3, doneCount + 1);
       }
+      const princeStage = princeByLesson.get(key) ?? null;
+      const princeCompleted = entry.princeCompleted || princeStage !== null;
 
-      if (completed || stoppedLevel > 0 || entry.princeCompleted || entry.sprintCompleted) {
+      if (completed || stoppedLevel > 0 || princeCompleted || entry.sprintCompleted) {
         lessons[key] = {
           completed,
           hardcoreCompleted: entry.isHardcoreCompleted,
-          princeCompleted: entry.princeCompleted,
+          princeCompleted,
+          princeStage,
           sprintCompleted: entry.sprintCompleted,
           stoppedLevel
         };
       }
     }
 
-    return new Response(JSON.stringify({ success: true, lessons }), {
+    for (const [pKey, princeStage] of princeByLesson.entries()) {
+      if (!lessons[pKey]) {
+        lessons[pKey] = {
+          completed: false,
+          hardcoreCompleted: false,
+          princeCompleted: true,
+          princeStage,
+          sprintCompleted: false,
+          stoppedLevel: 0
+        };
+      }
+    }
+
+    const totalStages = getTotalCampaignStages();
+    const nextStage = getNextCampaignStage(completedStages);
+    const princeCampaign = {
+      completedCount: new Set(completedStages).size,
+      totalStages,
+      currentStage: nextStage ? nextStage.stage : null
+    };
+
+    return new Response(JSON.stringify({ success: true, lessons, princeCampaign }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

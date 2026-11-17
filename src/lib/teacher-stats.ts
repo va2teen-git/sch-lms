@@ -1,4 +1,15 @@
 import coursesData from '../data/courses.json';
+import { getTotalCampaignStages } from './prince-campaign';
+import { hasPrinceProgressTable } from './prince-progress';
+
+export interface PrinceStageRecord {
+  stage: number;
+  mapLevel: number;
+  courseSlug: string;
+  lessonId: string;
+  timeSpentSec: number;
+  completedAt: string | null;
+}
 
 export interface LevelMetric {
   status: 'not_started' | 'in_progress' | 'completed' | 'reset';
@@ -87,6 +98,9 @@ export interface StudentMetric {
   princeCompleted?: boolean;
   princeBestTimeSec?: number | null;
   princeLevels?: number[];
+  princeCampaignCompleted: number;
+  princeCampaignTotal: number;
+  princeStages: PrinceStageRecord[];
   currentAttempt?: AttemptMetric | null;
   attempts: AttemptMetric[];
   lastCourseSlug?: string | null;
@@ -335,6 +349,38 @@ function getTelemetryColumns(db: any): Set<string> {
   }
 }
 
+function buildClassFilterSql(selectedClasses: string[], classExpr: string, targetParams: any[]): string {
+  if (selectedClasses.length === 0) return '';
+  const placeholders = selectedClasses.map(() => '?').join(', ');
+  targetParams.push(...selectedClasses);
+  return ` AND ${classExpr} IN (${placeholders})`;
+}
+
+function buildTestExclusionSql(classExpr: string): string {
+  return ` AND LOWER(first_name) NOT LIKE '%unknown%'
+           AND LOWER(last_name) NOT LIKE '%unknown%'
+           AND LOWER(first_name) NOT LIKE '%тест%'
+           AND LOWER(last_name) NOT LIKE '%тест%'
+           AND LOWER(first_name) NOT LIKE '%test%'
+           AND LOWER(last_name) NOT LIKE '%test%'
+           AND LOWER(first_name) NOT LIKE '%спринтер%'
+           AND LOWER(last_name) NOT LIKE '%спринтер%'
+           AND LOWER(first_name) NOT LIKE '%аттемпт%'
+           AND LOWER(last_name) NOT LIKE '%аттемпт%'
+           AND LOWER(first_name) NOT LIKE '%симулятор%'
+           AND LOWER(last_name) NOT LIKE '%симулятор%'
+           AND NOT (LOWER(first_name) = 'алиса' AND LOWER(last_name) = 'спринтер')
+           AND ${classExpr} NOT LIKE '%Unknown%'
+           AND ${classExpr} NOT LIKE '%Test%'
+           AND ${classExpr} NOT LIKE '%тест%'
+           AND ${classExpr} != '11-ИТ'`;
+}
+
+function buildStudentCanonicalKey(firstName: string, lastName: string, className: string): string {
+  const nameWords = [firstName.trim().toLowerCase(), lastName.trim().toLowerCase()].sort();
+  return `${className.trim()}_${nameWords.join('_')}`;
+}
+
 export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) {
   const courseFilter = options.courseFilter || 'all';
   const lessonFilter = options.lessonFilter || 'all';
@@ -361,12 +407,7 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
     .map(c => c.trim())
     .filter(c => c && c !== 'all');
 
-  let classCondition = '';
-  if (selectedClasses.length > 0) {
-    const placeholders = selectedClasses.map(() => '?').join(', ');
-    classCondition = ` AND COALESCE(student_class, class_name) IN (${placeholders})`;
-    params.push(...selectedClasses);
-  }
+  const classCondition = buildClassFilterSql(selectedClasses, 'COALESCE(student_class, class_name)', params);
 
   let courseCondition = '';
   if (courseFilter !== 'all') {
@@ -388,26 +429,8 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
     }
   }
 
-  let testCondition = '';
-  if (excludeTests) {
-    testCondition = ` AND LOWER(first_name) NOT LIKE '%unknown%'
-                      AND LOWER(last_name) NOT LIKE '%unknown%'
-                      AND LOWER(first_name) NOT LIKE '%тест%'
-                      AND LOWER(last_name) NOT LIKE '%тест%'
-                      AND LOWER(first_name) NOT LIKE '%test%'
-                      AND LOWER(last_name) NOT LIKE '%test%'
-                      AND LOWER(first_name) NOT LIKE '%спринтер%'
-                      AND LOWER(last_name) NOT LIKE '%спринтер%'
-                      AND LOWER(first_name) NOT LIKE '%аттемпт%'
-                      AND LOWER(last_name) NOT LIKE '%аттемпт%'
-                      AND LOWER(first_name) NOT LIKE '%симулятор%'
-                      AND LOWER(last_name) NOT LIKE '%симулятор%'
-                      AND NOT (LOWER(first_name) = 'алиса' AND LOWER(last_name) = 'спринтер')
-                      AND COALESCE(student_class, class_name) NOT LIKE '%Unknown%'
-                      AND COALESCE(student_class, class_name) NOT LIKE '%Test%'
-                      AND COALESCE(student_class, class_name) NOT LIKE '%тест%'
-                      AND COALESCE(student_class, class_name) != '11-ИТ'`;
-  }
+  const testCondition = excludeTests ? buildTestExclusionSql('COALESCE(student_class, class_name)') : '';
+  const totalCampaignStages = getTotalCampaignStages();
 
   const cols = getTelemetryColumns(db);
   const optionalCols = [
@@ -434,8 +457,7 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
     const fn = (r.first_name || '').trim();
     const ln = (r.last_name || '').trim();
     const effectiveCls = (r.student_class || r.class_name || 'Unknown').trim();
-    const nameWords = [fn.toLowerCase(), ln.toLowerCase()].sort();
-    const canonicalKey = `${effectiveCls}_${nameWords.join('_')}`;
+    const canonicalKey = buildStudentCanonicalKey(fn, ln, effectiveCls);
 
     if (!studentsMap[canonicalKey]) {
       let disp = `${ln} ${fn}`;
@@ -484,6 +506,9 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
         princeCompleted: false,
         princeBestTimeSec: null,
         princeLevels: [],
+        princeCampaignCompleted: 0,
+        princeCampaignTotal: totalCampaignStages,
+        princeStages: [],
         currentAttempt: null,
         attempts: [],
         lastCourseSlug: null,
@@ -863,6 +888,41 @@ export function computeTeacherStats(db: any, options: TeacherStatsOptions = {}) 
       s.recentEvents.shift();
     }
   });
+
+  if (hasPrinceProgressTable(db)) {
+    const princeParams: any[] = [];
+    const princeClassCondition = buildClassFilterSql(selectedClasses, 'student_class', princeParams);
+    const princeTestCondition = excludeTests ? buildTestExclusionSql('student_class') : '';
+    const princeRows = db.prepare(`
+      SELECT first_name, last_name, student_class, course_slug, lesson_id,
+             stage, map_level, time_spent_sec, completed_at
+      FROM prince_progress
+      WHERE 1=1 ${princeClassCondition} ${princeTestCondition}
+      ORDER BY stage ASC, id ASC
+    `).all(...princeParams) as any[];
+
+    for (const pr of princeRows) {
+      const fn = (pr.first_name || '').trim();
+      const ln = (pr.last_name || '').trim();
+      const cls = (pr.student_class || 'Unknown').trim();
+      const key = buildStudentCanonicalKey(fn, ln, cls);
+      const student = studentsMap[key];
+      if (!student) continue;
+
+      student.princeStages.push({
+        stage: Number(pr.stage),
+        mapLevel: Number(pr.map_level),
+        courseSlug: String(pr.course_slug || '').trim(),
+        lessonId: String(pr.lesson_id || '').trim(),
+        timeSpentSec: Number(pr.time_spent_sec || 0),
+        completedAt: pr.completed_at ? String(pr.completed_at) : null
+      });
+    }
+
+    for (const student of Object.values(studentsMap)) {
+      student.princeCampaignCompleted = student.princeStages.length;
+    }
+  }
 
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 

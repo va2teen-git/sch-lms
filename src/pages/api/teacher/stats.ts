@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 import Database from 'better-sqlite3';
 import path from 'path';
-import { computeTeacherStats, type LevelMetric, type AttemptMetric, type StudentMetric } from '../../../lib/teacher-stats';
+import { computeTeacherStats, type LevelMetric, type AttemptMetric, type StudentMetric, type PrinceStageRecord } from '../../../lib/teacher-stats';
 
-export type { LevelMetric, AttemptMetric, StudentMetric };
+export type { LevelMetric, AttemptMetric, StudentMetric, PrinceStageRecord };
 
 const dbPath = path.join(process.cwd(), 'telemetry.db');
 

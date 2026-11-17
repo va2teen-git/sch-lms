@@ -1,8 +1,11 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import coursesData from '../data/courses.json';
+import { getTotalCampaignStages } from '../lib/prince-campaign';
 import fs from 'fs';
 import path from 'path';
+
+const totalCampaignStages = getTotalCampaignStages();
 
 const COURSE_META: Record<string, { order: number; short: string }> = {
   '7-класс': { order: 1, short: '7 кл' },
@@ -64,6 +67,13 @@ const matrixCourses = [...coursesData]
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <span
+          id="prince-campaign-counter"
+          class="text-xs font-bold text-amber-900 bg-amber-100 border border-amber-400 px-2 py-0.5 select-none"
+          title="Прогресс сквозной кампании Prince of Persia"
+        >
+          ⚔️ Принц: 0 / {totalCampaignStages} этапов
+        </span>
         <span id="student-name" class="font-semibold text-xs sm:text-sm text-gray-900"></span>
         <span id="class-name" class="text-xs text-gray-600 bg-gray-100 border border-gray-300 px-2 py-0.5"></span>
         <button id="logout-btn" class="border border-red-500 text-red-600 px-2.5 py-0.5 hover:bg-red-50 transition-colors text-xs font-semibold cursor-pointer">
@@ -164,6 +174,21 @@ const matrixCourses = [...coursesData]
         const data = await res.json();
         const lessons = data?.lessons || {};
 
+        const campaignCounterEl = document.getElementById('prince-campaign-counter');
+        if (campaignCounterEl && data?.princeCampaign) {
+          const completedCount = Number(data.princeCampaign.completedCount ?? 0);
+          const totalStages = Number(data.princeCampaign.totalStages ?? 0);
+          const currentStage = data.princeCampaign.currentStage;
+          campaignCounterEl.textContent = `⚔️ Принц: ${completedCount} / ${totalStages} этапов`;
+          if (totalStages > 0 && completedCount >= totalStages) {
+            campaignCounterEl.className =
+              'text-xs font-bold text-emerald-900 bg-emerald-100 border border-emerald-500 px-2 py-0.5 select-none';
+            campaignCounterEl.title = `Кампания Prince of Persia полностью пройдена (${completedCount} из ${totalStages})!`;
+          } else if (currentStage) {
+            campaignCounterEl.title = `Прогресс кампании Prince of Persia • Следующий этап: №${currentStage}`;
+          }
+        }
+
         const cards = document.querySelectorAll<HTMLAnchorElement>('.lesson-card');
         cards.forEach((card) => {
           const cSlug = card.dataset.course;
@@ -217,7 +242,10 @@ const matrixCourses = [...coursesData]
               badgesHtml += '<span title="Пройден в режиме Хардкор">💀</span>';
               statusParts.push('💀 Хардкор');
             }
-            if (info.princeCompleted) {
+            if (typeof info.princeStage === 'number') {
+              badgesHtml += `<span class="px-1 py-0 text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-400 leading-none shrink-0" title="Пройден этап ${info.princeStage} кампании Prince of Persia">⚔️ Эт.${info.princeStage}</span>`;
+              statusParts.push(`⚔️ Принц: Этап ${info.princeStage}`);
+            } else if (info.princeCompleted) {
               badgesHtml += '<span title="Пройден бонусный уровень Prince of Persia">⚔️</span>';
               statusParts.push('⚔️ Prince of Persia');
             }
