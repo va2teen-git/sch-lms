@@ -1,0 +1,462 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 2 (Продвинутый)
+// Тема: Информационные процессы (7 класс, Урок 10)
+---
+
+<TaskLayout level={2} title="Урок 10 :: Информационные процессы (Уровень 2)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-warning pb-2 mb-3 gap-2">
+            <div>
+                <h2 class="h5 text-warning mb-0 fw-bold text-uppercase">ИНЖЕНЕРНЫЙ РАСЧЁТ ИНФОРМАЦИОННЫХ ПРОЦЕССОВ</h2>
+                <div class="small text-secondary">7 КЛАСС // УРОК 10: ИНФОРМАЦИОННЫЕ ПРОЦЕССЫ (УРОВЕНЬ 2)</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span id="phase-badge" class="badge bg-warning text-dark border border-warning rounded-0 px-3 py-2">Шаг 1 из 5</span>
+                <span class="badge bg-black text-danger border border-secondary rounded-0 px-3 py-2">
+                    Ошибок: <span id="attempts-display">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Оповещение об ошибке -->
+        <div id="error-box" class="alert alert-danger bg-black border border-danger text-danger rounded-0 d-none mb-3 py-2" role="alert">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <div class="small">
+                    <strong>[ОШИБКА РАСЧЁТА]</strong> <span id="error-message">Неверное значение.</span>
+                </div>
+                <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+            </div>
+        </div>
+
+        <!-- Экран успеха -->
+        <div id="success-screen" class="card bg-black border border-warning rounded-0 p-4 text-center d-none my-4">
+            <div class="badge bg-warning text-dark rounded-0 px-4 py-2 mb-3 fs-6">
+                РАСЧЁТЫ ПОДТВЕРЖДЕНЫ // УРОВЕНЬ 2 ПРОЙДЕН
+            </div>
+            <h3 class="h4 text-warning text-uppercase mb-2 fw-bold">Параметры информационных процессов вычислены!</h3>
+            <p class="text-light small mb-4 mx-auto" style="max-width: 580px;">
+                Вы освоили прямой и обратный расчёт пропускной способности каналов, перевод битов в байты, оценку резервного хранения после сжатия и учёт повторной передачи пакетов при помехах.
+            </p>
+            <div class="d-inline-flex flex-wrap justify-content-center gap-4 border border-secondary bg-dark p-3 rounded-0 mx-auto">
+                <div>
+                    <div class="text-secondary small">Затрачено времени</div>
+                    <div id="stat-time" class="text-warning fs-5 fw-bold">0 с</div>
+                </div>
+                <div class="border-end border-secondary d-none d-sm-block"></div>
+                <div>
+                    <div class="text-secondary small">Ошибок</div>
+                    <div id="stat-attempts" class="text-danger fs-5 fw-bold">0</div>
+                </div>
+                <div class="border-end border-secondary d-none d-sm-block"></div>
+                <div>
+                    <div class="text-secondary small">Статус</div>
+                    <div class="text-info fs-5 fw-bold">100% ЗАЧЁТ</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ФАЗА 1: Прямой расчёт объёма передачи (I = v * t) -->
+        <div id="phase1" class="phase-container">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-warning text-dark rounded-0">ФАЗА 1: ПРЯМОЙ РАСЧЁТ ПЕРЕДАЧИ</span>
+                    <span class="text-secondary small">ЦЕЛЬ: ОБЪЁМ ДАННЫХ (БАЙТ)</span>
+                </div>
+                <p id="p1-desc" class="text-light small mb-3"></p>
+                <div class="border border-secondary bg-dark p-2 mb-3 small text-secondary">
+                    Вводите только целое число байт (ручной ввод с клавиатуры; вставка из буфера отключена).
+                </div>
+                <div class="d-flex flex-column flex-sm-row align-items-stretch gap-2" style="max-width: 580px;">
+                    <input id="p1-input" type="text" inputmode="numeric" autocomplete="off"
+                           class="form-control bg-dark text-warning border-warning rounded-0 w-100"
+                           placeholder="Введите объём в байтах..." style="min-height: 48px;" />
+                    <button id="p1-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 text-uppercase flex-shrink-0" style="min-height: 48px;">
+                        Проверить [1/5]
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ФАЗА 2: Многошаговый расчёт с конвертацией (бит/с -> байт/с * t) -->
+        <div id="phase2" class="phase-container d-none">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-warning text-dark rounded-0">ФАЗА 2: КОНВЕРТАЦИЯ ЕДИНИЦ ПРИ ПЕРЕДАЧЕ</span>
+                    <span class="text-secondary small">ЦЕЛЬ: ОБЪЁМ (БАЙТ)</span>
+                </div>
+                <p id="p2-desc" class="text-light small mb-3"></p>
+                <div class="border border-secondary bg-dark p-2 mb-3 small text-info">
+                    Напоминание: в одном байте содержится ровно <strong>8 бит</strong>. Переведите скорость из бит/с в байт/с и умножьте на время.
+                </div>
+                <div class="d-flex flex-column flex-sm-row align-items-stretch gap-2" style="max-width: 580px;">
+                    <input id="p2-input" type="text" inputmode="numeric" autocomplete="off"
+                           class="form-control bg-dark text-warning border-warning rounded-0 w-100"
+                           placeholder="Введите объём в байтах..." style="min-height: 48px;" />
+                    <button id="p2-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 text-uppercase flex-shrink-0" style="min-height: 48px;">
+                        Проверить [2/5]
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ФАЗА 3: Пик 1 — Инверсия (поиск скорости канала по Кбайт и времени) -->
+        <div id="phase3" class="phase-container d-none">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-danger text-light rounded-0">ФАЗА 3: ОБРАТНАЯ ЗАДАЧА (СКОРОСТЬ КАНАЛА)</span>
+                    <span class="text-secondary small">ЦЕЛЬ: ПРОПУСКНАЯ СПОСОБНОСТЬ (БАЙТ/С)</span>
+                </div>
+                <p id="p3-desc" class="text-light small mb-3"></p>
+                <div class="border border-secondary bg-dark p-2 mb-3 small text-info">
+                    Справочно: <strong>1 Кбайт = 1024 байта</strong>. Выразите объём файла в байтах и разделите на длительность передачи.
+                </div>
+                <div class="d-flex flex-column flex-sm-row align-items-stretch gap-2" style="max-width: 580px;">
+                    <input id="p3-input" type="text" inputmode="numeric" autocomplete="off"
+                           class="form-control bg-dark text-warning border-warning rounded-0 w-100"
+                           placeholder="Введите скорость в байт/с..." style="min-height: 48px;" />
+                    <button id="p3-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 text-uppercase flex-shrink-0" style="min-height: 48px;">
+                        Проверить [3/5]
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ФАЗА 4: Долина консолидации — Обработка (сжатие) и резервное хранение -->
+        <div id="phase4" class="phase-container d-none">
+            <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-info text-dark rounded-0">ФАЗА 4: ОБРАБОТКА И РЕЗЕРВНОЕ ХРАНЕНИЕ</span>
+                    <span class="text-secondary small">ЦЕЛЬ: СУММАРНЫЙ ОБЪЁМ АРХИВОВ (КБАЙТ)</span>
+                </div>
+                <p id="p4-desc" class="text-light small mb-3"></p>
+                <div class="border border-secondary bg-dark p-2 mb-3 small text-secondary">
+                    Учтите сначала уменьшение объёма при сжатии (обработке), а затем количество сохранённых резервных копий (хранение).
+                </div>
+                <div class="d-flex flex-column flex-sm-row align-items-stretch gap-2" style="max-width: 580px;">
+                    <input id="p4-input" type="text" inputmode="numeric" autocomplete="off"
+                           class="form-control bg-dark text-warning border-warning rounded-0 w-100"
+                           placeholder="Введите общий объём в Кбайтах..." style="min-height: 48px;" />
+                    <button id="p4-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 text-uppercase flex-shrink-0" style="min-height: 48px;">
+                        Проверить [4/5]
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ФАЗА 5: Кульминация — Пакетная передача с округлением вверх и помехами -->
+        <div id="phase5" class="phase-container d-none">
+            <div class="card bg-black border border-danger rounded-0 p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-danger text-light rounded-0">ФАЗА 5: ПАКЕТНАЯ ПЕРЕДАЧА И ЗАЩИТА ОТ ШУМА</span>
+                    <span class="text-secondary small">ЦЕЛЬ: ВСЕГО ПЕРЕДАНО ПАКЕТОВ (ШТ.)</span>
+                </div>
+                <p id="p5-desc" class="text-light small mb-3"></p>
+                <div class="border border-secondary bg-dark p-2 mb-3 small text-warning">
+                    Внимание на краевое условие: даже неполный остаток данных занимает целый отдельный пакет, а повреждённые шумом пакеты пересылаются повторно.
+                </div>
+                <div class="d-flex flex-column flex-sm-row align-items-stretch gap-2" style="max-width: 580px;">
+                    <input id="p5-input" type="text" inputmode="numeric" autocomplete="off"
+                           class="form-control bg-dark text-warning border-warning rounded-0 w-100"
+                           placeholder="Введите количество пакетов..." style="min-height: 48px;" />
+                    <button id="p5-btn" type="button" class="btn btn-warning text-dark fw-bold rounded-0 px-4 text-uppercase flex-shrink-0" style="min-height: 48px;">
+                        Завершить [5/5]
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const missionName = 'Урок 10 :: Информационные процессы (Уровень 2)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
+
+    let attempts = 0;
+    let isLocked = false;
+
+    function parseCleanNumber(inputEl) {
+        const raw = inputEl ? inputEl.value : '';
+        if (!raw) return NaN;
+        const normalized = String(raw)
+            .trim()
+            .replace(/\s+/g, '')
+            .replace(',', '.')
+            .replace(/(байт[аов]*|кбайт[аов]*|бит[аов]*\/с|байт\/с|пакет[аов]*|шт\.?|сек\.?|с|%)$/i, '');
+        if (!/^-?\d+(\.\d+)?$/.test(normalized)) return NaN;
+        const num = Number(normalized);
+        return Number.isFinite(num) ? num : NaN;
+    }
+
+    function triggerError(message, retryCallback) {
+        if (isLocked) return;
+        isLocked = true;
+
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) errorMessage.textContent = message;
+        if (errorBox) errorBox.classList.remove('d-none');
+
+        telemetry.hardcoreReset({ action_log: [{ action: 'error', detail: message }] });
+        attempts = telemetry.getState().attemptsCount;
+        const attemptsDisplay = document.getElementById('attempts-display');
+        if (attemptsDisplay) attemptsDisplay.textContent = String(attempts);
+
+        setTimeout(() => {
+            if (errorBox) errorBox.classList.add('d-none');
+            isLocked = false;
+            if (retryCallback) retryCallback();
+        }, 1300);
+    }
+
+    function pickDistinct(pool, lastSignature) {
+        const filtered = pool.filter(item => item.sig !== lastSignature);
+        const candidates = filtered.length > 0 ? filtered : pool;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    ['p1-input', 'p2-input', 'p3-input', 'p4-input', 'p5-input'].forEach((id, idx) => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById(`p${idx + 1}-btn`)?.click();
+                }
+            });
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 1: Прямой расчёт объёма передачи (I = v * t)
+    // =========================================================================
+    const P1_SPEEDS = [200, 250, 300, 400, 500, 600, 800];
+    const P1_TIMES = [3, 4, 5, 6, 8, 9, 12];
+    let p1Correct = 0;
+    let p1LastSig = '';
+
+    function initPhase1() {
+        const pool = [];
+        P1_SPEEDS.forEach(v => {
+            P1_TIMES.forEach(t => {
+                pool.push({ v, t, sig: `${v}x${t}` });
+            });
+        });
+        const chosen = pickDistinct(pool, p1LastSig);
+        p1LastSig = chosen.sig;
+        p1Correct = chosen.v * chosen.t;
+
+        const desc = document.getElementById('p1-desc');
+        if (desc) {
+            desc.innerHTML = `Метеодатчик школьной станции передаёт показания по проводному каналу связи со скоростью <strong>${chosen.v} байт/с</strong>. Непрерывная передача данных длилась ровно <strong>${chosen.t} с</strong>. Какой объём данных (в <strong>байтах</strong>) поступил на приёмник за это время?`;
+        }
+        const input = document.getElementById('p1-input');
+        if (input) input.value = '';
+    }
+
+    document.getElementById('p1-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const val = parseCleanNumber(document.getElementById('p1-input'));
+        if (Number.isFinite(val) && Math.abs(val - p1Correct) < 1e-6) {
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+            telemetry.advanceStage(2, { action_log: [{ action: 'phase1_complete' }] });
+            initPhase2();
+        } else {
+            triggerError(`Неверное значение (${Number.isFinite(val) ? val : 'пусто'}). Используйте формулу I = v × t. Перегенерация варианта...`, initPhase1);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: Многошаговый расчёт с конвертацией (бит/с -> байт/с -> байты)
+    // =========================================================================
+    const P2_BIT_SPEEDS = [800, 1600, 2400, 3200, 4000, 4800, 6400];
+    const P2_TIMES = [3, 4, 5, 6, 7, 8];
+    let p2Correct = 0;
+    let p2LastSig = '';
+
+    function initPhase2() {
+        const pool = [];
+        P2_BIT_SPEEDS.forEach(bps => {
+            P2_TIMES.forEach(t => {
+                pool.push({ bps, t, sig: `${bps}x${t}` });
+            });
+        });
+        const chosen = pickDistinct(pool, p2LastSig);
+        p2LastSig = chosen.sig;
+        p2Correct = (chosen.bps / 8) * chosen.t;
+
+        const desc = document.getElementById('p2-desc');
+        if (desc) {
+            desc.innerHTML = `Беспроводной канал передаёт закодированное сообщение со скоростью <strong>${chosen.bps} бит/с</strong> на протяжении <strong>${chosen.t} с</strong>. Рассчитайте размер полученного сообщения в <strong>байтах</strong>.`;
+        }
+        const input = document.getElementById('p2-input');
+        if (input) input.value = '';
+    }
+
+    document.getElementById('p2-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const val = parseCleanNumber(document.getElementById('p2-input'));
+        if (Number.isFinite(val) && Math.abs(val - p2Correct) < 1e-6) {
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+            telemetry.advanceStage(3, { action_log: [{ action: 'phase2_complete' }] });
+            initPhase3();
+        } else {
+            triggerError(`Неверное значение (${Number.isFinite(val) ? val : 'пусто'}). Разделите скорость в бит/с на 8, чтобы получить байт/с, затем умножьте на время. Перегенерация...`, initPhase2);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: Инверсия — поиск скорости передачи (v = I / t)
+    // =========================================================================
+    const P3_VARIANTS = [
+        { kb: 2, t: 4 },   // 2048 / 4 = 512
+        { kb: 2, t: 8 },   // 2048 / 8 = 256
+        { kb: 3, t: 6 },   // 3072 / 6 = 512
+        { kb: 3, t: 12 },  // 3072 / 12 = 256
+        { kb: 4, t: 8 },   // 4096 / 8 = 512
+        { kb: 4, t: 16 },  // 4096 / 16 = 256
+        { kb: 5, t: 10 },  // 5120 / 10 = 512
+        { kb: 6, t: 12 },  // 6144 / 12 = 512
+        { kb: 8, t: 8 },   // 8192 / 8 = 1024
+        { kb: 8, t: 16 }   // 8192 / 16 = 512
+    ];
+    let p3Correct = 0;
+    let p3LastSig = '';
+
+    function initPhase3() {
+        const pool = P3_VARIANTS.map(v => ({ ...v, sig: `${v.kb}kb_${v.t}s` }));
+        const chosen = pickDistinct(pool, p3LastSig);
+        p3LastSig = chosen.sig;
+        p3Correct = (chosen.kb * 1024) / chosen.t;
+
+        const desc = document.getElementById('p3-desc');
+        if (desc) {
+            desc.innerHTML = `Текстовый отчёт размером <strong>${chosen.kb} Кбайт</strong> был полностью передан от источника к приёмнику за <strong>${chosen.t} с</strong>. Определите скорость передачи информации по этому каналу в <strong>байт/с</strong>.`;
+        }
+        const input = document.getElementById('p3-input');
+        if (input) input.value = '';
+    }
+
+    document.getElementById('p3-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const val = parseCleanNumber(document.getElementById('p3-input'));
+        if (Number.isFinite(val) && Math.abs(val - p3Correct) < 1e-6) {
+            document.getElementById('phase3').classList.add('d-none');
+            document.getElementById('phase4').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+            telemetry.advanceStage(4, { action_log: [{ action: 'phase3_complete' }] });
+            initPhase4();
+        } else {
+            triggerError(`Неверное значение (${Number.isFinite(val) ? val : 'пусто'}). Переведите Кбайты в байты (× 1024) и разделите на время в секундах. Перегенерация...`, initPhase3);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 4: Долина консолидации — Сжатие и резервное копирование
+    // =========================================================================
+    const P4_VARIANTS = [
+        { files: 4, sizeKb: 60, ratio: 2, copies: 2 },
+        { files: 6, sizeKb: 40, ratio: 2, copies: 2 },
+        { files: 8, sizeKb: 50, ratio: 4, copies: 2 },
+        { files: 5, sizeKb: 80, ratio: 2, copies: 3 },
+        { files: 6, sizeKb: 60, ratio: 3, copies: 2 },
+        { files: 8, sizeKb: 40, ratio: 4, copies: 3 },
+        { files: 10, sizeKb: 30, ratio: 3, copies: 2 },
+        { files: 12, sizeKb: 20, ratio: 2, copies: 2 }
+    ];
+    let p4Correct = 0;
+    let p4LastSig = '';
+
+    function initPhase4() {
+        const pool = P4_VARIANTS.map(v => ({ ...v, sig: `${v.files}_${v.sizeKb}_${v.ratio}_${v.copies}` }));
+        const chosen = pickDistinct(pool, p4LastSig);
+        p4LastSig = chosen.sig;
+        const rawTotal = chosen.files * chosen.sizeKb;
+        const compressed = rawTotal / chosen.ratio;
+        p4Correct = compressed * chosen.copies;
+
+        const desc = document.getElementById('p4-desc');
+        if (desc) {
+            desc.innerHTML = `Перед сохранением в хранилище школьник подготовил <strong>${chosen.files} презентаций</strong> по <strong>${chosen.sizeKb} Кбайт</strong> каждая. Программа-архиватор сжала общий объём данных в <strong>${chosen.ratio} раза</strong>. Для защиты от потери данных в итоге сохранили <strong>${chosen.copies} одинаковые копии</strong> полученного архива (на ПК и на внешнем носителе). Сколько всего <strong>Кбайт</strong> заняли все сохранённые копии архива?`;
+        }
+        const input = document.getElementById('p4-input');
+        if (input) input.value = '';
+    }
+
+    document.getElementById('p4-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const val = parseCleanNumber(document.getElementById('p4-input'));
+        if (Number.isFinite(val) && Math.abs(val - p4Correct) < 1e-6) {
+            document.getElementById('phase4').classList.add('d-none');
+            document.getElementById('phase5').classList.remove('d-none');
+            document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+            telemetry.advanceStage(5, { action_log: [{ action: 'phase4_complete' }] });
+            initPhase5();
+        } else {
+            triggerError(`Неверное значение (${Number.isFinite(val) ? val : 'пусто'}). Найдите суммарный размер файлов, разделите на коэффициент сжатия и умножьте на число копий. Перегенерация...`, initPhase4);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 5: Кульминация — Пакеты, округление вверх и повтор из-за помех
+    // =========================================================================
+    const P5_VARIANTS = [
+        { totalBytes: 250, packSize: 100, retries: 1 }, // ceil(2.5)=3 + 1 = 4
+        { totalBytes: 340, packSize: 100, retries: 2 }, // ceil(3.4)=4 + 2 = 6
+        { totalBytes: 420, packSize: 100, retries: 1 }, // ceil(4.2)=5 + 1 = 6
+        { totalBytes: 510, packSize: 100, retries: 3 }, // ceil(5.1)=6 + 3 = 9
+        { totalBytes: 450, packSize: 200, retries: 2 }, // ceil(2.25)=3 + 2 = 5
+        { totalBytes: 650, packSize: 200, retries: 1 }, // ceil(3.25)=4 + 1 = 5
+        { totalBytes: 850, packSize: 200, retries: 2 }, // ceil(4.25)=5 + 2 = 7
+        { totalBytes: 720, packSize: 200, retries: 3 }  // ceil(3.6)=4 + 3 = 7
+    ];
+    let p5Correct = 0;
+    let p5LastSig = '';
+
+    function initPhase5() {
+        const pool = P5_VARIANTS.map(v => ({ ...v, sig: `${v.totalBytes}_${v.packSize}_${v.retries}` }));
+        const chosen = pickDistinct(pool, p5LastSig);
+        p5LastSig = chosen.sig;
+        p5Correct = Math.ceil(chosen.totalBytes / chosen.packSize) + chosen.retries;
+
+        const desc = document.getElementById('p5-desc');
+        if (desc) {
+            desc.innerHTML = `Сетевой протокол разбивает сообщение размером <strong>${chosen.totalBytes} байт</strong> на пакеты; в каждый пакет помещается не более <strong>${chosen.packSize} байт</strong> данных. Из-за информационного шума в канале связи <strong>${chosen.retries}</strong> из отправленных пакетов пришли с искажением, и их пришлось отправить повторно. Сколько <strong>всего пакетов</strong> было передано по каналу связи?`;
+        }
+        const input = document.getElementById('p5-input');
+        if (input) input.value = '';
+    }
+
+    document.getElementById('p5-btn')?.addEventListener('click', () => {
+        if (isLocked) return;
+        const val = parseCleanNumber(document.getElementById('p5-input'));
+        if (Number.isFinite(val) && Math.abs(val - p5Correct) < 1e-6) {
+            const totalSec = telemetry.getState().timeSpentSec;
+            document.getElementById('stat-time').textContent = `${totalSec} с`;
+            document.getElementById('stat-attempts').textContent = String(attempts);
+
+            document.getElementById('phase5').classList.add('d-none');
+            document.getElementById('success-screen').classList.remove('d-none');
+            const badge = document.getElementById('phase-badge');
+            badge.className = 'badge bg-warning text-dark border border-warning rounded-0 px-3 py-2';
+            badge.textContent = 'Уровень пройден!';
+
+            telemetry.complete({ action_log: [{ action: 'phase5_complete' }] });
+        } else {
+            triggerError(`Неверное значение (${Number.isFinite(val) ? val : 'пусто'}). Остаток байт требует дополнительного целого пакета (округление вверх) + повторные отправки из-за помех. Перегенерация...`, initPhase5);
+        }
+    });
+
+    initPhase1();
+})();
+</script>

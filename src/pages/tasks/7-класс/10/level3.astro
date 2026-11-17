@@ -1,0 +1,731 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада)
+// Тема: Информационные процессы (7 класс, Урок 10)
+// Архетип 2: Flow Router / Data Pipelines (Конвейер информационных процессов)
+---
+
+<TaskLayout level={3} title="Урок 10 :: Информационные процессы (Уровень 3)">
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Верхняя панель HUD -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-danger pb-2 mb-3 gap-2">
+            <div>
+                <h2 class="h5 text-danger mb-0 fw-bold text-uppercase">МАРШРУТИЗАТОР ИНФОРМАЦИОННЫХ ПОТОКОВ</h2>
+                <div class="small text-secondary">7 КЛАСС // УРОК 10: ИНФОРМАЦИОННЫЕ ПРОЦЕССЫ (АРКАДА)</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-danger text-light border border-danger rounded-0 px-3 py-2">
+                    Волна <span v-text="currentWaveIndex + 1">1</span> из <span v-text="totalWaves">10</span>
+                </span>
+                <span class="badge bg-black text-warning border border-secondary rounded-0 px-3 py-2">
+                    Сбросов: <span v-text="attemptsCount">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Стартовый экран (Intro) -->
+        <div v-if="!started && !completed" class="card bg-black border border-danger rounded-0 p-4 text-center my-3">
+            <div class="badge bg-danger text-light rounded-0 px-3 py-2 mb-3 mx-auto">
+                РЕЖИМ РЕАЛЬНОГО ВРЕМЕНИ // HARDCORE PIPELINE
+            </div>
+            <h3 class="h4 text-light fw-bold text-uppercase mb-3">Операция «Чистый канал»</h3>
+            <p class="text-light small mb-3 mx-auto" style="max-width: 560px;">
+                Вы управляете узлом маршрутизации информационных процессов. На каждой из 10 волн поворачивайте сегменты шины кликом мыши, чтобы соединить входной порт <strong>IN</strong> с нужным выходным терминалом (<strong>ХРАНЕНИЕ</strong>, <strong>ОБРАБОТКА</strong> или <strong>ПЕРЕДАЧА</strong>), обходя узлы <strong>ШУМА</strong>.
+            </p>
+            <div class="d-flex flex-wrap justify-content-center gap-3 small text-secondary mb-4">
+                <span class="border border-secondary bg-dark px-2 py-1 text-light">Клик по ячейке — поворот на 90°</span>
+                <span class="border border-secondary bg-dark px-2 py-1 text-light">SPACE / Enter / Клик по OUT — пуск</span>
+                <span class="border border-danger bg-dark px-2 py-1 text-danger">Ошибка или таймер → сброс на Волну 1</span>
+            </div>
+            <div>
+                <button id="start-btn" type="button" @click="startGame"
+                        class="btn btn-danger btn-lg rounded-0 px-5 fw-bold text-uppercase" style="min-height: 52px;">
+                    Начать миссию
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран аварийного сброса -->
+        <div v-if="alarmActive" class="alert alert-danger bg-black border border-danger text-danger rounded-0 p-3 mb-3 text-center">
+            <div class="h5 fw-bold text-uppercase mb-1">[АВАРИЙНЫЙ СБРОС КОНВЕЙЕРА]</div>
+            <div class="small text-light mb-2" v-text="alarmMessage"></div>
+            <div class="small text-warning">Откат на Волну 1 через секунду...</div>
+        </div>
+
+        <!-- Экран победы -->
+        <div v-if="completed" id="success-screen" class="card bg-black border border-success rounded-0 p-4 text-center my-4">
+            <div class="badge bg-success text-dark rounded-0 px-4 py-2 mb-3 fs-6 mx-auto">
+                ВСЕ 10 ВОЛН ПРОЙДЕНЫ // УРОВЕНЬ 3 ЗАЧТЁН
+            </div>
+            <h3 class="h4 text-success text-uppercase mb-2 fw-bold">Магистраль информационных процессов стабилизирована!</h3>
+            <p class="text-light small mb-4 mx-auto" style="max-width: 560px;">
+                Вы безошибочно провели все 10 потоков данных через коммутационную сеть под нарастающим давлением времени и полностью исключили искажения от информационного шума.
+            </p>
+            <div class="d-inline-flex flex-wrap justify-content-center gap-4 border border-secondary bg-dark p-3 rounded-0 mx-auto">
+                <div>
+                    <div class="text-secondary small">Пройдено волн</div>
+                    <div class="text-success fs-5 fw-bold">10 / 10</div>
+                </div>
+                <div class="border-end border-secondary d-none d-sm-block"></div>
+                <div>
+                    <div class="text-secondary small">Сбросов</div>
+                    <div class="text-warning fs-5 fw-bold" v-text="attemptsCount">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основная игровая арена -->
+        <div v-if="started && !completed" id="arcade-arena">
+            <!-- Таймер волны -->
+            <div class="card bg-black border border-secondary rounded-0 p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center small mb-1">
+                    <span class="text-light fw-bold">
+                        ПОТОК: <span class="text-info" v-text="wave.packetLabel"></span>
+                    </span>
+                    <span class="fw-bold" :class="timeLeft <= 2.2 ? 'text-danger' : 'text-warning'">
+                        <span v-text="timeLeft.toFixed(1)">0.0</span> с
+                    </span>
+                </div>
+                <div class="progress rounded-0 bg-dark" style="height: 12px;">
+                    <div class="progress-bar" :class="timerBarClass" :style="timerStyle"></div>
+                </div>
+            </div>
+
+            <!-- Пространственная сетка коммутации: IN -> GRID -> OUT -->
+            <div class="card bg-black border border-secondary rounded-0 p-2 p-sm-3 mb-3">
+                <div class="d-flex align-items-stretch gap-2">
+                    <!-- Левый столбец: ВХОД (IN) -->
+                    <div class="d-flex flex-column justify-content-between gap-2" style="width: 96px; flex-shrink: 0;">
+                        <div v-for="r in gridSize" :key="'in-' + r"
+                             class="flex-fill border rounded-0 d-flex flex-column justify-content-center align-items-center text-center p-1"
+                             :class="(r - 1) === wave.inRow ? 'border-info bg-dark text-info fw-bold' : 'border-secondary bg-black text-secondary opacity-25'"
+                             style="min-height: 64px;">
+                            <template v-if="(r - 1) === wave.inRow">
+                                <div style="font-size: 0.65rem;" class="text-uppercase">ВХОД IN</div>
+                                <div class="lh-1 mt-1" style="font-size: 0.72rem;" v-text="wave.targetShort"></div>
+                                <div style="font-size: 0.75rem;">──▶</div>
+                            </template>
+                            <template v-else>
+                                <div style="font-size: 0.65rem;">—</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Центр: Поворотная сетка роутеров -->
+                    <div class="flex-fill d-flex flex-column gap-2" style="min-width: 0;">
+                        <div v-for="(rowArr, rIdx) in grid" :key="'row-' + rIdx" class="d-flex gap-2">
+                            <button v-for="(cell, cIdx) in rowArr" :key="'cell-' + rIdx + '-' + cIdx"
+                                    type="button"
+                                    @click="rotateCell(rIdx, cIdx)"
+                                    :disabled="cell.kind === 'noise' || cell.kind === 'block' || alarmActive || pulseAnimating"
+                                    :data-row="rIdx"
+                                    :data-col="cIdx"
+                                    :data-kind="cell.kind"
+                                    :data-rot="cell.rot"
+                                    :data-energized="cell.energized ? 'true' : 'false'"
+                                    class="btn rounded-0 flex-fill p-1 d-flex flex-column align-items-center justify-content-center position-relative"
+                                    :class="cellClass(cell)"
+                                    style="min-height: 64px; min-width: 48px;">
+                                <!-- Узел шума -->
+                                <template v-if="cell.kind === 'noise'">
+                                    <div class="fw-bold text-danger" style="font-size: 0.75rem;">⚡ ШУМ</div>
+                                    <div class="text-secondary" style="font-size: 0.62rem;">ПОМЕХА</div>
+                                </template>
+                                <!-- Заблокированный узел -->
+                                <template v-else-if="cell.kind === 'block'">
+                                    <div class="fw-bold text-secondary" style="font-size: 0.75rem;">⛔ БЛОК</div>
+                                </template>
+                                <!-- Поворотный канал (SVG) -->
+                                <template v-else>
+                                    <svg viewBox="0 0 60 60" width="44" height="44" class="d-block">
+                                        <!-- Прямой канал (rot=0: LEFT-RIGHT) -->
+                                        <g :transform="'rotate(' + (cell.rot * 90) + ' 30 30)'">
+                                            <template v-if="cell.kind === 'straight'">
+                                                <line x1="0" y1="30" x2="60" y2="30"
+                                                      :stroke="cell.pulse ? '#ffffff' : (cell.energized ? '#20c997' : '#6c757d')"
+                                                      stroke-width="10" stroke-linecap="butt" />
+                                            </template>
+                                            <!-- Уголок (rot=0: UP-RIGHT) -->
+                                            <template v-else-if="cell.kind === 'elbow'">
+                                                <path d="M 30 0 L 30 30 L 60 30" fill="none"
+                                                      :stroke="cell.pulse ? '#ffffff' : (cell.energized ? '#20c997' : '#6c757d')"
+                                                      stroke-width="10" stroke-linejoin="miter" />
+                                            </template>
+                                            <!-- Тройник (rot=0: UP-RIGHT-LEFT) -->
+                                            <template v-else-if="cell.kind === 'tee'">
+                                                <path d="M 0 30 L 60 30 M 30 0 L 30 30" fill="none"
+                                                      :stroke="cell.pulse ? '#ffffff' : (cell.energized ? '#20c997' : '#6c757d')"
+                                                      stroke-width="10" stroke-linejoin="miter" />
+                                            </template>
+                                            <circle cx="30" cy="30" r="5"
+                                                    :fill="cell.pulse ? '#ffffff' : (cell.energized ? '#0dcaf0' : '#adb5bd')" />
+                                        </g>
+                                    </svg>
+                                </template>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Правый столбец: ВЫХОДЫ (OUT) — клик запускает импульс прямо на порту -->
+                    <div class="d-flex flex-column justify-content-between gap-2" style="width: 112px; flex-shrink: 0;">
+                        <button v-for="r in gridSize" :key="'out-' + r"
+                                type="button"
+                                @click="launchPulse(r - 1)"
+                                :disabled="!hasOutPort(r - 1) || alarmActive || pulseAnimating"
+                                :data-out-row="r - 1"
+                                :data-out-label="getOutLabel(r - 1)"
+                                class="btn rounded-0 flex-fill d-flex flex-column justify-content-center align-items-center text-center p-1"
+                                :class="outPortClass(r - 1)"
+                                style="min-height: 64px; min-width: 48px;">
+                            <template v-if="hasOutPort(r - 1)">
+                                <div style="font-size: 0.65rem;" class="text-uppercase">ТЕРМИНАЛ</div>
+                                <div class="fw-bold lh-1 mt-1 text-wrap" style="font-size: 0.72rem;" v-text="getOutLabel(r - 1)"></div>
+                                <div v-if="traceState.reachedRows.includes(r - 1)" class="badge bg-success text-dark rounded-0 mt-1" style="font-size: 0.6rem;">
+                                    СВЯЗЬ ОК
+                                </div>
+                            </template>
+                            <template v-else>
+                                <span class="text-secondary small">—</span>
+                            </template>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель быстрого пуска (Форсаж) -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="small" :class="statusHintClass" v-text="statusHint"></div>
+                <button id="launch-btn" type="button" @click="launchPulse(null)"
+                        :disabled="alarmActive || pulseAnimating"
+                        class="btn rounded-0 px-4 fw-bold text-uppercase"
+                        :class="isPathReady ? 'btn-success text-dark' : 'btn-outline-danger'"
+                        style="min-height: 48px;">
+                    Пуск импульса [SPACE]
+                </button>
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script src="/static/vue.global.js" is:inline></script>
+<script is:inline>
+(function() {
+    const missionName = 'Урок 10 :: Информационные процессы (Уровень 3)';
+    const DR = [-1, 0, 1, 0];
+    const DC = [0, 1, 0, -1];
+
+    const PROCESS_TARGETS = [
+        { id: 'store', short: 'ХРАНЕНИЕ', label: 'ХРАНЕНИЕ (SSD)', packet: 'АРХИВ ДАННЫХ → ТЕРМИНАЛ: ХРАНЕНИЕ (SSD)' },
+        { id: 'process', short: 'ОБРАБОТКА', label: 'ОБРАБОТКА (ЦП)', packet: 'ВХОДНЫЕ ДАННЫЕ → ТЕРМИНАЛ: ОБРАБОТКА (ЦП)' },
+        { id: 'transmit', short: 'ПЕРЕДАЧА', label: 'ПЕРЕДАЧА (СЕТЬ)', packet: 'СИГНАЛ ДАТЧИКА → ТЕРМИНАЛ: ПЕРЕДАЧА (СЕТЬ)' }
+    ];
+
+    function getPorts(kind, rot) {
+        let base = [];
+        if (kind === 'straight') base = [1, 3];
+        else if (kind === 'elbow') base = [0, 1];
+        else if (kind === 'tee') base = [0, 1, 3];
+        else return [];
+        return base.map(d => (d + rot) % 4);
+    }
+
+    function portsMatch(a, b) {
+        if (a.length !== b.length) return false;
+        const sa = [...a].sort().join(',');
+        const sb = [...b].sort().join(',');
+        return sa === sb;
+    }
+
+    function buildRandomPath(size, inRow, outRow) {
+        const visited = Array.from({ length: size }, () => Array(size).fill(false));
+        const path = [];
+
+        function dfs(r, c) {
+            visited[r][c] = true;
+            path.push([r, c]);
+            if (r === outRow && c === size - 1 && path.length >= size) {
+                return true;
+            }
+            const dirs = [1, 0, 2, 3];
+            // Слегка перемешиваем, сохраняя предпочтение движения вправо
+            for (let i = dirs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+            }
+            dirs.sort((a, b) => (a === 1 ? -1 : b === 1 ? 1 : 0));
+
+            for (const d of dirs) {
+                const nr = r + DR[d];
+                const nc = c + DC[d];
+                if (nr >= 0 && nr < size && nc >= 0 && nc < size && !visited[nr][nc]) {
+                    if (dfs(nr, nc)) return true;
+                }
+            }
+            path.pop();
+            visited[r][c] = false;
+            return false;
+        }
+
+        if (!dfs(inRow, 0)) {
+            // Запасной гарантированный путь
+            const fallback = [];
+            for (let c = 0; c < size; c++) fallback.push([inRow, c]);
+            let r = inRow;
+            while (r !== outRow) {
+                r += r < outRow ? 1 : -1;
+                fallback.push([r, size - 1]);
+            }
+            return fallback;
+        }
+        return path;
+    }
+
+    function traceGrid(grid, size, inRow, outPorts) {
+        grid.forEach(row => row.forEach(cell => { cell.energized = false; cell.pulse = false; }));
+        const start = grid[inRow][0];
+        const visited = new Set();
+        const reachedRows = [];
+        const energizedOrder = [];
+        let hitNoise = false;
+
+        if (!start || start.kind === 'noise' || start.kind === 'block' || !getPorts(start.kind, start.rot).includes(3)) {
+            return { reachedRows, hitNoise, energizedOrder };
+        }
+
+        const queue = [[inRow, 0]];
+        visited.add(`${inRow},${0}`);
+
+        while (queue.length > 0) {
+            const [r, c] = queue.shift();
+            const cell = grid[r][c];
+            cell.energized = true;
+            energizedOrder.push([r, c]);
+
+            const ports = getPorts(cell.kind, cell.rot);
+            for (const dir of ports) {
+                const nr = r + DR[dir];
+                const nc = c + DC[dir];
+
+                if (nc === size && dir === 1) {
+                    if (outPorts.some(p => p.row === r)) {
+                        if (!reachedRows.includes(r)) reachedRows.push(r);
+                    }
+                    continue;
+                }
+
+                if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+                const nextCell = grid[nr][nc];
+                if (nextCell.kind === 'noise') {
+                    nextCell.energized = true;
+                    hitNoise = true;
+                    continue;
+                }
+                if (nextCell.kind === 'block') continue;
+
+                const opp = (dir + 2) % 4;
+                if (getPorts(nextCell.kind, nextCell.rot).includes(opp)) {
+                    const key = `${nr},${nc}`;
+                    if (!visited.has(key)) {
+                        visited.add(key);
+                        queue.push([nr, nc]);
+                    }
+                }
+            }
+        }
+
+        return { reachedRows, hitNoise, energizedOrder };
+    }
+
+    function createWave(waveIdx) {
+        // Таймер сжимается с 9.0с (Волна 1) до 5.2с (Волна 10), с передышкой на Волне 8 (+0.8с)
+        const timeLimits = [9.0, 8.5, 8.0, 7.5, 7.0, 6.6, 6.2, 7.0, 5.8, 5.2];
+        const size = waveIdx < 5 ? 3 : 4;
+        const scrambleCount = waveIdx < 3 ? 2 : (waveIdx < 7 ? 3 : 4);
+        const noiseCount = waveIdx < 3 ? 1 : (waveIdx < 6 ? 2 : 3);
+
+        const shuffledTargets = [...PROCESS_TARGETS].sort(() => Math.random() - 0.5);
+        const targetProc = shuffledTargets[0];
+        const decoyProc = shuffledTargets[1];
+
+        const inRow = Math.floor(Math.random() * size);
+        const rows = Array.from({ length: size }, (_, i) => i).sort(() => Math.random() - 0.5);
+        const targetOutRow = rows[0];
+        const decoyOutRow = rows[1];
+
+        const outPorts = [
+            { row: targetOutRow, label: targetProc.label, isTarget: true },
+            { row: decoyOutRow, label: decoyProc.label, isTarget: false }
+        ];
+
+        const path = buildRandomPath(size, inRow, targetOutRow);
+        const pathSet = new Set(path.map(([r, c]) => `${r},${c}`));
+
+        const grid = Array.from({ length: size }, () =>
+            Array.from({ length: size }, () => ({
+                kind: 'elbow',
+                rot: 0,
+                energized: false,
+                pulse: false
+            }))
+        );
+
+        // Заполняем клетки верного пути точными сегментами
+        for (let i = 0; i < path.length; i++) {
+            const [r, c] = path[i];
+            let dIn = 3;
+            if (i > 0) {
+                const [pr, pc] = path[i - 1];
+                for (let d = 0; d < 4; d++) {
+                    if (r + DR[d] === pr && c + DC[d] === pc) { dIn = d; break; }
+                }
+            }
+            let dOut = 1;
+            if (i < path.length - 1) {
+                const [nr, nc] = path[i + 1];
+                for (let d = 0; d < 4; d++) {
+                    if (r + DR[d] === nr && c + DC[d] === nc) { dOut = d; break; }
+                }
+            }
+
+            const isStraight = (dIn + 2) % 4 === dOut;
+            const kind = isStraight ? 'straight' : 'elbow';
+            let solvedRot = 0;
+            for (let rot = 0; rot < 4; rot++) {
+                if (portsMatch(getPorts(kind, rot), [dIn, dOut])) {
+                    solvedRot = rot;
+                    break;
+                }
+            }
+            grid[r][c] = { kind, rot: solvedRot, energized: false, pulse: false };
+        }
+
+        // Размещаем шум и обманные сегменты вне верного пути
+        const offPath = [];
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (!pathSet.has(`${r},${c}`)) offPath.push([r, c]);
+            }
+        }
+        offPath.sort(() => Math.random() - 0.5);
+
+        offPath.forEach(([r, c], idx) => {
+            if (idx < noiseCount) {
+                grid[r][c] = { kind: 'noise', rot: 0, energized: false, pulse: false };
+            } else if (idx === noiseCount && size === 4) {
+                grid[r][c] = { kind: 'block', rot: 0, energized: false, pulse: false };
+            } else {
+                const kinds = ['straight', 'elbow', 'tee'];
+                const kind = kinds[Math.floor(Math.random() * kinds.length)];
+                const rot = Math.floor(Math.random() * 4);
+                grid[r][c] = { kind, rot, energized: false, pulse: false };
+            }
+        });
+
+        // Поворачиваем фиксированное число сегментов верного пути (всегда решаемо за несколько кликов)
+        const pathIndices = Array.from({ length: path.length }, (_, i) => i).sort(() => Math.random() - 0.5);
+        for (let k = 0; k < Math.min(scrambleCount, pathIndices.length); k++) {
+            const [r, c] = path[pathIndices[k]];
+            const cell = grid[r][c];
+            const step = cell.kind === 'straight' ? 1 : (1 + Math.floor(Math.random() * 2));
+            cell.rot = (cell.rot + step) % 4;
+        }
+
+        // Гарантируем, что пазл не оказался случайно уже решённым до первого клика
+        let check = traceGrid(grid, size, inRow, outPorts);
+        if (check.reachedRows.includes(targetOutRow) && !check.hitNoise) {
+            const [r, c] = path[0];
+            grid[r][c].rot = (grid[r][c].rot + 1) % 4;
+        }
+
+        return {
+            size,
+            inRow,
+            targetOutRow,
+            decoyOutRow,
+            outPorts,
+            targetShort: targetProc.short,
+            packetLabel: targetProc.packet,
+            timeLimit: timeLimits[waveIdx],
+            grid
+        };
+    }
+
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const totalWaves = 10;
+            const started = ref(false);
+            const completed = ref(false);
+            const alarmActive = ref(false);
+            const alarmMessage = ref('');
+            const pulseAnimating = ref(false);
+            const currentWaveIndex = ref(0);
+            const attemptsCount = ref(0);
+
+            const wave = ref(createWave(0));
+            const timeLeft = ref(wave.value.timeLimit);
+            const traceState = ref({ reachedRows: [], hitNoise: false, energizedOrder: [] });
+
+            let timerInterval = null;
+            let resetTimeout = null;
+
+            const telemetry = window.LMSTelemetry.create({
+                missionName: missionName,
+                level: 3,
+                totalWaves: totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    clearInterval(timerInterval);
+                    clearTimeout(resetTimeout);
+                    alarmActive.value = false;
+                },
+                onAfkRetry: () => {
+                    alarmActive.value = false;
+                    resetToWave1();
+                }
+            });
+
+            const gridSize = computed(() => wave.value.size);
+            const grid = computed(() => wave.value.grid);
+
+            const isPathReady = computed(() => {
+                return traceState.value.reachedRows.includes(wave.value.targetOutRow)
+                    && !traceState.value.reachedRows.includes(wave.value.decoyOutRow)
+                    && !traceState.value.hitNoise;
+            });
+
+            const statusHint = computed(() => {
+                if (traceState.value.hitNoise) return 'ОПАСНОСТЬ: цепь касается узла ШУМА! Разорвите ответвление.';
+                if (traceState.value.reachedRows.includes(wave.value.decoyOutRow)) return 'ОШИБКА ПОРТА: цепь ведёт в неверный выходной терминал!';
+                if (isPathReady.value) return 'КАНАЛ СОБРАН: нажмите SPACE или кликните по целевому терминалу!';
+                return 'Кликайте по сегментам сетки для прокладки маршрута от IN к нужному терминалу.';
+            });
+
+            const statusHintClass = computed(() => {
+                if (traceState.value.hitNoise || traceState.value.reachedRows.includes(wave.value.decoyOutRow)) return 'text-danger fw-bold';
+                if (isPathReady.value) return 'text-success fw-bold';
+                return 'text-secondary';
+            });
+
+            const timerBarClass = computed(() => {
+                const ratio = timeLeft.value / wave.value.timeLimit;
+                if (ratio > 0.5) return 'bg-success';
+                if (ratio > 0.25) return 'bg-warning';
+                return 'bg-danger';
+            });
+
+            const timerStyle = computed(() => {
+                return 'width: ' + Math.max(0, (timeLeft.value / wave.value.timeLimit) * 100) + '%;';
+            });
+
+            function refreshTrace() {
+                traceState.value = traceGrid(wave.value.grid, wave.value.size, wave.value.inRow, wave.value.outPorts);
+            }
+
+            function loadWave(idx) {
+                currentWaveIndex.value = idx;
+                wave.value = createWave(idx);
+                timeLeft.value = wave.value.timeLimit;
+                pulseAnimating.value = false;
+                refreshTrace();
+            }
+
+            function resetToWave1() {
+                loadWave(0);
+                startTimer();
+            }
+
+            function startTimer() {
+                clearInterval(timerInterval);
+                const stepMs = 50;
+                timerInterval = setInterval(() => {
+                    if (alarmActive.value || pulseAnimating.value || completed.value) return;
+                    timeLeft.value = Math.max(0, timeLeft.value - stepMs / 1000);
+                    if (timeLeft.value <= 0) {
+                        clearInterval(timerInterval);
+                        triggerHardcoreFail('ТАЙМ-АУТ: поток данных не успел пройти коммутацию вовремя.', true);
+                    }
+                }, stepMs);
+            }
+
+            function rotateCell(r, c) {
+                if (!started.value || completed.value || alarmActive.value || pulseAnimating.value || telemetry.getState().isAfkPaused) return;
+                const cell = wave.value.grid[r][c];
+                if (cell.kind === 'noise' || cell.kind === 'block') return;
+                telemetry.markActivity();
+                cell.rot = (cell.rot + 1) % 4;
+                refreshTrace();
+            }
+
+            function hasOutPort(row) {
+                return wave.value.outPorts.some(p => p.row === row);
+            }
+
+            function getOutLabel(row) {
+                const port = wave.value.outPorts.find(p => p.row === row);
+                return port ? port.label : '';
+            }
+
+            function cellClass(cell) {
+                if (cell.kind === 'noise') {
+                    return cell.energized ? 'bg-danger bg-opacity-25 border-danger text-danger' : 'bg-dark border-danger text-danger';
+                }
+                if (cell.kind === 'block') {
+                    return 'bg-black border-secondary text-secondary opacity-50';
+                }
+                if (cell.pulse) return 'bg-success border-light';
+                if (cell.energized) return 'bg-dark border-success';
+                return 'bg-black border-secondary';
+            }
+
+            function outPortClass(row) {
+                const port = wave.value.outPorts.find(p => p.row === row);
+                if (!port) return 'bg-black border-secondary opacity-25';
+                if (port.isTarget) {
+                    return traceState.value.reachedRows.includes(row)
+                        ? 'btn-outline-success border-2 text-success bg-dark fw-bold'
+                        : 'btn-outline-info text-info bg-black fw-bold';
+                }
+                return 'btn-outline-secondary text-secondary bg-black';
+            }
+
+            function triggerHardcoreFail(reason, isTimeout = false) {
+                clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
+                const failedWave = currentWaveIndex.value + 1;
+                const sent = telemetry.hardcoreReset({
+                    wave: failedWave,
+                    isTimeout: Boolean(isTimeout)
+                });
+                attemptsCount.value = telemetry.getState().attemptsCount;
+                if (sent === false) {
+                    alarmActive.value = false;
+                    return;
+                }
+
+                alarmActive.value = true;
+                alarmMessage.value = reason;
+
+                resetTimeout = setTimeout(() => {
+                    alarmActive.value = false;
+                    if (started.value && !completed.value && !telemetry.getState().isAfkPaused) {
+                        resetToWave1();
+                    }
+                }, 1600);
+            }
+
+            function launchPulse(clickedOutRow) {
+                if (!started.value || completed.value || alarmActive.value || pulseAnimating.value || telemetry.getState().isAfkPaused) return;
+                telemetry.markActivity();
+
+                if (clickedOutRow !== null && clickedOutRow !== wave.value.targetOutRow) {
+                    triggerHardcoreFail('ОШИБКА ВЫБОРА ТЕРМИНАЛА: импульс направлен в несоответствующий порт назначения.', false);
+                    return;
+                }
+
+                if (traceState.value.hitNoise) {
+                    triggerHardcoreFail('СИГНАЛ ИСКАЖЁН: импульс попал в узел с информационным шумом.', false);
+                    return;
+                }
+
+                if (traceState.value.reachedRows.includes(wave.value.decoyOutRow)) {
+                    triggerHardcoreFail('ОШИБКА МАРШРУТИЗАЦИИ: часть потока уходит в посторонний терминал.', false);
+                    return;
+                }
+
+                if (!isPathReady.value) {
+                    triggerHardcoreFail('РАЗРЫВ КАНАЛА: маршрут не доведён до целевого выходного терминала.', false);
+                    return;
+                }
+
+                // Анимация пробега импульса (150-240 мс) перед переходом на следующую волну
+                clearInterval(timerInterval);
+                pulseAnimating.value = true;
+                const order = traceState.value.energizedOrder;
+                let step = 0;
+                const stepInterval = setInterval(() => {
+                    if (step < order.length) {
+                        const [pr, pc] = order[step];
+                        wave.value.grid[pr][pc].pulse = true;
+                        step++;
+                    } else {
+                        clearInterval(stepInterval);
+                        pulseAnimating.value = false;
+                        if (currentWaveIndex.value + 1 < totalWaves) {
+                            const nextIdx = currentWaveIndex.value + 1;
+                            telemetry.advanceWave(nextIdx + 1);
+                            loadWave(nextIdx);
+                            startTimer();
+                        } else {
+                            finishGame();
+                        }
+                    }
+                }, 35);
+            }
+
+            function startGame() {
+                clearTimeout(resetTimeout);
+                started.value = true;
+                telemetry.start();
+                telemetry.progress({ wave: 1, total_waves: totalWaves, stage: 1, total_stages: totalWaves });
+                loadWave(0);
+                startTimer();
+            }
+
+            function finishGame() {
+                clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
+                completed.value = true;
+                telemetry.complete({ wave: totalWaves });
+            }
+
+            function handleKeyDown(e) {
+                if (!started.value || completed.value || alarmActive.value || pulseAnimating.value || telemetry.getState().isAfkPaused) return;
+                if (e.code === 'Space' || e.key === 'Enter') {
+                    e.preventDefault();
+                    launchPulse(null);
+                }
+            }
+
+            onMounted(() => {
+                window.addEventListener('keydown', handleKeyDown);
+            });
+
+            onUnmounted(() => {
+                clearInterval(timerInterval);
+                clearTimeout(resetTimeout);
+                window.removeEventListener('keydown', handleKeyDown);
+            });
+
+            return {
+                totalWaves,
+                started,
+                completed,
+                alarmActive,
+                alarmMessage,
+                pulseAnimating,
+                currentWaveIndex,
+                attemptsCount,
+                wave,
+                gridSize,
+                grid,
+                timeLeft,
+                traceState,
+                isPathReady,
+                statusHint,
+                statusHintClass,
+                timerBarClass,
+                timerStyle,
+                rotateCell,
+                hasOutPort,
+                getOutLabel,
+                cellClass,
+                outPortClass,
+                launchPulse,
+                startGame
+            };
+        }
+    }).mount('#app');
+})();
+</script>
