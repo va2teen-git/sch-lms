@@ -75,7 +75,7 @@ const initialCode = "def solve():\n    # Ваш код\n    pass\n\nprint(solve(
      - Списки: `closest('ul')` подсвечивает `#btn-ul`, а `closest('ol')` — `#btn-ol`.
      - Выравнивание абзаца: анализируется стиль ближайшего блочного элемента (`p, h1, h2, h3, li, td, th`), гарантируя подсветку ровно одной активной кнопки группы (`#btn-align-left`, `#btn-align-center`, `#btn-align-right`, `#btn-align-justify`).
 3. **Модуль валидации (`WriterValidator`):**
-   * Глобально доступен в `window.WriterValidator` ([`src/lib/writer-validator.ts`](file:///D:/school-lms-dev-3/src/lib/writer-validator.ts)). Содержит методы очистки невидимых символов (`stripInvisibleChars`), нормализации пробелов, омоглифов и степеней, а также проверки тегов `hasSubscript`, `hasSuperscript`, `hasBoldWord`, `hasItalicWord`, `checkParagraphGeometry`.
+   * Глобально доступен в `window.WriterValidator` ([`src/lib/writer-validator.ts`](../src/lib/writer-validator.ts)). Содержит методы очистки невидимых символов (`stripInvisibleChars`), нормализации пробелов, омоглифов и степеней, а также проверки тегов `hasSubscript`, `hasSuperscript`, `hasBoldWord`, `hasItalicWord`, `checkParagraphGeometry`.
 4. **Детектор костылей ОГЭ 13.2:**
    * Проверяет использование недопустимых приемов: имитацию красной строки пробелами вместо абзацного отступа, дефис вместо тире, прямые кавычки вместо ёлочек, лишние пустые строки двойным Enter.
 

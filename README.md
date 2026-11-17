@@ -91,6 +91,9 @@ npm run build
 # Быстрые тесты контрактов (линтинг теории + схема БД + аналитика учителя)
 npm run test:contracts
 
+# Строгий аудит стандартов всех .astro-заданий (LMSTelemetry, start_time, AFK, отсутствие <style> и легаси HTML)
+STRICT_STANDARDS_AUDIT=1 npx playwright test tests/standards-audit.spec.js
+
 # Запуск полного набора автотестов Playwright
 npm test
 
