@@ -249,40 +249,28 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 <script is:inline>
 (function() {
     const missionName = 'Урок 10 :: Информационные процессы (Уровень 1)';
-    const startTime = new Date();
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
     let attempts = 0;
     let isLocked = false;
-
-    function sendTelemetry(actionType, status, success, extraLog) {
-        window.parent.postMessage({
-            type: 'TELEMETRY_EVENT',
-            mission_name: missionName,
-            action_type: actionType,
-            status: status,
-            start_time: startTime.toISOString(),
-            time_spent_sec: Math.floor((Date.now() - startTime.getTime()) / 1000),
-            attempts_count: attempts,
-            success: success,
-            action_log: extraLog || []
-        }, '*');
-    }
-
-    sendTelemetry('in_progress', 'in_progress', false, [{ action: 'level_start' }]);
 
     function triggerError(message, retryCallback) {
         if (isLocked) return;
         isLocked = true;
-        attempts++;
-
-        const attemptsDisplay = document.getElementById('attempts-display');
-        if (attemptsDisplay) attemptsDisplay.textContent = String(attempts);
 
         const errorBox = document.getElementById('error-box');
         const errorMessage = document.getElementById('error-message');
         if (errorMessage) errorMessage.textContent = message;
         if (errorBox) errorBox.classList.remove('d-none');
 
-        sendTelemetry('hardcore_reset', 'in_progress', false, [{ action: 'error', detail: message }]);
+        telemetry.hardcoreReset({ action_log: [{ action: 'error', detail: message }] });
+        attempts = telemetry.getState().attemptsCount;
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+        if (attemptsDisplay) attemptsDisplay.textContent = String(attempts);
 
         setTimeout(() => {
             if (errorBox) errorBox.classList.add('d-none');
@@ -500,7 +488,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        sendTelemetry('in_progress', 'in_progress', false, [{ action: 'phase1_complete' }]);
+        telemetry.advanceStage(2, { action_log: [{ action: 'phase1_complete' }] });
         document.getElementById('phase-1-container').classList.add('d-none');
         document.getElementById('phase-2-container').classList.remove('d-none');
         document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
@@ -761,7 +749,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        sendTelemetry('in_progress', 'in_progress', false, [{ action: 'phase2_complete' }]);
+        telemetry.advanceStage(3, { action_log: [{ action: 'phase2_complete' }] });
         document.getElementById('phase-2-container').classList.add('d-none');
         document.getElementById('phase-3-container').classList.remove('d-none');
         document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
@@ -1054,7 +1042,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
             return;
         }
 
-        const totalSec = Math.floor((Date.now() - startTime.getTime()) / 1000);
+        const totalSec = telemetry.getState().timeSpentSec;
         document.getElementById('stat-time').textContent = `${totalSec} с`;
         document.getElementById('stat-attempts').textContent = String(attempts);
 
@@ -1064,7 +1052,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         badge.className = 'badge bg-success text-dark border border-success rounded-0 px-3 py-2';
         badge.textContent = 'Уровень пройден!';
 
-        sendTelemetry('level_complete', 'completed', true, [{ action: 'phase3_complete' }]);
+        telemetry.complete({ action_log: [{ action: 'phase3_complete' }] });
     });
 
     // Запуск уровня с Фазы 1
