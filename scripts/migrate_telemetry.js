@@ -45,8 +45,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_telemetry_attempt ON telemetry(attempt_id);
   CREATE INDEX IF NOT EXISTS idx_telemetry_student_attempt ON telemetry(student_class, last_name, first_name, attempt_id);
   CREATE INDEX IF NOT EXISTS idx_telemetry_sprint ON telemetry(course_slug, lesson_id, student_class, action_type);
+
+  CREATE TABLE IF NOT EXISTS prince_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    student_class TEXT NOT NULL,
+    course_slug TEXT NOT NULL,
+    lesson_id TEXT NOT NULL,
+    stage INTEGER NOT NULL,
+    map_level INTEGER NOT NULL,
+    time_spent_sec INTEGER DEFAULT 0,
+    completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(first_name, last_name, student_class, course_slug, lesson_id),
+    UNIQUE(first_name, last_name, student_class, stage)
+  );
+  CREATE INDEX IF NOT EXISTS idx_prince_progress_student ON prince_progress(first_name, last_name, student_class);
+  CREATE INDEX IF NOT EXISTS idx_prince_progress_lesson ON prince_progress(course_slug, lesson_id);
 `);
-console.log('Indexes created/verified.');
+console.log('Indexes and prince_progress table created/verified.');
 
 // Step 2: Build primary student_class mapping
 console.log('Analyzing student cohorts...');
@@ -435,5 +452,8 @@ const crossCourse = db.prepare(`
 `).all();
 
 console.log('Cross-course 10th grade on 8th grade lesson 7:', crossCourse);
+
+const princeProgressCount = db.prepare('SELECT COUNT(*) as total FROM prince_progress').get();
+console.log('prince_progress rows:', princeProgressCount.total);
 
 db.close();
