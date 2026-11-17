@@ -94,7 +94,24 @@ CREATE TABLE IF NOT EXISTS telemetry (
   wave_number INTEGER,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS prince_progress (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  student_class TEXT NOT NULL,
+  course_slug TEXT NOT NULL,
+  lesson_id TEXT NOT NULL,
+  stage INTEGER NOT NULL,
+  map_level INTEGER NOT NULL,
+  time_spent_sec INTEGER DEFAULT 0,
+  completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(first_name, last_name, student_class, course_slug, lesson_id),
+  UNIQUE(first_name, last_name, student_class, stage)
+);
 ```
+Два уникальных ограничения `UNIQUE` в `prince_progress` гарантируют на уровне БД:
+* правило **«1 урок = 1 этап»** (`UNIQUE(first_name, last_name, student_class, course_slug, lesson_id)`);
+* невозможность повторного зачёта одного и того же этапа кампании (`UNIQUE(first_name, last_name, student_class, stage)`).
 
 ### Индексы для высокопроизводительных срезов:
 * `idx_telemetry_attempt` ON `telemetry(attempt_id)` — сверхбыстрая агрегация событий конкретного забега.
@@ -105,6 +122,8 @@ CREATE TABLE IF NOT EXISTS telemetry (
 * `idx_telemetry_student` ON `telemetry(class_name, last_name, first_name)` — легаси-совместимость.
 * `idx_telemetry_timestamp` ON `telemetry(timestamp)` — срезы по датам уроков.
 * `idx_telemetry_mission` ON `telemetry(mission_name)` — текстовый поиск по названиям.
+* `idx_prince_progress_student` ON `prince_progress(first_name, last_name, student_class)` — мгновенная выборка этапов сквозной кампании ученика.
+* `idx_prince_progress_lesson` ON `prince_progress(course_slug, lesson_id)` — привязка этапов Prince of Persia к конкретным урокам.
 
 Благодаря композитным индексам API дашборда учителя исключает ресурсоемкие сканирования всей таблицы и эвристики на базе `GROUP BY COUNT(*)`.
 
@@ -283,8 +302,9 @@ const telemetry = window.LMSTelemetry.create({
 * Если `course_slug` не передан, используется `student_class`.
 * В колонку `class_name` записывается `student_class` для сохранения совместимости.
 * Ограничение времени: `time_spent_sec` валидируется в диапазоне от `0` до `86400` секунд.
+* **Обработка зачёта кампании Prince of Persia (`action_type: 'prince_complete'`):** сервер в транзакции проверяет, что урок честно пройден в режиме «Хардкор» (`isHardcoreCompleted`, иначе `403`), проверяет правило «1 урок = 1 этап» (повторный запрос того же этапа идемпотентно возвращает `200 { success: true, idempotent: true, stage, mapLevel }`, попытка сдать другой этап или карту на том же уроке отклоняется с `409 Conflict`), проверяет соответствие следующему незавершённому этапу в `src/data/prince-campaign.json` и записывает событие в `telemetry` и `prince_progress`.
 
-**Ответ:** `200 OK` `{"success": true}` или `400 / 500`.
+**Ответ:** `200 OK` `{"success": true}` (для `prince_complete` — `{"success": true, "idempotent": false, "stage": 1, "mapLevel": 1}`) или `400 / 403 / 409 / 500`.
 
 ---
 
@@ -323,9 +343,30 @@ ORDER BY timestamp ASC
   "unlockedHardcore": 1,
   "isNormalCompleted": false,
   "isHardcoreCompleted": false,
-  "princeCompleted": false
+  "princeCompleted": false,
+  "princeProgress": {
+    "eligibleForHardcoreBonus": false,
+    "lessonStageCompleted": null,
+    "lessonMapLevel": null,
+    "completedStages": [1, 2],
+    "totalStages": 18,
+    "nextStage": {
+      "stage": 3,
+      "mapLevel": 3,
+      "title": "Катакомбы Скелета"
+    },
+    "campaignFinished": false
+  }
 }
 ```
+Поле `princeProgress` формируется из таблицы `prince_progress` и конфигурации `src/data/prince-campaign.json`:
+* `eligibleForHardcoreBonus` — честный статус хардкор-зачёта на данном уроке (`isHardcoreCompleted`);
+* `lessonStageCompleted` / `lessonMapLevel` — номер этапа и карты, уже закрытых в текущем `(courseSlug, lessonId)` (или `null`);
+* `completedStages` — отсортированный массив всех пройденных учеником этапов кампании;
+* `totalStages` — общее количество этапов кампании;
+* `nextStage` — объект следующего невыполненного этапа (`{ stage, mapLevel, title }`) либо `null`, если кампания завершена;
+* `campaignFinished` — `true`, если пройдены все этапы кампании.
+* `princeCompleted` равен `true`, если бонус завершён по данным телеметрии урока или присутствует `lessonStageCompleted !== null` в `prince_progress`.
 
 ---
 
@@ -341,7 +382,8 @@ ORDER BY timestamp ASC
 * События группируются по ключу `${course_slug}::${lesson_id}` в хронологическом порядке (`ORDER BY timestamp ASC, id ASC`).
 * Сдача всех 3 уровней фиксирует необратимые флаги `completed` (обычный/хардкор) и `hardcoreCompleted`.
 * Если урок ещё не пройден до конца (`completed: false`), но зафиксирована активность (`level_complete`, `level_fail`, `hardcore_reset`, `normal_reset` или `in_progress` с `time_spent_sec > 0`), вычисляется `stoppedLevel` (`1`, `2` или `3`) — уровень, на котором остановился ученик.
-* Отдельно от уровней `1..3` отслеживаются `princeCompleted` (завершение бонусного уровня `Prince of Persia`) и `sprintCompleted` (завершение `sprint_complete` в Лого-Шторме).
+* Отдельно от уровней `1..3` отслеживаются `princeCompleted` (завершение бонусного уровня `Prince of Persia`), `princeStage` (номер этапа кампании из `prince_progress`, закрытого на данном уроке, либо `null`) и `sprintCompleted` (завершение `sprint_complete` в Лого-Шторме).
+* Корневой объект `princeCampaign` содержит сквозной прогресс ученика по всей кампании: `{ completedCount, totalStages, currentStage }` (где `currentStage` — номер следующего доступного этапа или `null` по завершении кампании).
 
 **Ответ:**
 ```json
@@ -352,6 +394,7 @@ ORDER BY timestamp ASC
       "completed": true,
       "hardcoreCompleted": true,
       "princeCompleted": true,
+      "princeStage": 1,
       "sprintCompleted": true,
       "stoppedLevel": 0
     },
@@ -359,9 +402,15 @@ ORDER BY timestamp ASC
       "completed": false,
       "hardcoreCompleted": false,
       "princeCompleted": false,
+      "princeStage": null,
       "sprintCompleted": false,
       "stoppedLevel": 2
     }
+  },
+  "princeCampaign": {
+    "completedCount": 1,
+    "totalStages": 18,
+    "currentStage": 2
   }
 }
 ```
@@ -424,6 +473,18 @@ ORDER BY timestamp ASC;
       "princeCompleted": false,
       "princeBestTimeSec": null,
       "princeLevels": [],
+      "princeCampaignCompleted": 1,
+      "princeCampaignTotal": 18,
+      "princeStages": [
+        {
+          "stage": 1,
+          "mapLevel": 1,
+          "courseSlug": "8-класс",
+          "lessonId": "7",
+          "timeSpentSec": 94,
+          "completedAt": "2026-10-14 08:12:00"
+        }
+      ],
       "lastCourseSlug": "8-класс",
       "lastLessonId": "7",
       "workedLessons": [
@@ -491,6 +552,7 @@ ORDER BY timestamp ASC;
   "classes": [...]
 }
 ```
+> **Сквозной прогресс кампании Prince of Persia в `students[]`:** поля `princeCampaignCompleted`, `princeCampaignTotal` и массив `princeStages` (`stage`, `mapLevel`, `courseSlug`, `lessonId`, `timeSpentSec`, `completedAt`) формируются из таблицы `prince_progress` по всем урокам ученика (не ограничиваются текущим фильтром `course`/`lesson` и `date`, но учитывают фильтры `class` и `exclude_tests`).
 
 ### 5.4 Алгоритм Вычисления Метрик и Статусов
 1. **Партиционирование попыток:**
@@ -521,8 +583,9 @@ ORDER BY timestamp ASC;
   * Если урок **пройден полностью** (сданы 3 уровня) — карточка подсвечивается голубой рамкой (`bg-sky-50`, `border-sky-600`) и отображает эмоджи **`✅`**.
   * Дополнительные эмоджи-достижения на карточке:
     * **`💀`** — урок пройден в режиме Хардкор;
-    * **`⚔️`** — пройден бонусный уровень Prince of Persia;
+    * **`⚔️`** / **`⚔️ Эт. N`** — пройден этап сквозной кампании Prince of Persia (при наличии `princeStage` выводится номер закрытого в уроке этапа);
     * **`⚡`** — пройден хотя бы 1 раз Лого-Шторм.
+  * В верхней панели страницы `/courses` отображается суммарный счётчик сквозной кампании ученика **`⚔️ Принц: K / M этапов`**.
 
 ### 6.2 Панель Мониторинга Учителя (`/teacher`)
 * **Фильтры тулбара:**
@@ -532,7 +595,7 @@ ORDER BY timestamp ASC;
   4. **«Дата»:** фильтр по датам с поддержкой «Сегодня».
 * **Кросс-курсовые бейджи и ачивка Prince of Persia:**
   * В колонке «Статус урока», в раскрывающихся подстроках забегов (`.attempt-subrow`) и в карточках попыток модального окна отображаются бейджи пройденных курсов/уроков (`workedLessons`); прохождения уроков других классов (`courseSlug !== className`) выделяются индиго-бейджем **`🔀 <курс> • Ур. <N>`**.
-  * При прохождении бонусного уровня Prince of Persia отображается золотой бейдж **`⚔️ Принц Персии`** в таблице, **`⚔️ Принц`** в подстроке забега, отдельная карточка **`⚔️ Prince of Persia (1989)`** в модальном окне и колонка `Принц Персии` в экспорте CSV.
+  * При прохождении бонусного уровня Prince of Persia отображается золотой бейдж **`⚔️ Принц Персии`** в таблице, **`⚔️ Принц`** в подстроке забега, отдельная колонка **`⚔️ Принц`** (`⚔️ K/M`) с сортировкой по числу закрытых этапов кампании, подробный список пройденных этапов с привязкой к урокам в модальном окне деталей ученика, а также колонки `Принц Персии` и `Прогресс Принца` (`K/M`) в экспорте CSV.
 * **Интуитивно понятные метрики времени:**
   * **«Время решения»** (`bestNormalTimeSec` / лучшее чистое время сданного урока) — эффективное чистое время выполнения заданий учеником до успешной сдачи.
   * **«Был на уроке»** (`totalActiveTimeSec` / суммарное активное время) — общее астрономическое время активности ученика по всем попыткам (включая повторные прохождения и хардкор).
@@ -556,4 +619,4 @@ ORDER BY timestamp ASC;
   * При клике на строку или кнопку «Детали» открывается карточка ученика с интерактивной секцией **«История забегов (Попытки прохождения)»** и карточками уровней/достижений (включая `⚡ Лого-Шторм` и `⚔️ Prince of Persia`).
   * Для каждой попытки отображается карточка с режимом (Normal / Hardcore), итоговым статусом, затраченным чистым временем, количеством ошибок и поуровневыми бейджами прогресса.
 * **Живой мониторинг (Live Polling):** автоматический опрос каждые 5 секунд с индикатором сетевой активности и кнопкой паузы.
-* **Экспорт в CSV:** выгрузка таблицы результатов в формат CSV со структурированными колонками («Ученик», «Класс», «Курс / Урок», «Статус урока», «Забеги (всего)», «Забеги (хардкор)», «Уровень 1/2/3», «Лого-Шторм», «Время решения (сек)», «Был на уроке», «Хардкор», «Принц Персии», «Детали забегов»).
+* **Экспорт в CSV:** выгрузка таблицы результатов в формат CSV со структурированными колонками («Ученик», «Класс», «Курс / Урок», «Статус урока», «Забеги (всего)», «Забеги (хардкор)», «Уровень 1/2/3», «Лого-Шторм», «Время решения (сек)», «Был на уроке», «Хардкор», «Принц Персии», «Прогресс Принца», «Детали забегов»).
