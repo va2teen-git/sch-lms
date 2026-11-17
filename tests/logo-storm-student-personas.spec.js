@@ -223,4 +223,43 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
 
     sim.assertCleanSession();
   });
+
+  test('Persona: NOVICE — Grade 7 all existing lessons (4, 5, 6, 7, 8, 9, 22): launch Logo-Storm and verify term counts & HUD', async ({ page }) => {
+    const expectedLessons = [
+      { id: '4', count: 9 },
+      { id: '5', count: 9 },
+      { id: '6', count: 10 },
+      { id: '7', count: 12 },
+      { id: '8', count: 12 },
+      { id: '9', count: 12 },
+      { id: '22', count: 10 }
+    ];
+
+    const sim = new StudentSimulator(page, { persona: LearnerPersona.NOVICE });
+
+    for (const lesson of expectedLessons) {
+      await page.goto(`/lesson/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/${lesson.id}`);
+
+      const sprintBtn = page.locator('#sprint-toggle');
+      await expect(sprintBtn).toBeVisible();
+      await expect(sprintBtn).not.toBeDisabled();
+
+      await sprintBtn.click();
+      const overlay = page.locator('#sprint-overlay');
+      await expect(overlay).toBeVisible();
+
+      await expect(page.locator('#sprint-terms-count')).toHaveText(String(lesson.count));
+      await expect(page.locator('#sprint-def-step')).toHaveText(`1 / ${lesson.count}`);
+
+      const defTerm = await page.locator('#sprint-def-term').textContent();
+      const defDesc = await page.locator('#sprint-def-desc').textContent();
+      expect(defTerm.trim().length).toBeGreaterThan(0);
+      expect(defDesc.trim().length).toBeGreaterThan(0);
+
+      await page.keyboard.press('Escape');
+      await expect(overlay).toBeHidden();
+    }
+
+    sim.assertCleanSession();
+  });
 });
