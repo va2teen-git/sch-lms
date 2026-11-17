@@ -13,7 +13,7 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     }
   });
 
-  test('1. Curriculum configuration enables princeBonusLevel 1 for 8th grade lesson 6', () => {
+  test('1. Curriculum and campaign configuration support 8th grade lesson 6 without legacy princeBonusLevel', () => {
     const coursesPath = path.join(rootDir, 'src', 'data', 'courses.json');
     const courses = JSON.parse(fs.readFileSync(coursesPath, 'utf-8'));
 
@@ -23,7 +23,12 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     const lesson6 = grade8.lessons.find(l => l.id === '6');
     expect(lesson6).toBeDefined();
     expect(lesson6.topic).toContain('Системы счисления');
-    expect(lesson6.princeBonusLevel).toBe(1);
+    expect(lesson6.princeBonusLevel).toBeUndefined();
+
+    const campaignPath = path.join(rootDir, 'src', 'data', 'prince-campaign.json');
+    const campaign = JSON.parse(fs.readFileSync(campaignPath, 'utf-8'));
+    expect(campaign[0].stage).toBe(1);
+    expect(campaign[0].mapLevel).toBe(1);
   });
 
   test('2. Lesson template markup contains required Prince bonus card, overlay, and Persian modal elements', () => {
@@ -120,7 +125,7 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     await expect(completionScreen).toBeVisible();
     await expect(bonusCard).toBeVisible();
     await expect(bonusCard).toContainText('РЕТРО-АРХИВ 1989 // РАЗБЛОКИРОВАНО');
-    await expect(bonusCard).toContainText('УРОВЕНЬ 1');
+    await expect(bonusCard).toContainText('ЭТАП 1 ИЗ 18');
   });
 
   test('4. Opening Prince Level 1: Overlay visibility, iframe parameters, and control bar', async ({ page }) => {
@@ -236,7 +241,7 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     await expect(victoryModal).toContainText('повелитель алгоритмов и победитель Песков Времени');
 
     // Verify sealed palace banner and absence of Level 2 button
-    await expect(victoryModal).toContainText('ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1');
+    await expect(victoryModal).toContainText('ДАЛЬНЕЙШИЕ ЧЕРТОГИ ДВОРЦА ЗАПЕЧАТАНЫ ДРЕВНЕЙ МАГИЕЙ // ЭТАП 1 ИЗ 18 ПРОЙДЕН (ДОСТУПЕН ТОЛЬКО УРОВЕНЬ 1)');
     await expect(page.locator('#prince-continue-btn')).toHaveCount(0);
 
     // Verify telemetry dispatch
@@ -320,7 +325,7 @@ test.describe('Comprehensive Suite: Grade 8 Lesson 6 Prince of Persia Hardcore B
     await expect(completionScreen).toBeVisible();
   });
 
-  test('7. Replay Flow: "Пройти Уровень 1 заново" cleanly reloads game on Level 1', async ({ page }) => {
+  test('7. Replay Flow: "Пройти Этап 1 заново" cleanly reloads game on Level 1', async ({ page }) => {
     await page.route('**/api/progress*', async (route) => {
       await route.fulfill({
         status: 200,
