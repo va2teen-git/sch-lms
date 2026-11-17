@@ -74,6 +74,8 @@ function transliterate(str) {
 
 const PROD_DIR = '$REAL_HOME/Projects/school-lms';
 const DEFAULT_WORKTREE = '$REAL_HOME/Projects/school-lms-dev';
+const HARDCORE_PRINCE_COMPAT_NOTE =
+  'Совместимость с хардкором и кампанией Prince of Persia (#581): не отправляй вручную `prince_complete` и не подменяй статусы хардкора внутри levelX.astro — этап кампании `src/data/prince-campaign.json` («1 урок хардкора = 1 этап») открывается страницей урока автоматически после честного прохождения всех 3 уровней без сброса.';
 
 function generatePrompt1(className, classSlug, lessonId, topic, branchName, topicSlug) {
   return `Ты автономный ИИ-разработчик образовательной платформы School LMS (сервер ALT Linux).
@@ -151,6 +153,7 @@ function generatePrompt2(className, classSlug, lessonId, topic, branchName) {
      * при переходе фаз вызывай \`telemetry.advanceStage(nextStage)\`;
      * при ошибке — \`telemetry.fail()\` (передает \`stage\`/\`total_stages\`);
      * при завершении — \`telemetry.complete()\`.
+   - ${HARDCORE_PRINCE_COMPAT_NOTE}
    - Запрещено повторно навешивать \`addEventListener\` на постоянные элементы внутри \`init*\`.
 
 4. ВАЛИДАЦИЯ И КОММИТ:
@@ -184,6 +187,7 @@ function generatePrompt3(className, classSlug, lessonId, topic, branchName) {
    - Прогрессия фаз Sawtooth 2-1-2: прямой расчет -> конвертация единиц -> пик инверсии -> долина консолидации -> кульминация без Fake Difficulty.
    - При ошибке: показ сбоя, вызов \`telemetry.fail()\` и процедурная генерация нового варианта текущей фазы.
    - ЕДИНАЯ ТЕЛЕМЕТРИЯ (LMSTelemetry): используй \`window.LMSTelemetry.create({ missionName: 'Урок ${lessonId} :: ${topic} (Уровень 2)', level: 2, totalStages: 5 })\` (\`advanceStage\`, \`fail\`, \`complete\`, отложенный \`start_time\`). Не дублируй \`addEventListener\` внутри \`init*\`.
+   - ${HARDCORE_PRINCE_COMPAT_NOTE}
    - Zero-Style и Zero-CDN: никаких тегов <style> и внешних CDN.
 
 4. ВАЛИДАЦИЯ И КОММИТ:
@@ -222,6 +226,7 @@ function generatePrompt4(className, classSlug, lessonId, topic, branchName) {
      * При ошибке или таймауте вызывай \`telemetry.fail({ wave, isTimeout })\`: включается сирена (#alarm-box) и ПРОГРЕСС ПОЛНОСТЬЮ СБРАСЫВАЕТСЯ НА ВОЛНУ 1 с перегенерацией волн.
      * AFK-защита волны 1: передавай \`isTimeout: true\` при истечении таймера, чтобы \`LMSTelemetry\` останавливал бесконечный цикл сбросов после 2 таймаутов волны 1 без действий ученика и показывал экран «Повторить».
      * Запрещено повторное навешивание \`addEventListener\` при перезапуске игры.
+   - ${HARDCORE_PRINCE_COMPAT_NOTE}
    - Экспорт тестового хука: window.__DEV_LEVEL3_STATE__ = { waves, currentWaveIndex, currentWave, solveCurrentWave(), submitAction() }.
    - Zero-Style: никаких тегов <style>.
 
@@ -290,7 +295,7 @@ function generatePrompt6(className, classSlug, lessonId, topic, branchName) {
    Обязательно протестируй:
    - Архитектурные контракты (Zero Multiple Choice, отсутствие <style> и внешних CDN, TaskLayout, подключение LMSTelemetry).
    - Сквозное прохождение всех фаз и волн с фиксацией событий телеметрии (\`start_time\`, \`time_spent_sec\`, \`stage\`/\`total_stages\`, \`wave\`/\`total_waves\`, \`level_complete\`, \`success: true\`).
-   - Ошибочные сценарии: показ сбоя, \`hardcore_reset\` / \`level_fail\`, процедурная перегенерация, а в Уровне 3 — наличие экрана \`intro\` (таймер не тикает до старта) и AFK-защиту волны 1 (пауза и кнопка «Повторить» после 2 таймаутов).
+   - Ошибочные сценарии: показ сбоя, \`hardcore_reset\` / \`level_fail\`, процедурная перегенерация, защита гейта хардкора (сброс не открывает бонус Prince of Persia), а в Уровне 3 — наличие экрана \`intro\` (таймер не тикает до старта) и AFK-защиту волны 1 (пауза и кнопка «Повторить» после 2 таймаутов).
    - Симуляцию цифровых персон учащихся через \`StudentSimulator\` (NOVICE, CARELESS с русской запятой и пробелами, CHAOS со спам-кликами и Anti-Paste, DILIGENT) и проверку сложности через \`DifficultyBenchmarker\` (CCS и Sawtooth 2-1-2).
 
 3. ЗАПУСК И ОТЛАДКА (ALT Linux + agy-portable):
@@ -353,7 +358,9 @@ function generatePrompt7(className, classSlug, lessonId, topic, branchName) {
    - http://127.0.0.1:3000/lesson/${classSlug}/${lessonId}
    - http://127.0.0.1:3000/tasks/${classSlug}/${lessonId}/level1
    - http://127.0.0.1:3000/tasks/${classSlug}/${lessonId}/level2
-   - http://127.0.0.1:3000/tasks/${classSlug}/${lessonId}/level3`;
+   - http://127.0.0.1:3000/tasks/${classSlug}/${lessonId}/level3
+   - http://127.0.0.1:3000/courses
+   - http://127.0.0.1:3000/teacher`;
 }
 
 // Новые заголовки колонок

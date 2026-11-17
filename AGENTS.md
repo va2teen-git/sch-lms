@@ -31,7 +31,7 @@
 6. **Учебный план и структура файлов** -> Читать `docs/curriculum.md`
    *(Связь с учебником Полякова: 7–9 классы — базовая программа, 10–11 гуманитарный — базовая, 10–11 технологический — углубленная; папка `wp/`, структура `src/`, запрет LaTeX и правила оформления формул в учебном виде)*
 7. **Готовые компоненты (Терминал, Python IDE, Prince of Persia)** -> Читать `docs/components.md`
-   *(Описание пропсов и использования `Terminal.astro`, `PythonIDE.astro`, `PrinceEmulator.astro` и настройка бонуса `princeBonusLevel`)*
+   *(Описание пропсов и использования `Terminal.astro`, `PythonIDE.astro`, `PrinceEmulator.astro`, сквозная кампания `src/data/prince-campaign.json` «1 урок хардкора = 1 этап», `prince_progress` и legacy-fallback `princeBonusLevel`)*
 8. **Рабочий процесс ИИ (AI Workflow, Worktree, Параллельная работа агентов и Оформление багов)** -> Читать `docs/ai-workflow.md`
    *(Изоляция боевого сервера на ALT Linux, параллельные worktree `~/Projects/school-lms-dev-X`, гигиена веток, оформление багов через GitHub Issues/CLI, регламент обновления продакшна и чек-лист качества)*
 9. **Обязательное тестирование уроков** -> Читать `docs/testing.md`
