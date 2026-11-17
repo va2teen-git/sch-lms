@@ -1,0 +1,479 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2} title="Урок 9 :: Информационные процессы (Уровень 2)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 text-warning mb-0">Тренажер: Расчет параметров передачи и хранения (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет объема переданной информации</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> | Время: <span id="timer-display" class="text-light fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 1: ПРЯМОЙ РАСЧЕТ I = v × t (CCS = 4) -->
+                <!-- ========================================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light">
+                        Сетевой канал передает поток телеметрии со стабильной пропускной способностью <span id="p1-v-desc" class="text-warning fw-bold"></span> Кбит/с в течение <span id="p1-t-desc" class="text-warning fw-bold"></span> секунд.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПАРАМЕТРЫ КАНАЛА СВЯЗИ:</div>
+                        <div class="text-light">Скорость передачи (v): <span id="p1-v-val" class="text-warning fw-bold"></span> Кбит/с</div>
+                        <div class="text-light">Длительность сеанса (t): <span id="p1-t-val" class="text-warning fw-bold"></span> с</div>
+                        <div class="text-secondary small mt-1">Формула: I = v × t.</div>
+                    </div>
+
+                    <label for="p1-input" class="form-label text-light mb-2">Введите общий объем переданной информации (в Кбит):</label>
+                    <div class="input-group w-100 mb-3" style="max-width: 580px;">
+                        <input type="text" inputmode="numeric" id="p1-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" style="min-height: 48px;" placeholder="Число в Кбит" autocomplete="off">
+                        <button id="p1-btn" type="button" class="btn btn-warning rounded-0 text-dark fw-bold px-4" style="min-height: 48px;">Ввод ↵</button>
+                    </div>
+                    <div id="p1-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Перемножьте скорость канала v (Кбит/с) и время t (с). Генерация новой задачи...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 2: КОНВЕРТАЦИЯ ЕДИНИЦ (CCS = 6) -->
+                <!-- ========================================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light">
+                        Преподаватель отправляет на образовательный портал видеопрезентацию размером <span id="p2-size-desc" class="text-warning fw-bold"></span> Мбайт по каналу со скоростью <span id="p2-speed-desc" class="text-warning fw-bold"></span> Мбит/с.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">УСЛОВИЯ РАСЧЕТА:</div>
+                        <div class="text-light">Объем файла (I): <span id="p2-size-val" class="text-warning fw-bold"></span> Мбайт</div>
+                        <div class="text-light">Скорость канала (v): <span id="p2-speed-val" class="text-warning fw-bold"></span> Мбит/с</div>
+                        <div class="text-secondary small mt-1">Принять: 1 байт = 8 бит; 1 Мбайт и 1 Мбит в одном масштабе приставок (1 Мбайт = 8 Мбит); 1 минута = 60 секунд.</div>
+                    </div>
+
+                    <label for="p2-input" class="form-label text-light mb-2">Сколько целых минут займет передача презентации?</label>
+                    <div class="input-group w-100 mb-3" style="max-width: 580px;">
+                        <input type="text" inputmode="numeric" id="p2-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" style="min-height: 48px;" placeholder="Время в минутах" autocomplete="off">
+                        <button id="p2-btn" type="button" class="btn btn-warning rounded-0 text-dark fw-bold px-4" style="min-height: 48px;">Ввод ↵</button>
+                    </div>
+                    <div id="p2-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА РАСЧЕТА] Переведите Мбайты в Мбиты (× 8), разделите на скорость (получите секунды) и переведите в минуты (/ 60)! Генерация...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 3: ПИК 1 / ИНВЕРСИЯ С ПОМЕХОУСТОЙЧИВОСТЬЮ (CCS = 7-8) -->
+                <!-- ========================================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light">
+                        Цифровой архив объемом <span id="p3-size-desc" class="text-warning fw-bold"></span> Кбайт был передан по зашумленному каналу за <span id="p3-min-desc" class="text-warning fw-bold"></span> мин. Для защиты от помех система добавила к исходным данным ровно <strong>25% контрольных бит</strong> (фактический переданный объем увеличился в 1,25 раза).
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ДАННЫЕ ДЛЯ ОБРАТНОГО АНАЛИЗА:</div>
+                        <div class="text-light">Исходный размер архива: <span id="p3-size-val" class="text-warning fw-bold"></span> Кбайт</div>
+                        <div class="text-light">Избыточность помехоустойчивого кода: <span class="text-warning fw-bold">+25%</span> к объему</div>
+                        <div class="text-light">Время передачи: <span id="p3-min-val" class="text-warning fw-bold"></span> мин</div>
+                        <div class="text-secondary small mt-1">Принять: 1 Кбайт = 1024 байта, 1 Кбит/с = 1024 бит/с (1 Кбайт = 8 Кбит).</div>
+                    </div>
+
+                    <label for="p3-input" class="form-label text-light mb-2">Определите минимальную пропускную способность канала связи (в Кбит/с):</label>
+                    <div class="input-group w-100 mb-3" style="max-width: 580px;">
+                        <input type="text" inputmode="numeric" id="p3-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" style="min-height: 48px;" placeholder="Скорость в Кбит/с" autocomplete="off">
+                        <button id="p3-btn" type="button" class="btn btn-warning rounded-0 text-dark fw-bold px-4" style="min-height: 48px;">Ввод ↵</button>
+                    </div>
+                    <div id="p3-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА АНАЛИЗА] Найдите объем с учетом +25% контрольных бит (в Кбит) и разделите на время в секундах! Генерация...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ / ПРАВИЛО 3-2-1 (CCS = 5-6) -->
+                <!-- ========================================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <p class="text-light">
+                        Школьный медиацентр ведет <span id="p4-proj-desc" class="text-warning fw-bold"></span> исследовательских проектов объемом <span id="p4-gb-desc" class="text-warning fw-bold"></span> Гбайт каждый. Оригиналы всех проектов уже сохранены на основном рабочем SSD-диске.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПОЛИТИКА РЕЗЕРВНОГО КОПИРОВАНИЯ «3–2–1»:</div>
+                        <div class="text-light">Количество проектов: <span id="p4-proj-val" class="text-warning fw-bold"></span></div>
+                        <div class="text-light">Объем каждого проекта: <span id="p4-gb-val" class="text-warning fw-bold"></span> Гбайт</div>
+                        <div class="text-secondary small mt-1">Правило «3–2–1»: всего 3 полные копии данных (оригинал + локальный бэкап на другом носителе + удаленная копия в облаке).</div>
+                    </div>
+
+                    <label for="p4-input" class="form-label text-light mb-2">Сколько дополнительных Гбайт (суммарно на внешнем HDD и в облаке) потребуется для резервных копий?</label>
+                    <div class="input-group w-100 mb-3" style="max-width: 580px;">
+                        <input type="text" inputmode="numeric" id="p4-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" style="min-height: 48px;" placeholder="Доп. объем в Гбайт" autocomplete="off">
+                        <button id="p4-btn" type="button" class="btn btn-warning rounded-0 text-dark fw-bold px-4" style="min-height: 48px;">Ввод ↵</button>
+                    </div>
+                    <div id="p4-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА КОНЦЕПЦИИ] Учтите: одна копия уже есть на основном SSD! Сколько еще резервных копий нужно по правилу 3–2–1? Генерация...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ФАЗА 5: КУЛЬМИНАЦИЯ / ПАКЕТИРОВАНИЕ И ОКРУГЛЕНИЕ ВВЕРХ (CCS = 8-9) -->
+                <!-- ========================================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <p class="text-light">
+                        Документ объемом <span id="p5-kb-desc" class="text-warning fw-bold"></span> Кбайт разбивается для передачи на сетевые пакеты. В один пакет помещается не более <span id="p5-payload-desc" class="text-warning fw-bold"></span> байт полезных данных, а к каждому сформированному пакету добавляется служебный заголовок с контрольной суммой размером <span id="p5-header-desc" class="text-warning fw-bold"></span> байт.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-1">ПРОТОКОЛ ПАКЕТНОЙ ПЕРЕДАЧИ:</div>
+                        <div class="text-light">Размер файла: <span id="p5-kb-val" class="text-warning fw-bold"></span> Кбайт (1 Кбайт = 1024 байта)</div>
+                        <div class="text-light">Максимум полезных данных в 1 пакете: <span id="p5-payload-val" class="text-warning fw-bold"></span> байт</div>
+                        <div class="text-light">Служебный заголовок + CRC каждого пакета: <span id="p5-header-val" class="text-warning fw-bold"></span> байт</div>
+                        <div class="text-secondary small mt-1">Внимание: неполный остаток файла в конце также отправляется отдельным пакетом со своим полным заголовком!</div>
+                    </div>
+
+                    <label for="p5-input" class="form-label text-light mb-2">Вычислите суммарный объем переданных по каналу данных (в байтах):</label>
+                    <div class="input-group w-100 mb-3" style="max-width: 580px;">
+                        <input type="text" inputmode="numeric" id="p5-input" class="form-control bg-black text-warning border-warning rounded-0 font-monospace" style="min-height: 48px;" placeholder="Итого байт" autocomplete="off">
+                        <button id="p5-btn" type="button" class="btn btn-warning rounded-0 text-dark fw-bold px-4" style="min-height: 48px;">Ввод ↵</button>
+                    </div>
+                    <div id="p5-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2" role="alert">
+                        [ОШИБКА СИНТЕЗА] Переведите Кбайты в байты (× 1024), округлите число пакетов вверх и прибавьте заголовки всех пакетов! Генерация...
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ЭКРАН ПОБЕДЫ -->
+                <!-- ========================================== -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-warning bg-black p-4 mx-auto" style="max-width: 560px;">
+                        <div class="badge bg-warning text-dark rounded-0 px-3 py-2 mb-3">УРОВЕНЬ 2 ПРОЙДЕН</div>
+                        <h3 class="h4 text-warning mb-2">Аналитические расчеты успешно подтверждены</h3>
+                        <p class="text-light small mb-3">
+                            Вы выполнили прямые и обратные расчеты пропускной способности, учли помехоустойчивую избыточность, правило резервного копирования «3–2–1» и накладные расходы пакетирования.
+                        </p>
+                        <div class="d-flex justify-content-center gap-4 mb-3 text-secondary small">
+                            <div>Время: <strong id="final-time" class="text-light">00:00</strong></div>
+                            <div>Ошибки: <strong id="final-attempts" class="text-warning">0</strong></div>
+                        </div>
+                        <button id="restart-level-btn" type="button" class="btn btn-outline-warning rounded-0 px-4" style="min-height: 48px;">
+                            Пройти тренажер еще раз
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+document.addEventListener('DOMContentLoaded', () => {
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 9 :: Информационные процессы. Передача и хранение информации (Уровень 2)',
+        level: 2,
+        totalStages: 5
+    });
+
+    let currentPhase = 1;
+    let isProcessing = false;
+    let isLevelCompleted = false;
+
+    const timerDisplay = document.getElementById('timer-display');
+    const attemptsDisplay = document.getElementById('attempts-display');
+
+    setInterval(() => {
+        if (isLevelCompleted) return;
+        const elapsed = telemetry.getTimeSpentSec();
+        const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const s = String(elapsed % 60).padStart(2, '0');
+        if (timerDisplay) timerDisplay.textContent = `${m}:${s}`;
+    }, 1000);
+
+    function normalizeNumberInput(raw) {
+        if (raw === null || raw === undefined) return NaN;
+        let s = String(raw).trim().replace(',', '.');
+        s = s.replace(/\s+/g, '');
+        s = s.replace(/(кбит\/с|мбит\/с|кбайт|мбайт|гбайт|кбит|мбит|байт[а-я]*|бит[а-я]*|мин[а-я]*|сек[а-я]*|кб|мб|гб|с)$/i, '');
+        if (!s || !/^-?\d+(\.\d+)?$/.test(s)) return NaN;
+        return Number(s);
+    }
+
+    function pickRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function triggerPhaseError(feedbackEl, onRecover) {
+        if (isProcessing || isLevelCompleted) return;
+        isProcessing = true;
+        telemetry.fail({ stage: currentPhase });
+        if (attemptsDisplay) {
+            attemptsDisplay.textContent = String(telemetry.getState().attemptsCount);
+        }
+        if (feedbackEl) feedbackEl.classList.remove('d-none');
+
+        setTimeout(() => {
+            if (feedbackEl) feedbackEl.classList.add('d-none');
+            if (onRecover) onRecover();
+            isProcessing = false;
+        }, 1400);
+    }
+
+    // =====================================================
+    // КОНФИГУРАЦИИ И ПРОЦЕДУРНЫЕ ГЕНЕРАТОРЫ ФАЗ (Sawtooth 2-1-2)
+    // =====================================================
+    let p1Current = null;
+    let p2Current = null;
+    let p3Current = null;
+    let p4Current = null;
+    let p5Current = null;
+
+    // Фаза 1: Прямой расчет I = v * t (CCS = 4)
+    const P1_POOL_V = [128, 200, 256, 320, 400, 512, 640, 800, 1024];
+    const P1_POOL_T = [5, 8, 10, 12, 15, 20, 25, 30];
+
+    function initP1() {
+        const v = pickRandom(P1_POOL_V);
+        const t = pickRandom(P1_POOL_T);
+        p1Current = { v, t, ans: v * t };
+        document.getElementById('p1-v-desc').textContent = String(v);
+        document.getElementById('p1-t-desc').textContent = String(t);
+        document.getElementById('p1-v-val').textContent = String(v);
+        document.getElementById('p1-t-val').textContent = String(t);
+        const inp = document.getElementById('p1-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function checkP1() {
+        if (isProcessing || !p1Current) return;
+        const val = normalizeNumberInput(document.getElementById('p1-input').value);
+        if (val === p1Current.ans) {
+            goToP2();
+        } else {
+            triggerPhaseError(document.getElementById('p1-feedback'), initP1);
+        }
+    }
+
+    // Фаза 2: Конвертация единиц, время в минутах (CCS = 6)
+    const P2_POOL_SPEED = [8, 16, 24, 32, 48, 64];
+    const P2_POOL_MIN = [2, 3, 4, 5, 6, 8, 10, 12];
+
+    function initP2() {
+        const speed = pickRandom(P2_POOL_SPEED);
+        const minutes = pickRandom(P2_POOL_MIN);
+        const sizeMB = (speed * minutes * 60) / 8;
+        p2Current = { sizeMB, speed, ans: minutes };
+        document.getElementById('p2-size-desc').textContent = String(sizeMB);
+        document.getElementById('p2-speed-desc').textContent = String(speed);
+        document.getElementById('p2-size-val').textContent = String(sizeMB);
+        document.getElementById('p2-speed-val').textContent = String(speed);
+        const inp = document.getElementById('p2-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function checkP2() {
+        if (isProcessing || !p2Current) return;
+        const val = normalizeNumberInput(document.getElementById('p2-input').value);
+        if (val === p2Current.ans) {
+            goToP3();
+        } else {
+            triggerPhaseError(document.getElementById('p2-feedback'), initP2);
+        }
+    }
+
+    // Фаза 3: Пик 1 — Инверсия скорости с +25% контрольных бит (CCS = 7-8)
+    const P3_POOL_SPEED = [128, 160, 200, 256, 320, 400, 512, 640, 800, 1024];
+    const P3_POOL_MIN = [1, 2, 3, 4, 5];
+
+    function initP3() {
+        const speedKbps = pickRandom(P3_POOL_SPEED);
+        const minutes = pickRandom(P3_POOL_MIN);
+        // 1.25 * (sizeKB * 8) = 10 * sizeKB = speedKbps * minutes * 60 => sizeKB = speedKbps * minutes * 6
+        const sizeKB = speedKbps * minutes * 6;
+        p3Current = { sizeKB, minutes, ans: speedKbps };
+        document.getElementById('p3-size-desc').textContent = String(sizeKB);
+        document.getElementById('p3-min-desc').textContent = String(minutes);
+        document.getElementById('p3-size-val').textContent = String(sizeKB);
+        document.getElementById('p3-min-val').textContent = String(minutes);
+        const inp = document.getElementById('p3-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function checkP3() {
+        if (isProcessing || !p3Current) return;
+        const val = normalizeNumberInput(document.getElementById('p3-input').value);
+        if (val === p3Current.ans) {
+            goToP4();
+        } else {
+            triggerPhaseError(document.getElementById('p3-feedback'), initP3);
+        }
+    }
+
+    // Фаза 4: Долина консолидации — Правило «3–2–1» (CCS = 5-6)
+    const P4_POOL_PROJECTS = [2, 3, 4, 5, 6];
+    const P4_POOL_GB = [10, 15, 20, 25, 30, 40, 50];
+
+    function initP4() {
+        const projects = pickRandom(P4_POOL_PROJECTS);
+        const gbPerProject = pickRandom(P4_POOL_GB);
+        // 1 копия уже на SSD; нужно еще 2 копии (локальный HDD + облако)
+        const ans = projects * gbPerProject * 2;
+        p4Current = { projects, gbPerProject, ans };
+        document.getElementById('p4-proj-desc').textContent = String(projects);
+        document.getElementById('p4-gb-desc').textContent = String(gbPerProject);
+        document.getElementById('p4-proj-val').textContent = String(projects);
+        document.getElementById('p4-gb-val').textContent = String(gbPerProject);
+        const inp = document.getElementById('p4-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function checkP4() {
+        if (isProcessing || !p4Current) return;
+        const val = normalizeNumberInput(document.getElementById('p4-input').value);
+        if (val === p4Current.ans) {
+            goToP5();
+        } else {
+            triggerPhaseError(document.getElementById('p4-feedback'), initP4);
+        }
+    }
+
+    // Фаза 5: Кульминация — Пакетирование с округлением вверх + заголовки (CCS = 8-9)
+    const P5_POOL_KB = [3, 5, 6, 7, 9, 10, 11];
+    const P5_POOL_PAYLOAD = [500, 800, 1000];
+    const P5_POOL_HEADER = [20, 40, 50, 64];
+
+    function initP5() {
+        const kb = pickRandom(P5_POOL_KB);
+        const payload = pickRandom(P5_POOL_PAYLOAD);
+        const header = pickRandom(P5_POOL_HEADER);
+        const fileBytes = kb * 1024;
+        const packets = Math.ceil(fileBytes / payload);
+        const ans = fileBytes + packets * header;
+        p5Current = { kb, payload, header, packets, ans };
+        document.getElementById('p5-kb-desc').textContent = String(kb);
+        document.getElementById('p5-payload-desc').textContent = String(payload);
+        document.getElementById('p5-header-desc').textContent = String(header);
+        document.getElementById('p5-kb-val').textContent = String(kb);
+        document.getElementById('p5-payload-val').textContent = String(payload);
+        document.getElementById('p5-header-val').textContent = String(header);
+        const inp = document.getElementById('p5-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function checkP5() {
+        if (isProcessing || !p5Current) return;
+        const val = normalizeNumberInput(document.getElementById('p5-input').value);
+        if (val === p5Current.ans) {
+            finishLevel();
+        } else {
+            triggerPhaseError(document.getElementById('p5-feedback'), initP5);
+        }
+    }
+
+    // =====================================================
+    // ОДНОКРАТНАЯ ПРИВЯЗКА ОБРАБОТЧИКОВ КНОПОК И ПОЛЕЙ
+    // =====================================================
+    const phaseBindings = [
+        { btn: 'p1-btn', inp: 'p1-input', fn: checkP1 },
+        { btn: 'p2-btn', inp: 'p2-input', fn: checkP2 },
+        { btn: 'p3-btn', inp: 'p3-input', fn: checkP3 },
+        { btn: 'p4-btn', inp: 'p4-input', fn: checkP4 },
+        { btn: 'p5-btn', inp: 'p5-input', fn: checkP5 }
+    ];
+    phaseBindings.forEach(({ btn, inp, fn }) => {
+        document.getElementById(btn).addEventListener('click', fn);
+        document.getElementById(inp).addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') fn();
+        });
+    });
+
+    // =====================================================
+    // ПЕРЕХОДЫ МЕЖДУ ФАЗАМИ
+    // =====================================================
+    function goToP2() {
+        currentPhase = 2;
+        telemetry.advanceStage(2);
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+        document.getElementById('phase-title').textContent = 'Расчет времени передачи с конвертацией единиц';
+        initP2();
+    }
+
+    function goToP3() {
+        currentPhase = 3;
+        telemetry.advanceStage(3);
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+        document.getElementById('phase-title').textContent = 'Обратная задача с помехоустойчивой избыточностью';
+        initP3();
+    }
+
+    function goToP4() {
+        currentPhase = 4;
+        telemetry.advanceStage(4);
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('phase4').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+        document.getElementById('phase-title').textContent = 'Концептуальный расчет резервирования «3–2–1»';
+        initP4();
+    }
+
+    function goToP5() {
+        currentPhase = 5;
+        telemetry.advanceStage(5);
+        document.getElementById('phase4').classList.add('d-none');
+        document.getElementById('phase5').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+        document.getElementById('phase-title').textContent = 'Пакетирование с округлением вверх и контролем ошибок';
+        initP5();
+    }
+
+    function finishLevel() {
+        if (isLevelCompleted) return;
+        isLevelCompleted = true;
+        const timeSpent = Math.max(1, telemetry.getTimeSpentSec());
+        const m = String(Math.floor(timeSpent / 60)).padStart(2, '0');
+        const s = String(timeSpent % 60).padStart(2, '0');
+
+        document.getElementById('phase5').classList.add('d-none');
+        document.getElementById('phase-badge').classList.replace('bg-warning', 'bg-info');
+        document.getElementById('phase-badge').textContent = 'Пройдено';
+        document.getElementById('phase-title').textContent = 'Аттестация Уровня 2 завершена';
+
+        document.getElementById('victory-screen').classList.remove('d-none');
+        document.getElementById('final-time').textContent = `${m}:${s}`;
+        document.getElementById('final-attempts').textContent = String(telemetry.getState().attemptsCount);
+
+        telemetry.complete({ stage: 5 });
+    }
+
+    document.getElementById('restart-level-btn').addEventListener('click', () => {
+        location.reload();
+    });
+
+    window.__DEV_LEVEL2_STATE__ = {
+        getPhase: () => currentPhase,
+        getAttempts: () => telemetry.getState().attemptsCount,
+        getExpected: () => {
+            if (currentPhase === 1) return p1Current?.ans;
+            if (currentPhase === 2) return p2Current?.ans;
+            if (currentPhase === 3) return p3Current?.ans;
+            if (currentPhase === 4) return p4Current?.ans;
+            if (currentPhase === 5) return p5Current?.ans;
+            return null;
+        }
+    };
+
+    initP1();
+});
+</script>
