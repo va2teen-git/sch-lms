@@ -75,15 +75,15 @@ test.describe('Teacher Dashboard Logo-Storm Speed Metrics Suite', () => {
     await expect(expandBtn).toBeVisible();
     await expandBtn.click();
 
-    // Verify subrow appears and has 13 cells
+    // Verify subrow appears and has 14 cells
     const subrow = page.locator('.attempt-subrow').first();
     await expect(subrow).toBeVisible();
     const cells = subrow.locator('td');
-    await expect(cells).toHaveCount(13);
+    await expect(cells).toHaveCount(14);
 
-    // Cell 9 is the Logo-Storm column; Cell 10 is the Total Time column
+    // Cell 9 is the Logo-Storm column; Cell 10 is Prince of Persia; Cell 11 is the Total Time column
     const sprintCell = cells.nth(8); // 0-indexed: 8 = 9th column
-    const timeCell = cells.nth(9);   // 0-indexed: 9 = 10th column
+    const timeCell = cells.nth(10);  // 0-indexed: 10 = 11th column
 
     // Cell 10 must contain time format (e.g. "0с", "1м 20с" or "—")
     const timeText = await timeCell.textContent();

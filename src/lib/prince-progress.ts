@@ -50,7 +50,8 @@ export function ensurePrinceProgressSchema(db: Database.Database): void {
   `);
 }
 
-function hasPrinceProgressTable(db: Database.Database): boolean {
+/** Checks whether the prince_progress table exists in SQLite. */
+export function hasPrinceProgressTable(db: Database.Database): boolean {
   const row = db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='prince_progress'")
     .get() as { name?: string } | undefined;

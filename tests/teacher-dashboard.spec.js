@@ -534,10 +534,11 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     const c7Badges = await c7.locator('.card-status-badges').textContent();
     expect(c7Badges).toContain('✅');
     expect(c7Badges).toContain('💀');
-    expect(c7Badges).toContain('⚔️');
+    expect(c7Badges).toContain('⚔️ Эт.1');
     expect(c7Badges).toContain('⚡');
+    await expect(page.locator('#prince-campaign-counter')).toContainText('⚔️ Принц: 1 /');
 
-    // Verify /teacher shows Prince of Persia achievement badge and modal card
+    // Verify /teacher shows Prince of Persia achievement badge, campaign column, and modal card
     await page.goto(`${baseUrl}/teacher?date=today`);
     await page.locator('#filter-exclude-tests').uncheck();
     await page.locator('#filter-lesson').selectOption('7-класс::Урок 7');
@@ -546,10 +547,14 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     const row = page.locator('.student-row', { hasText: fName });
     await expect(row).toBeVisible();
     await expect(row.locator('td:nth-child(4)')).toContainText('⚔️ Принц Персии');
+    await expect(row.locator('td:nth-child(10)')).toContainText('⚔️ 1/');
 
     await row.locator('.view-log-btn').click();
     await expect(page.locator('#modal-level-cards')).toContainText('Prince of Persia (1989)');
     await expect(page.locator('#modal-level-cards')).toContainText('Покорен');
+    await expect(page.locator('#modal-prince-container')).toBeVisible();
+    await expect(page.locator('#modal-prince-stages-list')).toContainText('Этап 1');
+    await expect(page.locator('#modal-prince-stages-list')).toContainText('7 кл • Ур. 7');
   });
 
   test('Teacher dashboard renders stage stars (*****), Level 3 reset wave, active_tab time, and accurate error counts', async ({ page, request }) => {
@@ -712,5 +717,122 @@ test.describe('Teacher Monitoring Dashboard & Telemetry Analytics Suite', () => 
     await expect(l3Cell).toContainText('1 ош.');
     await expect(l3Cell).toContainText('★★');
     await expect(l3Cell).toContainText('↩ В.6');
+  });
+
+  test('Teacher dashboard aggregates cross-lesson Prince campaign progress, modal stages, and CSV export', async ({ page, request }) => {
+    const uniq = Date.now();
+    const fName = `ПринцДашборд${uniq}`;
+    const lName = 'Кампания';
+    const sClass = '8-класс';
+
+    const postEvent = async (payload) => {
+      const r = await request.post(`${baseUrl}/api/telemetry`, { data: payload });
+      expect(r.status()).toBe(200);
+    };
+
+    for (const lessonId of ['7', '8']) {
+      for (const lvl of [1, 2, 3]) {
+        await postEvent({
+          student_firstName: fName,
+          student_lastName: lName,
+          student_class: sClass,
+          course_slug: '8-класс',
+          lesson_id: lessonId,
+          level_number: lvl,
+          mission_name: `Урок ${lessonId} :: Кампания (Уровень ${lvl})`,
+          action_type: 'level_complete',
+          status: 'completed',
+          time_spent_sec: 12,
+          attempts_count: 1,
+          success: true,
+          is_hardcore: true
+        });
+      }
+    }
+
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '8-класс',
+      lesson_id: '7',
+      level_number: 1,
+      mission_name: 'Урок 7 :: Prince of Persia (Этап 1)',
+      action_type: 'prince_complete',
+      status: 'completed',
+      time_spent_sec: 35,
+      attempts_count: 1,
+      success: true,
+      is_hardcore: true,
+      stage_current: 1,
+      stage_total: 18
+    });
+
+    await postEvent({
+      student_firstName: fName,
+      student_lastName: lName,
+      student_class: sClass,
+      course_slug: '8-класс',
+      lesson_id: '8',
+      level_number: 2,
+      mission_name: 'Урок 8 :: Prince of Persia (Этап 2)',
+      action_type: 'prince_complete',
+      status: 'completed',
+      time_spent_sec: 48,
+      attempts_count: 1,
+      success: true,
+      is_hardcore: true,
+      stage_current: 2,
+      stage_total: 18
+    });
+
+    // Even when filtering to a single lesson (Урок 7), cross-lesson campaign progress stays 2 / total
+    const statsRes = await request.get(
+      `${baseUrl}/api/teacher/stats?date=today&class=${encodeURIComponent(sClass)}&course=8-класс&lesson=7&exclude_tests=1&search=${encodeURIComponent(fName)}`
+    );
+    expect(statsRes.status()).toBe(200);
+    const statsBody = await statsRes.json();
+    expect(statsBody.students.length).toBe(1);
+
+    const st = statsBody.students[0];
+    expect(st.princeCampaignCompleted).toBe(2);
+    expect(st.princeCampaignTotal).toBeGreaterThanOrEqual(15);
+    expect(st.princeStages.map(p => ({ stage: p.stage, mapLevel: p.mapLevel, courseSlug: p.courseSlug, lessonId: p.lessonId }))).toEqual([
+      { stage: 1, mapLevel: 1, courseSlug: '8-класс', lessonId: '7' },
+      { stage: 2, mapLevel: 2, courseSlug: '8-класс', lessonId: '8' }
+    ]);
+
+    await page.goto(`${baseUrl}/teacher?date=today`);
+    await page.locator('#filter-course').selectOption('8-класс');
+    await page.locator('#filter-lesson').selectOption('Урок 7');
+    await page.fill('#filter-search', fName);
+
+    const row = page.locator('.student-row', { hasText: fName });
+    await expect(row).toBeVisible();
+    await expect(row.locator('td:nth-child(10)')).toContainText(`⚔️ 2/${st.princeCampaignTotal}`);
+
+    // Open modal and check detailed stage list with linked lessons
+    await row.locator('.view-log-btn').click();
+    await expect(page.locator('#modal-prince-container')).toBeVisible();
+    await expect(page.locator('#modal-prince-title')).toContainText(`2 / ${st.princeCampaignTotal}`);
+    const stagesList = page.locator('#modal-prince-stages-list');
+    await expect(stagesList).toContainText('Этап 1');
+    await expect(stagesList).toContainText('Ур. 7');
+    await expect(stagesList).toContainText('Этап 2');
+    await expect(stagesList).toContainText('Ур. 8');
+    await page.locator('#modal-close-btn').click();
+
+    // Verify CSV export includes Prince campaign progress column
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#export-btn').click();
+    const download = await downloadPromise;
+    const csvStream = await download.createReadStream();
+    const chunks = [];
+    for await (const chunk of csvStream) {
+      chunks.push(chunk);
+    }
+    const csvText = Buffer.concat(chunks).toString('utf-8');
+    expect(csvText).toContain('Прогресс Принца');
+    expect(csvText).toContain(`"2/${st.princeCampaignTotal}"`);
   });
 });
