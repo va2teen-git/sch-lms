@@ -1,0 +1,926 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+// Уровень 3 (Аркада / Финальный босс): 10 класс (базовый), Урок 9 — Информационные процессы. Передача и хранение информации
+// Архетип: Packet Flow Router / Data Pipelines (коммутация маршрута передачи и выбор надежного хранилища)
+---
+
+<TaskLayout level={3} title="Урок 9 :: Информационные процессы (Уровень 3)" bodyClass="font-monospace m-0 p-0">
+    <div id="vue-app" class="container-fluid min-vh-100 p-2 p-md-3 bg-black text-danger font-monospace" v-cloak>
+
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ МИССИИ) -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="text-center py-3 py-md-4">
+            <div class="d-inline-block border border-danger p-3 p-md-4 bg-dark rounded-0 mb-3 text-start shadow-lg w-100" style="max-width: 820px;">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom border-danger pb-2 mb-3">
+                    <h1 class="h4 text-danger mb-0 fw-bold">⚡ PACKET FLOW ROUTER // КОММУТАТОР ПОТОКОВ</h1>
+                    <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-2">АРКАДНЫЙ БОСС</span>
+                </div>
+
+                <p class="text-light mb-3">
+                    Вы — главный диспетчер узла связи. На вход магистрали поступают <span class="text-danger fw-bold">10 скоростных волн</span> информационных пакетов с жесткими ограничениями по пропускной способности канала, энергонезависимости носителя и защите от шума.
+                </p>
+
+                <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 text-light small">
+                    <div class="fw-bold text-danger mb-2 text-uppercase">[РЕГЛАМЕНТ БОЕВОЙ КОММУТАЦИИ]:</div>
+                    <ul class="mb-0 ps-3">
+                        <li class="mb-1"><strong>Прямое управление:</strong> кликайте прямо по поворотным узлам матрицы (или клавиши <kbd class="bg-dark text-warning border border-warning">↑↓←→</kbd> + <kbd class="bg-dark text-warning border border-warning">R</kbd>), чтобы замкнуть маршрут от входного порта к нужному терминалу справа.</li>
+                        <li class="mb-1"><strong>Отбор терминала:</strong> проверьте, чтобы скорость канала покрывала объем за заданное время (<code>I × 8 / v ≤ T<sub>max</sub></code>), а носитель отвечал требованиям сохранности (остерегайтесь энергозависимого ОЗУ и узлов с пометкой <strong>⚡ ШУМ</strong>!).</li>
+                        <li class="mb-1"><strong>Пуск импульса:</strong> нажмите <kbd class="bg-dark text-success border border-success">ПРОБЕЛ</kbd> или кнопку <strong>«▶ ПУСК ИМПУЛЬСА»</strong>.</li>
+                        <li><strong>Хардкор-сброс:</strong> разрыв линии, проход через помехи, неверный терминал или тайм-аут вызывают сирену и <strong>СБРОС НА ВОЛНУ 1</strong> с перегенерацией всех трасс!</li>
+                    </ul>
+                </div>
+
+                <button id="start-btn" type="button" class="btn btn-danger btn-lg rounded-0 w-100 fw-bold font-monospace py-3 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    ▶ ЗАПУСТИТЬ КОММУТАТОР (ВОЛНА 1 ИЗ 10)
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (АРКАДНАЯ СЕССИЯ) -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'playing'" class="mx-auto" style="max-width: 980px;">
+
+            <!-- ВЕРХНИЙ HUD -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-danger pb-2 mb-2 gap-2">
+                <div>
+                    <div class="h6 text-danger mb-0 fw-bold">⚡ PACKET FLOW ROUTER // МАГИСТРАЛЬНЫЙ УЗЕЛ</div>
+                    <div class="small text-secondary">РЕЖИМ ХАРДКОР: ОШИБКА = СБРОС НА ВОЛНУ 1</div>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span id="wave-counter-badge" class="badge bg-danger text-black rounded-0 fs-6 px-3 py-2 fw-bold">
+                        Волна <span v-text="currentWave"></span> из <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="badge bg-dark border border-secondary text-light rounded-0 px-2 py-2">
+                        Сбоев: <span class="text-warning fw-bold" v-text="attempts"></span> | <span v-text="formatTime(sessionTime)"></span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- ТАЙМЕР-БАР ВОЛНЫ -->
+            <div class="card bg-black border border-secondary rounded-0 p-2 mb-2">
+                <div class="d-flex justify-content-between text-secondary small mb-1">
+                    <span>ОКНО КОММУТАЦИИ (УСКОРЯЕТСЯ С КАЖДОЙ ВОЛНОЙ):</span>
+                    <span class="fw-bold" :class="timeLeft < 3.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="timeLeft.toFixed(1)"></span> с / <span v-text="currentWaveDuration.toFixed(1)"></span> с
+                    </span>
+                </div>
+                <div class="progress rounded-0 bg-dark" style="height: 12px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         :class="timerBarClass"
+                         role="progressbar"
+                         :style="{ width: Math.max(0, (timeLeft / currentWaveDuration * 100)) + '%' }">
+                    </div>
+                </div>
+            </div>
+
+            <!-- АВАРИЙНАЯ СИРЕНА (#alarm-box) -->
+            <div id="alarm-box" v-if="alarmActive" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-2 py-2 text-center" role="alert">
+                <div class="fw-bold">🚨 [СИРЕНА // АВАРИЙНЫЙ СБРОС] <span v-text="alarmReason"></span></div>
+                <div class="small text-warning">ВОЗВРАТ НА ВОЛНУ 1 И ПЕРЕГЕНЕРАЦИЯ СХЕМЫ...</div>
+            </div>
+
+            <!-- ПАРАМЕТРЫ ВХОДЯЩЕГО ПАКЕТА (УНИКАЛЬНЫЕ ДАННЫЕ ПОТОКА) -->
+            <div v-if="currentWaveData" class="card bg-dark border border-danger rounded-0 p-2 p-md-3 mb-2">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                    <span class="fw-bold text-light small" v-text="currentWaveData.packetTitle"></span>
+                    <span class="badge bg-black border border-warning text-warning rounded-0" v-text="currentWaveData.requirementLabel"></span>
+                </div>
+                <div class="d-flex flex-wrap gap-2 small">
+                    <span class="badge bg-black border border-info text-info rounded-0 px-2 py-1">
+                        Объем: <strong v-text="currentWaveData.sizeMB"></strong> Мбайт (<strong v-text="currentWaveData.sizeMbit"></strong> Мбит)
+                    </span>
+                    <span class="badge bg-black border border-danger text-danger rounded-0 px-2 py-1">
+                        Лимит времени: ≤ <strong v-text="currentWaveData.maxSec"></strong> с (нужно v ≥ <strong v-text="currentWaveData.minSpeed"></strong> Мбит/с)
+                    </span>
+                </div>
+            </div>
+
+            <!-- РАБОЧАЯ АРЕНА: ВХОД + МАТРИЦА КОММУТАЦИИ + ВЫХОДНЫЕ ТЕРМИНАЛЫ -->
+            <div v-if="currentWaveData" class="card bg-black border border-secondary rounded-0 p-2 p-md-3 mb-2">
+                <div class="row g-2 align-items-stretch">
+
+                    <!-- Левый порт (Источник) -->
+                    <div class="col-12 col-sm-2 d-flex flex-column justify-content-between gap-2">
+                        <div v-for="r in currentWaveData.rows" :key="'in-' + r"
+                             class="border rounded-0 p-1 d-flex flex-column align-items-center justify-content-center text-center flex-fill"
+                             :class="r - 1 === currentWaveData.startRow ? 'border-info bg-dark text-info' : 'border-secondary bg-black text-secondary opacity-50'"
+                             style="min-height: 60px;">
+                            <template v-if="r - 1 === currentWaveData.startRow">
+                                <div class="fw-bold small lh-1">ВХОД →</div>
+                                <div class="small lh-1 mt-1" style="font-size: 0.65rem;">КОДЕР</div>
+                            </template>
+                            <template v-else>
+                                <div class="small" style="font-size: 0.65rem;">ЗАГЛУШКА</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Центр: Сетка поворотных узлов -->
+                    <div class="col-12 col-sm-6 d-flex flex-column justify-content-between gap-2">
+                        <div v-for="(rowArr, rIdx) in currentWaveData.grid" :key="'row-' + rIdx" class="d-flex gap-2">
+                            <button v-for="(cell, cIdx) in rowArr" :key="'cell-' + rIdx + '-' + cIdx"
+                                    type="button"
+                                    class="btn rounded-0 flex-fill p-1 d-flex flex-column align-items-center justify-content-center position-relative"
+                                    :class="getCellClass(cell, rIdx, cIdx)"
+                                    style="min-width: 52px; min-height: 60px;"
+                                    :aria-label="'Узел строка ' + (rIdx + 1) + ' столбец ' + (cIdx + 1)"
+                                    @click="rotateCell(rIdx, cIdx)">
+                                <svg viewBox="0 0 64 64" class="w-100 h-100" style="max-width: 44px; max-height: 44px;">
+                                    <g :transform="'rotate(' + (cell.rot * 90) + ' 32 32)'">
+                                        <line v-if="cell.type === 'straight'" x1="0" y1="32" x2="64" y2="32"
+                                              :stroke="getStrokeColor(cell, rIdx, cIdx)" stroke-width="10" stroke-linecap="square" />
+                                        <path v-else-if="cell.type === 'corner'" d="M 32 0 L 32 32 L 64 32" fill="none"
+                                              :stroke="getStrokeColor(cell, rIdx, cIdx)" stroke-width="10" stroke-linecap="square" stroke-linejoin="miter" />
+                                        <g v-else-if="cell.type === 'tee'">
+                                            <line x1="0" y1="32" x2="64" y2="32" :stroke="getStrokeColor(cell, rIdx, cIdx)" stroke-width="10" />
+                                            <line x1="32" y1="0" x2="32" y2="32" :stroke="getStrokeColor(cell, rIdx, cIdx)" stroke-width="10" />
+                                        </g>
+                                    </g>
+                                    <circle v-if="pulseCell && pulseCell.r === rIdx && pulseCell.c === cIdx" cx="32" cy="32" r="11" fill="#ffc107" />
+                                </svg>
+                                <span v-if="cell.hasNoise" class="badge bg-danger text-black rounded-0 position-absolute top-0 end-0" style="font-size: 0.55rem; padding: 1px 3px;">⚡ШУМ</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Правые выходные терминалы (Канал + Хранилище) -->
+                    <div class="col-12 col-sm-4 d-flex flex-column justify-content-between gap-2">
+                        <div v-for="(term, tIdx) in currentWaveData.terminals" :key="'term-' + tIdx"
+                             class="border rounded-0 p-2 d-flex flex-column justify-content-center flex-fill"
+                             :class="reachedTerminalIndex === tIdx ? 'border-info bg-dark text-light' : 'border-secondary bg-black text-light'"
+                             style="min-height: 60px;">
+                            <div class="d-flex justify-content-between align-items-center gap-1">
+                                <span class="fw-bold text-warning lh-1" style="font-size: 0.72rem;" v-text="term.title"></span>
+                                <span class="badge bg-dark border border-info text-info rounded-0" style="font-size: 0.65rem;" v-text="term.speed + ' Мбит/с'"></span>
+                            </div>
+                            <div class="text-secondary lh-1 mt-1" style="font-size: 0.65rem;" v-text="term.storageTrait"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ПАНЕЛЬ ПУСКА (ФОРСАЖ) -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="small text-secondary">
+                    Управление: клик по узлу — поворот 90° | <kbd class="bg-dark text-light border border-secondary">R</kbd> поворот курсора | <kbd class="bg-dark text-success border border-success">ПРОБЕЛ</kbd> пуск
+                </div>
+                <button id="launch-btn" type="button"
+                        class="btn btn-danger rounded-0 fw-bold px-4 py-2 text-uppercase"
+                        style="min-height: 48px; min-width: 220px;"
+                        :disabled="isAnimatingPulse || alarmActive"
+                        @click="launchPulse(false)">
+                    ▶ ПУСК ИМПУЛЬСА [SPACE]
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'victory'" class="text-center py-4 py-md-5">
+            <div class="d-inline-block border border-success bg-dark p-4 p-md-5 rounded-0 shadow-lg text-start w-100" style="max-width: 680px;">
+                <div class="text-center mb-4">
+                    <div class="display-5 text-success fw-bold mb-2">★ МИССИЯ ВЫПОЛНЕНА ★</div>
+                    <h3 class="h4 text-success fw-bold">ВСЕ 10 ВОЛН КОММУТАЦИИ ПРОЙДЕНЫ</h3>
+                    <p class="text-light small">
+                        Вы безошибочно проложили маршруты передачи данных в обход помех, соотнесли пропускную способность каналов с объемом файлов и выбрали надежные энергонезависимые хранилища.
+                    </p>
+                </div>
+
+                <div class="card bg-black border border-success rounded-0 p-3 mb-4">
+                    <div class="text-secondary small mb-2 border-bottom border-secondary pb-1">ИТОГОВЫЙ ОТЧЕТ ТЕЛЕМЕТРИИ:</div>
+                    <div class="text-light mb-1">Пройдено волн: <span class="text-success fw-bold">10 из 10</span></div>
+                    <div class="text-light mb-1">Время прохождения: <span class="text-warning fw-bold" v-text="formatTime(sessionTime)"></span></div>
+                    <div class="text-light">Зафиксировано сбоев: <span class="text-warning fw-bold" v-text="attempts"></span></div>
+                </div>
+
+                <button id="restart-arcade-btn" type="button" class="btn btn-outline-success rounded-0 w-100 py-3 fw-bold text-uppercase" style="min-height: 48px;" @click="restartGame">
+                    ПРОЙТИ АРКАДУ ЗАНОВО
+                </button>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+<script is:inline>
+(function () {
+    const { createApp } = Vue;
+
+    // Web Audio API синтезатор (без внешних файлов)
+    let audioCtx = null;
+    function getAudioCtx() {
+        try {
+            if (!audioCtx) {
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (Ctx) audioCtx = new Ctx();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function playTone(freq, type, duration, gainVal = 0.08) {
+        try {
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    }
+
+    function playRotateSound() { playTone(520, 'square', 0.06, 0.05); }
+    function playPulseStepSound() { playTone(760, 'sine', 0.05, 0.05); }
+    function playWaveSuccessSound() {
+        playTone(660, 'triangle', 0.1, 0.08);
+        setTimeout(() => playTone(880, 'triangle', 0.14, 0.08), 80);
+    }
+    function playAlarmSound() {
+        playTone(220, 'sawtooth', 0.25, 0.12);
+        setTimeout(() => playTone(165, 'sawtooth', 0.35, 0.12), 180);
+    }
+
+    // Порты сторон клетки: 0=Top(T), 1=Right(R), 2=Bottom(B), 3=Left(L)
+    const DIR_DR = [-1, 0, 1, 0];
+    const DIR_DC = [0, 1, 0, -1];
+    const OPP_DIR = [2, 3, 0, 1]; // T<->B, R<->L
+
+    function getOpenDirs(type, rot) {
+        const r = ((rot % 4) + 4) % 4;
+        if (type === 'straight') {
+            return r % 2 === 0 ? [3, 1] : [0, 2]; // L-R or T-B
+        }
+        if (type === 'corner') {
+            // rot 0: T-R (0,1), rot 1: R-B (1,2), rot 2: B-L (2,3), rot 3: L-T (3,0)
+            return [r, (r + 1) % 4];
+        }
+        if (type === 'tee') {
+            // rot 0: L-T-R (3,0,1 -> missing 2); general: missing (2+r)%4
+            const missing = (2 + r) % 4;
+            return [0, 1, 2, 3].filter((d) => d !== missing);
+        }
+        return [];
+    }
+
+    function findMatchingRot(type, d1, d2) {
+        for (let r = 0; r < 4; r++) {
+            const dirs = getOpenDirs(type, r);
+            if (dirs.includes(d1) && dirs.includes(d2)) return r;
+        }
+        return 0;
+    }
+
+    function pickRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function buildSolvableWave(waveNum) {
+        const rows = 3;
+        const cols = waveNum <= 2 ? 3 : 4;
+        const duration = Number(Math.max(8.0, 14.0 - (waveNum - 1) * 0.65).toFixed(1));
+
+        // Сбалансированные параметры скорости и объема (без дробного ада)
+        const speedCases = [
+            { sizeMB: 10, maxSec: 10, minSpeed: 8 },
+            { sizeMB: 20, maxSec: 10, minSpeed: 16 },
+            { sizeMB: 30, maxSec: 15, minSpeed: 16 },
+            { sizeMB: 40, maxSec: 10, minSpeed: 32 },
+            { sizeMB: 45, maxSec: 15, minSpeed: 24 },
+            { sizeMB: 60, maxSec: 15, minSpeed: 32 },
+            { sizeMB: 80, maxSec: 20, minSpeed: 32 },
+            { sizeMB: 120, maxSec: 15, minSpeed: 64 }
+        ];
+        const sc = pickRandom(speedCases);
+
+        const reqProfiles = [
+            {
+                key: 'persist',
+                label: 'ТРЕБОВАНИЕ: Энергонезависимое хранение',
+                packetTitle: 'Архивный документ для долговременного хранения',
+                goodTitle: 'ОПТОВОЛОКНО → ВНЕШНИЙ SSD',
+                goodTrait: 'Энергонезависимо • Защита от ударов',
+                badSlowTitle: 'РАДИОКАНАЛ → ФЛЕШ-ПАМЯТЬ',
+                badSlowTrait: 'Энергонезависимо • Медленный канал',
+                badTrapTitle: 'МАГИСТРАЛЬ → ОЗУ (RAM)',
+                badTrapTrait: 'ОПАСНО: Энергозависимая память!'
+            },
+            {
+                key: 'backup',
+                label: 'ТРЕБОВАНИЕ: Резервирование «3–2–1»',
+                packetTitle: 'Исследовательская база проекта (нужен бэкап)',
+                goodTitle: 'КАНАЛ ЦОД → ОБЛАКО (3–2–1)',
+                goodTrait: '3 копии • Удаленный дата-центр',
+                badSlowTitle: 'МЕДНЫЙ ЛИНК → ОБЛАКО (3–2–1)',
+                badSlowTrait: 'Резерв есть • Низкая скорость',
+                badTrapTitle: 'ПРЯМОЙ ПОРТ → ОДНА КОПИЯ',
+                badTrapTrait: 'ОПАСНО: Нет резервных копий!'
+            },
+            {
+                key: 'noise_safe',
+                label: 'ТРЕБОВАНИЕ: Высокая надежность без потерь',
+                packetTitle: 'Телеметрический отчет с контролем CRC',
+                goodTitle: 'ОПТОВОЛОКНО → SSD + CRC',
+                goodTrait: 'Энергонезависимо • Контроль CRC',
+                badSlowTitle: 'СТАРЫЙ МОДЕМ → HDD + CRC',
+                badSlowTrait: 'Контроль есть • Нехватка скорости',
+                badTrapTitle: 'НЕЗАЩИЩЕННЫЙ КЭШ → ОЗУ',
+                badTrapTrait: 'ОПАСНО: Сброс при потере питания!'
+            }
+        ];
+
+        const prof = waveNum <= 2 ? reqProfiles[0] : pickRandom(reqProfiles);
+
+        const startRow = Math.floor(Math.random() * rows);
+        const targetRow = Math.floor(Math.random() * rows);
+
+        // Построение простого пути слева направо с 1 или 2 вертикальными переходами
+        const pathCoords = [];
+        let curR = startRow;
+        if (startRow === targetRow) {
+            if (cols >= 4 && waveNum >= 3) {
+                const detourRow = (startRow + 1 + Math.floor(Math.random() * 2)) % rows;
+                const c1 = 1;
+                const c2 = 2;
+                for (let c = 0; c <= c1; c++) pathCoords.push([curR, c]);
+                while (curR !== detourRow) {
+                    curR += detourRow > curR ? 1 : -1;
+                    pathCoords.push([curR, c1]);
+                }
+                pathCoords.push([curR, c2]);
+                while (curR !== targetRow) {
+                    curR += targetRow > curR ? 1 : -1;
+                    pathCoords.push([curR, c2]);
+                }
+                for (let c = c2 + 1; c < cols; c++) pathCoords.push([curR, c]);
+            } else {
+                for (let c = 0; c < cols; c++) pathCoords.push([curR, c]);
+            }
+        } else {
+            const turnCol = Math.floor(Math.random() * cols);
+            for (let c = 0; c <= turnCol; c++) pathCoords.push([curR, c]);
+            while (curR !== targetRow) {
+                curR += targetRow > curR ? 1 : -1;
+                pathCoords.push([curR, turnCol]);
+            }
+            for (let c = turnCol + 1; c < cols; c++) pathCoords.push([curR, c]);
+        }
+
+        // Инициализация сетки случайными клетками
+        const grid = [];
+        for (let r = 0; r < rows; r++) {
+            const rowArr = [];
+            for (let c = 0; c < cols; c++) {
+                rowArr.push({
+                    r,
+                    c,
+                    type: pickRandom(['straight', 'corner', 'tee']),
+                    rot: Math.floor(Math.random() * 4),
+                    solutionRot: 0,
+                    onSolutionPath: false,
+                    hasNoise: false
+                });
+            }
+            grid.push(rowArr);
+        }
+
+        // Настройка клеток целевого пути
+        for (let i = 0; i < pathCoords.length; i++) {
+            const [r, c] = pathCoords[i];
+            let inDir = 3; // Left
+            if (i > 0) {
+                const [pr, pc] = pathCoords[i - 1];
+                if (pr < r) inDir = 0; // came from Top
+                else if (pr > r) inDir = 2; // came from Bottom
+                else if (pc < c) inDir = 3; // came from Left
+                else inDir = 1;
+            }
+            let outDir = 1; // Right exit
+            if (i < pathCoords.length - 1) {
+                const [nr, nc] = pathCoords[i + 1];
+                if (nr < r) outDir = 0;
+                else if (nr > r) outDir = 2;
+                else if (nc > c) outDir = 1;
+                else outDir = 3;
+            }
+
+            const isOpposite = OPP_DIR[inDir] === outDir;
+            const cellType = isOpposite ? 'straight' : 'corner';
+            const solRot = findMatchingRot(cellType, inDir, outDir);
+
+            grid[r][c].type = cellType;
+            grid[r][c].solutionRot = solRot;
+            grid[r][c].rot = solRot;
+            grid[r][c].onSolutionPath = true;
+        }
+
+        // Добавление узлов шума на клетки вне целевого пути (начиная с волны 3)
+        if (waveNum >= 3) {
+            const nonPathCells = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (!grid[r][c].onSolutionPath) nonPathCells.push(grid[r][c]);
+                }
+            }
+            const noiseCount = waveNum >= 7 ? Math.min(2, nonPathCells.length) : Math.min(1, nonPathCells.length);
+            for (let k = 0; k < noiseCount; k++) {
+                const idx = Math.floor(Math.random() * nonPathCells.length);
+                nonPathCells[idx].hasNoise = true;
+                nonPathCells.splice(idx, 1);
+            }
+        }
+
+        // Скручиваем целевые клетки для головоломки
+        const numTwist = waveNum <= 2 ? 2 : (waveNum <= 6 ? 3 : 4);
+        const indices = pathCoords.map((_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        const toTwist = indices.slice(0, Math.min(numTwist, pathCoords.length));
+        toTwist.forEach((pIdx) => {
+            const [r, c] = pathCoords[pIdx];
+            const cell = grid[r][c];
+            if (cell.type === 'straight') {
+                cell.rot = (cell.solutionRot + 1) % 4;
+            } else {
+                const delta = 1 + Math.floor(Math.random() * 3);
+                cell.rot = (cell.solutionRot + delta) % 4;
+            }
+        });
+
+        // Формирование 3 выходных терминалов
+        const goodSpeed = sc.minSpeed >= 64 ? 100 : (sc.minSpeed >= 32 ? 64 : sc.minSpeed * 2);
+        const slowSpeed = Math.max(2, Math.floor(sc.minSpeed / 2));
+        const trapFastSpeed = goodSpeed;
+
+        const terminals = [null, null, null];
+        terminals[targetRow] = {
+            title: prof.goodTitle,
+            speed: goodSpeed,
+            storageTrait: prof.goodTrait,
+            isValid: true,
+            failReason: ''
+        };
+
+        const otherRows = [0, 1, 2].filter((r) => r !== targetRow);
+        terminals[otherRows[0]] = {
+            title: prof.badSlowTitle,
+            speed: slowSpeed,
+            storageTrait: prof.badSlowTrait,
+            isValid: false,
+            failReason: `Недостаточная скорость канала (${slowSpeed} < ${sc.minSpeed} Мбит/с)!`
+        };
+        terminals[otherRows[1]] = {
+            title: prof.badTrapTitle,
+            speed: trapFastSpeed,
+            storageTrait: prof.badTrapTrait,
+            isValid: false,
+            failReason: 'Выбранный терминал не отвечает требованиям надежного хранения!'
+        };
+
+        return {
+            waveNum,
+            rows,
+            cols,
+            duration,
+            startRow,
+            targetRow,
+            pathCoords,
+            grid,
+            terminals,
+            sizeMB: sc.sizeMB,
+            sizeMbit: sc.sizeMB * 8,
+            maxSec: sc.maxSec,
+            minSpeed: sc.minSpeed,
+            packetTitle: prof.packetTitle,
+            requirementLabel: prof.label
+        };
+    }
+
+    const app = createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                totalWaves: 10,
+                currentWave: 1,
+                wavesList: [],
+                attempts: 0,
+                sessionTime: 0,
+                startTimeMs: 0,
+                timeLeft: 14.0,
+                currentWaveDuration: 14.0,
+
+                cursorR: 0,
+                cursorC: 0,
+                pulseCell: null,
+                isAnimatingPulse: false,
+                alarmActive: false,
+                alarmReason: '',
+
+                waveTimerId: null,
+                sessionTimerId: null,
+                resetTimeoutId: null,
+                pulseTimerId: null,
+                telemetry: null
+            };
+        },
+        computed: {
+            currentWaveData() {
+                return this.wavesList[this.currentWave - 1] || null;
+            },
+            timerBarClass() {
+                if (!this.currentWaveDuration) return 'bg-success';
+                const ratio = this.timeLeft / this.currentWaveDuration;
+                if (ratio > 0.5) return 'bg-success';
+                if (ratio > 0.25) return 'bg-warning';
+                return 'bg-danger';
+            },
+            routeAnalysis() {
+                return this.traceFromStart();
+            },
+            reachedTerminalIndex() {
+                return this.routeAnalysis.terminalRow;
+            }
+        },
+        mounted() {
+            const self = this;
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: 'Урок 9 :: Информационные процессы. Передача и хранение информации (Уровень 3)',
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    self.stopAllTimers();
+                    self.alarmActive = false;
+                },
+                onAfkRetry: () => {
+                    self.alarmActive = false;
+                    self.generateAllWaves();
+                    self.currentWave = 1;
+                    self.telemetry.setWave(1, self.totalWaves);
+                    self.initWave(1);
+                }
+            });
+
+            window.addEventListener('keydown', this.handleKeydown);
+
+            window.__DEV_LEVEL3_STATE__ = {
+                get waves() { return self.wavesList; },
+                get currentWaveIndex() { return self.currentWave - 1; },
+                get currentWave() { return self.currentWave; },
+                solveCurrentWave: () => self.devSolveCurrentWave(),
+                submitAction: (action, payload) => self.devSubmitAction(action, payload)
+            };
+        },
+        beforeUnmount() {
+            window.removeEventListener('keydown', this.handleKeydown);
+            this.stopAllTimers();
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
+        },
+        methods: {
+            formatTime(sec) {
+                const m = String(Math.floor(sec / 60)).padStart(2, '0');
+                const s = String(sec % 60).padStart(2, '0');
+                return `${m}:${s}`;
+            },
+
+            stopAllTimers() {
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                if (this.sessionTimerId) { clearInterval(this.sessionTimerId); this.sessionTimerId = null; }
+                if (this.resetTimeoutId) { clearTimeout(this.resetTimeoutId); this.resetTimeoutId = null; }
+                if (this.pulseTimerId) { clearTimeout(this.pulseTimerId); this.pulseTimerId = null; }
+            },
+
+            generateAllWaves() {
+                const arr = [];
+                for (let w = 1; w <= this.totalWaves; w++) {
+                    arr.push(buildSolvableWave(w));
+                }
+                this.wavesList = arr;
+            },
+
+            startGame() {
+                this.stopAllTimers();
+                this.generateAllWaves();
+                this.attempts = 0;
+                this.sessionTime = 0;
+                this.startTimeMs = Date.now();
+                this.currentWave = 1;
+                this.alarmActive = false;
+                this.isAnimatingPulse = false;
+                this.pulseCell = null;
+                this.gameState = 'playing';
+
+                if (this.telemetry) {
+                    this.telemetry.reset({ allowRecomplete: true });
+                    this.telemetry.start();
+                    this.telemetry.markActivity();
+                    this.telemetry.setWave(1, this.totalWaves);
+                    this.telemetry.progress({
+                        wave: 1,
+                        total_waves: this.totalWaves,
+                        stage: 1,
+                        total_stages: this.totalWaves
+                    });
+                }
+
+                this.sessionTimerId = setInterval(() => {
+                    this.sessionTime = this.telemetry
+                        ? this.telemetry.getTimeSpentSec()
+                        : Math.floor((Date.now() - this.startTimeMs) / 1000);
+                }, 1000);
+
+                this.initWave(1);
+            },
+
+            restartGame() {
+                this.startGame();
+            },
+
+            initWave(waveNum) {
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                if (this.pulseTimerId) { clearTimeout(this.pulseTimerId); this.pulseTimerId = null; }
+                this.currentWave = waveNum;
+                this.isAnimatingPulse = false;
+                this.pulseCell = null;
+                this.alarmActive = false;
+
+                const data = this.currentWaveData;
+                if (!data) return;
+                this.cursorR = data.startRow;
+                this.cursorC = 0;
+                this.currentWaveDuration = data.duration;
+                this.timeLeft = data.duration;
+
+                this.waveTimerId = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.alarmActive || this.isAnimatingPulse) return;
+                    this.timeLeft = Math.max(0, Number((this.timeLeft - 0.1).toFixed(1)));
+                    if (this.timeLeft <= 0) {
+                        clearInterval(this.waveTimerId);
+                        this.waveTimerId = null;
+                        this.triggerHardcoreReset('Истекло время коммутации волны!', true);
+                    }
+                }, 100);
+            },
+
+            rotateCell(r, c) {
+                if (this.gameState !== 'playing' || this.alarmActive || this.isAnimatingPulse) return;
+                if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+                const data = this.currentWaveData;
+                if (!data || !data.grid[r] || !data.grid[r][c]) return;
+
+                if (this.telemetry) this.telemetry.markActivity();
+                this.cursorR = r;
+                this.cursorC = c;
+                data.grid[r][c].rot = (data.grid[r][c].rot + 1) % 4;
+                playRotateSound();
+            },
+
+            traceFromStart() {
+                const data = this.currentWaveData;
+                if (!data) return { cells: new Set(), path: [], hitNoise: false, deadEnd: true, terminalRow: -1 };
+                const { rows, cols, grid, startRow } = data;
+                const visited = new Set();
+                const path = [];
+                let r = startRow;
+                let c = 0;
+                let enterFrom = 3; // Left edge
+                let hitNoise = false;
+
+                while (r >= 0 && r < rows && c >= 0 && c < cols) {
+                    const key = `${r},${c}`;
+                    if (visited.has(key)) {
+                        return { cells: visited, path, hitNoise, deadEnd: true, terminalRow: -1 };
+                    }
+                    const cell = grid[r][c];
+                    const dirs = getOpenDirs(cell.type, cell.rot);
+                    if (!dirs.includes(enterFrom)) {
+                        return { cells: visited, path, hitNoise, deadEnd: true, terminalRow: -1 };
+                    }
+                    visited.add(key);
+                    path.push([r, c]);
+                    if (cell.hasNoise) hitNoise = true;
+
+                    const exitOptions = dirs.filter((d) => d !== enterFrom);
+                    if (exitOptions.length === 0) {
+                        return { cells: visited, path, hitNoise, deadEnd: true, terminalRow: -1 };
+                    }
+                    // Если у узла (например T-перекрестка) несколько выходов, выбираем приоритетно вправо, затем по часовой
+                    const outDir = exitOptions.includes(1) ? 1 : exitOptions[0];
+                    const nr = r + DIR_DR[outDir];
+                    const nc = c + DIR_DC[outDir];
+
+                    if (nc === cols && outDir === 1) {
+                        return { cells: visited, path, hitNoise, deadEnd: false, terminalRow: nr };
+                    }
+                    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) {
+                        return { cells: visited, path, hitNoise, deadEnd: true, terminalRow: -1 };
+                    }
+                    r = nr;
+                    c = nc;
+                    enterFrom = OPP_DIR[outDir];
+                }
+                return { cells: visited, path, hitNoise, deadEnd: true, terminalRow: -1 };
+            },
+
+            getCellClass(cell, rIdx, cIdx) {
+                const isCursor = this.cursorR === rIdx && this.cursorC === cIdx;
+                const key = `${rIdx},${cIdx}`;
+                const isConnected = this.routeAnalysis.cells.has(key);
+                if (cell.hasNoise) {
+                    return isCursor ? 'bg-dark border-danger border-2' : 'bg-dark border-danger';
+                }
+                if (isCursor) {
+                    return 'bg-dark border-warning border-2';
+                }
+                return isConnected ? 'bg-dark border-info' : 'bg-black border-secondary';
+            },
+
+            getStrokeColor(cell, rIdx, cIdx) {
+                if (cell.hasNoise) return '#dc3545';
+                const key = `${rIdx},${cIdx}`;
+                return this.routeAnalysis.cells.has(key) ? '#0dcaf0' : '#6c757d';
+            },
+
+            launchPulse(instant = false) {
+                if (this.gameState !== 'playing' || this.alarmActive || this.isAnimatingPulse) return;
+                if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+                if (this.telemetry) this.telemetry.markActivity();
+
+                const trace = this.traceFromStart();
+                if (instant || trace.path.length === 0) {
+                    this.evaluateTrace(trace);
+                    return;
+                }
+
+                this.isAnimatingPulse = true;
+                let stepIdx = 0;
+                const stepNext = () => {
+                    if (this.gameState !== 'playing' || this.alarmActive) return;
+                    if (stepIdx < trace.path.length) {
+                        const [pr, pc] = trace.path[stepIdx];
+                        this.pulseCell = { r: pr, c: pc };
+                        playPulseStepSound();
+                        stepIdx++;
+                        this.pulseTimerId = setTimeout(stepNext, 70);
+                    } else {
+                        this.pulseCell = null;
+                        this.isAnimatingPulse = false;
+                        this.evaluateTrace(trace);
+                    }
+                };
+                stepNext();
+            },
+
+            evaluateTrace(trace) {
+                if (this.gameState !== 'playing' || this.alarmActive) return;
+                if (trace.hitNoise) {
+                    this.triggerHardcoreReset('Импульс прошел через узел сильных помех (⚡ ШУМ)!', false);
+                    return;
+                }
+                if (trace.deadEnd || trace.terminalRow < 0) {
+                    this.triggerHardcoreReset('Разрыв линии связи: импульс уперся в тупик!', false);
+                    return;
+                }
+                const term = this.currentWaveData.terminals[trace.terminalRow];
+                if (!term || !term.isValid) {
+                    this.triggerHardcoreReset(term ? term.failReason : 'Неподходящий выходной терминал!', false);
+                    return;
+                }
+
+                // Волна пройдена!
+                playWaveSuccessSound();
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+
+                if (this.currentWave >= this.totalWaves) {
+                    this.finishLevel();
+                } else {
+                    const nextWave = this.currentWave + 1;
+                    if (this.telemetry) {
+                        this.telemetry.advanceWave(nextWave);
+                    }
+                    this.initWave(nextWave);
+                }
+            },
+
+            triggerHardcoreReset(reason, isTimeout) {
+                if (this.alarmActive || this.gameState !== 'playing') return;
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                if (this.pulseTimerId) { clearTimeout(this.pulseTimerId); this.pulseTimerId = null; }
+                this.isAnimatingPulse = false;
+                this.pulseCell = null;
+
+                if (this.telemetry) {
+                    const sent = this.telemetry.fail({
+                        wave: this.currentWave,
+                        isTimeout: Boolean(isTimeout)
+                    });
+                    this.attempts = this.telemetry.getState().attemptsCount;
+                    if (sent === false) {
+                        this.alarmActive = false;
+                        return;
+                    }
+                } else {
+                    this.attempts++;
+                }
+
+                playAlarmSound();
+                this.alarmReason = reason;
+                this.alarmActive = true;
+                this.generateAllWaves();
+
+                this.resetTimeoutId = setTimeout(() => {
+                    if (this.gameState !== 'playing') return;
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+                    this.alarmActive = false;
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
+                    this.initWave(1);
+                }, 1300);
+            },
+
+            finishLevel() {
+                this.stopAllTimers();
+                this.gameState = 'victory';
+                this.sessionTime = this.telemetry
+                    ? Math.max(1, this.telemetry.getTimeSpentSec())
+                    : Math.max(1, Math.round((Date.now() - this.startTimeMs) / 1000));
+                if (this.telemetry) {
+                    this.telemetry.complete({ wave: this.totalWaves });
+                }
+            },
+
+            handleKeydown(e) {
+                if (this.gameState !== 'playing' || this.alarmActive || this.isAnimatingPulse) return;
+                if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+                const data = this.currentWaveData;
+                if (!data) return;
+
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === 'ц' || e.key === 'Ц') {
+                    e.preventDefault();
+                    this.cursorR = Math.max(0, this.cursorR - 1);
+                } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы') {
+                    e.preventDefault();
+                    this.cursorR = Math.min(data.rows - 1, this.cursorR + 1);
+                } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'ф' || e.key === 'Ф') {
+                    e.preventDefault();
+                    this.cursorC = Math.max(0, this.cursorC - 1);
+                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' || e.key === 'в' || e.key === 'В') {
+                    e.preventDefault();
+                    this.cursorC = Math.min(data.cols - 1, this.cursorC + 1);
+                } else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
+                    e.preventDefault();
+                    this.rotateCell(this.cursorR, this.cursorC);
+                } else if (e.code === 'Space') {
+                    e.preventDefault();
+                    this.launchPulse(false);
+                }
+            },
+
+            devSolveCurrentWave() {
+                if (this.gameState !== 'playing' || this.alarmActive) return;
+                const data = this.currentWaveData;
+                if (!data) return;
+                if (this.telemetry) this.telemetry.markActivity();
+                data.pathCoords.forEach(([r, c]) => {
+                    data.grid[r][c].rot = data.grid[r][c].solutionRot;
+                });
+                this.launchPulse(true);
+            },
+
+            devSubmitAction(action, payload) {
+                if (action === 'rotate_cell' && payload) {
+                    this.rotateCell(payload.r, payload.c);
+                } else if (action === 'launch') {
+                    this.launchPulse(Boolean(payload && payload.instant));
+                } else if (action === 'solve') {
+                    this.devSolveCurrentWave();
+                } else if (action === 'fail') {
+                    this.triggerHardcoreReset(payload || 'Тестовый принудительный сбой', false);
+                }
+            }
+        }
+    });
+
+    app.mount('#vue-app');
+})();
+</script>
