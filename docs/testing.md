@@ -49,14 +49,18 @@
 /-------------------------\
 ```
 
-### Уровень 1: Архитектурный линтинг контента (`curriculum-lint.spec.js`)
-* **Скорость выполнения:** менее 0.1 сек.
-* **Что проверяет:**
+### Уровень 1: Архитектурный линтинг контента и глобальный аудит стандартов (`curriculum-lint.spec.js`, `standards-audit.spec.js`)
+* **Скорость выполнения:** менее 0.2 сек.
+* **Что проверяет `curriculum-lint.spec.js`:**
   1. Наличие файла `theory.md` и ключевых терминов школьной программы.
   2. **Zero-LaTeX Policy:** автоматический запрет на сырые разделители `$ ... $` и `$$ ... $$` в markdown. Формулы обязаны быть оформлены в чистом типографском виде с HTML-тегами `<sub>`, `<sup>` и Unicode-символами (`λ`, `α`, `→`).
   3. Наличие файлов `level1.astro`, `level2.astro`, `level3.astro`.
   4. Использование обязательного компонента `<TaskLayout>` с атрибутами метаданных.
   5. Отсутствие запрещенных тегов `<style>` (гарантия использования утилит Tailwind CSS).
+* **Что проверяет `standards-audit.spec.js` (введён в Issue #566, строгий режим `STRICT_STANDARDS_AUDIT=1`):**
+  1. Отсутствие легаси-заданий `.html` в `public/tasks/` (все задания мигрированы в `.astro`).
+  2. Наличие `public/static/lms-telemetry.js` и его подключение в `TaskLayout.astro`.
+  3. По всем `.astro`-заданиям в `src/pages/tasks/`: отсутствие `<style>` и внешних CDN, наличие `<TaskLayout>`, `TELEMETRY_EVENT`/`LMSTelemetry`, `start_time`, `time_spent_sec`, `stage`/`wave`, а для Уровня 3 — обязательного экрана `intro` и AFK-защиты волны 1.
 
 ### Уровень 1.5: Контракты процедурной генерации, математических инвариантов и робастности интерфейса (`procedural-integrity.spec.js`, `procedural-contracts.js`)
 * **Скорость выполнения:** 1-3 сек.
@@ -96,8 +100,8 @@
 ### Уровень 2.5: Эмуляция поведения ученика и цифровые персоны (`student-simulator.js`, `*-student-personas.spec.js`)
 * **Скорость выполнения:** 3–7 сек (до 30 сек на полный набор).
 * **Модули:**
-  - `tests/student-simulator.js` ([`StudentSimulator`](file:///D:/school-lms-dev/tests/student-simulator.js)) — базовый движок симуляции поведения для стандартных полей ввода, кнопок, сеток и Drag-and-Drop.
-  - `tests/student-writer-simulator.js` ([`StudentWriterSimulator`](file:///D:/school-lms-dev/tests/student-writer-simulator.js)) — специализированный движок для текстовых процессоров (LibreOffice Writer, Jodit WYSIWYG, ОГЭ 13.2).
+  - [`tests/student-simulator.js`](../tests/student-simulator.js) (`StudentSimulator`) — базовый движок симуляции поведения для стандартных полей ввода, кнопок, сеток и Drag-and-Drop.
+  - [`tests/student-writer-simulator.js`](../tests/student-writer-simulator.js) (`StudentWriterSimulator`) — специализированный движок для текстовых процессоров (LibreOffice Writer, Jodit WYSIWYG, ОГЭ 13.2).
 * **Цель:** Полное исключение эффекта «всезнающего автора» (white-box bias), когда тест решал задачу через бэкдор-хуки (`window.__testState`) или точное знание приватных селекторов генератора.
 
 > [!IMPORTANT]
@@ -140,7 +144,7 @@
   ```
 
 ### Уровень 2.7: Автоматическая калибровка и оценка сложности (Difficulty Benchmarking Engine)
-* **Файлы:** 	ests/difficulty-benchmarker.js ([DifficultyBenchmarker](file:///D:/school-lms-dev/tests/difficulty-benchmarker.js)), 	ests/difficulty-benchmarker.spec.js.
+* **Файлы:** [`tests/difficulty-benchmarker.js`](../tests/difficulty-benchmarker.js) (`DifficultyBenchmarker`), `tests/difficulty-benchmarker.spec.js`.
 * **Скорость выполнения:** менее 0.5 сек.
 * **Что проверяет:**
   1. **Индекс Когнитивной Сложности (CCS 1–10):** программный расчет формулы CCS = F_depth + F_memory + F_search + F_inversion + F_stress - S_scaffolding для каждой фазы урока.
@@ -229,6 +233,9 @@ jobs:
 # cp ../school-lms/telemetry.db ./telemetry.db
 npm run test:contracts
 
+# 1.1 Строгий аудит стандартов всех .astro-заданий (Issue #566):
+STRICT_STANDARDS_AUDIT=1 npx playwright test tests/standards-audit.spec.js
+
 # 2. Запустить универсальные тесты процедурной генерации, математических инвариантов и UX
 npm run test:integrity
 
@@ -251,7 +258,7 @@ npx playwright test --ui
 2. Для процедурно-генерируемых заданий подключайте контракты из `tests/procedural-contracts.js` и проверяйте их через `npm run test:integrity`.
 3. Поле ввода чисел и процентов **никогда не должно быть** `<input type="number">`, так как браузер блокирует русскую запятую `,` и знак `%`. Используйте `type="text" inputmode="decimal"` с нормализацией `.replace('%', '').replace(',', '.').trim()`.
 4. В интерактивных механиках с перемещением элементов (Click-to-Move, Drag-and-Drop) используйте делегирование событий и никогда не блокируйте всплытие (`stopPropagation`) на внутренних бейджах и карточках.
-5. Перед коммитом запускайте `npm run test:contracts` и `npm run test:integrity`.
+5. Перед коммитом запускайте `npm run test:contracts`, `npm run test:integrity` и `STRICT_STANDARDS_AUDIT=1 npx playwright test tests/standards-audit.spec.js`.
 6. Сохраняйте скриншоты в папку `scratch/` для визуального контроля и удаляйте временные файлы перед отправкой Pull Request.
 7. Никогда не используйте сырой LaTeX синтаксис в `theory.md` — за этим следит автоматический линтер.
 8. **Обязательное создание тестов цифровых персон:** Для КАЖДОГО создаваемого урока ОБЯЗАТЕЛЬНО создавайте файл `tests/lesson<id>-grade<class>-student-personas.spec.js`, подключающий `StudentSimulator` и проверяющий поведение 4 персон (NOVICE, CARELESS, CHAOS, DILIGENT). Обязательно регистрируйте новый файл в `package.json` (`test:personas`).

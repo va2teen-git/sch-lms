@@ -240,7 +240,7 @@ $$\mathbf{CCS} = F_{depth} + F_{memory} + F_{search} + F_{inversion} + F_{stress
 
 ## 7. Автоматизированная оценка сложности в тестах Playwright (DifficultyBenchmarker)
 
-В тестовую систему School LMS внедрен автоматический измеритель когнитивной сложности tests/difficulty-benchmarker.js ([DifficultyBenchmarker](file:///D:/school-lms/tests/difficulty-benchmarker.js)), интегрированный с виртуальными персонами [StudentSimulator](file:///D:/school-lms/tests/student-simulator.js).
+В тестовую систему School LMS внедрен автоматический измеритель когнитивной сложности [`tests/difficulty-benchmarker.js`](../tests/difficulty-benchmarker.js) (`DifficultyBenchmarker`), интегрированный с виртуальными персонами [`StudentSimulator`](../tests/student-simulator.js).
 
 ### 7.1. Пример интеграции в тесты персон урока (*-student-personas.spec.js):
 ```javascript

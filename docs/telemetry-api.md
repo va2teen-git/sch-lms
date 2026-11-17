@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS prince_progress (
 
 ## 3. Миграция Исторических Данных
 
-Для обновления существующих баз данных создан скрипт [scripts/migrate_telemetry.js](file:///D:/school-lms/scripts/migrate_telemetry.js):
+Для обновления существующих баз данных создан скрипт [`scripts/migrate_telemetry.js`](../scripts/migrate_telemetry.js):
 
 ```bash
 node scripts/migrate_telemetry.js
