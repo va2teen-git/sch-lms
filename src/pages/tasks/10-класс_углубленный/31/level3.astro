@@ -1,0 +1,940 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout
+    level={3}
+    title="Урок 31 :: Единицы измерения количества информации. Алфавитный подход к оценке количества информации (Уровень 3)"
+    bodyClass="font-monospace m-0 p-0"
+>
+    <div id="arcade-app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-danger mb-0 fw-bold">Арена: Bit-Bus Allocator &amp; Hartley Multiplexer (Уровень 3)</h1>
+                <div class="text-secondary small">Урок 31 // 10 класс (углубленный, технологический профиль)</div>
+            </div>
+            <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-2">
+                Аркадный босс // Хардкор-сброс
+            </span>
+        </div>
+
+        <div class="card bg-dark rounded-0 shadow" :class="isAlarm ? 'border-danger border-2' : (isSuccessPulse ? 'border-success border-2' : 'border-danger')">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- ЭКРАН 1: ВВОДНЫЙ БРИФИНГ (Intro Screen) -->
+                <div v-if="gameState === 'intro'" class="text-center py-4">
+                    <div class="display-6 text-danger fw-bold mb-2">СИНХРОНИЗАТОР ШИНЫ ДАННЫХ (BIT-BUS MUX)</div>
+                    <p class="text-light fs-6 mx-auto mb-4" style="max-width: 740px;">
+                        Вы управляете аппаратным мультиплексором алфавитных кадров. На вход шины поступают пакеты с параметрами алфавитов, выравнивания записей и канальной пропускной способности.
+                        Рассчитайте точное значение в уме и синтезируйте его напрямую на 8-битной регистровой шине до обнуления таймера!
+                    </p>
+
+                    <div class="alert alert-dark bg-black border border-danger text-light rounded-0 text-start mx-auto p-3 mb-4" style="max-width: 700px;">
+                        <div class="text-danger fw-bold mb-2">⚡ ТАКТИЧЕСКИЙ РЕГЛАМЕНТ ХАРДКОР-РЕЖИМА:</div>
+                        <ul class="mb-0 text-secondary small ps-3">
+                            <li><strong class="text-light">10 процедурных волн:</strong> динамический таймер сжимается с 14.0 до 8.5 с (Волна 8 — тактическая передышка).</li>
+                            <li><strong class="text-danger">ХАРДКОР-СБРОС:</strong> ошибка в расчёте или обнуление таймера включают сирену и <em>ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</em> с перегенерацией пакетов.</li>
+                            <li><strong class="text-info">Прямое управление (Direct Manipulation):</strong> кликайте разряды <code>128..1</code> или жмите клавиши <code>1</code>–<code>8</code>; сброс регистра — <code>0</code> / <code>Backspace</code>; передача кадра — <code>Пробел</code> / <code>Enter</code>.</li>
+                        </ul>
+                    </div>
+
+                    <button
+                        id="start-btn"
+                        type="button"
+                        @click="startGame"
+                        class="btn btn-danger btn-lg rounded-0 px-5 py-3 fw-bold text-white shadow"
+                        style="min-height: 54px;"
+                    >
+                        ▶ НАЧАТЬ СИНХРОНИЗАЦИЮ [ПРОБЕЛ]
+                    </button>
+                </div>
+
+                <!-- ЭКРАН 2: АКТИВНАЯ АРЕНА (Playing Screen) -->
+                <div v-else-if="gameState === 'playing'">
+
+                    <!-- Верхняя панель статуса -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span id="phase-counter" class="badge bg-danger text-white rounded-0 fs-6">
+                                ВОЛНА <span v-text="currentWave"></span> ИЗ 10
+                            </span>
+                            <span class="text-light fw-bold fs-6" v-text="currentWaveData.title"></span>
+                            <span v-if="currentWaveData.isBreather" class="badge bg-info text-dark rounded-0">ПЕРЕДЫШКА</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-secondary small">
+                                Сбои: <span class="text-warning fw-bold" v-text="failCount"></span>
+                            </div>
+                            <div class="text-secondary small">
+                                Таймер: <span class="fw-bold fs-5" :class="timeLeft <= 3.0 ? 'text-danger' : 'text-warning'" v-text="timeLeft.toFixed(1) + 's'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Полоса таймера волны -->
+                    <div class="progress rounded-0 bg-black border border-secondary mb-3" style="height: 10px;">
+                        <div
+                            class="progress-bar"
+                            :class="timeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                            role="progressbar"
+                            :style="{ width: Math.max(0, Math.min(100, (timeLeft / currentWaveData.maxTime) * 100)) + '%', transition: 'width 100ms linear' }"
+                        ></div>
+                    </div>
+
+                    <!-- Аварийный баннер тревоги (#alarm-box) -->
+                    <div id="alarm-box" v-if="isAlarm" class="alert alert-danger bg-black border border-danger text-danger rounded-0 mb-3 py-2 px-3">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <span class="fw-bold fs-6">🚨 КРИТИЧЕСКИЙ СБОЙ ШИНЫ! ХАРДКОР-СБРОС НА ВОЛНУ 1:</span>
+                                <div class="small mt-1 text-light" v-text="alarmMessage"></div>
+                            </div>
+                            <div class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></div>
+                        </div>
+                    </div>
+
+                    <!-- Вспышка успешной фиксации -->
+                    <div v-if="isSuccessPulse" class="alert alert-success bg-black border border-success text-success rounded-0 mb-3 py-2 px-3">
+                        <span class="fw-bold">✔ КАДР ЗАФИКСИРОВАН:</span>
+                        <span class="small text-light ms-1" v-text="successMessage"></span>
+                    </div>
+
+                    <!-- Data Source: Терминал параметров входного пакета -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <span>ВХОДНОЙ ТЕЛЕМЕТРИЧЕСКИЙ КАДР // СПЕЦИФИКАЦИЯ ПОТОКА:</span>
+                            <span class="badge bg-secondary text-white rounded-0">FRAME-<span v-text="currentWave"></span></span>
+                        </div>
+                        <div class="card-body p-3">
+                            <p class="text-light fs-6 mb-3" v-text="currentWaveData.prompt"></p>
+
+                            <div class="row g-2">
+                                <div v-for="(spec, idx) in currentWaveData.specs" :key="idx" class="col-6 col-md-3">
+                                    <div class="p-2 bg-dark border border-secondary h-100">
+                                        <div class="text-secondary small" v-text="spec.label"></div>
+                                        <div class="text-info fw-bold fs-5" v-text="spec.value"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct Surface: Аппаратная шина + 8-битный регистр прямого переключения -->
+                    <div class="card bg-black border border-info rounded-0 mb-2">
+                        <div class="card-header bg-dark text-warning py-2 px-3 small fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <span>ПРЯМАЯ РЕГИСТРОВАЯ ШИНА (8-BIT DIRECT BUS ALLOCATOR):</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-black border border-secondary text-secondary rounded-0">
+                                    BIN: <span class="text-info" v-text="registerBinary"></span>
+                                </span>
+                                <span class="badge bg-info text-dark rounded-0 fs-6">
+                                    ШИНА: <span v-text="registerValue"></span> <span v-text="currentWaveData.targetUnit"></span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-3">
+                            <!-- Живая SVG-коммутация 8 линий к выходному коллектору -->
+                            <div class="mb-2 d-none d-sm-block">
+                                <svg viewBox="0 0 800 44" class="w-100" style="height: 44px;" aria-hidden="true">
+                                    <line x1="40" y1="36" x2="760" y2="36" stroke="#343a40" stroke-width="4" />
+                                    <line
+                                        v-if="registerValue > 0"
+                                        x1="40"
+                                        y1="36"
+                                        x2="760"
+                                        y2="36"
+                                        :stroke="isAlarm ? '#dc3545' : (isSuccessPulse ? '#198754' : '#0dcaf0')"
+                                        stroke-width="4"
+                                    />
+                                    <g v-for="bit in bitPins" :key="'trace-' + bit.weight">
+                                        <line
+                                            :x1="bit.svgX"
+                                            y1="4"
+                                            :x2="bit.svgX"
+                                            y2="36"
+                                            :stroke="(registerMask & bit.weight) ? (isAlarm ? '#dc3545' : '#0dcaf0') : '#495057'"
+                                            :stroke-width="(registerMask & bit.weight) ? 4 : 2"
+                                        />
+                                        <circle
+                                            :cx="bit.svgX"
+                                            cy="36"
+                                            r="5"
+                                            :fill="(registerMask & bit.weight) ? '#0dcaf0' : '#212529'"
+                                            stroke="#6c757d"
+                                            stroke-width="1.5"
+                                        />
+                                    </g>
+                                </svg>
+                            </div>
+
+                            <!-- 8 тактильных переключателей разрядов (хитбоксы >= 48x48 px) -->
+                            <div class="row g-2 mb-3">
+                                <div v-for="bit in bitPins" :key="bit.weight" class="col-3 col-md">
+                                    <button
+                                        type="button"
+                                        @click="toggleBit(bit.weight)"
+                                        :disabled="isActionBlocked"
+                                        :aria-pressed="Boolean(registerMask & bit.weight)"
+                                        class="btn w-100 rounded-0 p-2 d-flex flex-column align-items-center justify-content-between fw-bold"
+                                        :class="(registerMask & bit.weight) ? 'btn-info text-dark border-light shadow' : 'btn-outline-secondary text-light bg-dark'"
+                                        style="min-width: 52px; min-height: 68px;"
+                                    >
+                                        <span class="badge rounded-0 w-100" :class="(registerMask & bit.weight) ? 'bg-dark text-info' : 'bg-black text-secondary'">
+                                            [<span v-text="bit.hotkey"></span>]
+                                        </span>
+                                        <span class="fs-5 my-1" v-text="bit.weight"></span>
+                                        <span class="small" v-text="(registerMask & bit.weight) ? 'BIT: 1' : 'BIT: 0'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Панель фиксации и сброса шины -->
+                            <div class="row g-2 align-items-stretch">
+                                <div class="col-12 col-sm-4">
+                                    <button
+                                        id="clear-bus-btn"
+                                        type="button"
+                                        @click="clearRegister"
+                                        :disabled="isActionBlocked"
+                                        class="btn btn-outline-warning w-100 h-100 rounded-0 fw-bold"
+                                        style="min-height: 52px;"
+                                    >
+                                        ↺ СБРОС ШИНЫ [0]
+                                    </button>
+                                </div>
+                                <div class="col-12 col-sm-8">
+                                    <button
+                                        id="commit-frame-btn"
+                                        type="button"
+                                        @click="commitFrame"
+                                        :disabled="isActionBlocked || registerValue === 0"
+                                        class="btn w-100 h-100 rounded-0 fw-bold fs-6"
+                                        :class="registerValue > 0 ? 'btn-success text-white' : 'btn-outline-secondary text-secondary'"
+                                        style="min-height: 52px;"
+                                    >
+                                        ⚡ ПЕРЕДАТЬ КАДР (<span v-text="registerValue"></span> <span v-text="currentWaveData.targetUnit"></span>) [ПРОБЕЛ]
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ЭКРАН 3: ПОБЕДА НАД БОССОМ (Victory Screen) -->
+                <div v-else-if="gameState === 'victory'" class="text-center py-4">
+                    <h2 class="display-6 text-success fw-bold mb-2">СИНХРОНИЗАЦИЯ ШИНЫ ЗАВЕРШЕНА!</h2>
+                    <p class="text-light fs-6 mx-auto mb-4" style="max-width: 700px;">
+                        Все 10 волн алфавитных расчётов, выравнивания записей, блочного сжатия и перевода единиц Хартли–МЭК выполнены без критической потери буфера.
+                    </p>
+                    <div class="d-inline-flex flex-wrap justify-content-center gap-4 p-3 bg-black border border-success rounded-0 mb-4 text-start">
+                        <div>
+                            <span class="text-secondary small d-block">СБОЕВ (HARDCORE RESETS):</span>
+                            <span class="fs-4 fw-bold text-warning" v-text="failCount"></span>
+                        </div>
+                        <div>
+                            <span class="text-secondary small d-block">ИТОГОВОЕ ВРЕМЯ МИССИИ:</span>
+                            <span class="fs-4 fw-bold text-info" v-text="formatTime(totalSessionElapsed)"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <button
+                            type="button"
+                            @click="restartGame"
+                            class="btn btn-outline-danger rounded-0 px-4 py-2 fw-bold"
+                            style="min-height: 48px;"
+                        >
+                            ↻ Пройти аркаду заново
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+document.addEventListener('DOMContentLoaded', () => {
+    const { createApp } = Vue;
+
+    const MISSION_NAME = 'Урок 31 :: Единицы измерения количества информации. Алфавитный подход к оценке количества информации (Уровень 3)';
+    const TOTAL_WAVES = 10;
+
+    let appInstance = null;
+    let resetTimeout = null;
+    let pulseTimeout = null;
+    let audioCtx = null;
+
+    function getAudioContext() {
+        if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new Ctx();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type, duration, vol = 0.12) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    }
+
+    function playToggleSound(isOn) {
+        playTone(isOn ? 580 : 340, 'triangle', 0.06, 0.08);
+    }
+
+    function playSuccessSound() {
+        playTone(523.25, 'sine', 0.1, 0.11);
+        setTimeout(() => playTone(659.25, 'sine', 0.1, 0.11), 65);
+        setTimeout(() => playTone(783.99, 'sine', 0.16, 0.13), 130);
+    }
+
+    function playAlarmSiren() {
+        playTone(880, 'sawtooth', 0.16, 0.14);
+        setTimeout(() => playTone(440, 'sawtooth', 0.22, 0.14), 160);
+        setTimeout(() => playTone(880, 'sawtooth', 0.16, 0.12), 380);
+    }
+
+    function playVictoryFanfare() {
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+            setTimeout(() => playTone(f, 'triangle', 0.22, 0.13), idx * 110);
+        });
+    }
+
+    function pick(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function generateWaves() {
+        // Волна 1: Формула Хартли N <= 2^i (14.0s)
+        const w1Bit = pick([4, 5, 6, 7]);
+        const w1Min = (1 << (w1Bit - 1)) + 1;
+        const w1Max = 1 << w1Bit;
+        const w1N = randInt(w1Min, w1Max);
+
+        // Волна 2: Объем сообщения в битах I = K * i (13.0s)
+        const w2Pool = [
+            [16, 17, 32, 5],
+            [24, 9, 16, 4],
+            [12, 33, 64, 6],
+            [32, 9, 16, 4],
+            [32, 17, 32, 5],
+            [16, 33, 64, 6],
+            [16, 65, 128, 7],
+            [32, 33, 64, 6],
+            [20, 9, 16, 4],
+            [24, 33, 64, 6]
+        ];
+        const [w2K, w2MinN, w2MaxN, w2i] = pick(w2Pool);
+        const w2N = randInt(w2MinN, w2MaxN);
+        const w2Ans = w2K * w2i;
+
+        // Волна 3: Объем сообщения в Байтах (K * i) / 8 (12.0s)
+        const w3Pool = [
+            [32, 17, 32, 5],
+            [64, 9, 16, 4],
+            [64, 17, 32, 5],
+            [32, 33, 64, 6],
+            [64, 33, 64, 6],
+            [128, 17, 32, 5],
+            [128, 33, 64, 6],
+            [256, 9, 16, 4],
+            [128, 65, 128, 7],
+            [256, 17, 32, 5],
+            [256, 33, 64, 6]
+        ];
+        const [w3K, w3MinN, w3MaxN, w3i] = pick(w3Pool);
+        const w3N = randInt(w3MinN, w3MaxN);
+        const w3Ans = (w3K * w3i) / 8;
+
+        // Волна 4: Побайтное выравнивание записей M * ceil(K * i / 8) (11.5s)
+        const w4Pool = [
+            [15, 17, 32, 5, 8],
+            [11, 33, 64, 6, 8],
+            [17, 9, 16, 4, 4],
+            [21, 17, 32, 5, 8],
+            [9, 65, 128, 7, 12],
+            [13, 17, 32, 5, 16],
+            [19, 9, 16, 4, 16],
+            [11, 17, 32, 5, 8],
+            [7, 33, 64, 6, 16]
+        ];
+        const [w4K, w4MinN, w4MaxN, w4i, w4M] = pick(w4Pool);
+        const w4N = randInt(w4MinN, w4MaxN);
+        const w4PerRec = Math.ceil((w4K * w4i) / 8);
+        const w4Ans = w4PerRec * w4M;
+
+        // Волна 5: Дельта при расширении алфавита с N1 до N2 (11.0s)
+        const w5Pool = [
+            [32, 9, 16, 4, 17, 32, 5],
+            [64, 9, 16, 4, 33, 64, 6],
+            [128, 17, 32, 5, 65, 128, 7],
+            [96, 9, 16, 4, 17, 32, 5],
+            [160, 17, 32, 5, 65, 128, 7],
+            [192, 9, 16, 4, 33, 64, 6],
+            [256, 17, 32, 5, 65, 128, 7],
+            [128, 9, 16, 4, 65, 128, 7],
+            [256, 9, 16, 4, 65, 128, 7]
+        ];
+        const [w5K, w5Min1, w5Max1, w5i1, w5Min2, w5Max2, w5i2] = pick(w5Pool);
+        const w5N1 = randInt(w5Min1, w5Max1);
+        const w5N2 = randInt(w5Min2, w5Max2);
+        const w5Ans = (w5K * (w5i2 - w5i1)) / 8;
+
+        // Волна 6: Время передачи файла через степени двойки (10.0s)
+        const w6Pool = [
+            { vol: '5 МиБ', rate: '256 КиБ/с', sec: 20, note: '5 · 1024 / 256 = 20 с' },
+            { vol: '3 МиБ', rate: '128 КиБ/с', sec: 24, note: '3 · 1024 / 128 = 24 с' },
+            { vol: '6 МиБ', rate: '192 КиБ/с', sec: 32, note: '6 · 1024 / 192 = 32 с' },
+            { vol: '9 МиБ', rate: '256 КиБ/с', sec: 36, note: '9 · 1024 / 256 = 36 с' },
+            { vol: '12 МиБ', rate: '128 КиБ/с', sec: 96, note: '12 · 1024 / 128 = 96 с' },
+            { vol: '10 МиБ', rate: '256 КиБ/с', sec: 40, note: '10 · 1024 / 256 = 40 с' },
+            { vol: '32 КиБ', rate: '16 384 бит/с (2^14)', sec: 16, note: '(32 · 2^13) / 2^14 = 16 с' },
+            { vol: '48 КиБ', rate: '32 768 бит/с (2^15)', sec: 12, note: '(48 · 2^13) / 2^15 = 12 с' },
+            { vol: '64 КиБ', rate: '65 536 бит/с (2^16)', sec: 8, note: '(64 · 2^13) / 2^16 = 8 с' },
+            { vol: '80 КиБ', rate: '65 536 бит/с (2^16)', sec: 10, note: '(80 · 2^13) / 2^16 = 10 с' }
+        ];
+        const w6 = pick(w6Pool);
+
+        // Волна 7: Стандарт МЭК (КиБ = 1024 Б vs КБ = 1000 Б) (9.5s)
+        const w7M = pick([1, 2, 3, 4, 6, 8]);
+        const w7Ans = 24 * w7M;
+
+        // Волна 8 (ПЕРЕДЫШКА): Обратная задача — максимальная мощность алфавита N_max = 2^i (10.5s)
+        const w8Pool = [
+            [64, 24, 3],
+            [128, 64, 4],
+            [64, 40, 5],
+            [128, 96, 6],
+            [64, 56, 7],
+            [256, 160, 5],
+            [256, 192, 6],
+            [256, 224, 7]
+        ];
+        const [w8K, w8I, w8i] = pick(w8Pool);
+        const w8Ans = 1 << w8i;
+
+        // Волна 9: Блочное кодирование N^k <= 2^m -> объем B блоков в Байтах (9.0s)
+        const w9Pool = [
+            [3, 3, 5, 16],
+            [3, 5, 8, 32],
+            [5, 2, 5, 32],
+            [5, 3, 7, 16],
+            [6, 3, 8, 40],
+            [10, 2, 7, 32],
+            [9, 2, 7, 64],
+            [3, 4, 7, 128]
+        ];
+        const [w9N, w9k, w9m, w9B] = pick(w9Pool);
+        const w9Ans = (w9B * w9m) / 8;
+
+        // Волна 10 (БОСС): Побайтный ID + служебный заголовок H для M пакетов (8.5s)
+        const w10Pool = [
+            [11, 17, 32, 5, 3, 16],
+            [9, 33, 64, 6, 5, 8],
+            [13, 17, 32, 5, 7, 8],
+            [15, 9, 16, 4, 4, 12],
+            [7, 65, 128, 7, 9, 12],
+            [17, 17, 32, 5, 5, 6],
+            [10, 33, 64, 6, 2, 8]
+        ];
+        const [w10K, w10MinN, w10MaxN, w10i, w10H, w10M] = pick(w10Pool);
+        const w10N = randInt(w10MinN, w10MaxN);
+        const w10IdBytes = Math.ceil((w10K * w10i) / 8);
+        const w10Ans = (w10IdBytes + w10H) * w10M;
+
+        return [
+            {
+                waveNumber: 1,
+                title: 'Глубина кода Хартли',
+                prompt: `Определите минимальную целую разрядность кода i (бит на символ) для равномерного кодирования алфавита из N = ${w1N} символов.`,
+                specs: [
+                    { label: 'Мощность N', value: `${w1N} симв.` },
+                    { label: 'Кодирование', value: 'Равномерное' },
+                    { label: 'Условие', value: 'N ≤ 2^i' },
+                    { label: 'Цель шины', value: 'i (бит/симв)' }
+                ],
+                targetValue: w1Bit,
+                targetUnit: 'бит/симв',
+                maxTime: 14.0,
+                isBreather: false,
+                explanation: `Для N = ${w1N} выполняются неравенства 2^${w1Bit - 1} < ${w1N} ≤ 2^${w1Bit}, поэтому i = ${w1Bit} бит/симв.`
+            },
+            {
+                waveNumber: 2,
+                title: 'Информационный объём (биты)',
+                prompt: `Сообщение длиной K = ${w2K} символов записано с помощью алфавита мощностью N = ${w2N}. Выставьте объём сообщения в битах.`,
+                specs: [
+                    { label: 'Длина K', value: `${w2K} симв.` },
+                    { label: 'Мощность N', value: `${w2N} симв.` },
+                    { label: 'Формула', value: 'I = K · i' },
+                    { label: 'Цель шины', value: 'I (бит)' }
+                ],
+                targetValue: w2Ans,
+                targetUnit: 'бит',
+                maxTime: 13.0,
+                isBreather: false,
+                explanation: `Для N = ${w2N} вес символа i = ${w2i} бит, значит I = ${w2K} · ${w2i} = ${w2Ans} бит.`
+            },
+            {
+                waveNumber: 3,
+                title: 'Байтовая упаковка кадра',
+                prompt: `Текстовый кадр из K = ${w3K} символов кодируется в алфавите из N = ${w3N} символов (равномерно, побитно без разделителей). Сколько Байт занимает кадр?`,
+                specs: [
+                    { label: 'Длина K', value: `${w3K} симв.` },
+                    { label: 'Мощность N', value: `${w3N} симв.` },
+                    { label: 'Перевод', value: '1 Байт = 8 бит' },
+                    { label: 'Цель шины', value: 'I (Байт)' }
+                ],
+                targetValue: w3Ans,
+                targetUnit: 'Байт',
+                maxTime: 12.0,
+                isBreather: false,
+                explanation: `Вес символа i = ${w3i} бит; общий объём (${w3K} · ${w3i}) / 8 = ${w3Ans} Байт.`
+            },
+            {
+                waveNumber: 4,
+                title: 'Побайтное выравнивание (ЕГЭ №11)',
+                prompt: `Идентификатор из K = ${w4K} символов (алфавит N = ${w4N}) хранится в минимальном целом числе Байт на одну запись. Сколько Байт займут M = ${w4M} записей?`,
+                specs: [
+                    { label: 'Длина ID (K)', value: `${w4K} симв.` },
+                    { label: 'Мощность N', value: `${w4N} симв.` },
+                    { label: 'Записей M', value: `${w4M} шт.` },
+                    { label: 'Выравнивание', value: 'На запись (Байт)' }
+                ],
+                targetValue: w4Ans,
+                targetUnit: 'Байт',
+                maxTime: 11.5,
+                isBreather: false,
+                explanation: `i = ${w4i} бит → ${w4K * w4i} бит → ⌈${w4K * w4i}/8⌉ = ${w4PerRec} Байт/запись; всего ${w4PerRec} · ${w4M} = ${w4Ans} Байт.`
+            },
+            {
+                waveNumber: 5,
+                title: 'Дельта перекодирования алфавита',
+                prompt: `Сообщение длиной K = ${w5K} символов перевели с алфавита N₁ = ${w5N1} на расширенный алфавит N₂ = ${w5N2}. На сколько Байт вырос его объём?`,
+                specs: [
+                    { label: 'Длина K', value: `${w5K} симв.` },
+                    { label: 'Алфавит N₁', value: `${w5N1} симв.` },
+                    { label: 'Алфавит N₂', value: `${w5N2} симв.` },
+                    { label: 'Цель шины', value: 'ΔI (Байт)' }
+                ],
+                targetValue: w5Ans,
+                targetUnit: 'Байт',
+                maxTime: 11.0,
+                isBreather: false,
+                explanation: `Разрядность выросла с i₁ = ${w5i1} до i₂ = ${w5i2} бит (Δi = ${w5i2 - w5i1}); ΔI = (${w5K} · ${w5i2 - w5i1}) / 8 = ${w5Ans} Байт.`
+            },
+            {
+                waveNumber: 6,
+                title: 'Пропускная способность и время',
+                prompt: `Через канал со скоростью ${w6.rate} передаётся файл объёмом ${w6.vol}. Выставьте время передачи t в секундах.`,
+                specs: [
+                    { label: 'Объём V', value: w6.vol },
+                    { label: 'Скорость v', value: w6.rate },
+                    { label: 'База КиБ', value: '1024 Байт' },
+                    { label: 'Цель шины', value: 't (с)' }
+                ],
+                targetValue: w6.sec,
+                targetUnit: 'с',
+                maxTime: 10.0,
+                isBreather: false,
+                explanation: `Через степени двойки: ${w6.note}.`
+            },
+            {
+                waveNumber: 7,
+                title: 'Стандарт МЭК: КиБ против КБ',
+                prompt: `Буфер памяти равен ${w7M} КиБ (1 КиБ = 1024 Б), а паспортная оценка — ${w7M} КБ (1 КБ = 1000 Б). На сколько Байт двоичный буфер больше?`,
+                specs: [
+                    { label: 'Двоичный (IEC)', value: `${w7M} КиБ` },
+                    { label: 'Десятичный (SI)', value: `${w7M} КБ` },
+                    { label: 'Разница базы', value: '1024 − 1000' },
+                    { label: 'Цель шины', value: 'Δ (Байт)' }
+                ],
+                targetValue: w7Ans,
+                targetUnit: 'Байт',
+                maxTime: 9.5,
+                isBreather: false,
+                explanation: `1 КиБ − 1 КБ = 24 Байт, поэтому для ${w7M} единиц разница равна ${w7M} · 24 = ${w7Ans} Байт.`
+            },
+            {
+                waveNumber: 8,
+                title: 'Обратная оценка мощности алфавита',
+                prompt: `Равномерно закодированное сообщение из K = ${w8K} символов занимает ровно ${w8I} Байт. Определите максимально возможную мощность алфавита N_max = 2^i.`,
+                specs: [
+                    { label: 'Длина K', value: `${w8K} симв.` },
+                    { label: 'Объём I', value: `${w8I} Байт` },
+                    { label: 'Формула', value: 'N_max = 2^i' },
+                    { label: 'Цель шины', value: 'N_max (симв.)' }
+                ],
+                targetValue: w8Ans,
+                targetUnit: 'симв.',
+                maxTime: 10.5,
+                isBreather: true,
+                explanation: `i = (${w8I} · 8) / ${w8K} = ${w8i} бит/симв, откуда N_max = 2^${w8i} = ${w8Ans} символов.`
+            },
+            {
+                waveNumber: 9,
+                title: 'Блочное уплотнение кода',
+                prompt: `Символы алфавита N = ${w9N} группируются в неделимые блоки по k = ${w9k} символа (минимальная длина блока m бит из условия N^k ≤ 2^m). Сколько Байт займут ${w9B} таких блоков?`,
+                specs: [
+                    { label: 'Алфавит N', value: `${w9N} симв.` },
+                    { label: 'Блок k', value: `${w9k} симв.` },
+                    { label: 'Число блоков', value: `${w9B} шт.` },
+                    { label: 'Цель шины', value: 'Объём (Байт)' }
+                ],
+                targetValue: w9Ans,
+                targetUnit: 'Байт',
+                maxTime: 9.0,
+                isBreather: false,
+                explanation: `${w9N}^${w9k} = ${Math.pow(w9N, w9k)} ≤ 2^${w9m}, поэтому m = ${w9m} бит/блок; объём (${w9B} · ${w9m}) / 8 = ${w9Ans} Байт.`
+            },
+            {
+                waveNumber: 10,
+                title: 'Финальный босс: Заголовок + ID',
+                prompt: `Пакет включает ID из K = ${w10K} символов (алфавит N = ${w10N}, посимвольный код округлён вверх до целых Байт) и H = ${w10H} Байт заголовка. Сколько Байт займут M = ${w10M} пакетов?`,
+                specs: [
+                    { label: 'ID: K и N', value: `${w10K} / N=${w10N}` },
+                    { label: 'Заголовок H', value: `${w10H} Байт` },
+                    { label: 'Пакетов M', value: `${w10M} шт.` },
+                    { label: 'Цель шины', value: 'Итого (Байт)' }
+                ],
+                targetValue: w10Ans,
+                targetUnit: 'Байт',
+                maxTime: 8.5,
+                isBreather: false,
+                explanation: `i = ${w10i} бит → ID = ⌈${w10K * w10i}/8⌉ = ${w10IdBytes} Байт; пакет = ${w10IdBytes} + ${w10H} = ${w10IdBytes + w10H} Байт; всего · ${w10M} = ${w10Ans} Байт.`
+            }
+        ];
+    }
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 3,
+        totalWaves: TOTAL_WAVES,
+        showAfkOverlay: true,
+        onAfkStop: () => {
+            if (!appInstance) return;
+            appInstance.stopWaveTimer();
+            if (resetTimeout) clearTimeout(resetTimeout);
+            if (pulseTimeout) clearTimeout(pulseTimeout);
+            appInstance.isActionBlocked = true;
+            appInstance.isAfkPaused = true;
+        },
+        onAfkRetry: () => {
+            if (!appInstance) return;
+            appInstance.isAfkPaused = false;
+            appInstance.isAlarm = false;
+            appInstance.isActionBlocked = false;
+            appInstance.activeWaves = generateWaves();
+            appInstance.loadWave(1);
+        }
+    });
+
+    const app = createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro' | 'playing' | 'victory'
+                currentWave: 1,
+                activeWaves: generateWaves(),
+                registerMask: 0,
+                timeLeft: 14.0,
+                timerInterval: null,
+                isAlarm: false,
+                alarmMessage: '',
+                isSuccessPulse: false,
+                successMessage: '',
+                isActionBlocked: false,
+                isAfkPaused: false,
+                failCount: 0,
+                sessionStartTime: 0,
+                totalSessionElapsed: 0,
+                bitPins: [
+                    { weight: 128, hotkey: '1', svgX: 50 },
+                    { weight: 64, hotkey: '2', svgX: 150 },
+                    { weight: 32, hotkey: '3', svgX: 250 },
+                    { weight: 16, hotkey: '4', svgX: 350 },
+                    { weight: 8, hotkey: '5', svgX: 450 },
+                    { weight: 4, hotkey: '6', svgX: 550 },
+                    { weight: 2, hotkey: '7', svgX: 650 },
+                    { weight: 1, hotkey: '8', svgX: 750 }
+                ]
+            };
+        },
+
+        computed: {
+            currentWaveData() {
+                return this.activeWaves[this.currentWave - 1] || this.activeWaves[0];
+            },
+            registerValue() {
+                return this.registerMask;
+            },
+            registerBinary() {
+                return this.registerMask.toString(2).padStart(8, '0');
+            }
+        },
+
+        methods: {
+            startGame() {
+                if (resetTimeout) clearTimeout(resetTimeout);
+                if (pulseTimeout) clearTimeout(pulseTimeout);
+                this.gameState = 'playing';
+                this.sessionStartTime = Date.now();
+                this.totalSessionElapsed = 0;
+                this.failCount = 0;
+                this.isAlarm = false;
+                this.isSuccessPulse = false;
+                this.isAfkPaused = false;
+                this.activeWaves = generateWaves();
+
+                telemetry.reset({ allowRecomplete: true });
+                telemetry.start();
+                telemetry.markActivity();
+                telemetry.setWave(1, TOTAL_WAVES);
+                telemetry.progress({
+                    wave: 1,
+                    total_waves: TOTAL_WAVES,
+                    stage: 1,
+                    total_stages: TOTAL_WAVES
+                });
+                this.loadWave(1);
+            },
+
+            restartGame() {
+                this.stopWaveTimer();
+                if (resetTimeout) clearTimeout(resetTimeout);
+                if (pulseTimeout) clearTimeout(pulseTimeout);
+                this.isAlarm = false;
+                this.isSuccessPulse = false;
+                this.isActionBlocked = false;
+                this.isAfkPaused = false;
+                this.registerMask = 0;
+                telemetry.reset({ allowRecomplete: true });
+                this.gameState = 'intro';
+            },
+
+            loadWave(waveNum) {
+                this.stopWaveTimer();
+                this.currentWave = waveNum;
+                this.registerMask = 0;
+                this.isAlarm = false;
+                this.isActionBlocked = false;
+                telemetry.setWave(waveNum, TOTAL_WAVES);
+
+                const waveData = this.currentWaveData;
+                this.timeLeft = waveData.maxTime;
+
+                this.timerInterval = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                    this.timeLeft = Math.max(0, +(this.timeLeft - 0.1).toFixed(1));
+                    if (this.timeLeft <= 0) {
+                        this.triggerHardcoreReset(`Время истекло! ${waveData.explanation}`, true);
+                    }
+                }, 100);
+            },
+
+            stopWaveTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            },
+
+            toggleBit(weight) {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                telemetry.markActivity();
+                this.registerMask = this.registerMask ^ weight;
+                playToggleSound(Boolean(this.registerMask & weight));
+            },
+
+            clearRegister() {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                telemetry.markActivity();
+                this.registerMask = 0;
+                playToggleSound(false);
+            },
+
+            commitFrame() {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                if (this.registerValue === 0) return;
+
+                telemetry.markActivity();
+                const waveData = this.currentWaveData;
+
+                if (this.registerValue === waveData.targetValue) {
+                    this.stopWaveTimer();
+                    this.isActionBlocked = true;
+
+                    if (this.currentWave >= TOTAL_WAVES) {
+                        playVictoryFanfare();
+                        this.totalSessionElapsed = Math.max(1, Math.round((Date.now() - this.sessionStartTime) / 1000));
+                        this.gameState = 'victory';
+                        telemetry.complete({
+                            wave: TOTAL_WAVES,
+                            total_waves: TOTAL_WAVES,
+                            stage: TOTAL_WAVES,
+                            total_stages: TOTAL_WAVES,
+                            time_spent_sec: this.totalSessionElapsed
+                        });
+                    } else {
+                        playSuccessSound();
+                        const nextWave = this.currentWave + 1;
+                        this.successMessage = `${waveData.targetValue} ${waveData.targetUnit} подтверждено. Переход к волне ${nextWave}...`;
+                        this.isSuccessPulse = true;
+                        telemetry.advanceWave(nextWave);
+                        pulseTimeout = setTimeout(() => {
+                            this.isSuccessPulse = false;
+                            if (this.gameState === 'playing' && !this.isAfkPaused) {
+                                this.loadWave(nextWave);
+                            }
+                        }, 240);
+                    }
+                } else {
+                    this.triggerHardcoreReset(
+                        `Передано ${this.registerValue} ${waveData.targetUnit} вместо ${waveData.targetValue} ${waveData.targetUnit}. ${waveData.explanation}`,
+                        false
+                    );
+                }
+            },
+
+            triggerHardcoreReset(reason, isTimeout) {
+                this.stopWaveTimer();
+                this.isActionBlocked = true;
+                this.isSuccessPulse = false;
+                this.failCount += 1;
+
+                const shouldReset = telemetry.fail({
+                    wave: this.currentWave,
+                    total_waves: TOTAL_WAVES,
+                    stage: this.currentWave,
+                    total_stages: TOTAL_WAVES,
+                    isTimeout: Boolean(isTimeout)
+                });
+
+                if (shouldReset === false) {
+                    return;
+                }
+
+                playAlarmSiren();
+                this.alarmMessage = reason;
+                this.isAlarm = true;
+
+                if (resetTimeout) clearTimeout(resetTimeout);
+                resetTimeout = setTimeout(() => {
+                    if (this.gameState !== 'playing' || this.isAfkPaused) return;
+                    this.isAlarm = false;
+                    this.activeWaves = generateWaves();
+                    this.loadWave(1);
+                }, 1700);
+            },
+
+            formatTime(sec) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return `${m}м ${String(s).padStart(2, '0')}с`;
+            }
+        }
+    });
+
+    appInstance = app.mount('#arcade-app');
+
+    // Единственное навешивание глобального обработчика клавиш за всю жизнь страницы
+    window.addEventListener('keydown', (e) => {
+        if (!appInstance || e.repeat) return;
+        if (appInstance.isAfkPaused) return;
+
+        if (e.code === 'Space' || e.code === 'Enter') {
+            if (appInstance.gameState === 'intro') {
+                e.preventDefault();
+                appInstance.startGame();
+                return;
+            }
+            if (appInstance.gameState === 'playing') {
+                e.preventDefault();
+                appInstance.commitFrame();
+                return;
+            }
+        }
+
+        if (appInstance.gameState !== 'playing' || appInstance.isActionBlocked) return;
+
+        const pin = appInstance.bitPins.find((b) => b.hotkey === e.key);
+        if (pin) {
+            e.preventDefault();
+            appInstance.toggleBit(pin.weight);
+            return;
+        }
+
+        if (e.key === '0' || e.key === 'Backspace' || e.key === 'c' || e.key === 'C') {
+            e.preventDefault();
+            appInstance.clearRegister();
+        }
+    });
+
+    window.__DEV_LEVEL3_STATE__ = {
+        get waves() {
+            return appInstance ? appInstance.activeWaves : [];
+        },
+        get currentWaveIndex() {
+            return appInstance ? appInstance.currentWave - 1 : 0;
+        },
+        get currentWave() {
+            return appInstance ? appInstance.currentWaveData : null;
+        },
+        solveCurrentWave() {
+            if (!appInstance || appInstance.gameState !== 'playing' || appInstance.isActionBlocked) return false;
+            appInstance.registerMask = appInstance.currentWaveData.targetValue;
+            appInstance.commitFrame();
+            return true;
+        },
+        submitAction(action, payload) {
+            if (!appInstance) return false;
+            if (typeof action === 'number') {
+                appInstance.registerMask = action;
+                appInstance.commitFrame();
+                return true;
+            }
+            if (action === 'wrong') {
+                const target = appInstance.currentWaveData.targetValue;
+                appInstance.registerMask = target === 1 ? 2 : 1;
+                appInstance.commitFrame();
+                return true;
+            }
+            if (action === 'timeout') {
+                appInstance.triggerHardcoreReset('Тайм-аут волны (тест)', true);
+                return true;
+            }
+            if (payload && typeof payload.value === 'number') {
+                appInstance.registerMask = payload.value;
+                appInstance.commitFrame();
+                return true;
+            }
+            if (action === 'commit') {
+                appInstance.commitFrame();
+                return true;
+            }
+            return false;
+        }
+    };
+});
+</script>
