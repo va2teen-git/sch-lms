@@ -469,4 +469,70 @@ test.describe('LibreOffice Writer Emulator Suite', () => {
     await expect(page.locator('#btn-bold')).not.toHaveClass(/active/);
   });
 
+  test('LibreOffice 26.8 UI: 11 пунктов меню, Fullscreen с модалками, панель Таблица, объединение/valign ячеек, ПКМ, единицы см/пт и палитра цветов', async ({ page }) => {
+    // 1. Все 11 пунктов главного меню LibreOffice 26.8
+    const allMenus = ['Файл', 'Правка', 'Вид', 'Вставка', 'Формат', 'Стили', 'Таблица', 'Форма', 'Сервис', 'Окно', 'Справка'];
+    for (const m of allMenus) {
+      await expect(page.locator('.lo-menu-item').filter({ hasText: new RegExp(`^${m}$`) })).toBeVisible();
+    }
+
+    // 2. Полноэкранный режим: разворот контейнера и открытие модального окна поверх него
+    await page.locator('#btn-window-fullscreen').click();
+    await expect(page.locator('#lo-root-window')).toHaveClass(/lo-is-fullscreen/);
+    await expect(page.locator('#lo-fullscreen-exit-btn')).toBeVisible();
+
+    await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+    await page.locator('#menu-format-paragraph').click();
+    await expect(page.locator('#modal-paragraph')).toBeVisible();
+
+    // 3. Поддержка единиц «см» и «пт» в диалоге «Абзац»
+    await page.locator('#dialog-para-bottom-unit').selectOption('cm');
+    await page.locator('#dialog-para-bottom').fill('0,5');
+    await page.locator('#btn-apply-paragraph').click();
+    await expect(page.locator('#modal-paragraph')).toBeHidden();
+
+    const marginBottomPt = await page.evaluate(() => {
+      const p = document.querySelector('.jodit-wysiwyg p');
+      return p ? p.style.marginBottom : '';
+    });
+    expect(marginBottomPt).toBe('14pt');
+
+    // Выходим из Fullscreen
+    await page.locator('#lo-fullscreen-exit-btn').click();
+    await expect(page.locator('#lo-root-window')).not.toHaveClass(/lo-is-fullscreen/);
+
+    // 4. Визуальная палитра цветов вместо prompt()
+    await page.locator('#btn-fontcolor').click();
+    await expect(page.locator('#lo-color-popover')).toBeVisible();
+    await page.locator('.lo-color-swatch[data-color="#c9211e"]').click();
+    await expect(page.locator('#lo-color-popover')).toBeHidden();
+
+    // 5. Контекстная панель «Таблица», вставка столбца, объединение и вертикальное выравнивание ячеек
+    await page.evaluate(() => {
+      const w = document.querySelector('.jodit-wysiwyg');
+      w.innerHTML = '<table><thead><tr><th>А</th><th>Б</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>';
+    });
+    await page.locator('.jodit-wysiwyg td').first().click();
+    await expect(page.locator('#lo-table-toolbar')).toBeVisible();
+
+    // Вставка столбца справа
+    await page.locator('#btn-tbl-col-right').click();
+    expect(await page.locator('.jodit-wysiwyg tr').first().locator('th, td').count()).toBe(3);
+
+    // Вертикальное выравнивание по центру
+    await page.locator('#btn-tbl-valign-middle').click();
+    const valign = await page.locator('.jodit-wysiwyg td').first().evaluate(el => el.style.verticalAlign);
+    expect(valign).toBe('middle');
+
+    // Объединение ячейки со следующей
+    await page.locator('#btn-tbl-merge').click();
+    const colspan = await page.locator('.jodit-wysiwyg td').first().getAttribute('colspan');
+    expect(colspan).toBe('2');
+
+    // 6. Контекстное меню по правой кнопке мыши (ПКМ) внутри таблицы
+    await page.locator('.jodit-wysiwyg td').first().click({ button: 'right' });
+    await expect(page.locator('#lo-context-menu')).toBeVisible();
+    await expect(page.locator('#ctx-tbl-props')).toBeVisible();
+  });
+
 });

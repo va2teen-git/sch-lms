@@ -28,13 +28,30 @@ export interface PageMargins {
 }
 
 /**
+ * Парсер размера в пунктах (pt) из строки CSS
+ */
+export function parsePt(val: string | null | undefined): number | null {
+    if (!val) return null;
+    val = val.trim().replace(',', '.').toLowerCase();
+    if (val.endsWith('pt')) return parseFloat(val);
+    if (val.endsWith('cm')) return parseFloat(val) * 28.3464567;
+    if (val.endsWith('mm')) return parseFloat(val) * 2.83464567;
+    if (val.endsWith('px')) return parseFloat(val) * 0.75;
+    const num = parseFloat(val);
+    return isNaN(num) ? null : num;
+}
+
+/**
  * Парсер размера в сантиметрах из строки CSS или атрибута
  */
 export function parseCm(val: string | null | undefined): number | null {
     if (!val) return null;
-    val = val.trim().toLowerCase();
+    val = val.trim().replace(',', '.').toLowerCase();
     if (val.endsWith('cm')) {
         return parseFloat(val);
+    }
+    if (val.endsWith('mm')) {
+        return parseFloat(val) / 10;
     }
     if (val.endsWith('px')) {
         // 1 см ~ 37.795 px (при 96 DPI)
@@ -352,6 +369,29 @@ export function inspectOgeDocument(rootEl: HTMLElement | null, margins: PageMarg
                 passed: false,
                 message: 'Межстрочный интервал выходит за рамки допустимого (должен быть не менее одинарного и не более полуторного, рекомендуется 1.15).'
             });
+        }
+
+        // Межабзацный интервал (если задан явно — в пт или см — проверяем соответствие диапазону ОГЭ 0..24 пт)
+        const hasMultipleOrTable = contentParas.length > 1 || rootEl.querySelectorAll('table').length > 0;
+        if (hasMultipleOrTable) {
+            let invalidGap = false;
+            for (const p of contentParas) {
+                const topPt = parsePt(p.style.marginTop || '0pt') || 0;
+                const botPt = parsePt(p.style.marginBottom || '0pt') || 0;
+                if (topPt > 26 || botPt > 26) {
+                    invalidGap = true;
+                    break;
+                }
+            }
+            if (invalidGap) {
+                items.push({
+                    id: 'para_spacing',
+                    category: 'paragraph',
+                    label: 'Межабзацный интервал (до 24 пт)',
+                    passed: false,
+                    message: 'Интервал перед/после абзаца превышает 24 пт (0.85 см). Установите от 12 до 24 пт (рекомендуется 12–18 пт или 0.42–0.64 см).'
+                });
+            }
         }
     }
 
