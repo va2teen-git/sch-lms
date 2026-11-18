@@ -247,13 +247,13 @@ export class StudentWriterSimulator extends StudentSimulator {
     await firstLineInput.fill(firstLine);
 
     // Line spacing
-    await this.page.locator('#dialog-para-linespacing').selectOption(lineSpacing);
+    await this.page.locator('#dialog-para-lineheight').selectOption(lineSpacing);
 
     // Alignment
     await this.page.locator('#dialog-para-align').selectOption(align);
 
     // Click OK
-    await this.page.locator('#btn-dialog-para-ok').click();
+    await this.page.locator('#btn-apply-paragraph').click();
     await expect(modal).toBeHidden();
     await this.cognitivePause(100);
   }

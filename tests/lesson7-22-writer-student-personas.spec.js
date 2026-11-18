@@ -220,3 +220,205 @@ test.describe('Grade 7 Lesson 22 Level 3 — Student Persona Simulations (Writer
     writerSim.assertCleanSession();
   });
 });
+
+test.describe('Grade 7 Lesson 22 Level 1 — Student Persona Simulations (Interactive Writer Practicum)', () => {
+  const level1Url = '/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/22/level1';
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(level1Url);
+    await expect(page.locator('.jodit-wysiwyg')).toBeVisible();
+    await page.waitForFunction(() => !!window.getLevel1WriterState?.()?.activeData);
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 1 из 3');
+  });
+
+  test('Persona: NOVICE — fails incomplete formatting, tests space indent trap, reads diagnostics', async ({ page }) => {
+    const writerSim = new StudentWriterSimulator(page, { persona: LearnerPersona.NOVICE });
+
+    await writerSim.cognitivePause(150);
+    await writerSim.checkDocument();
+
+    const errorBox = page.locator('#error-box');
+    await expect(errorBox).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('Не выполнены требования');
+    await expect(page.locator('#attempts-display')).toHaveText('1');
+
+    // Stage 2: Novice tries 5 spaces instead of first-line indent
+    await page.evaluate(() => window.jumpToLevel1Stage(2));
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 2 из 3');
+
+    await writerSim.clearDocument();
+    await writerSim.simulateSpaceIndentTrap('Абзац с пробельным отступом вместо красной строки.');
+    await writerSim.checkDocument();
+
+    await expect(errorBox).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('Красная строка');
+    writerSim.assertCleanSession();
+  });
+
+  test('Persona: CHAOS — spams toolbar formatting and restores draft safely', async ({ page }) => {
+    const writerSim = new StudentWriterSimulator(page, { persona: LearnerPersona.CHAOS });
+
+    await writerSim.focusEditor();
+    await writerSim.simulateSpamClick(page.locator('#btn-bold'), 3);
+    await writerSim.simulateSpamClick(page.locator('#btn-italic'), 3);
+    await writerSim.simulateSpamClick(page.locator('#btn-underline'), 3);
+    await writerSim.simulateSpamClick(page.locator('#btn-sup'), 2);
+    await writerSim.simulateSpamClick(page.locator('#btn-sub'), 2);
+
+    await page.locator('#btn-restore-draft').click();
+    const html = await writerSim.getCleanEditorHTML();
+    expect(html.length).toBeGreaterThan(10);
+
+    writerSim.assertCleanSession();
+  });
+
+  test('Persona: DILIGENT — completes Stage 1 and Stage 2 via Writer toolbar & Format dialogs', async ({ page }) => {
+    const writerSim = new StudentWriterSimulator(page, { persona: LearnerPersona.DILIGENT });
+    const st1 = await page.evaluate(() => window.getLevel1WriterState());
+    const d1 = st1.activeData;
+
+    // Select all text for font & size
+    await page.evaluate(() => {
+      const w = document.querySelector('.jodit-wysiwyg');
+      const r = document.createRange();
+      r.selectNodeContents(w);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    });
+    await page.locator('#select-font').selectOption(d1.font);
+    await page.locator('#select-fontsize').selectOption(`${d1.sizePt}pt`);
+
+    await writerSim.selectText(d1.boldWord);
+    await writerSim.toggleStyle('bold');
+    await writerSim.selectText(d1.italicWord);
+    await writerSim.toggleStyle('italic');
+    await writerSim.selectText(d1.underlineWord);
+    await writerSim.toggleStyle('underline');
+
+    // Superscript digit (м3/м2/mv2)
+    await page.evaluate((digit) => {
+      const w = document.querySelector('.jodit-wysiwyg');
+      const walker = document.createTreeWalker(w, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.parentElement?.closest('sup, sub')) continue;
+        const m = node.textContent.match(/(?:м|mv)(\d)/i);
+        if (m && m[1] === String(digit)) {
+          const r = document.createRange();
+          const idx = m.index + m[0].length - 1;
+          r.setStart(node, idx);
+          r.setEnd(node, idx + 1);
+          const s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(r);
+          break;
+        }
+      }
+    }, d1.supDigit);
+    await writerSim.toggleStyle('sup');
+
+    // Subscript digit (H2O/CO2/O2)
+    await page.evaluate((digit) => {
+      const w = document.querySelector('.jodit-wysiwyg');
+      const walker = document.createTreeWalker(w, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.parentElement?.closest('sup, sub')) continue;
+        const m = node.textContent.match(/(?:H|CO|O)(\d)/i);
+        if (m && m[1] === String(digit)) {
+          const r = document.createRange();
+          const idx = m.index + m[0].length - 1;
+          r.setStart(node, idx);
+          r.setEnd(node, idx + 1);
+          const s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(r);
+          break;
+        }
+      }
+    }, d1.subDigit);
+    await writerSim.toggleStyle('sub');
+
+    await writerSim.checkDocument();
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 2 из 3');
+
+    // Stage 2: Page margins + Paragraph dialog
+    const st2 = await page.evaluate(() => window.getLevel1WriterState());
+    await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+    await page.locator('#menu-format-page').click();
+    await page.locator('#btn-page-set-oge').click();
+    await page.locator('#btn-apply-page').click();
+
+    await writerSim.configureParagraphViaDialog({
+      firstLine: '1.0',
+      lineSpacing: st2.activeData.lineHeight,
+      align: 'justify'
+    });
+
+    await writerSim.checkDocument();
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 3 из 3');
+    writerSim.assertCleanSession();
+  });
+});
+
+test.describe('Grade 7 Lesson 22 Level 2 — Student Persona Simulations (Engineering Layout in Writer)', () => {
+  const level2Url = '/tasks/7-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/22/level2';
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(level2Url);
+    await expect(page.locator('.jodit-wysiwyg')).toBeVisible();
+    await page.waitForFunction(() => !!window.getLevel2WriterState?.()?.activeData);
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 1 из 5');
+  });
+
+  test('Persona: NOVICE & CHAOS — unfixed Stage 1 draft triggers diagnostic feedback and toolbar spam does not crash', async ({ page }) => {
+    const writerSim = new StudentWriterSimulator(page, { persona: LearnerPersona.NOVICE });
+
+    // CHAOS-style clicks on toolbar toggles
+    await writerSim.simulateSpamClick(page.locator('#btn-nonprinting'), 2);
+    await writerSim.simulateSpamClick(page.locator('#btn-bold'), 2);
+
+    // NOVICE submits raw draft without fixing spaces/quotes/hyphen
+    await writerSim.checkDocument();
+    await expect(page.locator('#feedback-box')).toBeVisible();
+    await expect(page.locator('#feedback-text')).toContainText('Не выполнены требования');
+    await expect(page.locator('#attempts-display')).toHaveText('1');
+
+    writerSim.assertCleanSession();
+  });
+
+  test('Persona: CARELESS — enters Russian commas and trailing spaces (" 1,0 ", " 0,5 " cm) in Paragraph dialog on Stage 2', async ({ page }) => {
+    const writerSim = new StudentWriterSimulator(page, { persona: LearnerPersona.CARELESS });
+
+    await page.evaluate(() => window.jumpToLevel2Stage(2));
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 2 из 5');
+    const st2 = await page.evaluate(() => window.getLevel2WriterState());
+
+    // Find and Replace via Edit menu
+    await page.locator('.lo-menu-item').filter({ hasText: /^Правка$/ }).click();
+    await page.locator('#menu-edit-find').click();
+    await expect(page.locator('#modal-find-replace')).toBeVisible();
+    await page.locator('#dialog-find-query').fill(st2.activeData.badWord);
+    await page.locator('#dialog-find-replace-val').fill(st2.activeData.goodWord);
+    await page.locator('#btn-apply-replace-all').click();
+    await page.locator('#modal-find-replace .btn-close').click();
+
+    // Careless student clicks each paragraph and enters " 1,0 " and " 0,5 " cm with commas & spaces
+    const paraCount = await page.locator('.jodit-wysiwyg p').count();
+    for (let i = 0; i < paraCount; i++) {
+      await page.locator('.jodit-wysiwyg p').nth(i).click();
+      await page.locator('.lo-menu-item').filter({ hasText: /^Формат$/ }).click();
+      await page.locator('#menu-format-paragraph').click();
+      await page.locator('#dialog-para-firstline').fill(' 1,0 ');
+      await page.locator('#dialog-para-bottom-unit').selectOption('cm');
+      await page.locator('#dialog-para-bottom').fill(' 0,5 ');
+      await page.locator('#align-radio-justify').check();
+      await page.locator('#btn-apply-paragraph').click();
+    }
+
+    await writerSim.checkDocument();
+    await expect(page.locator('#phase-badge')).toHaveText('Шаг 3 из 5');
+    writerSim.assertCleanSession();
+  });
+});

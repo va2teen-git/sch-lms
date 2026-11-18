@@ -1,722 +1,377 @@
 ---
 import TaskLayout from '../../../../layouts/TaskLayout.astro';
-// Уровень 1 (Базовый)
-// 7 класс, Урок 22: Практическая работа: Форматирование текстовых документов
+import WriterEmulator from '../../../../components/WriterEmulator.astro';
 ---
 
-<TaskLayout level={1}>
-    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
-        <!-- Шапка -->
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2 border-bottom border-success pb-2">
-            <h2 class="h4 text-success mb-0">Тренажер: Форматирование текстовых документов (Уровень 1)</h2>
-            <span class="badge border border-success text-success bg-black rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
-        </div>
-
-        <div id="game-container" class="card bg-dark border-success rounded-0">
-            <div class="card-body p-3 p-md-4">
-
-                <!-- Верхняя панель статуса и счетчика попыток -->
-                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
-                    <div>
-                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
-                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация операций: Редактирование, Символы, Абзацы</span>
-                    </div>
-                    <div class="text-secondary small">
-                        Ошибки / Перекалибровки: <span id="attempts-display" class="text-warning fw-bold">0</span>
-                    </div>
+<TaskLayout title="7 Класс - Урок 22 - Уровень 1: Практикум в LibreOffice Writer" level={1} bodyClass="d-flex flex-column min-vh-100">
+    <div class="container-fluid px-2 px-md-3 pt-2 pb-1 bg-dark border-bottom border-success flex-shrink-0 font-monospace">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6">Шаг 1 из 3</span>
+                <h2 id="phase-title" class="h6 text-success fw-bold mb-0">Форматирование символов в LibreOffice Writer</h2>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge border border-success text-success bg-black rounded-0 px-2 py-1">Интерактивный практикум // Writer</span>
+                <div class="text-secondary small">
+                    Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span>
                 </div>
-
-                <!-- Блок обратной связи при ошибке -->
-                <div id="error-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <span>[СИСТЕМНЫЙ СБОЙ ВЕРСТКИ] <span id="error-message">Неверная конфигурация!</span> Генерация нового варианта...</span>
-                        <span class="spinner-border spinner-border-sm text-danger ms-2" role="status"></span>
-                    </div>
-                </div>
-
-                <!-- ================= ФАЗА 1: КЛАССИФИКАЦИЯ ОПЕРАЦИЙ (Drag-to-Bucket) ================= -->
-                <div id="phase1" class="phase-container">
-                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                        <span class="text-success fw-bold">ФАЗА 1 ИЗ 3: Сортировка операций текстового процессора</span>
-                        <span class="badge bg-success text-dark rounded-0">МЕХАНИКА: DRAG-TO-BUCKET</span>
-                    </div>
-                    <p class="text-light small mb-3">
-                        Распределите 6 поступивших операций по трем целевым контейнерам: перетащите карточку мышью или <strong>кликните сначала по карточке, а затем по нужному контейнеру</strong>. Чтобы вернуть карточку в пул, кликните по ней внутри контейнера.
-                    </p>
-
-                    <!-- Пул карточек -->
-                    <div class="mb-3">
-                        <div class="text-secondary small mb-1 text-uppercase">Очередь операций (осталось распределить: <span id="p1-pool-count" class="text-success fw-bold">6</span>):</div>
-                        <div id="p1-cards-pool" class="d-flex flex-wrap gap-2 p-2 bg-black border border-secondary" style="min-height: 76px;">
-                            <!-- Генерируется процедурно -->
-                        </div>
-                    </div>
-
-                    <!-- 3 целевых контейнера -->
-                    <div class="row g-2 mb-3">
-                        <div class="col-12 col-sm-4">
-                            <div class="card bg-black border-success rounded-0 h-100 p-2 p1-dropzone" data-bucket="edit" style="cursor: pointer;">
-                                <div class="border-bottom border-success pb-1 mb-2 d-flex justify-content-between align-items-center">
-                                    <span class="fw-bold text-success small">1. РЕДАКТИРОВАНИЕ ТЕКСТА</span>
-                                    <span class="badge bg-dark text-success border border-success count-badge rounded-0">0</span>
-                                </div>
-                                <div class="text-secondary mb-2" style="font-size: 0.75rem;">Изменение содержимого: правка опечаток, удаление, вставка, буфер обмена, замена слов.</div>
-                                <div class="bucket-slots d-flex flex-column gap-2 p-2 bg-dark border border-secondary flex-grow-1" style="min-height: 135px;"></div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-sm-4">
-                            <div class="card bg-black border-info rounded-0 h-100 p-2 p1-dropzone" data-bucket="char" style="cursor: pointer;">
-                                <div class="border-bottom border-info pb-1 mb-2 d-flex justify-content-between align-items-center">
-                                    <span class="fw-bold text-info small">2. ФОРМАТИРОВАНИЕ СИМВОЛОВ</span>
-                                    <span class="badge bg-dark text-info border border-info count-badge rounded-0">0</span>
-                                </div>
-                                <div class="text-secondary mb-2" style="font-size: 0.75rem;">Внешний вид отдельных букв и слов: гарнитура, кегль (пт), начертание (Ж/К/Ч), индексы, цвет.</div>
-                                <div class="bucket-slots d-flex flex-column gap-2 p-2 bg-dark border border-secondary flex-grow-1" style="min-height: 135px;"></div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-sm-4">
-                            <div class="card bg-black border-warning rounded-0 h-100 p-2 p1-dropzone" data-bucket="para" style="cursor: pointer;">
-                                <div class="border-bottom border-warning pb-1 mb-2 d-flex justify-content-between align-items-center">
-                                    <span class="fw-bold text-warning small">3. ФОРМАТИРОВАНИЕ АБЗАЦЕВ</span>
-                                    <span class="badge bg-dark text-warning border border-warning count-badge rounded-0">0</span>
-                                </div>
-                                <div class="text-secondary mb-2" style="font-size: 0.75rem;">Параметры целого абзаца: выравнивание, красная строка (1,0 см), междустрочный и межабзацный интервалы.</div>
-                                <div class="bucket-slots d-flex flex-column gap-2 p-2 bg-dark border border-secondary flex-grow-1" style="min-height: 135px;"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button id="btn-phase1" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold" disabled>ПРОВЕРИТЬ КЛАССИФИКАЦИЮ (ШАГ 1)</button>
-                </div>
-
-                <!-- ================= ФАЗА 2: СЛОТ-ПАЗЛ СЛУЖЕБНЫХ СИМВОЛОВ И КОМАНД (Slot & Snap) ================= -->
-                <div id="phase2" class="phase-container d-none">
-                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                        <span class="text-success fw-bold">ФАЗА 2 ИЗ 3: Таблица коммутации непечатаемых знаков и горячих клавиш</span>
-                        <span class="badge bg-success text-dark rounded-0">МЕХАНИКА: SLOT & SNAP</span>
-                    </div>
-                    <p class="text-light small mb-3">
-                        Сопоставьте задачи верстки с правильными служебными символами или комбинациями клавиш LibreOffice Writer. Выберите токен в палитре и кликните по целевому гнезду (или перетащите мышью). <strong>Внимание: в палитре есть ложные токены-дистракторы!</strong>
-                    </p>
-
-                    <!-- Палитра токенов -->
-                    <div class="mb-3">
-                        <div class="text-secondary small mb-1 text-uppercase">Палитра токенов и комбинаций (кликните для выбора или перетащите):</div>
-                        <div id="p2-tokens-palette" class="d-flex flex-wrap gap-2 p-2 bg-black border border-secondary" style="min-height: 68px;">
-                            <!-- Генерируется процедурно -->
-                        </div>
-                    </div>
-
-                    <!-- Целевые гнезда (4 слота) -->
-                    <div id="p2-slots-container" class="row g-2 mb-3">
-                        <!-- Генерируется процедурно -->
-                    </div>
-
-                    <button id="btn-phase2" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold" disabled>ПРОВЕРИТЬ СБОРКУ ПРОТОКОЛА (ШАГ 2)</button>
-                </div>
-
-                <!-- ================= ФАЗА 3: КАЛИБРАТОР ПАРАМЕТРОВ АБЗАЦА И СТРАНИЦЫ (Slider & Toggle) ================= -->
-                <div id="phase3" class="phase-container d-none">
-                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                        <span class="text-success fw-bold">ФАЗА 3 ИЗ 3: Калибровка параметров страницы и абзаца по техническому заданию</span>
-                        <span class="badge bg-success text-dark rounded-0">МЕХАНИКА: INTERACTIVE CALIBRATOR</span>
-                    </div>
-                    <p class="text-light small mb-3">
-                        Настройте ползунки и переключатели калибратора так, чтобы параметры верстки в точности совпали с техническим заданием (ТЗ).
-                    </p>
-
-                    <div class="row g-3 mb-3">
-                        <!-- Карточка ТЗ -->
-                        <div class="col-12 col-md-5">
-                            <div class="card bg-black border-warning rounded-0 h-100 p-3">
-                                <div class="text-warning fw-bold small border-bottom border-warning pb-1 mb-2">ТЕХНИЧЕСКОЕ ЗАДАНИЕ НА ВЕРСТКУ:</div>
-                                <ul id="p3-spec-list" class="list-unstyled mb-0 small text-light d-flex flex-column gap-2">
-                                    <!-- Генерируется процедурно -->
-                                </ul>
-                            </div>
-                        </div>
-
-                        <!-- Панель управления ползунками и тумблерами -->
-                        <div class="col-12 col-md-7">
-                            <div class="card bg-black border-success rounded-0 h-100 p-3">
-                                <div class="text-success fw-bold small border-bottom border-secondary pb-1 mb-3">ПУЛЬТ КАЛИБРОВКИ ФОРМАТА:</div>
-
-                                <!-- 1. Кегль шрифта -->
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between small mb-1">
-                                        <label for="p3-slider-size" class="text-light">1. Кегль (размер) шрифта:</label>
-                                        <span id="p3-val-size" class="badge bg-success text-dark rounded-0">11 пт</span>
-                                    </div>
-                                    <input type="range" id="p3-slider-size" class="form-range" min="10" max="18" step="1" value="11">
-                                </div>
-
-                                <!-- 2. Отступ первой строки (красная строка) -->
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between small mb-1">
-                                        <label for="p3-slider-indent" class="text-light">2. Отступ первой строки (красная строка):</label>
-                                        <span id="p3-val-indent" class="badge bg-info text-dark rounded-0">0.00 см</span>
-                                    </div>
-                                    <input type="range" id="p3-slider-indent" class="form-range" min="0" max="2.5" step="0.25" value="0">
-                                </div>
-
-                                <!-- 3. Левое поле страницы -->
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between small mb-1">
-                                        <label for="p3-slider-margin" class="text-light">3. Поля страницы (левое и правое):</label>
-                                        <span id="p3-val-margin" class="badge bg-warning text-dark rounded-0">1.0 см</span>
-                                    </div>
-                                    <input type="range" id="p3-slider-margin" class="form-range" min="1.0" max="3.0" step="0.5" value="1.0">
-                                </div>
-
-                                <!-- 4. Тумблеры Выравнивания и Междустрочного интервала -->
-                                <div class="row g-2">
-                                    <div class="col-12 col-sm-6">
-                                        <div class="p-2 bg-dark border border-secondary">
-                                            <div class="text-secondary" style="font-size: 0.72rem;">4. ВЫРАВНИВАНИЕ АБЗАЦА:</div>
-                                            <button type="button" id="p3-btn-align" class="btn btn-sm btn-outline-success rounded-0 w-100 mt-1 fw-bold" data-align="left">
-                                                По левому краю (Left)
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-sm-6">
-                                        <div class="p-2 bg-dark border border-secondary">
-                                            <div class="text-secondary" style="font-size: 0.72rem;">5. МЕЖДУСТРОЧНЫЙ ИНТЕРВАЛ:</div>
-                                            <button type="button" id="p3-btn-lh" class="btn btn-sm btn-outline-info rounded-0 w-100 mt-1 fw-bold" data-lh="1.0">
-                                                Одинарный (1.0)
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Живой предпросмотр макета листа -->
-                    <div class="card bg-black border-secondary rounded-0 p-2 mb-3">
-                        <div class="text-secondary small mb-1">ВИЗУАЛЬНЫЙ КОНТРОЛЬ ПОЛОСЫ НАБОРА (WYSIWYG МАКЕТ):</div>
-                        <div id="p3-page-preview" class="bg-light text-dark p-3 border border-secondary" style="font-family: 'Liberation Serif', 'Times New Roman', serif; transition: all 0.15s;">
-                            <p id="p3-para-preview" class="mb-0" style="text-indent: 0cm; font-size: 11pt; line-height: 1.0; text-align: left;">
-                                Текстовый процессор LibreOffice Writer обеспечивает точную настройку параметров страницы, абзацев и символов в соответствии с полиграфическими стандартами и требованиями государственной итоговой аттестации.
-                            </p>
-                        </div>
-                    </div>
-
-                    <button id="btn-phase3" class="btn btn-outline-success rounded-0 px-4 py-2 fw-bold">ПРИМЕНИТЬ ПАРАМЕТРЫ И ЗАВЕРШИТЬ УРОВЕНЬ</button>
-                </div>
-
-                <!-- ================= ЭКРАН ПОБЕДЫ ================= -->
-                <div id="success-screen" class="card bg-black border-success rounded-0 d-none mt-3">
-                    <div class="card-body text-center py-4">
-                        <h3 class="text-success fw-bold mb-2">УРОВЕНЬ 1 УСПЕШНО ЗАВЕРШЕН!</h3>
-                        <p class="text-light mb-0">Базовые механики классификации операций, непечатаемых знаков и калибровки абзаца подтверждены.</p>
-                    </div>
-                </div>
-
             </div>
         </div>
+
+        <!-- Живой чек-лист требований этапа -->
+        <div id="live-checklist" class="d-flex flex-wrap gap-1 mb-2"></div>
+
+        <!-- Инструкция и образец -->
+        <div id="task-instruction" class="card bg-black border-success rounded-0 p-2 mb-2 text-light small">
+            Загрузка задания...
+        </div>
+
+        <!-- Ошибка и перегенерация -->
+        <div id="error-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none py-2 px-3 mb-2 small" role="alert">
+            <strong>[ОШИБКА ОФОРМЛЕНИЯ]</strong> <span id="error-message">Проверьте требования этапа.</span>
+        </div>
+
+        <!-- Экран победы -->
+        <div id="success-screen" class="alert alert-success bg-black text-success border-2 border-success rounded-0 d-none py-3 px-3 mb-2">
+            <h5 class="fw-bold mb-1">✅ УРОВЕНЬ 1 УСПЕШНО ЗАВЕРШЕН!</h5>
+            <p class="text-light small mb-0">Все 3 интерактивных этапа форматирования символов, абзацев, полей и таблиц в LibreOffice Writer выполнены.</p>
+        </div>
+    </div>
+
+    <!-- Интерактивный текстовый редактор LibreOffice Writer -->
+    <div class="flex-grow-1 d-flex flex-column" style="min-height: 540px;">
+        <WriterEmulator
+            missionName="Урок 22 :: Форматирование текстовых документов (Уровень 1)"
+            initialHTML=""
+            checkOgeFormat={false}
+            hardcoreReset={false}
+            disableAutoTelemetry={true}
+        />
     </div>
 </TaskLayout>
 
 <script is:inline>
+(function () {
     const MISSION_NAME = 'Урок 22 :: Форматирование текстовых документов (Уровень 1)';
-    const actionLog = [];
     const telemetry = window.LMSTelemetry.create({
         missionName: MISSION_NAME,
         level: 1,
         totalStages: 3
     });
 
-    function logAction(action, details = {}) {
-        actionLog.push({ time: new Date().toISOString(), action, ...details });
-    }
+    let currentStage = 1;
+    let currentVariantIdx = 0;
+    let isCompleted = false;
+    let stage1Variants = [];
+    let stage2Variants = [];
+    let stage3Variants = [];
 
-    function triggerError(msg, regenCallback) {
-        telemetry.hardcoreReset({ action_log: actionLog });
-        const attEl = document.getElementById('attempts-display');
-        if (attEl) attEl.textContent = String(telemetry.getState().attemptsCount);
-
-        const errBox = document.getElementById('error-box');
-        const errMsg = document.getElementById('error-message');
-        if (errMsg) errMsg.textContent = msg;
-        if (errBox) errBox.classList.remove('d-none');
-
-        setTimeout(() => {
-            if (errBox) errBox.classList.add('d-none');
-            if (regenCallback) regenCallback();
-        }, 1200);
-    }
-
-    function shuffle(arr) {
-        const a = [...arr];
-        for (let i = a.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [a[i], a[j]] = [a[j], a[i]];
+    function pickVariant(arr) {
+        if (typeof window.__FORCE_L1_VARIANT === 'number') {
+            return arr[window.__FORCE_L1_VARIANT % arr.length];
         }
-        return a;
+        return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    // =========================================================================
-    // ФАЗА 1: КЛАССИФИКАЦИЯ ОПЕРАЦИЙ (Drag-to-Bucket + Click-to-Move)
-    // =========================================================================
-    const P1_BANK = [
-        // Редактирование (edit)
-        { id: 'ed1', text: 'Исправление орфографической опечатки в слове', bucket: 'edit' },
-        { id: 'ed2', text: 'Удаление лишнего символа клавишей Backspace или Delete', bucket: 'edit' },
-        { id: 'ed3', text: 'Копирование и вставка предложения через буфер обмена (Ctrl+C / Ctrl+V)', bucket: 'edit' },
-        { id: 'ed4', text: 'Автоматический поиск и замена слова во всем тексте (Ctrl+H)', bucket: 'edit' },
-        { id: 'ed5', text: 'Вставка пропущенного слова в середину предложения', bucket: 'edit' },
-        { id: 'ed6', text: 'Перемещение фрагмента текста в конец документа (Ctrl+X / Ctrl+V)', bucket: 'edit' },
+    function initVariants() {
+        stage1Variants = [
+            {
+                draftHtml: '<p>Плотность воды составляет 1000 кг/м3, а химическая формула записывается как H2O при стандартном давлении.</p>',
+                font: 'Liberation Serif',
+                sizePt: 14,
+                boldWord: 'Плотность',
+                italicWord: 'формула',
+                underlineWord: 'давлении',
+                supDigit: '3',
+                subDigit: '2',
+                sampleText: 'Плотность воды составляет 1000 кг/м³ (надстрочный «3»), а химическая формула записывается как H₂O (подстрочный «2») при стандартном давлении.'
+            },
+            {
+                draftHtml: '<p>Площадь квадрата равна 25 м2, при этом углекислый газ имеет формулу CO2 в атмосфере Земли.</p>',
+                font: 'Times New Roman',
+                sizePt: 14,
+                boldWord: 'Площадь',
+                italicWord: 'углекислый',
+                underlineWord: 'атмосфере',
+                supDigit: '2',
+                subDigit: '2',
+                sampleText: 'Площадь квадрата равна 25 м² (надстрочный «2»), при этом углекислый газ имеет формулу CO₂ (подстрочный «2») в атмосфере Земли.'
+            },
+            {
+                draftHtml: '<p>Энергия тела пропорциональна mv2, а молекула кислорода обозначается формулой O2 в таблице элементов.</p>',
+                font: 'Liberation Serif',
+                sizePt: 14,
+                boldWord: 'Энергия',
+                italicWord: 'молекула',
+                underlineWord: 'таблице',
+                supDigit: '2',
+                subDigit: '2',
+                sampleText: 'Энергия тела пропорциональна mv² (надстрочный «2»), а молекула кислорода обозначается формулой O₂ (подстрочный «2») в таблице элементов.'
+            }
+        ];
 
-        // Форматирование символов (char)
-        { id: 'ch1', text: 'Смена гарнитуры шрифта на Liberation Serif', bucket: 'char' },
-        { id: 'ch2', text: 'Установка размера шрифта (кегля) равным 14 пт', bucket: 'char' },
-        { id: 'ch3', text: 'Выделение ключевого термина полужирным начертанием (Ctrl+B)', bucket: 'char' },
-        { id: 'ch4', text: 'Перевод двойки в формуле км² в верхний (надстрочный) индекс', bucket: 'char' },
-        { id: 'ch5', text: 'Оформление цитаты курсивным начертанием (Ctrl+I)', bucket: 'char' },
-        { id: 'ch6', text: 'Перевод цифры в формуле H₂O в нижний (подстрочный) индекс', bucket: 'char' },
+        stage2Variants = [
+            {
+                draftHtml: '<p>Компьютерная типографика предъявляет строгие требования к геометрии страницы и абзацев. Красная строка и выравнивание по ширине делают длинный учебный текст удобным для чтения с бумаги и экрана.</p>',
+                lineHeight: '1.15',
+                indentCm: 1.0,
+                marginCm: 2.0
+            },
+            {
+                draftHtml: '<p>Оформление деловых и учебных документов в LibreOffice Writer начинается с настройки полей листа. Правильные отступы первой строки и междустрочный интервал позволяют обойтись без лишних пробелов и пустых строк.</p>',
+                lineHeight: '1.5',
+                indentCm: 1.0,
+                marginCm: 2.0
+            }
+        ];
 
-        // Форматирование абзацев (para)
-        { id: 'pa1', text: 'Выравнивание основного текста по ширине страницы (Ctrl+J)', bucket: 'para' },
-        { id: 'pa2', text: 'Установка отступа первой строки (красной строки) равным 1,0 см', bucket: 'para' },
-        { id: 'pa3', text: 'Настройка междустрочного интервала на 1,15 строки', bucket: 'para' },
-        { id: 'pa4', text: 'Выравнивание заголовка главы посередине строки (Ctrl+E)', bucket: 'para' },
-        { id: 'pa5', text: 'Задание интервала 6 пт после каждого абзаца текста', bucket: 'para' },
-        { id: 'pa6', text: 'Увеличение левого отступа всего текстового блока цитаты на 2 см', bucket: 'para' }
-    ];
-
-    let p1ActiveItems = [];
-    let p1Placements = {}; // id -> bucket | null
-    let p1SelectedCardId = null;
-
-    function initPhase1() {
-        const edits = shuffle(P1_BANK.filter(x => x.bucket === 'edit')).slice(0, 2);
-        const chars = shuffle(P1_BANK.filter(x => x.bucket === 'char')).slice(0, 2);
-        const paras = shuffle(P1_BANK.filter(x => x.bucket === 'para')).slice(0, 2);
-        p1ActiveItems = shuffle([...edits, ...chars, ...paras]);
-        p1Placements = {};
-        p1ActiveItems.forEach(it => { p1Placements[it.id] = null; });
-        p1SelectedCardId = null;
-        renderPhase1();
+        stage3Variants = [
+            {
+                draftHtml: '<p style="font-family: \'Liberation Serif\', serif; font-size: 14pt; text-align: justify; text-indent: 1.0cm;">Сравнительная таблица ключевых параметров системных блоков в компьютерном классе:</p>' +
+                    '<table style="width: 100%; border-collapse: collapse;">' +
+                    '<thead><tr><th style="border:1px solid #000; padding:6px; text-align:left; font-weight:normal;">Параметр</th><th style="border:1px solid #000; padding:6px; text-align:left; font-weight:normal;">Значение</th></tr></thead>' +
+                    '<tbody><tr><td style="border:1px solid #000; padding:6px;">Оперативная память</td><td style="border:1px solid #000; padding:6px;">16 Гбайт</td></tr>' +
+                    '<tr><td style="border:1px solid #000; padding:6px;">Накопитель SSD</td><td style="border:1px solid #000; padding:6px;">512 Гбайт</td></tr></tbody></table>',
+                note: 'Отцентрируйте таблицу на листе, выровняйте шапку по центру с полужирным шрифтом и задайте вертикальное выравнивание ячеек «По середине».'
+            },
+            {
+                draftHtml: '<p style="font-family: \'Liberation Serif\', serif; font-size: 14pt; text-align: justify; text-indent: 1.0cm;">Основные характеристики передаваемых текстовых файлов различных стандартов:</p>' +
+                    '<table style="width: 100%; border-collapse: collapse;">' +
+                    '<thead><tr><th style="border:1px solid #000; padding:6px; text-align:left; font-weight:normal;">Формат</th><th style="border:1px solid #000; padding:6px; text-align:left; font-weight:normal;">Назначение</th></tr></thead>' +
+                    '<tbody><tr><td style="border:1px solid #000; padding:6px;">.odt</td><td style="border:1px solid #000; padding:6px;">Стандарт LibreOffice Writer</td></tr>' +
+                    '<tr><td style="border:1px solid #000; padding:6px;">.pdf</td><td style="border:1px solid #000; padding:6px;">Фиксированная печать</td></tr></tbody></table>',
+                note: 'Отцентрируйте таблицу на листе, выровняйте шапку по центру с полужирным шрифтом и задайте вертикальное выравнивание ячеек «По середине».'
+            }
+        ];
     }
 
-    function renderPhase1() {
-        const poolEl = document.getElementById('p1-cards-pool');
-        if (!poolEl) return;
-        poolEl.innerHTML = '';
+    let activeData = null;
 
-        const dropzones = document.querySelectorAll('.p1-dropzone');
-        dropzones.forEach(dz => {
-            const slots = dz.querySelector('.bucket-slots');
-            if (slots) slots.innerHTML = '';
-        });
+    function getStageDraftHtml() {
+        return activeData ? activeData.draftHtml : '<p></p>';
+    }
 
-        let poolCount = 0;
-        const counts = { edit: 0, char: 0, para: 0 };
+    function evaluateStageChecks(state) {
+        const V = window.WriterValidator;
+        const wysiwyg = state?.wysiwyg || document.querySelector('.jodit-wysiwyg');
+        if (!wysiwyg || !activeData) return [];
 
-        p1ActiveItems.forEach(item => {
-            const placedBucket = p1Placements[item.id];
-            const card = document.createElement('div');
-            const isSelected = p1SelectedCardId === item.id;
-            card.className = `p1-card p-2 border rounded-0 small user-select-none ${
-                isSelected ? 'bg-success text-dark border-light fw-bold' : 'bg-dark text-light border-secondary'
-            }`;
-            card.style.cursor = 'pointer';
-            card.setAttribute('draggable', 'true');
-            card.setAttribute('data-id', item.id);
-            card.setAttribute('data-expected-bucket', item.bucket);
-            card.innerHTML = `<span class="me-1">[#]</span><span>${item.text}</span>`;
+        if (currentStage === 1) {
+            const p = wysiwyg.querySelector('p') || wysiwyg;
+            const geom = V ? V.checkParagraphGeometry(p, { font: activeData.font, sizePt: activeData.sizePt }) : { fontOk: false, sizeOk: false };
+            const boldOk = V ? V.hasBoldWord(wysiwyg, activeData.boldWord) : false;
+            const italicOk = V ? V.hasItalicWord(wysiwyg, activeData.italicWord) : false;
+            const underOk = V ? V.hasUnderlineWord(wysiwyg, activeData.underlineWord) : false;
+            const supOk = V ? V.hasSuperscript(wysiwyg, activeData.supDigit) : false;
+            const subOk = V ? V.hasSubscript(wysiwyg, activeData.subDigit) : false;
+            return [
+                { id: 's1_font', label: `Шрифт ${activeData.font}`, passed: !!geom.fontOk },
+                { id: 's1_size', label: `Кегль ${activeData.sizePt} пт`, passed: !!geom.sizeOk },
+                { id: 's1_bold', label: `Полужирный «${activeData.boldWord}»`, passed: boldOk },
+                { id: 's1_italic', label: `Курсив «${activeData.italicWord}»`, passed: italicOk },
+                { id: 's1_under', label: `Подчёркнутый «${activeData.underlineWord}»`, passed: underOk },
+                { id: 's1_sup', label: `Верхний индекс «${activeData.supDigit}»`, passed: supOk },
+                { id: 's1_sub', label: `Нижний индекс «${activeData.subDigit}»`, passed: subOk }
+            ];
+        }
 
-            card.addEventListener('dragstart', (e) => {
-                p1SelectedCardId = item.id;
-                if (e.dataTransfer) e.dataTransfer.setData('text/plain', item.id);
+        if (currentStage === 2) {
+            const m = state?.pageMargins || { leftCm: 1, rightCm: 1, topCm: 1, bottomCm: 1 };
+            const marginsOk = Math.abs(m.leftCm - activeData.marginCm) < 0.1 &&
+                Math.abs(m.rightCm - activeData.marginCm) < 0.1 &&
+                Math.abs(m.topCm - activeData.marginCm) < 0.1 &&
+                Math.abs(m.bottomCm - activeData.marginCm) < 0.1;
+            const p = wysiwyg.querySelector('p');
+            const geom = (V && p) ? V.checkParagraphGeometry(p, {
+                textAlign: 'justify',
+                indentCm: activeData.indentCm,
+                lineHeight: activeData.lineHeight
+            }) : { alignOk: false, indentOk: false, lineHeightOk: false };
+            const noSpacesCrutch = p ? !/^(&nbsp;|\s){2,}/i.test(p.innerHTML || '') : false;
+            return [
+                { id: 's2_margins', label: `Поля ${activeData.marginCm.toFixed(1)} см`, passed: marginsOk },
+                { id: 's2_align', label: 'Выравнивание: По ширине', passed: !!geom.alignOk },
+                { id: 's2_indent', label: 'Красная строка 1.0 см (без пробелов)', passed: !!geom.indentOk && noSpacesCrutch },
+                { id: 's2_lh', label: `Междустрочный интервал ${activeData.lineHeight}`, passed: !!geom.lineHeightOk }
+            ];
+        }
+
+        // Этап 3: Таблица
+        const tbl = wysiwyg.querySelector('table');
+        const tblCentered = tbl ? ((tbl.style.marginLeft === 'auto' && tbl.style.marginRight === 'auto') || tbl.getAttribute('align') === 'center') : false;
+        let headersCenterBold = false;
+        let valignMiddleOk = false;
+        if (tbl && tbl.rows && tbl.rows.length > 0) {
+            const ths = Array.from(tbl.rows[0].cells);
+            headersCenterBold = ths.length > 0 && ths.every(c => {
+                const st = window.getComputedStyle(c);
+                const al = c.style.textAlign || st.textAlign;
+                const fw = c.style.fontWeight || st.fontWeight;
+                const isB = fw === 'bold' || parseInt(fw, 10) >= 600;
+                return al === 'center' && isB;
             });
-
-            if (!placedBucket) {
-                poolCount++;
-                poolEl.appendChild(card);
-            } else {
-                counts[placedBucket] = (counts[placedBucket] || 0) + 1;
-                const targetZone = document.querySelector(`.p1-dropzone[data-bucket="${placedBucket}"] .bucket-slots`);
-                if (targetZone) targetZone.appendChild(card);
-            }
-        });
-
-        const poolCountEl = document.getElementById('p1-pool-count');
-        if (poolCountEl) poolCountEl.textContent = String(poolCount);
-
-        dropzones.forEach(dz => {
-            const b = dz.getAttribute('data-bucket');
-            const badge = dz.querySelector('.count-badge');
-            if (badge && b) badge.textContent = String(counts[b] || 0);
-        });
-
-        const btn1 = document.getElementById('btn-phase1');
-        if (btn1) btn1.disabled = poolCount > 0;
+            const allCells = Array.from(tbl.querySelectorAll('th, td'));
+            valignMiddleOk = allCells.length > 0 && allCells.every(c => (c.style.verticalAlign || '').toLowerCase() === 'middle');
+        }
+        return [
+            { id: 's3_center', label: 'Таблица по центру листа', passed: tblCentered },
+            { id: 's3_header', label: 'Шапка: по центру и полужирный', passed: headersCenterBold },
+            { id: 's3_valign', label: 'Ячейки: вертикально по середине', passed: valignMiddleOk }
+        ];
     }
 
-    // Делегирование кликов и Drag-and-Drop для Фазы 1 (без stopPropagation на дочерних элементах)
-    document.getElementById('phase1')?.addEventListener('click', (e) => {
-        const target = e.target;
-        if (!(target instanceof HTMLElement)) return;
-
-        // 1. Если выбрана карточка и клик пришелся по контейнеру-корзине (включая карточки внутри нее) -> помещаем выбранную карточку в корзину
-        const dzEl = target.closest('.p1-dropzone');
-        if (dzEl && p1SelectedCardId) {
-            const bucket = dzEl.getAttribute('data-bucket');
-            if (bucket) {
-                p1Placements[p1SelectedCardId] = bucket;
-                p1SelectedCardId = null;
-                renderPhase1();
-                return;
-            }
-        }
-
-        // 2. Клик по карточке
-        const cardEl = target.closest('.p1-card');
-        if (cardEl) {
-            const id = cardEl.getAttribute('data-id');
-            if (!id) return;
-            // Если карточка уже лежит в корзине и у нас не выбрана другая карточка из пула -> возврат в пул
-            if (p1Placements[id] !== null && p1SelectedCardId === null) {
-                p1Placements[id] = null;
-                renderPhase1();
-                return;
-            }
-            // Иначе выбираем/снимаем выделение
-            p1SelectedCardId = (p1SelectedCardId === id) ? null : id;
-            renderPhase1();
-            return;
-        }
-    });
-
-    document.querySelectorAll('.p1-dropzone').forEach(dz => {
-        dz.addEventListener('dragover', (e) => e.preventDefault());
-        dz.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const bucket = dz.getAttribute('data-bucket');
-            const id = e.dataTransfer?.getData('text/plain') || p1SelectedCardId;
-            if (id && bucket) {
-                p1Placements[id] = bucket;
-                p1SelectedCardId = null;
-                renderPhase1();
-            }
+    function renderChecklist(state) {
+        const listEl = document.getElementById('live-checklist');
+        if (!listEl) return;
+        const checks = evaluateStageChecks(state || (window.getWriterState ? window.getWriterState() : null));
+        listEl.innerHTML = '';
+        checks.forEach(c => {
+            const span = document.createElement('span');
+            span.className = `badge font-monospace ${c.passed ? 'bg-success text-white' : 'bg-dark border border-secondary text-secondary'}`;
+            span.innerText = `${c.passed ? '✅' : '⏳'} ${c.label}`;
+            listEl.appendChild(span);
         });
-    });
-
-    document.getElementById('btn-phase1')?.addEventListener('click', () => {
-        const allCorrect = p1ActiveItems.every(it => p1Placements[it.id] === it.bucket);
-        if (allCorrect) {
-            logAction('phase1_complete');
-            document.getElementById('phase1')?.classList.add('d-none');
-            document.getElementById('phase2')?.classList.remove('d-none');
-            const badge = document.getElementById('phase-badge');
-            const title = document.getElementById('phase-title');
-            if (badge) badge.textContent = 'Шаг 2 из 3';
-            if (title) title.textContent = 'Слот-пазл непечатаемых символов и горячих клавиш';
-            telemetry.advanceStage(2, { action_log: actionLog });
-            initPhase2();
-        } else {
-            triggerError('Ошибка классификации! Проверьте различие между изменением содержания (редактированием), оформлением символов и свойствами абзаца.', () => {
-                initPhase1();
-            });
-        }
-    });
-
-    // =========================================================================
-    // ФАЗА 2: СЛОТ-ПАЗЛ СЛУЖЕБНЫХ ЗНАКОВ И ГОРЯЧИХ КЛАВИШ (Slot & Snap)
-    // =========================================================================
-    const P2_SLOTS_BANK = [
-        { slotId: 's_para', desc: 'Служебный маркер конца абзаца (вводится клавишей Enter)', expectedToken: '¶ (Конец абзаца)' },
-        { slotId: 's_nbsp', desc: 'Неразрывный пробел между числом и единицей измерения (Ctrl+Shift+Space)', expectedToken: '° (Неразрывный пробел)' },
-        { slotId: 's_br', desc: 'Принудительный разрыв строки без начала нового абзаца (Shift+Enter)', expectedToken: '↵ (Разрыв строки)' },
-        { slotId: 's_tab', desc: 'Непечатаемый знак сдвига к позиции табуляции или перехода в ячейку (Tab)', expectedToken: '→ (Символ табуляции)' },
-        { slotId: 's_just', desc: 'Горячая клавиша выравнивания абзаца по ширине страницы (стандарт ОГЭ)', expectedToken: 'Ctrl + J' },
-        { slotId: 's_cent', desc: 'Горячая клавиша центрирования заголовка или названия таблицы', expectedToken: 'Ctrl + E' },
-        { slotId: 's_nonp', desc: 'Горячая клавиша включения режима непечатаемых символов в LibreOffice Writer', expectedToken: 'Ctrl + F10' },
-        { slotId: 's_clear', desc: 'Горячая клавиша очистки прямого форматирования фрагмента в LibreOffice Writer', expectedToken: 'Ctrl + M' }
-    ];
-
-    const P2_DISTRACTORS = [
-        '§ (Знак параграфа)',
-        'Alt + F4',
-        'Ctrl + Alt + Space',
-        'Ctrl + W'
-    ];
-
-    let p2ActiveSlots = [];
-    let p2TokensPool = [];
-    let p2SlotValues = {}; // slotId -> tokenString | null
-    let p2SelectedToken = null;
-
-    function initPhase2() {
-        p2ActiveSlots = shuffle(P2_SLOTS_BANK).slice(0, 4);
-        const correctTokens = p2ActiveSlots.map(s => s.expectedToken);
-        const distractors = shuffle(P2_DISTRACTORS).slice(0, 3);
-        p2TokensPool = shuffle([...correctTokens, ...distractors]);
-        p2SlotValues = {};
-        p2ActiveSlots.forEach(s => { p2SlotValues[s.slotId] = null; });
-        p2SelectedToken = null;
-        renderPhase2();
     }
 
-    function renderPhase2() {
-        const paletteEl = document.getElementById('p2-tokens-palette');
-        const slotsEl = document.getElementById('p2-slots-container');
-        if (!paletteEl || !slotsEl) return;
+    function loadStage(stageNum) {
+        currentStage = stageNum;
+        const badge = document.getElementById('phase-badge');
+        const title = document.getElementById('phase-title');
+        const instr = document.getElementById('task-instruction');
+        if (badge) badge.innerText = `Шаг ${stageNum} из 3`;
 
-        const usedTokens = new Set(Object.values(p2SlotValues).filter(Boolean));
-        paletteEl.innerHTML = '';
-
-        p2TokensPool.forEach(tok => {
-            if (usedTokens.has(tok)) return;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            const isSel = p2SelectedToken === tok;
-            btn.className = `btn btn-sm rounded-0 p2-token-btn fw-bold ${
-                isSel ? 'btn-success text-dark border-light' : 'btn-outline-success bg-dark text-success'
-            }`;
-            btn.setAttribute('data-token', tok);
-            btn.textContent = tok;
-            paletteEl.appendChild(btn);
-        });
-
-        slotsEl.innerHTML = '';
-        let filledCount = 0;
-
-        p2ActiveSlots.forEach((slot, idx) => {
-            const val = p2SlotValues[slot.slotId];
-            if (val) filledCount++;
-
-            const col = document.createElement('div');
-            col.className = 'col-12 col-md-6';
-            col.innerHTML = `
-                <div class="card bg-black border-secondary rounded-0 h-100 p-3 p2-slot-box" data-slot-id="${slot.slotId}" data-expected="${slot.expectedToken}" style="cursor: pointer;">
-                    <div class="text-secondary small mb-1">ГНЕЗДО ПРОТОКОЛА #${idx + 1}:</div>
-                    <div class="text-light small mb-2">${slot.desc}</div>
-                    <div class="p-2 border rounded-0 text-center fw-bold ${val ? 'border-success bg-dark text-success' : 'border-secondary bg-black text-secondary'}">
-                        ${val ? val : '[ КЛИКНИТЕ ДЛЯ УСТАНОВКИ ТОКЕНА ]'}
+        if (stageNum === 1) {
+            activeData = pickVariant(stage1Variants);
+            if (title) title.innerText = 'Форматирование символов (шрифт, кегль, начертания и индексы)';
+            if (instr) {
+                instr.innerHTML = `
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-bold text-warning mb-1">Задание этапа 1: отформатируйте предзагруженный текст в окне LibreOffice Writer ниже:</div>
+                            <ul class="mb-1 ps-3">
+                                <li>Установите гарнитуру <strong class="text-info">${activeData.font}</strong> и размер <strong class="text-info">${activeData.sizePt} пт</strong>;</li>
+                                <li>Сделайте слово <strong class="text-warning">«${activeData.boldWord}»</strong> — полужирным (<b>Ж</b>), <strong class="text-warning">«${activeData.italicWord}»</strong> — курсивом (<i>К</i>), <strong class="text-warning">«${activeData.underlineWord}»</strong> — подчёркнутым (<u>Ч</u>);</li>
+                                <li>Оформите цифру <strong class="text-info">${activeData.supDigit}</strong> в верхний индекс (<kbd>x²</kbd>) и цифру <strong class="text-info">${activeData.subDigit}</strong> в формуле в нижний индекс (<kbd>x₂</kbd>).</li>
+                            </ul>
+                            <div class="bg-white text-dark p-1 px-2 border small mt-1"><strong>Ориентир:</strong> ${activeData.sampleText}</div>
+                        </div>
+                        <button type="button" id="btn-restore-draft" class="btn btn-outline-secondary btn-sm rounded-0 flex-shrink-0">Сбросить текст этапа</button>
                     </div>
-                </div>
-            `;
-            slotsEl.appendChild(col);
+                `;
+            }
+        } else if (stageNum === 2) {
+            activeData = pickVariant(stage2Variants);
+            if (title) title.innerText = 'Параметры страницы, красная строка (1,0 см) и интервалы абзаца';
+            if (instr) {
+                instr.innerHTML = `
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-bold text-warning mb-1">Задание этапа 2: настройте геометрию страницы и абзаца:</div>
+                            <ul class="mb-0 ps-3">
+                                <li>Откройте меню <strong class="text-info">Формат → Стиль страницы…</strong> и установите поля <strong class="text-warning">2.0 см</strong> со всех сторон;</li>
+                                <li>Выровняйте абзац <strong class="text-info">По ширине</strong> (<kbd>Ctrl+J</kbd>);</li>
+                                <li>Установите отступ первой строки (красную строку) <strong class="text-warning">1.0 см</strong> (через линейку или <strong class="text-info">Формат → Абзац…</strong>) и междустрочный интервал <strong class="text-warning">${activeData.lineHeight}</strong>.</li>
+                            </ul>
+                        </div>
+                        <button type="button" id="btn-restore-draft" class="btn btn-outline-secondary btn-sm rounded-0 flex-shrink-0">Сбросить текст этапа</button>
+                    </div>
+                `;
+            }
+        } else {
+            activeData = pickVariant(stage3Variants);
+            if (title) title.innerText = 'Форматирование таблицы: выравнивание на листе, шапка и ячейки';
+            if (instr) {
+                instr.innerHTML = `
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-bold text-warning mb-1">Задание этапа 3: оформите таблицу в документе по стандарту ОГЭ:</div>
+                            <ul class="mb-0 ps-3">
+                                <li>Поставьте курсор в таблицу и откройте <strong class="text-info">Таблица → Свойства…</strong> (или кнопку на контекстной панели «Таблица» снизу);</li>
+                                <li>Выровняйте таблицу <strong class="text-warning">По центру</strong> страницы, шапку — <strong class="text-warning">По центру</strong> и <strong class="text-warning">полужирным</strong> шрифтом;</li>
+                                <li>Установите вертикальное выравнивание ячеек <strong class="text-info">По середине</strong> (<kbd>middle</kbd>).</li>
+                            </ul>
+                        </div>
+                        <button type="button" id="btn-restore-draft" class="btn btn-outline-secondary btn-sm rounded-0 flex-shrink-0">Сбросить текст этапа</button>
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('btn-restore-draft')?.addEventListener('click', () => {
+            if (window.resetWriterState) {
+                window.resetWriterState(getStageDraftHtml(), false, true);
+                renderChecklist();
+            }
         });
 
-        const btn2 = document.getElementById('btn-phase2');
-        if (btn2) btn2.disabled = filledCount < p2ActiveSlots.length;
+        if (window.resetWriterState) {
+            window.resetWriterState(getStageDraftHtml(), false, true);
+        }
+        renderChecklist();
     }
 
-    document.getElementById('phase2')?.addEventListener('click', (e) => {
-        const target = e.target;
-        if (!(target instanceof HTMLElement)) return;
+    function initWhenWriterReady() {
+        if (window.resetWriterState && document.querySelector('.jodit-wysiwyg')) {
+            initVariants();
+            loadStage(1);
+        } else {
+            setTimeout(initWhenWriterReady, 30);
+        }
+    }
 
-        const tokBtn = target.closest('.p2-token-btn');
-        if (tokBtn) {
-            const tok = tokBtn.getAttribute('data-token');
-            if (!tok) return;
-            p2SelectedToken = (p2SelectedToken === tok) ? null : tok;
-            renderPhase2();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenWriterReady);
+    } else {
+        initWhenWriterReady();
+    }
+
+    document.addEventListener('writer-change', (e) => {
+        if (!isCompleted) renderChecklist(e.detail);
+    });
+
+    document.addEventListener('writer-check', (e) => {
+        if (isCompleted) return;
+        telemetry.markActivity();
+        const checks = evaluateStageChecks(e.detail);
+        const failed = checks.filter(c => !c.passed);
+
+        if (failed.length > 0) {
+            const errMsg = `Не выполнены требования: ${failed.map(f => f.label).join('; ')}`;
+            telemetry.hardcoreReset({ stage: currentStage });
+            const attEl = document.getElementById('attempts-display');
+            if (attEl) attEl.innerText = String(telemetry.getState().attemptsCount);
+            const errBox = document.getElementById('error-box');
+            const errText = document.getElementById('error-message');
+            if (errText) errText.innerText = errMsg;
+            if (errBox) errBox.classList.remove('d-none');
+            e.detail.resolve(false, `❌ ${errMsg}`, false);
+            setTimeout(() => {
+                if (errBox) errBox.classList.add('d-none');
+            }, 2500);
             return;
         }
 
-        const slotBox = target.closest('.p2-slot-box');
-        if (slotBox) {
-            const slotId = slotBox.getAttribute('data-slot-id');
-            if (!slotId) return;
-            if (p2SelectedToken) {
-                p2SlotValues[slotId] = p2SelectedToken;
-                p2SelectedToken = null;
-                renderPhase2();
-            } else if (p2SlotValues[slotId]) {
-                p2SlotValues[slotId] = null;
-                renderPhase2();
-            }
-        }
-    });
-
-    document.getElementById('btn-phase2')?.addEventListener('click', () => {
-        const allOk = p2ActiveSlots.every(s => p2SlotValues[s.slotId] === s.expectedToken);
-        if (allOk) {
-            logAction('phase2_complete');
-            document.getElementById('phase2')?.classList.add('d-none');
-            document.getElementById('phase3')?.classList.remove('d-none');
-            const badge = document.getElementById('phase-badge');
-            const title = document.getElementById('phase-title');
-            if (badge) badge.textContent = 'Шаг 3 из 3';
-            if (title) title.textContent = 'Калибратор параметров страницы и абзаца';
-            telemetry.advanceStage(3, { action_log: actionLog });
-            initPhase3();
+        if (currentStage < 3) {
+            e.detail.resolve(true, `✅ Этап ${currentStage} из 3 выполнен!`, false);
+            currentStage++;
+            telemetry.advanceStage(currentStage);
+            setTimeout(() => loadStage(currentStage), 350);
         } else {
-            triggerError('Неверное сопоставление служебных символов или горячих клавиш! Проверьте таблицу непечатаемых знаков.', () => {
-                initPhase2();
-            });
-        }
-    });
-
-    // =========================================================================
-    // ФАЗА 3: ИНТЕРФЕЙС КАЛИБРОВКИ ПАРАМЕТРОВ (Slider & Toggle)
-    // =========================================================================
-    const ALIGN_MODES = [
-        { key: 'left', label: 'По левому краю (Left)' },
-        { key: 'center', label: 'По центру (Center)' },
-        { key: 'right', label: 'По правому краю (Right)' },
-        { key: 'justify', label: 'По ширине (Justify)' }
-    ];
-
-    const LH_MODES = [
-        { key: '1.0', label: 'Одинарный (1.0)' },
-        { key: '1.15', label: 'Комфортный (1.15)' },
-        { key: '1.5', label: 'Полуторный (1.5)' },
-        { key: '2.0', label: 'Двойной (2.0)' }
-    ];
-
-    let p3Target = {
-        size: 14,
-        indent: 1.0,
-        margin: 2.0,
-        align: 'justify',
-        lh: '1.15'
-    };
-
-    function initPhase3() {
-        const sizes = [12, 14, 16];
-        const indents = [1.0, 1.25, 1.5];
-        const margins = [1.5, 2.0, 2.5];
-        const aligns = ['justify', 'center', 'right'];
-        const lhs = ['1.15', '1.5', '2.0'];
-
-        p3Target = {
-            size: sizes[Math.floor(Math.random() * sizes.length)],
-            indent: indents[Math.floor(Math.random() * indents.length)],
-            margin: margins[Math.floor(Math.random() * margins.length)],
-            align: aligns[Math.floor(Math.random() * aligns.length)],
-            lh: lhs[Math.floor(Math.random() * lhs.length)]
-        };
-
-        const alignObj = ALIGN_MODES.find(a => a.key === p3Target.align);
-        const lhObj = LH_MODES.find(l => l.key === p3Target.lh);
-
-        const specList = document.getElementById('p3-spec-list');
-        if (specList) {
-            specList.innerHTML = `
-                <li class="p-2 bg-dark border border-secondary">1. Кегль шрифта: <strong class="text-success" id="p3-target-size" data-val="${p3Target.size}">${p3Target.size} пт</strong></li>
-                <li class="p-2 bg-dark border border-secondary">2. Отступ первой строки: <strong class="text-info" id="p3-target-indent" data-val="${p3Target.indent.toFixed(2)}">${p3Target.indent.toFixed(2)} см</strong></li>
-                <li class="p-2 bg-dark border border-secondary">3. Поля страницы (левое/правое): <strong class="text-warning" id="p3-target-margin" data-val="${p3Target.margin.toFixed(1)}">${p3Target.margin.toFixed(1)} см</strong></li>
-                <li class="p-2 bg-dark border border-secondary">4. Выравнивание абзаца: <strong class="text-success" id="p3-target-align" data-val="${p3Target.align}">${alignObj?.label}</strong></li>
-                <li class="p-2 bg-dark border border-secondary">5. Междустрочный интервал: <strong class="text-info" id="p3-target-lh" data-val="${p3Target.lh}">${lhObj?.label}</strong></li>
-            `;
-        }
-
-        // Сброс ползунков в начальное рассогласованное состояние
-        const sSize = document.getElementById('p3-slider-size');
-        const sIndent = document.getElementById('p3-slider-indent');
-        const sMargin = document.getElementById('p3-slider-margin');
-        const bAlign = document.getElementById('p3-btn-align');
-        const bLh = document.getElementById('p3-btn-lh');
-
-        if (sSize) sSize.value = '11';
-        if (sIndent) sIndent.value = '0';
-        if (sMargin) sMargin.value = '1.0';
-        if (bAlign) {
-            bAlign.setAttribute('data-align', 'left');
-            bAlign.textContent = ALIGN_MODES[0].label;
-        }
-        if (bLh) {
-            bLh.setAttribute('data-lh', '1.0');
-            bLh.textContent = LH_MODES[0].label;
-        }
-
-        updatePhase3Preview();
-    }
-
-    function updatePhase3Preview() {
-        const sSize = document.getElementById('p3-slider-size');
-        const sIndent = document.getElementById('p3-slider-indent');
-        const sMargin = document.getElementById('p3-slider-margin');
-        const bAlign = document.getElementById('p3-btn-align');
-        const bLh = document.getElementById('p3-btn-lh');
-
-        const sizeVal = parseInt(sSize?.value || '11', 10);
-        const indentVal = parseFloat(sIndent?.value || '0');
-        const marginVal = parseFloat(sMargin?.value || '1.0');
-        const alignVal = bAlign?.getAttribute('data-align') || 'left';
-        const lhVal = bLh?.getAttribute('data-lh') || '1.0';
-
-        const vSize = document.getElementById('p3-val-size');
-        const vIndent = document.getElementById('p3-val-indent');
-        const vMargin = document.getElementById('p3-val-margin');
-
-        if (vSize) vSize.textContent = `${sizeVal} пт`;
-        if (vIndent) vIndent.textContent = `${indentVal.toFixed(2)} см`;
-        if (vMargin) vMargin.textContent = `${marginVal.toFixed(1)} см`;
-
-        const pageEl = document.getElementById('p3-page-preview');
-        const paraEl = document.getElementById('p3-para-preview');
-        if (pageEl) {
-            const padPx = Math.round(marginVal * 24);
-            pageEl.style.paddingLeft = `${padPx}px`;
-            pageEl.style.paddingRight = `${padPx}px`;
-        }
-        if (paraEl) {
-            paraEl.style.fontSize = `${sizeVal}pt`;
-            paraEl.style.textIndent = `${indentVal}cm`;
-            paraEl.style.textAlign = alignVal;
-            paraEl.style.lineHeight = lhVal;
-        }
-    }
-
-    document.getElementById('p3-slider-size')?.addEventListener('input', updatePhase3Preview);
-    document.getElementById('p3-slider-indent')?.addEventListener('input', updatePhase3Preview);
-    document.getElementById('p3-slider-margin')?.addEventListener('input', updatePhase3Preview);
-
-    document.getElementById('p3-btn-align')?.addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        if (!(btn instanceof HTMLElement)) return;
-        const cur = btn.getAttribute('data-align') || 'left';
-        const idx = ALIGN_MODES.findIndex(a => a.key === cur);
-        const next = ALIGN_MODES[(idx + 1) % ALIGN_MODES.length];
-        btn.setAttribute('data-align', next.key);
-        btn.textContent = next.label;
-        updatePhase3Preview();
-    });
-
-    document.getElementById('p3-btn-lh')?.addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        if (!(btn instanceof HTMLElement)) return;
-        const cur = btn.getAttribute('data-lh') || '1.0';
-        const idx = LH_MODES.findIndex(l => l.key === cur);
-        const next = LH_MODES[(idx + 1) % LH_MODES.length];
-        btn.setAttribute('data-lh', next.key);
-        btn.textContent = next.label;
-        updatePhase3Preview();
-    });
-
-    document.getElementById('btn-phase3')?.addEventListener('click', () => {
-        const sSize = parseInt(document.getElementById('p3-slider-size')?.value || '0', 10);
-        const sIndent = parseFloat(document.getElementById('p3-slider-indent')?.value || '0');
-        const sMargin = parseFloat(document.getElementById('p3-slider-margin')?.value || '0');
-        const sAlign = document.getElementById('p3-btn-align')?.getAttribute('data-align') || '';
-        const sLh = document.getElementById('p3-btn-lh')?.getAttribute('data-lh') || '';
-
-        const isOk =
-            sSize === p3Target.size &&
-            Math.abs(sIndent - p3Target.indent) < 0.01 &&
-            Math.abs(sMargin - p3Target.margin) < 0.01 &&
-            sAlign === p3Target.align &&
-            sLh === p3Target.lh;
-
-        if (isOk) {
-            logAction('phase3_complete');
-            document.getElementById('phase3')?.classList.add('d-none');
+            isCompleted = true;
+            e.detail.resolve(true, '🏆 Уровень 1 успешно пройден!', true);
+            telemetry.complete({ stage: 3 });
             document.getElementById('success-screen')?.classList.remove('d-none');
-            telemetry.complete({ action_log: actionLog });
-        } else {
-            triggerError('Параметры калибратора не совпадают с техническим заданием! Проверьте кегль, красную строку, поля, выравнивание и интервал.', () => {
-                initPhase3();
-            });
         }
     });
 
-    initPhase1();
+    window.getLevel1WriterState = () => ({
+        currentStage,
+        activeData,
+        isCompleted,
+        attempts: telemetry.getState().attemptsCount
+    });
+    window.jumpToLevel1Stage = (n) => {
+        if (n >= 1 && n <= 3) loadStage(n);
+    };
+})();
 </script>
