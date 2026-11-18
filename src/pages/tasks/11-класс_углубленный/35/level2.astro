@@ -1,0 +1,725 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2} title="Урок 35 :: Стеки. Анализ правильности скобочного выражения (Уровень 2)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-warning mb-0 fw-bold">Тренажер: Аналитические расчеты стеков и кадров памяти (Уровень 2)</h1>
+                <div class="text-secondary small">Урок 35 // 11 класс (углубленный уровень, технологический профиль)</div>
+            </div>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">
+                Ручной ввод // Sawtooth 2-1-2 // Anti-Paste
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик ошибок и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой расчет: трассировка стека команд LIFO</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> |
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Баннер ошибки -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2 small" role="alert">
+                    <span class="fw-bold">[ОШИБКА РАСЧЕТА]</span> <span id="feedback-text"></span>
+                </div>
+
+                <!-- Баннер успеха -->
+                <div id="success-box" class="alert alert-success bg-black text-success border border-success rounded-0 d-none mb-3 py-2 small" role="alert">
+                    <span class="fw-bold">[ВЕРИФИЦИРОВАНО]</span> <span id="success-text"></span>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 1: Прямой расчет — трассировка стека команд (CCS = 4)        -->
+                <!-- ================================================================= -->
+                <div id="phase1" class="phase-view">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ФАЗА 1 (Прямой расчет):</span>
+                        Изначально пустой стек целых чисел последовательно получает следующие команды.
+                        Выполните трассировку состояния стека по принципу <strong class="text-warning">LIFO</strong>.
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПРОТОКОЛ ОПЕРАЦИЙ НАД СТЕКОМ (сверху вниз):</div>
+                        <div id="p1-ops-list" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p1-input" class="form-label small text-secondary">
+                            Вычислите сумму всех элементов, оставшихся в стеке после выполнения последней команды:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p1-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число" autocomplete="off" />
+                            <button id="p1-submit-btn" type="button" class="btn btn-warning rounded-0 px-4 fw-bold text-dark" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 2: Конвертация единиц — заполнение лимита стека (CCS = 6)    -->
+                <!-- ================================================================= -->
+                <div id="phase2" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ФАЗА 2 (Конвертация и проценты):</span>
+                        Рекурсивный синтаксический анализатор исполняется в 64-битной ОС.
+                        Каждый вложенный вызов размещает на стеке новый <strong class="text-warning">кадр стека</strong> (адрес возврата, сохраненный <code>RBP</code> и локальные данные).
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПАРАМЕТРЫ СИСТЕМНОГО СТЕКА:</div>
+                        <div class="row g-2 text-light small">
+                            <div class="col-12 col-sm-6">
+                                <div>Лимит стека потока: <strong id="p2-limit-kb" class="text-warning fs-6">256</strong> Кбайт</div>
+                                <div>Адрес возврата + Saved RBP: <strong class="text-info">8 + 8 = 16</strong> байт</div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Локальные переменные кадра: <strong id="p2-local-bytes" class="text-info">48</strong> байт</div>
+                                <div>Текущая глубина рекурсии: <strong id="p2-depth" class="text-warning fs-6">1536</strong> вызовов</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p2-input" class="form-label small text-secondary">
+                            Определите, сколько процентов (%) от выделенного лимита стека занято при данной глубине рекурсии (можно с запятой или точкой, напр. 37,5%):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p2-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Например: 37,5%" autocomplete="off" />
+                            <button id="p2-submit-btn" type="button" class="btn btn-warning rounded-0 px-4 fw-bold text-dark" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 3: Пик 1 (Инверсия) — динамический стек с удвоением (CCS=7-8)-->
+                <!-- ================================================================= -->
+                <div id="phase3" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ФАЗА 3 (Пик 1 — Обратная задача):</span>
+                        Парсер хранит активные скобочные токены в динамическом массиве, емкость которого удваивается при заполнении.
+                        Восстановите число оставшихся свободных слотов по итоговому объему выделенного буфера.
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">СНИМОК ПАМЯТИ АЛЛОКАТОРА:</div>
+                        <div class="row g-2 text-light small">
+                            <div class="col-12 col-sm-6">
+                                <div>Выделенный объем буфера: <strong id="p3-alloc-kb" class="text-warning fs-6">16</strong> Кбайт</div>
+                                <div>Размер одного токена в стеке: <strong id="p3-elem-bytes" class="text-info">32</strong> байт</div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Заполнение текущей емкости: <strong id="p3-fill-pct" class="text-warning fs-6">62,5%</strong></div>
+                                <div>Емкость кратна степени двойки (<code>1 Кбайт = 1024 Б</code>)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p3-input" class="form-label small text-secondary">
+                            Сколько свободных слотов (в элементах) осталось в выделенном буфере до следующего переполнения и реаллокации?
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p3-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число слотов" autocomplete="off" />
+                            <button id="p3-submit-btn" type="button" class="btn btn-warning rounded-0 px-4 fw-bold text-dark" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 4: Долина консолидации — индекс сбоя в ПСП (CCS = 5-6)      -->
+                <!-- ================================================================= -->
+                <div id="phase4" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ФАЗА 4 (Долина консолидации — Инвариант LIFO):</span>
+                        Проследите слева направо работу стекового алгоритма проверки правильности скобочного выражения.
+                        В приведенной строке ровно одна синтаксическая ошибка (конфликт типов вложенности или лишняя закрывающая скобка).
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">ПРОИНДЕКСИРОВАННАЯ СТРОКА (индексы от 0):</div>
+                        <div id="p4-tape" class="d-flex flex-wrap gap-1 justify-content-center"></div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p4-input" class="form-label small text-secondary">
+                            Укажите индекс символа (целое число от 0), на котором парсер впервые обнаружит нарушение ПСП:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p4-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите индекс позиции" autocomplete="off" />
+                            <button id="p4-submit-btn" type="button" class="btn btn-warning rounded-0 px-4 fw-bold text-dark" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 5: Кульминация — ABI-выравнивание кадра и страницы ОС (CCS=9)-->
+                <!-- ================================================================= -->
+                <div id="phase5" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-warning fw-bold">ФАЗА 5 (Кульминация — Синтез x86-64 ABI и ОС):</span>
+                        Функция парсера скомпилирована под <code>System V AMD64 ABI</code> с защитой <code>Stack Canary</code>.
+                        Каждый кадр стека (сумма всех служебных полей и локальных переменных) перед вызовом <strong class="text-warning">выравнивается вверх до ближайшего кратного 16 байт</strong>.
+                        Виртуальная память под стек выделяется страницами по <strong class="text-info">4096 байт</strong> (округление вверх до целого числа страниц).
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">КОМПОНОВКА КАДРА И НАГРУЗКА:</div>
+                        <div class="row g-2 text-light small">
+                            <div class="col-12 col-sm-6">
+                                <div>Служебные поля (Ret + RBP + Canary): <strong class="text-info">8 + 8 + 8 = 24</strong> байта</div>
+                                <div>Локальные переменные: <code>char buf[<span id="p5-buf-size">25</span>]</code> + <code>int32_t state</code> (<strong>4</strong> Б)</div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div>Выравнивание кадра (ABI): <strong class="text-warning">кратность 16 байт (вверх)</strong></div>
+                                <div>Глубина вложенных вызовов: <strong id="p5-depth" class="text-warning fs-6">200</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 580px;">
+                        <label for="p5-input" class="form-label small text-secondary">
+                            Сколько минимально страниц памяти (по 4096 байт) потребуется для размещения всего стека вызовов?
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p5-input" class="form-control bg-black text-warning border-secondary rounded-0 font-monospace fs-5 py-2 px-3" placeholder="Введите целое число страниц" autocomplete="off" />
+                            <button id="p5-submit-btn" type="button" class="btn btn-warning rounded-0 px-4 fw-bold text-dark" style="min-height: 48px;">
+                                Проверить ➔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ЭКРАН ПОБЕДЫ                                                      -->
+                <!-- ================================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-warning bg-black p-4 mx-auto" style="max-width: 560px;">
+                        <h2 class="h3 text-warning fw-bold mb-2">✓ УРОВЕНЬ 2 ПРОЙДЕН</h2>
+                        <p class="text-light small mb-3">
+                            Вы успешно прошли все 5 аналитических фаз: трассировку LIFO, расчет заполнения стека, инверсию емкости аллокатора, поиск сбоя ПСП и выравнивание кадров стека x86-64 ABI.
+                        </p>
+                        <div class="d-flex justify-content-center gap-4 text-info fw-bold mb-2">
+                            <div>Ошибок: <span id="final-attempts" class="text-warning">0</span></div>
+                            <div>Время: <span id="final-time" class="text-warning">00:00</span></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    'use strict';
+
+    const missionName = 'Урок 35 :: Стеки. Анализ правильности скобочного выражения (Уровень 2)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
+
+    let currentPhase = 1;
+    let isLocked = false;
+    let timerInterval = null;
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // Нормализация числового и процентного ввода (поддержка русской запятой ',', пробелов и '%')
+    function parseDecimalInput(raw) {
+        if (typeof raw !== 'string') return NaN;
+        const cleaned = raw.replace(/%/g, '').replace(/\s+/g, '').replace(',', '.').trim();
+        if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return NaN;
+        const num = Number(cleaned);
+        return Number.isFinite(num) ? num : NaN;
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(telemetry.getState().attemptsCount || 0);
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(function() {
+            const elapsed = telemetry.getTimeSpentSec();
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = mins + ':' + secs;
+        }, 1000);
+    }
+
+    function triggerErrorReset(msg, regenerateFn) {
+        if (isLocked) return;
+        isLocked = true;
+        telemetry.markActivity();
+        telemetry.fail({ stage: currentPhase });
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        setTimeout(function() {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (regenerateFn) regenerateFn();
+        }, 1450);
+    }
+
+    function showSuccessFeedback(msg, nextFn) {
+        if (isLocked) return;
+        isLocked = true;
+        const sb = document.getElementById('success-box');
+        const st = document.getElementById('success-text');
+        if (sb && st) {
+            st.textContent = msg;
+            sb.classList.remove('d-none');
+        }
+        setTimeout(function() {
+            if (sb) sb.classList.add('d-none');
+            isLocked = false;
+            if (nextFn) nextFn();
+        }, 950);
+    }
+
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const evt = telemetry.complete({ stage: 5 });
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        const attempts = telemetry.getState().attemptsCount || 0;
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        for (let i = 1; i <= 5; i++) {
+            const p = document.getElementById('phase' + i);
+            if (p) p.classList.add('d-none');
+        }
+        document.getElementById('victory-screen').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Пройдено';
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attempts);
+        if (ft) ft.textContent = mins + ':' + secs;
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Прямой расчет — трассировка стека команд LIFO (CCS = 4)
+    // =========================================================================
+    let p1Expected = 0;
+
+    function initPhase1() {
+        currentPhase = 1;
+        document.getElementById('phase-badge').textContent = 'Шаг 1 из 5';
+        document.getElementById('phase-title').textContent = 'Прямой расчет: трассировка стека команд LIFO';
+
+        const ops = [];
+        const stack = [];
+        const totalOps = getRandomInt(7, 8);
+
+        for (let i = 0; i < totalOps; i++) {
+            // Гарантируем к концу 2-3 элемента и отсутствие pop на пустом стеке
+            const remaining = totalOps - i;
+            const mustPush = stack.length === 0 || (stack.length + remaining <= 3);
+            const canPop = stack.length >= 2 && i >= 2 && (stack.length + remaining > 3);
+
+            if (!mustPush && canPop && Math.random() < 0.45) {
+                stack.pop();
+                ops.push('pop()');
+            } else {
+                const v = getRandomInt(1, 9) * 5 + getRandomInt(0, 4);
+                stack.push(v);
+                ops.push('push(' + v + ')');
+            }
+        }
+
+        // На случай если остался 1 элемент — докинем еще один push в конец или заменим последний pop
+        if (stack.length < 2) {
+            const extra = getRandomInt(2, 8) * 5;
+            stack.push(extra);
+            ops.push('push(' + extra + ')');
+        }
+
+        p1Expected = stack.reduce(function(acc, x) { return acc + x; }, 0);
+
+        const listEl = document.getElementById('p1-ops-list');
+        listEl.innerHTML = ops.map(function(op, idx) {
+            const isPop = op === 'pop()';
+            return '<span class="badge rounded-0 px-3 py-2 fs-6 border ' +
+                (isPop ? 'bg-dark text-danger border-danger' : 'bg-dark text-warning border-warning') + '">' +
+                (idx + 1) + '. ' + escapeHtml(op) +
+                '</span>';
+        }).join('');
+
+        const inp = document.getElementById('p1-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase1() {
+        if (isLocked) return;
+        telemetry.markActivity();
+        const val = parseDecimalInput(document.getElementById('p1-input').value);
+        if (Number.isNaN(val)) {
+            triggerErrorReset('Введите корректное числовое значение! Генерируем новую последовательность...', initPhase1);
+            return;
+        }
+        if (Math.abs(val - p1Expected) > 1e-6) {
+            triggerErrorReset('Неверная сумма элементов в стеке (ожидалось ' + p1Expected + '). Помните правило LIFO: pop() удаляет последний добавленный элемент. Регенерация...', initPhase1);
+            return;
+        }
+
+        showSuccessFeedback('Трассировка стека выполнена верно! Переход к Фазе 2...', function() {
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
+            initPhase2();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Конвертация единиц и проценты заполнения стека (CCS = 6)
+    // =========================================================================
+    let p2Expected = 0;
+
+    function initPhase2() {
+        currentPhase = 2;
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 5';
+        document.getElementById('phase-title').textContent = 'Конвертация единиц: заполнение лимита стека вызовов';
+
+        const limitsKb = [128, 256, 512];
+        const frameSizes = [32, 64, 128];
+        const pctOptions = [12.5, 25, 37.5, 62.5, 75, 87.5];
+
+        const limitKb = limitsKb[getRandomInt(0, limitsKb.length - 1)];
+        const frameSize = frameSizes[getRandomInt(0, frameSizes.length - 1)];
+        const pct = pctOptions[getRandomInt(0, pctOptions.length - 1)];
+
+        const localBytes = frameSize - 16; // 8 (ret) + 8 (rbp)
+        const totalBytes = limitKb * 1024;
+        const maxCalls = totalBytes / frameSize;
+        const depth = Math.round((maxCalls * pct) / 100);
+
+        p2Expected = pct;
+
+        document.getElementById('p2-limit-kb').textContent = String(limitKb);
+        document.getElementById('p2-local-bytes').textContent = String(localBytes);
+        document.getElementById('p2-depth').textContent = String(depth);
+
+        const inp = document.getElementById('p2-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase2() {
+        if (isLocked) return;
+        telemetry.markActivity();
+        const val = parseDecimalInput(document.getElementById('p2-input').value);
+        if (Number.isNaN(val)) {
+            triggerErrorReset('Введите числовое значение процента (например, 37,5%). Регенерация параметров...', initPhase2);
+            return;
+        }
+        if (Math.abs(val - p2Expected) > 1e-6) {
+            triggerErrorReset('Неверный процент заполнения! Проверьте перевод Кбайт в байты (× 1024) и размер кадра (16 + локальные переменные). Регенерация...', initPhase2);
+            return;
+        }
+
+        showSuccessFeedback('Заполнение стека в процентах рассчитано точно! Переход к Фазе 3...', function() {
+            document.getElementById('phase2').classList.add('d-none');
+            document.getElementById('phase3').classList.remove('d-none');
+            telemetry.advanceStage(3);
+            initPhase3();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Пик 1 (Инверсия) — свободные слоты динамического стека (CCS = 7-8)
+    // =========================================================================
+    let p3Expected = 0;
+
+    function initPhase3() {
+        currentPhase = 3;
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 5';
+        document.getElementById('phase-title').textContent = 'Пик 1 (Инверсия): свободные слоты буфера стека';
+
+        const allocOptions = [8, 16, 32];
+        const elemOptions = [16, 32, 64];
+        const fillOptions = [37.5, 62.5, 75, 87.5];
+
+        const allocKb = allocOptions[getRandomInt(0, allocOptions.length - 1)];
+        const elemBytes = elemOptions[getRandomInt(0, elemOptions.length - 1)];
+        const fillPct = fillOptions[getRandomInt(0, fillOptions.length - 1)];
+
+        const capSlots = (allocKb * 1024) / elemBytes; // Всегда целая степень 2 >= 128
+        const occupied = Math.round((capSlots * fillPct) / 100);
+        p3Expected = capSlots - occupied;
+
+        document.getElementById('p3-alloc-kb').textContent = String(allocKb);
+        document.getElementById('p3-elem-bytes').textContent = String(elemBytes);
+        document.getElementById('p3-fill-pct').textContent = String(fillPct).replace('.', ',') + '%';
+
+        const inp = document.getElementById('p3-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase3() {
+        if (isLocked) return;
+        telemetry.markActivity();
+        const val = parseDecimalInput(document.getElementById('p3-input').value);
+        if (Number.isNaN(val)) {
+            triggerErrorReset('Введите целое число свободных слотов! Регенерация снимка памяти...', initPhase3);
+            return;
+        }
+        if (Math.abs(val - p3Expected) > 1e-6) {
+            triggerErrorReset('Ошибка в обратной задаче! Найдите полную емкость (Кбайт × 1024 / байт_на_слот) и долю (100% − заполнение). Ожидалось ' + p3Expected + '. Регенерация...', initPhase3);
+            return;
+        }
+
+        showSuccessFeedback('Инверсия емкости аллокатора решена безупречно! Переход к Фазе 4...', function() {
+            document.getElementById('phase3').classList.add('d-none');
+            document.getElementById('phase4').classList.remove('d-none');
+            telemetry.advanceStage(4);
+            initPhase4();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 4: Долина консолидации — точный индекс первого сбоя ПСП (CCS = 5-6)
+    // =========================================================================
+    let p4ExpectedIdx = 0;
+
+    function findFirstBracketError(expr) {
+        const opening = { '(': true, '[': true, '{': true, '<': true };
+        const pairs = { ')': '(', ']': '[', '}': '{', '>': '<' };
+        const st = [];
+        for (let i = 0; i < expr.length; i++) {
+            const ch = expr[i];
+            if (opening[ch]) {
+                st.push(ch);
+            } else if (pairs[ch]) {
+                if (st.length === 0 || st[st.length - 1] !== pairs[ch]) {
+                    return i;
+                }
+                st.pop();
+            }
+        }
+        return -1;
+    }
+
+    function initPhase4() {
+        currentPhase = 4;
+        document.getElementById('phase-badge').textContent = 'Шаг 4 из 5';
+        document.getElementById('phase-title').textContent = 'Долина консолидации: индекс первого сбоя ПСП';
+
+        const pairs = [['(', ')'], ['[', ']'], ['{', '}'], ['<', '>']];
+        const lits = ['a', 'x', '+', '1'];
+        let expr = '';
+        let errIdx = -1;
+
+        for (let attempt = 0; attempt < 30; attempt++) {
+            const p0 = pairs[getRandomInt(0, 3)];
+            const p1 = pairs[(pairs.indexOf(p0) + 1) % 4];
+            const p2 = pairs[(pairs.indexOf(p0) + 2) % 4];
+            const p3 = pairs[(pairs.indexOf(p0) + 3) % 4];
+            const l1 = lits[getRandomInt(0, lits.length - 1)];
+            const l2 = lits[getRandomInt(0, lits.length - 1)];
+
+            const kind = getRandomInt(0, 5);
+            if (kind === 0) {
+                expr = p0[0] + p1[0] + p1[1] + p2[0] + p3[0] + l1 + p2[1] + p3[1] + p0[1];
+            } else if (kind === 1) {
+                expr = p0[0] + p0[1] + p1[0] + p2[0] + l1 + p2[1] + p1[1] + p3[1] + p2[0] + p2[1];
+            } else if (kind === 2) {
+                expr = p0[0] + p1[0] + l1 + p2[0] + p2[1] + l2 + p0[1] + p1[1];
+            } else if (kind === 3) {
+                expr = p0[0] + p1[0] + p1[1] + p0[1] + p2[0] + p3[0] + p2[1] + p3[1] + l1;
+            } else if (kind === 4) {
+                expr = p0[0] + p0[1] + p1[0] + p2[0] + p1[1] + p2[1] + l1;
+            } else {
+                expr = p0[0] + p1[0] + p2[0] + l1 + p2[1] + p1[1] + p0[1] + l2 + p3[0] + p3[1] + p2[1];
+            }
+
+            errIdx = findFirstBracketError(expr);
+            if (errIdx >= 3 && errIdx <= expr.length - 1) break;
+        }
+
+        p4ExpectedIdx = errIdx;
+
+        const tapeEl = document.getElementById('p4-tape');
+        tapeEl.innerHTML = '';
+        for (let i = 0; i < expr.length; i++) {
+            const box = document.createElement('div');
+            box.className = 'border border-secondary bg-dark px-2 py-2 text-center';
+            box.style.minWidth = '42px';
+            box.innerHTML = '<div class="text-warning fw-bold fs-5">' + escapeHtml(expr[i]) + '</div>' +
+                '<div class="text-info small border-top border-secondary mt-1 pt-1">' + i + '</div>';
+            tapeEl.appendChild(box);
+        }
+
+        const inp = document.getElementById('p4-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase4() {
+        if (isLocked) return;
+        telemetry.markActivity();
+        const val = parseDecimalInput(document.getElementById('p4-input').value);
+        if (Number.isNaN(val)) {
+            triggerErrorReset('Введите целое число (индекс символа от 0)! Генерируем новую строку...', initPhase4);
+            return;
+        }
+        if (Math.abs(val - p4ExpectedIdx) > 1e-6) {
+            triggerErrorReset('Неверный индекс сбоя! Ошибка впервые фиксируется на позиции ' + p4ExpectedIdx + '. Проследите состояние вершины стека слева направо. Регенерация...', initPhase4);
+            return;
+        }
+
+        showSuccessFeedback('Индекс нарушения ПСП найден точно! Переход к финальной Фазе 5...', function() {
+            document.getElementById('phase4').classList.add('d-none');
+            document.getElementById('phase5').classList.remove('d-none');
+            telemetry.advanceStage(5);
+            initPhase5();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 5: Кульминация — ABI-выравнивание кадра (align 16) + страницы (CCS=9)
+    // =========================================================================
+    let p5ExpectedPages = 0;
+
+    function initPhase5() {
+        currentPhase = 5;
+        document.getElementById('phase-badge').textContent = 'Шаг 5 из 5';
+        document.getElementById('phase-title').textContent = 'Кульминация: выравнивание кадра x86-64 и страницы ОС';
+
+        // Подбираем такие bufSize и depth, чтобы:
+        // 1) rawFrame = 24 + bufSize + 4 = 28 + bufSize не делилось на 16 (округление вверх до 16 обязательно меняет кадр)
+        // 2) alignedFrame * depth не делилось на 4096 нацело (округление вверх до страниц обязательно)
+        // 3) ceil((rawFrame * depth) / 4096) !== ceil((alignedFrame * depth) / 4096)
+        const candidates = [
+            { buf: 21, depth: 240 }, // raw=49 -> aligned=64 -> 15360 B -> ceil(3.75)=4 (без выравн: 11760 -> 3)
+            { buf: 25, depth: 200 }, // raw=53 -> aligned=64 -> 12800 B -> ceil(3.125)=4 (без выравн: 10600 -> 3)
+            { buf: 26, depth: 280 }, // raw=58 -> aligned=64 -> 17920 B -> ceil(4.375)=5 (без выравн: 16240 -> 4)
+            { buf: 37, depth: 220 }, // raw=69 -> aligned=80 -> 17600 B -> ceil(4.296)=5 (без выравн: 15180 -> 4)
+            { buf: 53, depth: 260 }, // raw=85 -> aligned=96 -> 24960 B -> ceil(6.093)=7 (без выравн: 22100 -> 6)
+            { buf: 42, depth: 320 }  // raw=74 -> aligned=80 -> 25600 B -> ceil(6.25)=7 (без выравн: 23680 -> 6)
+        ];
+
+        const valid = candidates.filter(function(c) {
+            const raw = 28 + c.buf;
+            const aligned = Math.ceil(raw / 16) * 16;
+            const pRaw = Math.ceil((raw * c.depth) / 4096);
+            const pAligned = Math.ceil((aligned * c.depth) / 4096);
+            return raw % 16 !== 0 && (aligned * c.depth) % 4096 !== 0 && pRaw !== pAligned;
+        });
+
+        const chosen = valid[getRandomInt(0, valid.length - 1)];
+        const rawFrame = 28 + chosen.buf;
+        const alignedFrame = Math.ceil(rawFrame / 16) * 16;
+        p5ExpectedPages = Math.ceil((alignedFrame * chosen.depth) / 4096);
+
+        document.getElementById('p5-buf-size').textContent = String(chosen.buf);
+        document.getElementById('p5-depth').textContent = String(chosen.depth);
+
+        const inp = document.getElementById('p5-input');
+        inp.value = '';
+        inp.focus();
+    }
+
+    function verifyPhase5() {
+        if (isLocked) return;
+        telemetry.markActivity();
+        const val = parseDecimalInput(document.getElementById('p5-input').value);
+        if (Number.isNaN(val)) {
+            triggerErrorReset('Введите целое число страниц памяти! Регенерация параметров кадра...', initPhase5);
+            return;
+        }
+        if (Math.abs(val - p5ExpectedPages) > 1e-6) {
+            triggerErrorReset('Неверное число страниц! Не забудьте: сначала выравняйте кадр вверх до кратного 16 байт, умножьте на глубину и округлите вверх от 4096 байт (ожидалось ' + p5ExpectedPages + '). Регенерация...', initPhase5);
+            return;
+        }
+
+        showSuccessFeedback('Кульминационный расчет выравнивания кадра и страниц ОС выполнен безупречно!', function() {
+            completeLevel();
+        });
+    }
+
+    // =========================================================================
+    // ОДНОКРАТНАЯ ПРИВЯЗКА СЛУШАТЕЛЕЙ СОБЫТИЙ
+    // =========================================================================
+    function bindAllEventsOnce() {
+        const gameContainer = document.getElementById('game-container');
+
+        // Anti-Paste защита на уровне контейнера
+        gameContainer.addEventListener('paste', function(e) {
+            if (e.target && e.target.tagName === 'INPUT') {
+                e.preventDefault();
+            }
+        });
+        gameContainer.addEventListener('drop', function(e) {
+            if (e.target && e.target.tagName === 'INPUT') {
+                e.preventDefault();
+            }
+        });
+
+        // Подтверждение по Enter в текстовых полях
+        gameContainer.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            const id = e.target && e.target.id;
+            if (id === 'p1-input') verifyPhase1();
+            else if (id === 'p2-input') verifyPhase2();
+            else if (id === 'p3-input') verifyPhase3();
+            else if (id === 'p4-input') verifyPhase4();
+            else if (id === 'p5-input') verifyPhase5();
+        });
+
+        document.getElementById('p1-submit-btn').addEventListener('click', verifyPhase1);
+        document.getElementById('p2-submit-btn').addEventListener('click', verifyPhase2);
+        document.getElementById('p3-submit-btn').addEventListener('click', verifyPhase3);
+        document.getElementById('p4-submit-btn').addEventListener('click', verifyPhase4);
+        document.getElementById('p5-submit-btn').addEventListener('click', verifyPhase5);
+    }
+
+    bindAllEventsOnce();
+    startTimer();
+    initPhase1();
+})();
+</script>

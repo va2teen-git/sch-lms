@@ -1,0 +1,1269 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1} title="Урок 35 :: Стеки. Анализ правильности скобочного выражения (Уровень 1)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-success mb-0 fw-bold">Тренажер: Стеки и анализ скобочных выражений (Уровень 1)</h1>
+                <div class="text-secondary small">Урок 35 // 11 класс (углубленный уровень, технологический профиль)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Прямое манипулирование // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик ошибок и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Дисциплина LIFO и диагностика операций стека</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> |
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках -->
+                <div id="feedback-box" class="alert alert-danger bg-black border border-danger text-danger rounded-0 d-none mb-3 py-2 px-3 small">
+                    <span class="fw-bold">⚠️ СБОЙ СИСТЕМЫ:</span> <span id="feedback-text"></span>
+                </div>
+
+                <!-- Блок успешного шага -->
+                <div id="success-box" class="alert alert-success bg-black border border-success text-success rounded-0 d-none mb-3 py-2 px-3 small">
+                    <span class="fw-bold">✓ УСПЕХ:</span> <span id="success-text"></span>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 1: Сортировка операций и сценариев стека по шлюзам          -->
+                <!-- ================================================================= -->
+                <div id="phase1" class="phase-view">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (Фаза 1 из 3):</span>
+                        Перетащите мышью (или кликните карточку, затем шлюз) все поступившие сценарии работы со стеком в три функциональных шлюза:
+                        <ul class="mb-0 mt-1 ps-3 text-secondary">
+                            <li><strong class="text-success">Штатная операция LIFO (O(1))</strong> — корректная работа с вершиной стека без нарушения ограничений.</li>
+                            <li><strong class="text-warning">Нарушение LIFO / деградация O(n)</strong> — операции со сдвигом массива или доступом мимо вершины.</li>
+                            <li><strong class="text-danger">Авария стека (Overflow / Underflow)</strong> — выход за пределы емкости, чтение пустого стека или срыв лимита рекурсии.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Очередь карточек для распределения -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ОЧЕРЕДЬ СЦЕНАРИЕВ (перетащите или кликните токен, затем шлюз):</span>
+                            <span id="p1-queue-count" class="badge bg-secondary rounded-0">0</span>
+                        </div>
+                        <div id="p1-token-palette" class="card-body p-2 d-flex flex-wrap gap-2 align-items-center" style="min-height: 76px;">
+                        </div>
+                    </div>
+
+                    <!-- 3 функциональных контейнера-шлюза (col-12 col-sm-4 по ui-styling.md) -->
+                    <div id="p1-buckets-row" class="row g-2 mb-3">
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border border-success rounded-0 h-100 p1-bucket-drop" data-bucket="0" id="p1-bucket-card-0" style="cursor: pointer;">
+                                <div class="card-header bg-dark text-success py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" style="min-height: 48px;">
+                                    <span>📦 Штатно LIFO O(1)</span>
+                                    <span id="p1-count-0" class="badge bg-success text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-0" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 150px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border border-warning rounded-0 h-100 p1-bucket-drop" data-bucket="1" id="p1-bucket-card-1" style="cursor: pointer;">
+                                <div class="card-header bg-dark text-warning py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" style="min-height: 48px;">
+                                    <span>⚠️ Нарушение / O(n)</span>
+                                    <span id="p1-count-1" class="badge bg-warning text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-1" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 150px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border border-danger rounded-0 h-100 p1-bucket-drop" data-bucket="2" id="p1-bucket-card-2" style="cursor: pointer;">
+                                <div class="card-header bg-dark text-danger py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" style="min-height: 48px;">
+                                    <span>💥 Авария стека</span>
+                                    <span id="p1-count-2" class="badge bg-danger text-white rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-2" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 150px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <button id="p1-reset-btn" type="button" class="btn btn-outline-secondary rounded-0 fw-bold px-3" style="min-height: 48px;">
+                            ↺ Вернуть все в очередь
+                        </button>
+                        <button id="p1-check-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4" style="min-height: 48px;">
+                            ✓ Проверить распределение
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 2: Прямая манипуляция стеком (валидатор скобочного выражения)-->
+                <!-- ================================================================= -->
+                <div id="phase2" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (Фаза 2 из 3):</span>
+                        Управляйте стеком парсера вручную на каждом символе входной строки слева направо:
+                        <ul class="mb-0 mt-1 ps-3 text-secondary">
+                            <li>Открывающую скобку <strong>поместите в стек (PUSH)</strong> — перетащите активный символ в зону приема или кликните по нему / по зоне <code>PUSH</code>.</li>
+                            <li>Не-скобочный символ (буква, знак операции) <strong>пропустите</strong> прямо на каретке ленты.</li>
+                            <li>Закрывающую скобку <strong>снимите с вершины (POP)</strong>, кликнув по верхнему блоку в шахте стека, если тип совпадает.</li>
+                            <li>При конфликте типов, пустом стеке для закрывающей скобки или незакрытом хвосте в конце — <strong>зафиксируйте синтаксический сбой</strong>; если строка пройдена и стек пуст — подтвердите корректность ПСП.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Лента входного выражения -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <span>ВХОДНАЯ ЛЕНТА ВЫРАЖЕНИЯ:</span>
+                            <span id="p2-pos-badge" class="badge bg-info text-dark rounded-0">Позиция: 0</span>
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="p2-tape" class="d-flex flex-wrap gap-2 justify-content-center align-items-center mb-3">
+                            </div>
+                            <div id="p2-current-action-bar" class="d-flex flex-wrap justify-content-center align-items-center gap-2 pt-2 border-top border-secondary">
+                                <button id="p2-skip-btn" type="button" class="btn btn-outline-info rounded-0 fw-bold px-3" style="min-height: 48px; min-width: 140px;">
+                                    ⏭ Пропустить не-скобку
+                                </button>
+                                <button id="p2-error-btn" type="button" class="btn btn-outline-danger rounded-0 fw-bold px-3" style="min-height: 48px; min-width: 180px;">
+                                    ⚠️ Зафиксировать сбой ПСП
+                                </button>
+                                <button id="p2-finish-ok-btn" type="button" class="btn btn-outline-success rounded-0 fw-bold px-3" style="min-height: 48px; min-width: 180px;">
+                                    ✓ Стек пуст: ПСП корректна
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Шахта стека (Direct Manipulation) -->
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-7">
+                            <div class="card bg-black border border-success rounded-0 h-100">
+                                <div class="card-header bg-dark text-success py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                                    <span>ШАХТА СТЕКА (ВЕРШИНА СВЕРХУ)</span>
+                                    <span id="p2-stack-size" class="badge bg-success text-dark rounded-0">Размер: 0</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column gap-2">
+                                    <button id="p2-push-zone" type="button" class="btn btn-outline-success border-dashed rounded-0 fw-bold w-100 py-2" style="min-height: 52px;">
+                                        ⬇ PUSH: Поместить активный символ на вершину стека
+                                    </button>
+                                    <div id="p2-stack-well" class="border border-secondary bg-dark p-2 d-flex flex-column gap-2" style="min-height: 170px;">
+                                    </div>
+                                    <div class="text-secondary small text-center">
+                                        Подсказка: кликните по верхнему блоку в шахте стека для выполнения <code>POP</code>.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-sm-5">
+                            <div class="card bg-black border border-secondary rounded-0 h-100">
+                                <div class="card-header bg-dark text-secondary py-2 px-3 small fw-bold">
+                                    ЖУРНАЛ ТРАССИРОВКИ ПАРСЕРА
+                                </div>
+                                <div id="p2-log" class="card-body p-2 small text-light d-flex flex-column gap-1" style="max-height: 260px; overflow-y: auto;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 3: Слот-пазл защищенного кадра стека x86-64                 -->
+                <!-- ================================================================= -->
+                <div id="phase3" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (Фаза 3 из 3):</span>
+                        Функция <code id="p3-func-sig" class="text-info fw-bold">void parse_pkt(const char* s)</code> скомпилирована с защитой <code>-fstack-protector-strong</code>.
+                        Восстановите взаимное расположение блоков в ее кадре стека x86-64 от <strong>старших адресов (верх)</strong> к <strong>младшим адресам (низ)</strong>, отбросив лишние сегменты памяти:
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <!-- Целевые слоты памяти -->
+                        <div class="col-12 col-sm-7">
+                            <div class="card bg-black border border-success rounded-0 h-100">
+                                <div class="card-header bg-dark text-success py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                                    <span>КАДР СТЕКА В ПАМЯТИ (Старшие → Младшие адреса)</span>
+                                    <span class="badge bg-secondary rounded-0">Рост стека ▼</span>
+                                </div>
+                                <div id="p3-slots" class="card-body p-2 d-flex flex-column gap-2">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Палитра блоков (4 верных + 4 дистрактора) -->
+                        <div class="col-12 col-sm-5">
+                            <div class="card bg-black border border-secondary rounded-0 h-100">
+                                <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                                    <span>ПАЛИТРА БЛОКОВ ПАМЯТИ</span>
+                                    <span id="p3-palette-count" class="badge bg-info text-dark rounded-0">8</span>
+                                </div>
+                                <div id="p3-palette" class="card-body p-2 d-flex flex-column gap-2">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <button id="p3-reset-btn" type="button" class="btn btn-outline-secondary rounded-0 fw-bold px-3" style="min-height: 48px;">
+                            ↺ Очистить слоты
+                        </button>
+                        <button id="p3-check-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4" style="min-height: 48px;">
+                            ✓ Проверить архитектуру кадра
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ЭКРАН ПОБЕДЫ                                                      -->
+                <!-- ================================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-success bg-black p-4 mx-auto" style="max-width: 560px;">
+                        <h2 class="h3 text-success fw-bold mb-2">✓ УРОВЕНЬ 1 ПРОЙДЕН</h2>
+                        <p class="text-light small mb-3">
+                            Вы успешно подтвердили навыки работы со стеком LIFO, алгоритмом проверки правильности скобочных выражений и архитектурой защищенного кадра стека x86-64.
+                        </p>
+                        <div class="d-flex justify-content-center gap-4 text-info fw-bold mb-2">
+                            <div>Ошибок: <span id="final-attempts" class="text-warning">0</span></div>
+                            <div>Время: <span id="final-time" class="text-success">00:00</span></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    'use strict';
+
+    const missionName = 'Урок 35 :: Стеки. Анализ правильности скобочного выражения (Уровень 1)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
+
+    let currentPhase = 1;
+    let isLocked = false;
+    let timerInterval = null;
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+        const copy = arr.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = copy[i];
+            copy[i] = copy[j];
+            copy[j] = tmp;
+        }
+        return copy;
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(telemetry.getState().attemptsCount || 0);
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(function() {
+            const elapsed = telemetry.getTimeSpentSec();
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = mins + ':' + secs;
+        }, 1000);
+    }
+
+    function triggerErrorReset(msg, regenerateFn) {
+        if (isLocked) return;
+        isLocked = true;
+        telemetry.markActivity();
+        telemetry.fail({ stage: currentPhase });
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        setTimeout(function() {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (regenerateFn) regenerateFn();
+        }, 1400);
+    }
+
+    function showSuccessFeedback(msg, nextFn) {
+        if (isLocked) return;
+        isLocked = true;
+        const sb = document.getElementById('success-box');
+        const st = document.getElementById('success-text');
+        if (sb && st) {
+            st.textContent = msg;
+            sb.classList.remove('d-none');
+        }
+        setTimeout(function() {
+            if (sb) sb.classList.add('d-none');
+            isLocked = false;
+            if (nextFn) nextFn();
+        }, 950);
+    }
+
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const evt = telemetry.complete({ stage: 3 });
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        const attempts = telemetry.getState().attemptsCount || 0;
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Пройдено';
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attempts);
+        if (ft) ft.textContent = mins + ':' + secs;
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Интерактивная сортировка сценариев работы со стеком
+    // =========================================================================
+    let p1Items = [];
+    let p1SelectedId = null;
+
+    function buildP1ScenarioGenerators() {
+        const cap = getRandomInt(6, 16);
+        const freeSize = getRandomInt(1, cap - 1);
+        const val1 = getRandomInt(10, 99);
+        const val2 = getRandomInt(10, 99);
+        const recLimit = 1000;
+        const depth = getRandomInt(1500, 5000);
+
+        const okPool = [
+            {
+                text: 'st.push(' + val1 + ') при size = ' + freeSize + ' из capacity = ' + cap,
+                bucket: 0,
+                reason: 'В ограниченном стеке есть свободное место, запись на вершину выполняется за O(1).'
+            },
+            {
+                text: 'Чтение top() / peek() при size = ' + freeSize,
+                bucket: 0,
+                reason: 'Чтение вершины непустого стека без удаления корректно выполняется за O(1).'
+            },
+            {
+                text: 'Python: deque.append(' + val2 + ') и deque.pop() (size > 0)',
+                bucket: 0,
+                reason: 'Операции с правым концом collections.deque работают как стек LIFO за строгое O(1).'
+            },
+            {
+                text: 'C++: вызов st.top(), затем st.pop() при !st.empty()',
+                bucket: 0,
+                reason: 'В std::stack чтение top() перед void-методом pop() при непустом стеке — штатный шаблон O(1).'
+            }
+        ];
+
+        const nonLifoPool = [
+            {
+                text: 'Python: st.insert(0, ' + val1 + ') — вставка в начало списка',
+                bucket: 1,
+                reason: 'Вставка в индекс 0 динамического массива сдвигает все элементы и деградирует до O(n).'
+            },
+            {
+                text: 'Python: st.pop(0) — удаление нулевого элемента списка',
+                bucket: 1,
+                reason: 'Извлечение из начала реализует очередь (FIFO) со сдвигом массива за O(n), а не стек LIFO.'
+            },
+            {
+                text: 'Прямое чтение дна buf[0] и середины buf[2] без pop()',
+                bucket: 1,
+                reason: 'Стек LIFO открывает доступ только к вершине; обращение к произвольному индексу нарушает АТД.'
+            },
+            {
+                text: 'Удаление самого старого элемента со дна при переполнении',
+                bucket: 1,
+                reason: 'Вытеснение старейшего элемента со дна превращает структуру в кольцевой буфер, нарушая LIFO.'
+            }
+        ];
+
+        const crashPool = [
+            {
+                text: 'Вызов pop() при пустом стеке (top_idx = -1, size = 0)',
+                bucket: 2,
+                reason: 'Извлечение из пустого стека приводит к аварийному состоянию Stack Underflow (опустошение).'
+            },
+            {
+                text: 'st.push(' + val2 + ') при полном буфере (size = ' + cap + ', capacity = ' + cap + ')',
+                bucket: 2,
+                reason: 'Запись сверх выделенной емкости вызывает Stack Overflow (переполнение стека).'
+            },
+            {
+                text: 'Вызов peek() на пустом стеке без проверки isEmpty()',
+                bucket: 2,
+                reason: 'Попытка прочитать несуществующую вершину пустого стека вызывает ошибку Underflow.'
+            },
+            {
+                text: 'Рекурсия без базового случая (глубина ' + depth + ' > лимита ' + recLimit + ')',
+                bucket: 2,
+                reason: 'Исчерпание системного стека вызовов провоцирует RecursionError или SIGSEGV.'
+            }
+        ];
+
+        return { okPool: okPool, nonLifoPool: nonLifoPool, crashPool: crashPool };
+    }
+
+    function initPhase1() {
+        currentPhase = 1;
+        p1SelectedId = null;
+        document.getElementById('phase-badge').textContent = 'Шаг 1 из 3';
+        document.getElementById('phase-title').textContent = 'Дисциплина LIFO и диагностика операций стека';
+
+        const pools = buildP1ScenarioGenerators();
+        // Гарантируем по 2 из каждого класса или случайный микс (6-7 карточек)
+        const picked = [
+            ...shuffleArray(pools.okPool).slice(0, 2),
+            ...shuffleArray(pools.nonLifoPool).slice(0, 2),
+            ...shuffleArray(pools.crashPool).slice(0, 2)
+        ];
+        // Иногда добавляем 7-й случайный токен из любого класса, чтобы нельзя было считать "ровно по 2"
+        const extraPool = shuffleArray([...pools.okPool, ...pools.nonLifoPool, ...pools.crashPool]);
+        const seventh = extraPool.find(function(x) {
+            return !picked.some(function(p) { return p.text === x.text; });
+        });
+        if (seventh) picked.push(seventh);
+
+        p1Items = shuffleArray(picked).map(function(item, idx) {
+            return {
+                id: 'p1-item-' + idx,
+                text: item.text,
+                bucket: item.bucket,
+                reason: item.reason,
+                assigned: null
+            };
+        });
+
+        renderPhase1();
+    }
+
+    function renderPhase1() {
+        const palette = document.getElementById('p1-token-palette');
+        const b0 = document.getElementById('p1-bucket-0');
+        const b1 = document.getElementById('p1-bucket-1');
+        const b2 = document.getElementById('p1-bucket-2');
+
+        palette.innerHTML = '';
+        b0.innerHTML = '';
+        b1.innerHTML = '';
+        b2.innerHTML = '';
+
+        let queueCount = 0;
+        const counts = [0, 0, 0];
+
+        p1Items.forEach(function(item) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.draggable = true;
+            btn.setAttribute('data-item-id', item.id);
+            const isSelected = p1SelectedId === item.id;
+            btn.className = 'btn rounded-0 text-start fw-bold px-3 py-2 small text-wrap ' +
+                (isSelected ? 'btn-info text-dark border-white' : 'btn-outline-light bg-dark');
+            btn.style.minHeight = '48px';
+            btn.style.minWidth = '48px';
+            btn.style.cursor = 'grab';
+            btn.style.wordBreak = 'break-word';
+            btn.textContent = item.text;
+
+            if (item.assigned === null) {
+                queueCount += 1;
+                palette.appendChild(btn);
+            } else {
+                counts[item.assigned] += 1;
+                btn.title = 'Кликните, чтобы вернуть карточку в очередь';
+                document.getElementById('p1-bucket-' + item.assigned).appendChild(btn);
+            }
+        });
+
+        if (queueCount === 0) {
+            palette.innerHTML = '<span class="text-success small px-2">Все сценарии распределены — нажмите «Проверить распределение».</span>';
+        }
+
+        document.getElementById('p1-queue-count').textContent = queueCount + ' шт.';
+        document.getElementById('p1-count-0').textContent = String(counts[0]);
+        document.getElementById('p1-count-1').textContent = String(counts[1]);
+        document.getElementById('p1-count-2').textContent = String(counts[2]);
+    }
+
+    function checkPhase1() {
+        if (isLocked) return;
+        telemetry.markActivity();
+
+        const unassigned = p1Items.filter(function(i) { return i.assigned === null; });
+        if (unassigned.length > 0) {
+            const fb = document.getElementById('feedback-box');
+            const ft = document.getElementById('feedback-text');
+            if (fb && ft) {
+                ft.textContent = 'Распределите все сценарии из очереди по шлюзам (осталось: ' + unassigned.length + ').';
+                fb.classList.remove('d-none');
+                setTimeout(function() { fb.classList.add('d-none'); }, 1800);
+            }
+            return;
+        }
+
+        const wrong = p1Items.find(function(i) { return i.assigned !== i.bucket; });
+        if (wrong) {
+            const names = ['Штатно LIFO O(1)', 'Нарушение / O(n)', 'Авария стека'];
+            triggerErrorReset(
+                'Неверно классифицирован сценарий «' + wrong.text + '» (помещен в «' + names[wrong.assigned] + '»). ' + wrong.reason + ' Генерируем новый набор...',
+                initPhase1
+            );
+            return;
+        }
+
+        showSuccessFeedback('Все сценарии LIFO, деградации O(n) и аварий стека распределены безошибочно! Переход к Фазе 2...', function() {
+            document.getElementById('phase1').classList.add('d-none');
+            document.getElementById('phase2').classList.remove('d-none');
+            telemetry.advanceStage(2);
+            initPhase2();
+        });
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Прямая манипуляция стеком (анализ правильности скобочного выражения)
+    // =========================================================================
+    const P2_OPENING = { '(': true, '[': true, '{': true, '<': true };
+    const P2_CLOSING = { ')': '(', ']': '[', '}': '{', '>': '<' };
+    const P2_PAIRS = [['(', ')'], ['[', ']'], ['{', '}'], ['<', '>']];
+    const P2_NOISE = ['a', 'b', 'x', '+'];
+
+    let p2Expr = '';
+    let p2Pos = 0;
+    let p2Stack = [];
+    let p2Logs = [];
+
+    function generateP2Expression() {
+        // Генерируем разнообразные выражения длиной 6-8 символов:
+        // 0: корректное вложенное/составное с 1-2 литералами
+        // 1: конфликт типов вложенности (например ([)] или {[a>})
+        // 2: лишняя закрывающая при пустом стеке
+        // 3: незакрытая открывающая скобка в конце
+        const mode = getRandomInt(0, 3);
+        const pairIdxA = getRandomInt(0, 3);
+        let pairIdxB = getRandomInt(0, 3);
+        if (pairIdxB === pairIdxA) pairIdxB = (pairIdxA + 1) % 4;
+        let pairIdxC = getRandomInt(0, 3);
+        if (pairIdxC === pairIdxA || pairIdxC === pairIdxB) pairIdxC = (pairIdxB + 1) % 4;
+
+        const A = P2_PAIRS[pairIdxA];
+        const B = P2_PAIRS[pairIdxB];
+        const C = P2_PAIRS[pairIdxC];
+        const lit1 = P2_NOISE[getRandomInt(0, P2_NOISE.length - 1)];
+        const lit2 = P2_NOISE[getRandomInt(0, P2_NOISE.length - 1)];
+
+        if (mode === 0) {
+            const templates = [
+                A[0] + B[0] + lit1 + B[1] + C[0] + C[1] + A[1],
+                A[0] + A[1] + B[0] + C[0] + lit1 + C[1] + B[1],
+                A[0] + B[0] + C[0] + lit1 + C[1] + B[1] + A[1],
+                A[0] + lit1 + B[0] + B[1] + A[1] + C[0] + C[1]
+            ];
+            return templates[getRandomInt(0, templates.length - 1)];
+        }
+        if (mode === 1) {
+            // Конфликт типов: внутренняя не закрыта, закрываем внешнюю (или несовпадающую)
+            const templates = [
+                A[0] + B[0] + lit1 + A[1] + B[1],
+                A[0] + B[0] + C[0] + B[1] + C[1] + A[1],
+                C[0] + A[0] + B[0] + A[1] + C[1]
+            ];
+            return templates[getRandomInt(0, templates.length - 1)];
+        }
+        if (mode === 2) {
+            // Лишняя закрывающая скобка на пустом стеке
+            const templates = [
+                A[0] + lit1 + A[1] + B[1] + C[0] + C[1],
+                B[1] + A[0] + A[1] + lit1 + C[0] + C[1],
+                A[0] + B[0] + B[1] + A[1] + C[1] + lit2
+            ];
+            return templates[getRandomInt(0, templates.length - 1)];
+        }
+        // mode === 3: Незакрытые скобки в конце строки
+        const templates = [
+            A[0] + B[0] + lit1 + B[1] + C[0] + C[1],
+            A[0] + A[1] + B[0] + C[0] + lit1 + C[1],
+            A[0] + lit1 + B[0] + C[0] + C[1] + B[1]
+        ];
+        return templates[getRandomInt(0, templates.length - 1)];
+    }
+
+    function initPhase2() {
+        currentPhase = 2;
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+        document.getElementById('phase-title').textContent = 'Стековый валидатор скобочного выражения';
+
+        p2Expr = generateP2Expression();
+        p2Pos = 0;
+        p2Stack = [];
+        p2Logs = ['Старт разбора строки длиной ' + p2Expr.length + '. Стек пуст.'];
+        renderPhase2();
+    }
+
+    function renderPhase2() {
+        const tape = document.getElementById('p2-tape');
+        const well = document.getElementById('p2-stack-well');
+        const logBox = document.getElementById('p2-log');
+        const posBadge = document.getElementById('p2-pos-badge');
+        const sizeBadge = document.getElementById('p2-stack-size');
+
+        posBadge.textContent = p2Pos < p2Expr.length
+            ? ('Позиция: ' + p2Pos + ' / ' + p2Expr.length + ' (символ «' + p2Expr[p2Pos] + '»)')
+            : 'Конец строки (EOF)';
+        sizeBadge.textContent = 'Размер: ' + p2Stack.length;
+
+        tape.innerHTML = '';
+        for (let i = 0; i < p2Expr.length; i++) {
+            const ch = p2Expr[i];
+            const isCur = (i === p2Pos);
+            const isDone = (i < p2Pos);
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.setAttribute('data-tape-idx', String(i));
+            cell.draggable = isCur && Boolean(P2_OPENING[ch]);
+            cell.className = 'btn rounded-0 fw-bold fs-5 d-flex flex-column justify-content-center align-items-center ' +
+                (isCur ? 'btn-warning text-dark border-white' : (isDone ? 'btn-outline-secondary text-secondary opacity-50' : 'btn-outline-light bg-dark'));
+            cell.style.minWidth = '48px';
+            cell.style.minHeight = '54px';
+            cell.style.cursor = isCur ? 'pointer' : 'default';
+            cell.innerHTML = '<span>' + escapeHtml(ch) + '</span><span style="font-size: 0.65rem;">' + i + '</span>';
+            tape.appendChild(cell);
+        }
+
+        // Маркер EOF в конце ленты
+        const eofEl = document.createElement('div');
+        eofEl.className = 'px-2 py-1 border rounded-0 small fw-bold d-flex align-items-center justify-content-center ' +
+            (p2Pos >= p2Expr.length ? 'border-success bg-success text-dark' : 'border-secondary text-secondary');
+        eofEl.style.minHeight = '54px';
+        eofEl.style.minWidth = '48px';
+        eofEl.textContent = 'EOF';
+        tape.appendChild(eofEl);
+
+        // Отрисовка шахты стека (вершина сверху)
+        well.innerHTML = '';
+        if (p2Stack.length === 0) {
+            well.innerHTML = '<div class="text-secondary small text-center my-auto py-4">[ СТЕК ПУСТ ]</div>';
+        } else {
+            for (let k = p2Stack.length - 1; k >= 0; k--) {
+                const isTop = (k === p2Stack.length - 1);
+                const item = p2Stack[k];
+                const block = document.createElement('button');
+                block.type = 'button';
+                block.setAttribute('data-stack-top', isTop ? '1' : '0');
+                block.className = 'btn rounded-0 fw-bold d-flex justify-content-between align-items-center px-3 ' +
+                    (isTop ? 'btn-info text-dark border-white' : 'btn-outline-secondary text-light bg-black');
+                block.style.minHeight = '48px';
+                block.innerHTML = '<span class="fs-5">' + escapeHtml(item.ch) + '</span>' +
+                    '<span class="small">' + (isTop ? '▲ TOP (клик = POP)' : 'индекс ' + item.idx) + '</span>';
+                well.appendChild(block);
+            }
+        }
+
+        logBox.innerHTML = p2Logs.map(function(entry) {
+            return '<div class="border-bottom border-secondary pb-1">' + escapeHtml(entry) + '</div>';
+        }).join('');
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function handleP2Action(action) {
+        if (isLocked) return;
+        telemetry.markActivity();
+
+        // Случай: дошли до конца строки (EOF)
+        if (p2Pos >= p2Expr.length) {
+            if (p2Stack.length === 0) {
+                if (action === 'finish_ok') {
+                    showSuccessFeedback('Анализ завершен: вся строка пройдена, стек пуст — ПСП корректна! Переход к Фазе 3...', function() {
+                        document.getElementById('phase2').classList.add('d-none');
+                        document.getElementById('phase3').classList.remove('d-none');
+                        telemetry.advanceStage(3);
+                        initPhase3();
+                    });
+                } else {
+                    triggerErrorReset(
+                        'Вся строка обработана без конфликтов и стек пуст — выражение корректно! Нужно подтвердить ПСП. Генерируем новую строку...',
+                        initPhase2
+                    );
+                }
+            } else {
+                if (action === 'report_error') {
+                    const unclosed = p2Stack[p2Stack.length - 1];
+                    showSuccessFeedback('Сбой ПСП обнаружен верно: в стеке осталась незакрытая скобка «' + unclosed.ch + '» (поз. ' + unclosed.idx + '). Переход к Фазе 3...', function() {
+                        document.getElementById('phase2').classList.add('d-none');
+                        document.getElementById('phase3').classList.remove('d-none');
+                        telemetry.advanceStage(3);
+                        initPhase3();
+                    });
+                } else {
+                    triggerErrorReset(
+                        'Строка закончилась, но стек НЕ пуст (в нем остались незакрытые скобки)! Здесь необходимо зафиксировать сбой. Генерируем новую строку...',
+                        initPhase2
+                    );
+                }
+            }
+            return;
+        }
+
+        const ch = p2Expr[p2Pos];
+
+        // 1. Открывающая скобка
+        if (P2_OPENING[ch]) {
+            if (action === 'push') {
+                p2Stack.push({ ch: ch, idx: p2Pos });
+                p2Logs.push('Поз. ' + p2Pos + ': PUSH «' + ch + '» в стек.');
+                p2Pos += 1;
+                renderPhase2();
+            } else {
+                triggerErrorReset(
+                    'Символ «' + ch + '» на позиции ' + p2Pos + ' — открывающая скобка. Его необходимо поместить на вершину стека (PUSH). Генерируем новую строку...',
+                    initPhase2
+                );
+            }
+            return;
+        }
+
+        // 2. Закрывающая скобка
+        if (P2_CLOSING[ch]) {
+            const expectedOpen = P2_CLOSING[ch];
+            const topItem = p2Stack.length > 0 ? p2Stack[p2Stack.length - 1] : null;
+            const isValidPair = topItem && topItem.ch === expectedOpen;
+
+            if (isValidPair) {
+                if (action === 'pop') {
+                    p2Stack.pop();
+                    p2Logs.push('Поз. ' + p2Pos + ': пара «' + topItem.ch + ch + '» совпала → POP.');
+                    p2Pos += 1;
+                    renderPhase2();
+                } else {
+                    triggerErrorReset(
+                        'Для закрывающей скобки «' + ch + '» на вершине стека есть парная «' + topItem.ch + '». Кликните по верхнему блоку стека, чтобы выполнить POP! Генерируем новую строку...',
+                        initPhase2
+                    );
+                }
+            } else {
+                if (action === 'report_error') {
+                    const reason = !topItem
+                        ? 'стек пуст — лишняя закрывающая скобка «' + ch + '» на позиции ' + p2Pos
+                        : 'конфликт типов на позиции ' + p2Pos + ' — на вершине «' + topItem.ch + '», встречена «' + ch + '»';
+                    showSuccessFeedback('Верно! Синтаксическая ошибка вовремя перехвачена: ' + reason + '. Переход к Фазе 3...', function() {
+                        document.getElementById('phase2').classList.add('d-none');
+                        document.getElementById('phase3').classList.remove('d-none');
+                        telemetry.advanceStage(3);
+                        initPhase3();
+                    });
+                } else {
+                    const reason = !topItem
+                        ? 'Стек пуст, а встречена закрывающая скобка «' + ch + '»!'
+                        : 'На вершине стека лежит «' + topItem.ch + '», она не образует пару с «' + ch + '»!';
+                    triggerErrorReset(
+                        reason + ' В этот момент парсер должен зафиксировать сбой ПСП. Генерируем новую строку...',
+                        initPhase2
+                    );
+                }
+            }
+            return;
+        }
+
+        // 3. Не-скобка (литерал / оператор)
+        if (action === 'skip') {
+            p2Logs.push('Поз. ' + p2Pos + ': символ «' + ch + '» не скобка → пропуск.');
+            p2Pos += 1;
+            renderPhase2();
+        } else {
+            triggerErrorReset(
+                'Символ «' + ch + '» не является скобкой — его нужно пропустить без обращения к стеку. Генерируем новую строку...',
+                initPhase2
+            );
+        }
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Слот-пазл защищенного кадра стека x86-64
+    // =========================================================================
+    let p3Slots = [];
+    let p3Palette = [];
+    let p3SelectedTokenId = null;
+
+    const P3_DISTRACTORS = [
+        {
+            id: 'dist-heap',
+            label: 'Динамическая куча (Heap malloc)',
+            hint: 'Сегмент динамического выделения памяти',
+            reason: 'Память кучи (Heap) располагается в отдельном сегменте адресного пространства и растет навстречу стеку, а не внутри кадра функции.'
+        },
+        {
+            id: 'dist-bss',
+            label: 'Статические переменные (.data / .bss)',
+            hint: 'Глобальные данные программы',
+            reason: 'Глобальные и статические переменные размещаются в фиксированных секциях .data/.bss вне стека вызовов.'
+        },
+        {
+            id: 'dist-text',
+            label: 'Машинный код инструкций (.text)',
+            hint: 'Исполняемый сегмент кода',
+            reason: 'Секция .text с инструкциями программы отделена от стека (и защищена битом NX на стеке).'
+        },
+        {
+            id: 'dist-fd',
+            label: 'Таблица файловых дескрипторов ядра',
+            hint: 'Структура пространства ядра ОС',
+            reason: 'Таблица открытых дескрипторов файлов хранится в памяти ядра ОС, а не в пользовательском кадре стека.'
+        },
+        {
+            id: 'dist-tlb',
+            label: 'Аппаратный кэш трансляции адресов (TLB)',
+            hint: 'Буфер блока управления памятью MMU',
+            reason: 'TLB — это внутренний аппаратный кэш процессора (MMU), он не хранится в виртуальной памяти стека.'
+        },
+        {
+            id: 'dist-vtable',
+            label: 'Таблица виртуальных методов (vtable)',
+            hint: 'Метаданные полиморфизма C++',
+            reason: 'Таблицы vtable размещаются компилятором в сегменте констант .rodata, а не в кадре стека.'
+        }
+    ];
+
+    function initPhase3() {
+        currentPhase = 3;
+        p3SelectedTokenId = null;
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+        document.getElementById('phase-title').textContent = 'Слот-пазл: архитектура защищенного кадра стека x86-64';
+
+        const fnNames = ['parse_pkt', 'check_auth', 'read_header', 'decode_frame'];
+        const bufNames = ['buf', 'input', 'msg', 'frame'];
+        const bufSizes = [16, 24, 32, 64];
+        const fn = fnNames[getRandomInt(0, fnNames.length - 1)];
+        const bName = bufNames[getRandomInt(0, bufNames.length - 1)];
+        const bSize = bufSizes[getRandomInt(0, bufSizes.length - 1)];
+
+        document.getElementById('p3-func-sig').textContent = 'void ' + fn + '(const char* src) { char ' + bName + '[' + bSize + ']; ... }';
+
+        // Генерируем случайный базовый адрес стека (без знака доллара!)
+        const baseAddr = 0x7fffffffe000 + getRandomInt(2, 14) * 16;
+        const addrRet = '0x' + (baseAddr + 24 + bSize).toString(16);
+        const addrRbp = '0x' + (baseAddr + 16 + bSize).toString(16);
+        const addrCan = '0x' + (baseAddr + 8 + bSize).toString(16);
+        const addrBuf = '0x' + baseAddr.toString(16);
+
+        const requiredBlocks = [
+            {
+                id: 'blk-ret',
+                label: 'Адрес возврата (Return Address)',
+                hint: 'Помещен на стек инструкцией call перед входом в ' + fn,
+                reason: 'Адрес возврата кладется командой call до пролога функции — поэтому занимает старший адрес кадра.'
+            },
+            {
+                id: 'blk-rbp',
+                label: 'Сохраненный RBP вызывающей функции',
+                hint: 'Положен первой командой пролога push rbp',
+                reason: 'Сохраненный RBP кладется сразу после адреса возврата в прологе функции (push rbp).'
+            },
+            {
+                id: 'blk-canary',
+                label: 'Стековая канарейка (Stack Canary)',
+                hint: 'Случайное контрольное слово защиты -fstack-protector',
+                reason: 'Канарейка должна лежать строго между локальным буфером и сохраненным RBP, чтобы поймать переполнение до ret.'
+            },
+            {
+                id: 'blk-buf',
+                label: 'Локальный буфер char ' + bName + '[' + bSize + ']',
+                hint: 'Выделен в младших адресах кадра (sub rsp, N)',
+                reason: 'Локальный буфер размещается на младшем адресе кадра; при записи вверх к старшим адресам первым упирается в канарейку.'
+            }
+        ];
+
+        p3Slots = [
+            { slotIdx: 0, addr: addrRet, offset: '[rbp + 8]', expectedId: 'blk-ret', placedId: null, role: 'Старший адрес кадра (точка возврата после ret)' },
+            { slotIdx: 1, addr: addrRbp, offset: '[rbp + 0]', expectedId: 'blk-rbp', placedId: null, role: 'Опорная база текущего кадра (push rbp)' },
+            { slotIdx: 2, addr: addrCan, offset: '[rbp - 8]', expectedId: 'blk-canary', placedId: null, role: 'Барьер контроля целостности перед эпилогом' },
+            { slotIdx: 3, addr: addrBuf, offset: '[rbp - ' + (8 + bSize) + ']', expectedId: 'blk-buf', placedId: null, role: 'Младший адрес кадра (область пользовательских данных)' }
+        ];
+
+        const distractors = shuffleArray(P3_DISTRACTORS).slice(0, 4);
+        p3Palette = shuffleArray([...requiredBlocks, ...distractors]);
+
+        renderPhase3();
+    }
+
+    function getP3TokenById(id) {
+        return p3Palette.find(function(t) { return t.id === id; }) || null;
+    }
+
+    function renderPhase3() {
+        const slotsBox = document.getElementById('p3-slots');
+        const palBox = document.getElementById('p3-palette');
+        slotsBox.innerHTML = '';
+        palBox.innerHTML = '';
+
+        const usedIds = new Set();
+        p3Slots.forEach(function(s) {
+            if (s.placedId) usedIds.add(s.placedId);
+        });
+
+        p3Slots.forEach(function(s) {
+            const slotEl = document.createElement('div');
+            slotEl.setAttribute('data-slot-idx', String(s.slotIdx));
+            slotEl.className = 'p-2 border rounded-0 d-flex flex-column gap-1 ' +
+                (s.placedId ? 'border-success bg-dark' : 'border-secondary bg-black');
+            slotEl.style.minHeight = '66px';
+            slotEl.style.cursor = 'pointer';
+
+            const header = '<div class="d-flex flex-wrap justify-content-between align-items-center gap-1 small">' +
+                '<span class="text-info fw-bold">' + escapeHtml(s.addr) + ' ' + escapeHtml(s.offset) + '</span>' +
+                '<span class="text-secondary">' + escapeHtml(s.role) + '</span>' +
+                '</div>';
+
+            if (s.placedId) {
+                const tok = getP3TokenById(s.placedId);
+                slotEl.innerHTML = header +
+                    '<div class="btn btn-success text-dark rounded-0 fw-bold text-start py-2 px-3 small d-flex justify-content-between align-items-center" style="min-height: 48px;">' +
+                    '<span>' + escapeHtml(tok ? tok.label : s.placedId) + '</span>' +
+                    '<span class="badge bg-dark text-success rounded-0">✕ снять</span>' +
+                    '</div>';
+            } else {
+                slotEl.innerHTML = header +
+                    '<div class="border border-secondary text-secondary text-center py-2 small" style="min-height: 48px; line-height: 30px;">' +
+                    '[ Поместите блок кадра сюда ]' +
+                    '</div>';
+            }
+            slotsBox.appendChild(slotEl);
+        });
+
+        let availCount = 0;
+        p3Palette.forEach(function(tok) {
+            if (usedIds.has(tok.id)) return;
+            availCount += 1;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.draggable = true;
+            btn.setAttribute('data-p3-token-id', tok.id);
+            const isSel = p3SelectedTokenId === tok.id;
+            btn.className = 'btn rounded-0 text-start p-2 text-wrap ' +
+                (isSel ? 'btn-info text-dark border-white' : 'btn-outline-light bg-dark');
+            btn.style.minHeight = '52px';
+            btn.style.cursor = 'grab';
+            btn.style.wordBreak = 'break-word';
+            btn.innerHTML = '<div class="fw-bold small">' + escapeHtml(tok.label) + '</div>' +
+                '<div class="small ' + (isSel ? 'text-dark' : 'text-secondary') + '" style="font-size: 0.72rem;">' + escapeHtml(tok.hint) + '</div>';
+            palBox.appendChild(btn);
+        });
+
+        if (availCount === 0) {
+            palBox.innerHTML = '<div class="text-secondary small p-2">Все блоки использованы.</div>';
+        }
+        document.getElementById('p3-palette-count').textContent = String(availCount);
+    }
+
+    function assignP3TokenToSlot(tokenId, slotIdx) {
+        if (isLocked) return;
+        const slot = p3Slots[slotIdx];
+        if (!slot) return;
+        p3Slots.forEach(function(s) {
+            if (s.placedId === tokenId) s.placedId = null;
+        });
+        slot.placedId = tokenId;
+        p3SelectedTokenId = null;
+        renderPhase3();
+    }
+
+    function checkPhase3() {
+        if (isLocked) return;
+        telemetry.markActivity();
+
+        const empty = p3Slots.filter(function(s) { return !s.placedId; });
+        if (empty.length > 0) {
+            const fb = document.getElementById('feedback-box');
+            const ft = document.getElementById('feedback-text');
+            if (fb && ft) {
+                ft.textContent = 'Заполните все 4 адресных слота кадра стека (осталось пустых: ' + empty.length + ').';
+                fb.classList.remove('d-none');
+                setTimeout(function() { fb.classList.add('d-none'); }, 1800);
+            }
+            return;
+        }
+
+        const mismatch = p3Slots.find(function(s) { return s.placedId !== s.expectedId; });
+        if (mismatch) {
+            const placedTok = getP3TokenById(mismatch.placedId);
+            const expectedTok = getP3TokenById(mismatch.expectedId);
+            const extraReason = placedTok && placedTok.reason ? placedTok.reason : '';
+            const needReason = expectedTok && expectedTok.reason ? expectedTok.reason : '';
+            triggerErrorReset(
+                'Ошибка в слоте ' + mismatch.offset + ' (' + mismatch.addr + '): помещен блок «' +
+                (placedTok ? placedTok.label : '') + '». ' + extraReason + ' ' + needReason + ' Перегенерируем кадр стека...',
+                initPhase3
+            );
+            return;
+        }
+
+        showSuccessFeedback('Защищенный кадр стека x86-64 собран безупречно! Все 3 фазы Уровня 1 завершены.', function() {
+            completeLevel();
+        });
+    }
+
+    // =========================================================================
+    // ОДНОКРАТНАЯ ПРИВЯЗКА СЛУШАТЕЛЕЙ ЧЕРЕЗ ДЕЛЕГИРОВАНИЕ СОБЫТИЙ
+    // =========================================================================
+    function bindAllEventsOnce() {
+        // --- Фаза 1 ---
+        const p1Palette = document.getElementById('p1-token-palette');
+        const p1BucketsRow = document.getElementById('p1-buckets-row');
+
+        p1Palette.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const btn = e.target.closest('[data-item-id]');
+            if (!btn) return;
+            telemetry.markActivity();
+            const id = btn.getAttribute('data-item-id');
+            p1SelectedId = (p1SelectedId === id) ? null : id;
+            renderPhase1();
+        });
+
+        p1Palette.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-item-id]');
+            if (!btn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', btn.getAttribute('data-item-id'));
+        });
+
+        p1BucketsRow.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-item-id]');
+            if (!btn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', btn.getAttribute('data-item-id'));
+        });
+
+        p1BucketsRow.addEventListener('dragover', function(e) {
+            if (e.target.closest('.p1-bucket-drop')) {
+                e.preventDefault();
+            }
+        });
+
+        p1BucketsRow.addEventListener('drop', function(e) {
+            const bucketEl = e.target.closest('.p1-bucket-drop');
+            if (!bucketEl || isLocked) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            const itemId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : p1SelectedId;
+            const bIdx = Number(bucketEl.getAttribute('data-bucket'));
+            const item = p1Items.find(function(i) { return i.id === itemId; });
+            if (item) {
+                item.assigned = bIdx;
+                p1SelectedId = null;
+                renderPhase1();
+            }
+        });
+
+        p1Palette.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+
+        p1Palette.addEventListener('drop', function(e) {
+            if (isLocked) return;
+            e.preventDefault();
+            const itemId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : null;
+            const item = p1Items.find(function(i) { return i.id === itemId; });
+            if (item) {
+                item.assigned = null;
+                p1SelectedId = null;
+                renderPhase1();
+            }
+        });
+
+        p1BucketsRow.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const itemBtn = e.target.closest('[data-item-id]');
+            if (itemBtn && !p1SelectedId) {
+                telemetry.markActivity();
+                const id = itemBtn.getAttribute('data-item-id');
+                const item = p1Items.find(function(i) { return i.id === id; });
+                if (item) {
+                    item.assigned = null;
+                    renderPhase1();
+                }
+                return;
+            }
+            const bucketEl = e.target.closest('.p1-bucket-drop');
+            if (bucketEl && p1SelectedId) {
+                telemetry.markActivity();
+                const bIdx = Number(bucketEl.getAttribute('data-bucket'));
+                const item = p1Items.find(function(i) { return i.id === p1SelectedId; });
+                if (item) {
+                    item.assigned = bIdx;
+                    p1SelectedId = null;
+                    renderPhase1();
+                }
+            }
+        });
+
+        document.getElementById('p1-reset-btn').addEventListener('click', function() {
+            if (isLocked) return;
+            telemetry.markActivity();
+            p1Items.forEach(function(i) { i.assigned = null; });
+            p1SelectedId = null;
+            renderPhase1();
+        });
+
+        document.getElementById('p1-check-btn').addEventListener('click', checkPhase1);
+
+        // --- Фаза 2 ---
+        const p2Tape = document.getElementById('p2-tape');
+        const p2PushZone = document.getElementById('p2-push-zone');
+        const p2Well = document.getElementById('p2-stack-well');
+
+        p2Tape.addEventListener('click', function(e) {
+            const cell = e.target.closest('[data-tape-idx]');
+            if (!cell) return;
+            const idx = Number(cell.getAttribute('data-tape-idx'));
+            if (idx !== p2Pos || p2Pos >= p2Expr.length) return;
+            const ch = p2Expr[p2Pos];
+            if (P2_OPENING[ch]) {
+                handleP2Action('push');
+            } else if (!P2_CLOSING[ch]) {
+                handleP2Action('skip');
+            }
+        });
+
+        p2Tape.addEventListener('dragstart', function(e) {
+            const cell = e.target.closest('[data-tape-idx]');
+            if (!cell || !e.dataTransfer) return;
+            const idx = Number(cell.getAttribute('data-tape-idx'));
+            if (idx !== p2Pos) {
+                e.preventDefault();
+                return;
+            }
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', 'p2-push');
+        });
+
+        p2PushZone.addEventListener('dragover', function(e) { e.preventDefault(); });
+        p2PushZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            handleP2Action('push');
+        });
+        p2PushZone.addEventListener('click', function() { handleP2Action('push'); });
+
+        p2Well.addEventListener('dragover', function(e) { e.preventDefault(); });
+        p2Well.addEventListener('drop', function(e) {
+            e.preventDefault();
+            handleP2Action('push');
+        });
+        p2Well.addEventListener('click', function(e) {
+            const topBtn = e.target.closest('[data-stack-top="1"]');
+            if (topBtn) {
+                handleP2Action('pop');
+            }
+        });
+
+        document.getElementById('p2-skip-btn').addEventListener('click', function() { handleP2Action('skip'); });
+        document.getElementById('p2-error-btn').addEventListener('click', function() { handleP2Action('report_error'); });
+        document.getElementById('p2-finish-ok-btn').addEventListener('click', function() { handleP2Action('finish_ok'); });
+
+        // --- Фаза 3 ---
+        const p3PaletteEl = document.getElementById('p3-palette');
+        const p3SlotsEl = document.getElementById('p3-slots');
+
+        p3PaletteEl.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const btn = e.target.closest('[data-p3-token-id]');
+            if (!btn) return;
+            telemetry.markActivity();
+            const tid = btn.getAttribute('data-p3-token-id');
+            p3SelectedTokenId = (p3SelectedTokenId === tid) ? null : tid;
+            renderPhase3();
+        });
+
+        p3PaletteEl.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-p3-token-id]');
+            if (!btn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', btn.getAttribute('data-p3-token-id'));
+        });
+
+        p3SlotsEl.addEventListener('dragover', function(e) {
+            if (e.target.closest('[data-slot-idx]')) e.preventDefault();
+        });
+
+        p3SlotsEl.addEventListener('drop', function(e) {
+            const slotEl = e.target.closest('[data-slot-idx]');
+            if (!slotEl || isLocked) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            const tokenId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : p3SelectedTokenId;
+            const sIdx = Number(slotEl.getAttribute('data-slot-idx'));
+            if (tokenId && getP3TokenById(tokenId)) {
+                assignP3TokenToSlot(tokenId, sIdx);
+            }
+        });
+
+        p3SlotsEl.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const slotEl = e.target.closest('[data-slot-idx]');
+            if (!slotEl) return;
+            telemetry.markActivity();
+            const sIdx = Number(slotEl.getAttribute('data-slot-idx'));
+            if (p3SelectedTokenId) {
+                assignP3TokenToSlot(p3SelectedTokenId, sIdx);
+            } else if (p3Slots[sIdx] && p3Slots[sIdx].placedId) {
+                p3Slots[sIdx].placedId = null;
+                renderPhase3();
+            }
+        });
+
+        document.getElementById('p3-reset-btn').addEventListener('click', function() {
+            if (isLocked) return;
+            telemetry.markActivity();
+            p3Slots.forEach(function(s) { s.placedId = null; });
+            p3SelectedTokenId = null;
+            renderPhase3();
+        });
+
+        document.getElementById('p3-check-btn').addEventListener('click', checkPhase3);
+    }
+
+    bindAllEventsOnce();
+    startTimer();
+    initPhase1();
+})();
+</script>
