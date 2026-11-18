@@ -262,4 +262,44 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
 
     sim.assertCleanSession();
   });
+
+  test('Persona: DILIGENT — Grade 8 Lesson 10: launches Logo-Storm, verifies 12 terms, HUD, and streams a term', async ({ page }) => {
+    const sim = new StudentSimulator(page, { persona: LearnerPersona.DILIGENT });
+    await page.goto('/lesson/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/10');
+
+    const sprintBtn = page.locator('#sprint-toggle');
+    await expect(sprintBtn).toBeVisible();
+    await expect(sprintBtn).not.toBeDisabled();
+
+    await sprintBtn.click();
+    const overlay = page.locator('#sprint-overlay');
+    await expect(overlay).toBeVisible();
+
+    // Grade 8 Lesson 10 has 12 marked-up terms
+    await expect(page.locator('#sprint-terms-count')).toHaveText('12');
+    await expect(page.locator('#sprint-def-step')).toHaveText('1 / 12');
+
+    const firstTermHud = await page.locator('#sprint-def-term').textContent();
+    const firstDefDesc = await page.locator('#sprint-def-desc').textContent();
+    expect(firstTermHud.trim().length).toBeGreaterThan(0);
+    expect(firstDefDesc.trim().length).toBeGreaterThan(0);
+
+    // Arena renders first term sentence and transitions to term 2 on completion
+    const term1Text = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+    );
+    expect(term1Text.toLowerCase()).toContain(firstTermHud.trim().toLowerCase());
+
+    await page.locator('#sprint-hidden-input').pressSequentially(term1Text);
+
+    await expect(page.locator('#sprint-def-step')).toHaveText('2 / 12');
+    const secondTermHud = await page.locator('#sprint-def-term').textContent();
+    expect(secondTermHud.trim().length).toBeGreaterThan(0);
+    expect(secondTermHud.trim().toLowerCase()).not.toBe(firstTermHud.trim().toLowerCase());
+
+    await page.keyboard.press('Escape');
+    await expect(overlay).toBeHidden();
+
+    sim.assertCleanSession();
+  });
 });
