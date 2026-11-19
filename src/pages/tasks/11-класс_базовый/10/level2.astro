@@ -447,26 +447,19 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
     let p2Target = { dist: 0, timeMin: 0 };
 
     function setupPhase2() {
-        // Скорости в км/ч с точным переводом в м/мин: 12->200, 15->250, 18->300, 24->400, 30->500
+        // Скорости в км/ч с точным переводом в м/мин: 6->100, 12->200, 15->250, 24->400, 30->500
+        // Деление любого числа, кратного 100 м, на эти значения всегда даёт точную конечную десятичную дробь
         const speedOptions = [
+            { kmh: 6,  mpm: 100 },
             { kmh: 12, mpm: 200 },
             { kmh: 15, mpm: 250 },
-            { kmh: 18, mpm: 300 },
             { kmh: 24, mpm: 400 },
             { kmh: 30, mpm: 500 }
         ];
         const spd = speedOptions[randInt(0, speedOptions.length - 1)];
 
         // Процедурно строим 5-вершинный взвешенный граф (А=0, Б=1, В=2, Г=3, Д=4)
-        // Кратчайший путь с 2-3 шагами: обеспечиваем точное кратное 100 м расстояние
-        const stepUnit = 100;
-        const ab = randInt(4, 9) * stepUnit;
-        const bc = randInt(5, 10) * stepUnit;
-        const cd = randInt(4, 9) * stepUnit;
-        const de = randInt(3, 8) * stepUnit;
-
-        // Два альтернативных пути: A->B->C->D->E (длинный) и A->B->D->E / A->C->E
-        // Сгенерируем все рёбра так, чтобы один маршрут был строго минимальным
+        // Сгенерируем все рёбра кратными 100 м так, чтобы маршрут определялся нетривиально
         const wAB = randInt(5, 9) * 100;
         const wAC = randInt(10, 16) * 100;
         const wBC = randInt(3, 7) * 100;
@@ -544,7 +537,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         if (isLocked) return;
         const uDist = parseDecimal(document.getElementById('p2-input-dist').value);
         const uTime = parseDecimal(document.getElementById('p2-input-time').value);
-        if (uDist === p2Target.dist && Math.abs(uTime - p2Target.timeMin) < 0.01) {
+        if (uDist === p2Target.dist && Math.abs(uTime - p2Target.timeMin) < 0.001) {
             advancePhase(2, 3, setupPhase3, 'Пик инверсии: восстановление скрытого веса ребра');
         } else {
             recordError('Неверная длина пути или ошибка при переводе км/ч в м/мин!', setupPhase2);
@@ -834,17 +827,17 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
         }
 
         if (!chosenCfg) {
-            // Резервный проверенный DAG из раздела 4.3 теории
+            // Резервный проверенный DAG без пересечения промежуточных вершин
             const fbEdges = [
                 [0, 1], [0, 2], [0, 3], [1, 2], [3, 2],
-                [1, 4], [2, 4], [2, 5], [3, 5], [4, 6], [5, 6],
+                [1, 4], [2, 4], [2, 5], [3, 5], [3, 6], [4, 5], [6, 5],
                 [4, 7], [5, 7], [6, 7]
             ];
             chosenCfg = {
                 edges: fbEdges,
-                req: 4,
-                forb: 2,
-                ans: countDagPaths(8, fbEdges, 0, 4, 2) * countDagPaths(8, fbEdges, 4, 7, 2)
+                req: 5,
+                forb: 3,
+                ans: countDagPaths(8, fbEdges, 0, 5, 3) * countDagPaths(8, fbEdges, 5, 7, 3)
             };
         }
 
