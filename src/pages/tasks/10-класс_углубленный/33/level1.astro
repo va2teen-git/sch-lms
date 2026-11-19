@@ -1,0 +1,844 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Шапка тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Перевод чисел между системами счисления (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок фазы и телеметрия -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Развернутая форма числа (Slot &amp; Snap)</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span>[СИСТЕМНЫЙ СБОЙ] <span id="feedback-text">Неверная конфигурация!</span> Перегенерация варианта...</span>
+                        <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 1: РАЗВЕРНУТАЯ ФОРМА (SLOT & SNAP) ==================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-2">
+                        Дано число в позиционной системе счисления: <strong id="p1-number-display" class="text-success fs-5"></strong>.
+                        <strong>Перетащите токен точного десятичного вклада каждого разряда</strong> (a<sub>k</sub> &middot; q<sup>k</sup>) в соответствующий слот (либо кликните по токену, затем по слоту).
+                    </p>
+                    <div class="text-warning small mb-3">
+                        Разберите число по степеням основания q. В палитре присутствуют два лишних токена-дистрактора.
+                    </div>
+
+                    <!-- Палитра токенов -->
+                    <div class="card bg-black border-secondary rounded-0 mb-3 p-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <span class="text-secondary small text-uppercase">Палитра десятичных вкладов разрядов:</span>
+                            <button id="p1-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-height: 48px;">Сбросить слоты</button>
+                        </div>
+                        <div id="p1-token-pool" class="d-flex flex-wrap gap-2 align-items-center" style="min-height: 56px;">
+                            <!-- Генерируется JS -->
+                        </div>
+                    </div>
+
+                    <!-- Целевые слоты разрядов -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-3 border-bottom border-secondary pb-1">
+                            Позиционные слоты развернутой формы:
+                        </div>
+                        <div id="p1-slots-container" class="d-flex flex-column gap-3">
+                            <!-- Генерируется JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-submit-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4 py-2" style="min-height: 48px;" disabled>
+                            Зафиксировать разложение &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 2: КОММУТАЦИЯ ПЕРЕВОДОВ (WIRE PATCHING) ==================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Скоммутируйте исходные числа слева с их точными представлениями в целевых системах счисления справа.
+                        <strong>Кликните на выходной порт слева, затем на входной порт справа</strong> (или протяните провод мышью).
+                    </p>
+                    <div class="text-warning small mb-3">
+                        Учитывайте порядок записи остатков при делении (снизу вверх) и веса буквенных цифр A–F. Два правых порта — ложные дистракторы.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                            <span class="text-secondary small text-uppercase">Матрица коммутации систем счисления (3 канала):</span>
+                            <button id="p2-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-height: 48px;">Сбросить провода</button>
+                        </div>
+
+                        <div id="p2-wiring-board" class="position-relative">
+                            <svg id="p2-svg-wires" class="position-absolute top-0 start-0 w-100 h-100 pe-none" style="z-index: 2;"></svg>
+                            <div class="row g-2 align-items-center position-relative" style="z-index: 3;">
+                                <div class="col-5">
+                                    <div id="p2-left-ports" class="d-flex flex-column gap-3">
+                                        <!-- Левые порты JS -->
+                                    </div>
+                                </div>
+                                <div class="col-2"></div>
+                                <div class="col-5">
+                                    <div id="p2-right-ports" class="d-flex flex-column gap-2">
+                                        <!-- Правые порты JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span id="p2-link-counter" class="text-secondary small">Скоммутировано каналов: 0 / 3</span>
+                        <button id="p2-submit-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4 py-2" style="min-height: 48px;" disabled>
+                            Проверить коммутацию &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 3: ЛЕНТА РЕГИСТРА (DIRECT TAPE MANIPULATION) ==================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Выполните кросс-перевод исходного числа в целевую систему счисления с основанием <strong id="p3-target-base-text" class="text-info"></strong> и вручную настройте разрядную ленту регистра.
+                    </p>
+                    <div id="p3-task-spec" class="card bg-black border-info rounded-0 p-3 mb-3 text-light">
+                        <!-- Спецификация задачи JS -->
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                            <span class="text-secondary small text-uppercase">Разрядная лента регистра (кликните по ячейке для переключения цифры):</span>
+                            <button id="p3-clear-tape-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-height: 48px;">Обнулить ленту</button>
+                        </div>
+                        <div id="p3-tape-container" class="d-flex flex-wrap justify-content-center gap-2 my-2">
+                            <!-- Ячейки ленты JS -->
+                        </div>
+                        <div class="text-secondary small text-center mt-2">
+                            Старший разряд расположен слева, младший (q<sup>0</sup>) — справа. При необходимости дополняйте незначащими нулями слева.
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span id="p3-preview-text" class="text-secondary small">Текущее состояние ленты: <strong class="text-light">000000</strong></span>
+                        <button id="p3-submit-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4 py-2" style="min-height: 48px;">
+                            Зафиксировать регистр &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== ЭКРАН ПОБЕДЫ ==================== -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-success bg-black p-4 mb-3">
+                        <h3 class="text-success mb-2">[ УРОВЕНЬ 1 ПРОЙДЕН ]</h3>
+                        <p class="text-light mb-3">Все 3 фазы манипулятивного синтеза переводов между системами счисления выполнены без обхода алгоритмов.</p>
+                        <div class="d-flex justify-content-center gap-4 text-secondary small">
+                            <span>Ошибок: <strong id="final-attempts" class="text-warning">0</strong></span>
+                            <span>Время: <strong id="final-time" class="text-info">00:00</strong></span>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-0">Переключайтесь на вкладку «Уровень 2» для аналитических расчетов с ручным вводом.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+    (function() {
+        let currentPhase = 1;
+        let isProcessingError = false;
+        let timerInterval = null;
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 33 :: Перевод чисел из одной системы счисления в другую (Уровень 1)',
+            level: 1,
+            totalStages: 3
+        });
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const phaseBadge = document.getElementById('phase-badge');
+        const phaseTitle = document.getElementById('phase-title');
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+
+        const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function shuffle(arr) {
+            const copy = arr.slice();
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = copy[i];
+                copy[i] = copy[j];
+                copy[j] = tmp;
+            }
+            return copy;
+        }
+
+        function formatTime(sec) {
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function toBase(num, base) {
+            if (num === 0) return '0';
+            let n = num;
+            let res = '';
+            while (n > 0) {
+                res = DIGITS[n % base] + res;
+                n = Math.floor(n / base);
+            }
+            return res;
+        }
+
+        function updateTimerDisplay() {
+            if (timerDisplay) {
+                timerDisplay.textContent = formatTime(telemetry.getTimeSpentSec());
+            }
+        }
+
+        timerInterval = setInterval(updateTimerDisplay, 1000);
+
+        function triggerFailure(message, resetCallback) {
+            if (isProcessingError) return;
+            isProcessingError = true;
+            telemetry.fail({ stage: currentPhase, total_stages: 3 });
+            if (attemptsDisplay) {
+                attemptsDisplay.textContent = String(telemetry.getState().attemptsCount);
+            }
+            if (feedbackText) feedbackText.textContent = message;
+            if (feedbackBox) feedbackBox.classList.remove('d-none');
+
+            setTimeout(() => {
+                if (feedbackBox) feedbackBox.classList.add('d-none');
+                isProcessingError = false;
+                resetCallback();
+            }, 1250);
+        }
+
+        function switchToPhase(nextPhase) {
+            document.getElementById(`phase${currentPhase}`).classList.add('d-none');
+            currentPhase = nextPhase;
+            if (nextPhase <= 3) {
+                telemetry.advanceStage(nextPhase);
+                document.getElementById(`phase${nextPhase}`).classList.remove('d-none');
+                phaseBadge.textContent = `Шаг ${nextPhase} из 3`;
+                if (nextPhase === 2) {
+                    phaseTitle.textContent = 'Коммутация систем счисления (Wire Patching)';
+                    generatePhase2();
+                } else if (nextPhase === 3) {
+                    phaseTitle.textContent = 'Синтезатор разрядной ленты (Tape Toggle)';
+                    generatePhase3();
+                }
+            }
+        }
+
+        function showVictory() {
+            document.getElementById('phase3').classList.add('d-none');
+            if (timerInterval) clearInterval(timerInterval);
+            telemetry.complete({ stage: 3, total_stages: 3 });
+            const finalTime = formatTime(telemetry.getTimeSpentSec());
+            document.getElementById('final-attempts').textContent = String(telemetry.getState().attemptsCount);
+            document.getElementById('final-time').textContent = finalTime;
+            document.getElementById('victory-screen').classList.remove('d-none');
+            phaseBadge.textContent = 'Завершено';
+            phaseTitle.textContent = 'Все 3 фазы выполнены';
+        }
+
+        /* =========================================================================
+           ФАЗА 1: РАЗВЕРНУТАЯ ФОРМА ЧИСЛА (SLOT & SNAP)
+           ========================================================================= */
+        const p1State = {
+            base: 8,
+            slots: [],
+            tokens: [],
+            assignments: {}, // slotId -> tokenId
+            selectedTokenId: null
+        };
+
+        const p1NumberDisplay = document.getElementById('p1-number-display');
+        const p1TokenPool = document.getElementById('p1-token-pool');
+        const p1SlotsContainer = document.getElementById('p1-slots-container');
+        const p1ResetBtn = document.getElementById('p1-reset-btn');
+        const p1SubmitBtn = document.getElementById('p1-submit-btn');
+
+        function generatePhase1() {
+            const base = pickRandom([5, 6, 7, 8, 12, 16]);
+            p1State.base = base;
+            p1State.assignments = {};
+            p1State.selectedTokenId = null;
+
+            // Генерируем 3 уникальные ненулевые цифры (для base >= 12 гарантируем хотя бы одну букву)
+            const poolDigits = [];
+            for (let d = 1; d < base; d++) poolDigits.push(d);
+            let chosen = shuffle(poolDigits).slice(0, 3);
+            if (base >= 12 && chosen.every(d => d < 10)) {
+                chosen[1] = randInt(10, base - 1);
+                if (chosen[1] === chosen[0]) chosen[1] = (chosen[1] === base - 1 ? 10 : chosen[1] + 1);
+                if (chosen[1] === chosen[2]) chosen[2] = randInt(1, 9);
+            }
+
+            const numStr = chosen.map(d => DIGITS[d]).join('');
+            p1NumberDisplay.innerHTML = `${numStr}<sub>${base}</sub>`;
+
+            const powers = [2, 1, 0];
+            p1State.slots = powers.map((pow, idx) => {
+                const digitVal = chosen[idx];
+                const contribution = digitVal * Math.pow(base, pow);
+                return {
+                    id: `slot-${idx}`,
+                    power: pow,
+                    digitChar: DIGITS[digitVal],
+                    digitVal: digitVal,
+                    correctValue: contribution
+                };
+            });
+
+            const correctValues = p1State.slots.map(s => s.correctValue);
+            const distractorCandidates = new Set();
+
+            // Реалистичные дистракторы: ошибка на 1 в значении буквы/цифры или перепутанная степень
+            p1State.slots.forEach(s => {
+                const wrongDigitUp = (s.digitVal + 1) * Math.pow(base, s.power);
+                const wrongDigitDown = Math.max(1, s.digitVal - 1) * Math.pow(base, s.power);
+                const swappedPow = s.digitVal * Math.pow(base, s.power === 2 ? 1 : (s.power === 1 ? 2 : 1));
+                [wrongDigitUp, wrongDigitDown, swappedPow].forEach(cand => {
+                    if (!correctValues.includes(cand) && cand > 0) {
+                        distractorCandidates.add(cand);
+                    }
+                });
+            });
+
+            const distractors = shuffle(Array.from(distractorCandidates)).slice(0, 2);
+            while (distractors.length < 2) {
+                const fallback = randInt(2, base * base) + randInt(1, 9);
+                if (!correctValues.includes(fallback) && !distractors.includes(fallback)) {
+                    distractors.push(fallback);
+                }
+            }
+
+            const allValues = shuffle(correctValues.concat(distractors));
+            p1State.tokens = allValues.map((val, idx) => ({
+                id: `tok-${idx}`,
+                value: val
+            }));
+
+            renderPhase1();
+        }
+
+        function assignTokenToSlot(tokenId, slotId) {
+            if (isProcessingError) return;
+            // Убираем токен из других слотов, если он уже был назначен
+            Object.keys(p1State.assignments).forEach(k => {
+                if (p1State.assignments[k] === tokenId) {
+                    delete p1State.assignments[k];
+                }
+            });
+            p1State.assignments[slotId] = tokenId;
+            p1State.selectedTokenId = null;
+            renderPhase1();
+        }
+
+        function renderPhase1() {
+            const usedTokenIds = new Set(Object.values(p1State.assignments));
+            p1TokenPool.innerHTML = '';
+
+            p1State.tokens.forEach(tok => {
+                if (usedTokenIds.has(tok.id)) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const isSelected = p1State.selectedTokenId === tok.id;
+                btn.className = `btn rounded-0 fw-bold px-3 py-2 ${isSelected ? 'btn-warning text-dark border-warning' : 'btn-outline-success text-success border-success'}`;
+                btn.style.minHeight = '48px';
+                btn.style.minWidth = '72px';
+                btn.draggable = true;
+                btn.dataset.tokenId = tok.id;
+                btn.textContent = String(tok.value);
+
+                btn.addEventListener('dragstart', (e) => {
+                    if (isProcessingError) return;
+                    p1State.selectedTokenId = tok.id;
+                    e.dataTransfer.setData('text/plain', tok.id);
+                });
+
+                btn.addEventListener('click', () => {
+                    if (isProcessingError) return;
+                    p1State.selectedTokenId = (p1State.selectedTokenId === tok.id) ? null : tok.id;
+                    renderPhase1();
+                });
+
+                p1TokenPool.appendChild(btn);
+            });
+
+            if (p1TokenPool.children.length === 0) {
+                const emptyNote = document.createElement('span');
+                emptyNote.className = 'text-secondary small';
+                emptyNote.textContent = 'Доступных токенов больше нет';
+                p1TokenPool.appendChild(emptyNote);
+            }
+
+            p1SlotsContainer.innerHTML = '';
+            p1State.slots.forEach(slot => {
+                const row = document.createElement('div');
+                row.className = 'd-flex flex-wrap align-items-center justify-content-between gap-2 p-2 border border-secondary bg-dark';
+
+                const label = document.createElement('div');
+                label.className = 'text-light small';
+                label.innerHTML = `Разряд <strong>${p1State.base}<sup>${slot.power}</sup></strong> &nbsp;|&nbsp; Цифра: <span class="badge bg-secondary text-light rounded-0 fs-6">${slot.digitChar}</span>`;
+
+                const dropZone = document.createElement('button');
+                dropZone.type = 'button';
+                const assignedTokenId = p1State.assignments[slot.id];
+                const assignedToken = p1State.tokens.find(t => t.id === assignedTokenId);
+
+                dropZone.className = `btn rounded-0 fw-bold px-3 py-2 ${assignedToken ? 'btn-success text-dark' : 'btn-outline-secondary text-secondary'}`;
+                dropZone.style.minHeight = '48px';
+                dropZone.style.minWidth = '150px';
+                dropZone.dataset.slotId = slot.id;
+                dropZone.textContent = assignedToken ? `Вклад = ${assignedToken.value}` : '[ Поместить вклад ]';
+
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-warning');
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-warning');
+                });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-warning');
+                    const tid = e.dataTransfer.getData('text/plain') || p1State.selectedTokenId;
+                    if (tid) assignTokenToSlot(tid, slot.id);
+                });
+
+                dropZone.addEventListener('click', () => {
+                    if (isProcessingError) return;
+                    if (p1State.selectedTokenId) {
+                        assignTokenToSlot(p1State.selectedTokenId, slot.id);
+                    } else if (assignedTokenId) {
+                        delete p1State.assignments[slot.id];
+                        renderPhase1();
+                    }
+                });
+
+                row.appendChild(label);
+                row.appendChild(dropZone);
+                p1SlotsContainer.appendChild(row);
+            });
+
+            p1SubmitBtn.disabled = Object.keys(p1State.assignments).length < p1State.slots.length;
+        }
+
+        p1ResetBtn.addEventListener('click', () => {
+            if (isProcessingError) return;
+            p1State.assignments = {};
+            p1State.selectedTokenId = null;
+            renderPhase1();
+        });
+
+        p1SubmitBtn.addEventListener('click', () => {
+            if (isProcessingError) return;
+            const allCorrect = p1State.slots.every(slot => {
+                const tid = p1State.assignments[slot.id];
+                const tok = p1State.tokens.find(t => t.id === tid);
+                return tok && tok.value === slot.correctValue;
+            });
+
+            if (allCorrect) {
+                switchToPhase(2);
+            } else {
+                triggerFailure('Ошибка в разложении разрядов! Проверьте значение буквенных цифр и степени основания.', generatePhase1);
+            }
+        });
+
+        /* =========================================================================
+           ФАЗА 2: КОММУТАЦИЯ ПЕРЕВОДОВ (WIRE PATCHING)
+           ========================================================================= */
+        const p2State = {
+            pairs: [],        // { leftId, leftHtml, rightId, rightHtml }
+            rightPorts: [],   // 3 верных + 2 дистрактора
+            connections: {},  // leftId -> rightId
+            activeLeftId: null
+        };
+
+        const p2LeftPorts = document.getElementById('p2-left-ports');
+        const p2RightPorts = document.getElementById('p2-right-ports');
+        const p2SvgWires = document.getElementById('p2-svg-wires');
+        const p2WiringBoard = document.getElementById('p2-wiring-board');
+        const p2ResetBtn = document.getElementById('p2-reset-btn');
+        const p2SubmitBtn = document.getElementById('p2-submit-btn');
+        const p2LinkCounter = document.getElementById('p2-link-counter');
+
+        function generatePhase2() {
+            p2State.connections = {};
+            p2State.activeLeftId = null;
+
+            // Генерируем 3 разнотипных задания:
+            // Канал 1: 10 -> q (q in [5, 7, 8])
+            const q1 = pickRandom([5, 6, 7, 8]);
+            const n1 = randInt(q1 * q1 + 2, Math.min(220, q1 * q1 * q1 - 1));
+            const ans1 = toBase(n1, q1);
+            const rev1 = ans1.split('').reverse().join('');
+            const dist1 = (rev1 !== ans1) ? rev1 : toBase(n1 + q1, q1);
+
+            // Канал 2: 10 -> 16 (гарантируем буквы A-F в результате)
+            let n2 = randInt(170, 250);
+            while (!/[A-F]/.test(toBase(n2, 16))) {
+                n2 = randInt(170, 250);
+            }
+            const ans2 = toBase(n2, 16);
+            const dist2 = toBase(n2 + 16, 16);
+
+            // Канал 3: p -> 10 (p in [3, 4, 5], 3-значное число)
+            const p3 = pickRandom([3, 4, 5]);
+            const n3 = randInt(p3 * p3 + 1, p3 * p3 * p3 - 1);
+            const src3 = toBase(n3, p3);
+            const ans3 = String(n3);
+
+            const items = [
+                {
+                    leftId: 'L1',
+                    leftHtml: `${n1}<sub>10</sub> &rarr; (?)<sub>${q1}</sub>`,
+                    rightId: 'R-ok-1',
+                    rightHtml: `${ans1}<sub>${q1}</sub>`,
+                    distHtml: `${dist1}<sub>${q1}</sub>`
+                },
+                {
+                    leftId: 'L2',
+                    leftHtml: `${n2}<sub>10</sub> &rarr; (?)<sub>16</sub>`,
+                    rightId: 'R-ok-2',
+                    rightHtml: `${ans2}<sub>16</sub>`,
+                    distHtml: `${dist2}<sub>16</sub>`
+                },
+                {
+                    leftId: 'L3',
+                    leftHtml: `${src3}<sub>${p3}</sub> &rarr; (?)<sub>10</sub>`,
+                    rightId: 'R-ok-3',
+                    rightHtml: `${ans3}<sub>10</sub>`,
+                    distHtml: `${Number(ans3) + p3}<sub>10</sub>`
+                }
+            ];
+
+            p2State.pairs = items.map(it => ({
+                leftId: it.leftId,
+                leftHtml: it.leftHtml,
+                correctRightId: it.rightId
+            }));
+
+            const distPool = shuffle([
+                { rightId: 'R-dist-1', rightHtml: items[0].distHtml },
+                { rightId: 'R-dist-2', rightHtml: items[1].distHtml },
+                { rightId: 'R-dist-3', rightHtml: items[2].distHtml }
+            ]).slice(0, 2);
+
+            const validRights = items.map(it => ({
+                rightId: it.rightId,
+                rightHtml: it.rightHtml
+            }));
+
+            // Исключаем случайное совпадение отображаемых строк
+            const seenHtml = new Set(validRights.map(r => r.rightHtml));
+            const cleanDist = [];
+            distPool.forEach((d, idx) => {
+                if (!seenHtml.has(d.rightHtml)) {
+                    seenHtml.add(d.rightHtml);
+                    cleanDist.push(d);
+                } else {
+                    cleanDist.push({ rightId: `R-dist-fb-${idx}`, rightHtml: `${n3 + 11 + idx}<sub>10</sub>` });
+                }
+            });
+
+            p2State.rightPorts = shuffle(validRights.concat(cleanDist));
+            renderPhase2();
+        }
+
+        function connectPorts(leftId, rightId) {
+            if (isProcessingError) return;
+            // Отсоединяем rightId от других левых портов (1 к 1)
+            Object.keys(p2State.connections).forEach(lKey => {
+                if (p2State.connections[lKey] === rightId) {
+                    delete p2State.connections[lKey];
+                }
+            });
+            p2State.connections[leftId] = rightId;
+            p2State.activeLeftId = null;
+            renderPhase2();
+        }
+
+        function drawWires() {
+            if (!p2SvgWires || !p2WiringBoard) return;
+            const boardRect = p2WiringBoard.getBoundingClientRect();
+            p2SvgWires.setAttribute('viewBox', `0 0 ${Math.max(1, boardRect.width)} ${Math.max(1, boardRect.height)}`);
+            p2SvgWires.innerHTML = '';
+
+            Object.entries(p2State.connections).forEach(([leftId, rightId]) => {
+                const leftEl = p2LeftPorts.querySelector(`[data-left-id="${leftId}"]`);
+                const rightEl = p2RightPorts.querySelector(`[data-right-id="${rightId}"]`);
+                if (!leftEl || !rightEl) return;
+
+                const lRect = leftEl.getBoundingClientRect();
+                const rRect = rightEl.getBoundingClientRect();
+
+                const x1 = lRect.right - boardRect.left;
+                const y1 = lRect.top + lRect.height / 2 - boardRect.top;
+                const x2 = rRect.left - boardRect.left;
+                const y2 = rRect.top + rRect.height / 2 - boardRect.top;
+                const dx = Math.max(30, (x2 - x1) * 0.5);
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+                path.setAttribute('stroke', '#198754');
+                path.setAttribute('stroke-width', '3');
+                path.setAttribute('fill', 'none');
+                p2SvgWires.appendChild(path);
+
+                [ [x1, y1], [x2, y2] ].forEach(([cx, cy]) => {
+                    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    dot.setAttribute('cx', String(cx));
+                    dot.setAttribute('cy', String(cy));
+                    dot.setAttribute('r', '5');
+                    dot.setAttribute('fill', '#20c997');
+                    p2SvgWires.appendChild(dot);
+                });
+            });
+        }
+
+        function renderPhase2() {
+            p2LeftPorts.innerHTML = '';
+            p2RightPorts.innerHTML = '';
+
+            p2State.pairs.forEach(pair => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const isActive = p2State.activeLeftId === pair.leftId;
+                const isConnected = Boolean(p2State.connections[pair.leftId]);
+                btn.className = `btn rounded-0 w-100 text-start fw-bold px-3 py-2 d-flex justify-content-between align-items-center ${
+                    isActive ? 'btn-warning text-dark' : (isConnected ? 'btn-success text-dark' : 'btn-outline-light text-light')
+                }`;
+                btn.style.minHeight = '52px';
+                btn.dataset.leftId = pair.leftId;
+                btn.draggable = true;
+                btn.innerHTML = `<span>${pair.leftHtml}</span><span class="badge bg-dark text-success border border-success rounded-0 ms-1">&bull;</span>`;
+
+                btn.addEventListener('dragstart', (e) => {
+                    if (isProcessingError) return;
+                    p2State.activeLeftId = pair.leftId;
+                    e.dataTransfer.setData('text/plain', pair.leftId);
+                });
+
+                btn.addEventListener('click', () => {
+                    if (isProcessingError) return;
+                    p2State.activeLeftId = (p2State.activeLeftId === pair.leftId) ? null : pair.leftId;
+                    renderPhase2();
+                });
+
+                p2LeftPorts.appendChild(btn);
+            });
+
+            const connectedRights = new Set(Object.values(p2State.connections));
+            p2State.rightPorts.forEach(rp => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const isConnected = connectedRights.has(rp.rightId);
+                btn.className = `btn rounded-0 w-100 text-end fw-bold px-3 py-2 d-flex justify-content-between align-items-center ${
+                    isConnected ? 'btn-success text-dark' : 'btn-outline-secondary text-light'
+                }`;
+                btn.style.minHeight = '52px';
+                btn.dataset.rightId = rp.rightId;
+                btn.innerHTML = `<span class="badge bg-dark text-info border border-info rounded-0 me-1">&bull;</span><span>${rp.rightHtml}</span>`;
+
+                btn.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    btn.classList.add('border-warning');
+                });
+                btn.addEventListener('dragleave', () => {
+                    btn.classList.remove('border-warning');
+                });
+                btn.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    btn.classList.remove('border-warning');
+                    const lid = e.dataTransfer.getData('text/plain') || p2State.activeLeftId;
+                    if (lid) connectPorts(lid, rp.rightId);
+                });
+
+                btn.addEventListener('click', () => {
+                    if (isProcessingError) return;
+                    if (p2State.activeLeftId) {
+                        connectPorts(p2State.activeLeftId, rp.rightId);
+                    } else if (isConnected) {
+                        Object.keys(p2State.connections).forEach(k => {
+                            if (p2State.connections[k] === rp.rightId) delete p2State.connections[k];
+                        });
+                        renderPhase2();
+                    }
+                });
+
+                p2RightPorts.appendChild(btn);
+            });
+
+            const count = Object.keys(p2State.connections).length;
+            p2LinkCounter.textContent = `Скоммутировано каналов: ${count} / 3`;
+            p2SubmitBtn.disabled = count < 3;
+
+            requestAnimationFrame(drawWires);
+        }
+
+        window.addEventListener('resize', () => {
+            if (currentPhase === 2) drawWires();
+        });
+
+        p2ResetBtn.addEventListener('click', () => {
+            if (isProcessingError) return;
+            p2State.connections = {};
+            p2State.activeLeftId = null;
+            renderPhase2();
+        });
+
+        p2SubmitBtn.addEventListener('click', () => {
+            if (isProcessingError) return;
+            const ok = p2State.pairs.every(pair => p2State.connections[pair.leftId] === pair.correctRightId);
+            if (ok) {
+                switchToPhase(3);
+            } else {
+                triggerFailure('Неверная коммутация каналов! Проверьте порядок остатков и значение цифр.', generatePhase2);
+            }
+        });
+
+        /* =========================================================================
+           ФАЗА 3: СИНТЕЗАТОР РАЗРЯДНОЙ ЛЕНТЫ (DIRECT TAPE TOGGLE)
+           ========================================================================= */
+        const p3State = {
+            sourceBase: 5,
+            sourceStr: '',
+            decimalValue: 0,
+            targetBase: 2,
+            tapeLen: 6,
+            tapeDigits: []
+        };
+
+        const p3TargetBaseText = document.getElementById('p3-target-base-text');
+        const p3TaskSpec = document.getElementById('p3-task-spec');
+        const p3TapeContainer = document.getElementById('p3-tape-container');
+        const p3ClearTapeBtn = document.getElementById('p3-clear-tape-btn');
+        const p3PreviewText = document.getElementById('p3-preview-text');
+        const p3SubmitBtn = document.getElementById('p3-submit-btn');
+
+        function generatePhase3() {
+            const mode = pickRandom([
+                { targetBase: 2, tapeLen: 6, minVal: 19, maxVal: 61, srcBases: [5, 7, 12, 16] },
+                { targetBase: 3, tapeLen: 5, minVal: 32, maxVal: 120, srcBases: [5, 7, 8, 16] },
+                { targetBase: 4, tapeLen: 4, minVal: 35, maxVal: 190, srcBases: [5, 6, 7, 12] }
+            ]);
+
+            p3State.targetBase = mode.targetBase;
+            p3State.tapeLen = mode.tapeLen;
+            p3State.sourceBase = pickRandom(mode.srcBases);
+            p3State.decimalValue = randInt(mode.minVal, mode.maxVal);
+            p3State.sourceStr = toBase(p3State.decimalValue, p3State.sourceBase);
+            p3State.tapeDigits = new Array(mode.tapeLen).fill(0);
+
+            p3TargetBaseText.innerHTML = `${mode.targetBase} (q = ${mode.targetBase})`;
+            p3TaskSpec.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <span class="text-secondary small text-uppercase d-block">Исходное число для кросс-перевода:</span>
+                        <span class="fs-4 fw-bold text-info">${p3State.sourceStr}<sub>${p3State.sourceBase}</sub></span>
+                    </div>
+                    <div class="text-end">
+                        <span class="text-secondary small text-uppercase d-block">Целевая разрядность регистра:</span>
+                        <span class="badge bg-info text-dark rounded-0 fs-6">${mode.tapeLen} разрядов (основание ${mode.targetBase})</span>
+                    </div>
+                </div>
+            `;
+
+            renderPhase3();
+        }
+
+        function renderPhase3() {
+            p3TapeContainer.innerHTML = '';
+            for (let i = 0; i < p3State.tapeLen; i++) {
+                const power = p3State.tapeLen - 1 - i;
+                const val = p3State.tapeDigits[i];
+
+                const cellWrap = document.createElement('div');
+                cellWrap.className = 'd-flex flex-column align-items-center';
+
+                const weightLabel = document.createElement('div');
+                weightLabel.className = 'text-secondary small mb-1';
+                weightLabel.innerHTML = `${p3State.targetBase}<sup>${power}</sup>`;
+
+                const cellBtn = document.createElement('button');
+                cellBtn.type = 'button';
+                cellBtn.className = `btn rounded-0 fw-bold fs-4 ${
+                    val > 0 ? 'btn-success text-dark border-success' : 'btn-outline-secondary text-light'
+                }`;
+                cellBtn.style.minWidth = '58px';
+                cellBtn.style.minHeight = '64px';
+                cellBtn.dataset.tapeIdx = String(i);
+                cellBtn.textContent = String(val);
+
+                cellBtn.addEventListener('click', () => {
+                    if (isProcessingError) return;
+                    p3State.tapeDigits[i] = (p3State.tapeDigits[i] + 1) % p3State.targetBase;
+                    renderPhase3();
+                });
+
+                cellWrap.appendChild(weightLabel);
+                cellWrap.appendChild(cellBtn);
+                p3TapeContainer.appendChild(cellWrap);
+            }
+
+            const strVal = p3State.tapeDigits.join('');
+            p3PreviewText.innerHTML = `Текущее состояние ленты: <strong class="text-light">${strVal}<sub>${p3State.targetBase}</sub></strong>`;
+        }
+
+        p3ClearTapeBtn.addEventListener('click', () => {
+            if (isProcessingError) return;
+            p3State.tapeDigits.fill(0);
+            renderPhase3();
+        });
+
+        p3SubmitBtn.addEventListener('click', () => {
+            if (isProcessingError) return;
+            let assembled = 0;
+            for (let i = 0; i < p3State.tapeLen; i++) {
+                assembled = assembled * p3State.targetBase + p3State.tapeDigits[i];
+            }
+
+            if (assembled === p3State.decimalValue) {
+                showVictory();
+            } else {
+                triggerFailure('Код в регистре не совпадает с исходным числом! Переведите число через 10-ную систему заново.', generatePhase3);
+            }
+        });
+
+        // Однократный старт Фазы 1
+        generatePhase1();
+    })();
+    </script>
+</TaskLayout>

@@ -1,0 +1,1163 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout
+    level={3}
+    title="Урок 33 :: Перевод чисел из одной системы счисления в другую (Уровень 3)"
+    bodyClass="font-monospace m-0 p-0"
+>
+    <div id="arcade-app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-danger mb-0 fw-bold">Арена: Транскодер позиционных шин (Radix-ALU Bus // Уровень 3)</h1>
+                <div class="text-secondary small">Урок 33 // 10 класс (углубленный, технологический профиль)</div>
+            </div>
+            <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-2">
+                Аркадный босс // Хардкор-сброс
+            </span>
+        </div>
+
+        <div class="card bg-dark rounded-0 shadow" :class="isAlarm ? 'border-danger border-2' : (isSuccessPulse ? 'border-success border-2' : 'border-danger')">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- ЭКРАН 1: ВВОДНЫЙ БРИФИНГ (Intro Screen) -->
+                <div v-if="gameState === 'intro'" class="text-center py-4">
+                    <div class="display-6 text-danger fw-bold mb-2">ТРАНСКОДЕР ПОЗИЦИОННЫХ ШИН (RADIX-ALU BUS)</div>
+                    <p class="text-light fs-6 mx-auto mb-4" style="max-width: 740px;">
+                        Вы управляете аппаратным транскодером систем счисления. На вход конвейера поступают позиционные кадры
+                        с основаниями 2, 3, 4, 5, 6, 7, 8, 10, 16 и калибровочным основанием x. Считайте разряды с шины,
+                        выполните перевод и синтезируйте целевое значение на 8-битной выходной шине до обнуления таймера!
+                    </p>
+
+                    <div class="alert alert-dark bg-black border border-danger text-light rounded-0 text-start mx-auto p-3 mb-4" style="max-width: 720px;">
+                        <div class="text-danger fw-bold mb-2">⚡ ТАКТИЧЕСКИЙ РЕГЛАМЕНТ ХАРДКОР-РЕЖИМА:</div>
+                        <ul class="mb-0 text-secondary small ps-3">
+                            <li><strong class="text-light">10 процедурных волн:</strong> динамический таймер сжимается с 14.0 с до 8.5 с (Волна 8 — тактическая передышка).</li>
+                            <li><strong class="text-danger">ХАРДКОР-СБРОС:</strong> ошибка транскодирования или обнуление таймера включают сирену и <em>ПОЛНОСТЬЮ СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</em> с перегенерацией кадров.</li>
+                            <li><strong class="text-info">Прямое управление (Direct Manipulation):</strong> биты <code>128..1</code> — клик или клавиши <code>1</code>–<code>8</code>; сдвиги и инкремент АЛУ — <code>Q</code> (×2), <code>W</code> (÷2), <code>E</code> (+1), <code>A</code> (−1); сброс — <code>0</code> / <code>Backspace</code>; пуск — <code>Пробел</code> / <code>Enter</code>.</li>
+                        </ul>
+                    </div>
+
+                    <button
+                        id="start-btn"
+                        type="button"
+                        @click="startGame"
+                        class="btn btn-danger btn-lg rounded-0 px-5 py-3 fw-bold text-white shadow"
+                        style="min-height: 54px;"
+                    >
+                        ▶ НАЧАТЬ ТРАНСКОДИРОВАНИЕ [ПРОБЕЛ]
+                    </button>
+                </div>
+
+                <!-- ЭКРАН 2: АКТИВНАЯ АРЕНА (Playing Screen) -->
+                <div v-else-if="gameState === 'playing'">
+
+                    <!-- Верхняя панель статуса -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span id="phase-counter" class="badge bg-danger text-white rounded-0 fs-6">
+                                ВОЛНА <span v-text="currentWave"></span> ИЗ 10
+                            </span>
+                            <span class="text-light fw-bold fs-6" v-text="currentWaveData.title"></span>
+                            <span v-if="currentWaveData.isBreather" class="badge bg-info text-dark rounded-0">ПЕРЕДЫШКА</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-secondary small">
+                                Сбои: <span class="text-warning fw-bold" v-text="failCount"></span>
+                            </div>
+                            <div class="text-secondary small">
+                                Таймер: <span class="fw-bold fs-5" :class="timeLeft <= 3.0 ? 'text-danger' : 'text-warning'" v-text="timeLeft.toFixed(1) + 's'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Полоса таймера волны -->
+                    <div class="progress rounded-0 bg-black border border-secondary mb-3" style="height: 10px;">
+                        <div
+                            class="progress-bar"
+                            :class="timeLeft <= 3.0 ? 'bg-danger' : 'bg-warning'"
+                            role="progressbar"
+                            :style="{ width: Math.max(0, Math.min(100, (timeLeft / currentWaveData.maxTime) * 100)) + '%', transition: 'width 100ms linear' }"
+                        ></div>
+                    </div>
+
+                    <!-- Аварийный баннер тревоги (#alarm-box) -->
+                    <div id="alarm-box" v-if="isAlarm" class="alert alert-danger bg-black border border-danger text-danger rounded-0 mb-3 py-2 px-3">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <span class="fw-bold fs-6">🚨 КРИТИЧЕСКИЙ СБОЙ ТРАНСКОДЕРА! ХАРДКОР-СБРОС НА ВОЛНУ 1:</span>
+                                <div class="small mt-1 text-light" v-text="alarmMessage"></div>
+                            </div>
+                            <div class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></div>
+                        </div>
+                    </div>
+
+                    <!-- Вспышка успешной фиксации -->
+                    <div v-if="isSuccessPulse" class="alert alert-success bg-black border border-success text-success rounded-0 mb-3 py-2 px-3">
+                        <span class="fw-bold">✔ КАДР ТРАНСКОДИРОВАН:</span>
+                        <span class="small text-light ms-1" v-text="successMessage"></span>
+                    </div>
+
+                    <!-- Data Source: Графический конвейер входных позиционных регистров -->
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <span>ВХОДНОЙ КОНВЕЙЕР ПОЗИЦИОННЫХ КАДРОВ (DATA SOURCE):</span>
+                            <span class="badge bg-secondary text-white rounded-0">FRAME-<span v-text="currentWave"></span> // → 10</span>
+                        </div>
+                        <div class="card-body p-3">
+                            <p class="text-light fs-6 mb-3" v-text="currentWaveData.directive"></p>
+
+                            <div class="d-flex flex-wrap align-items-stretch gap-2">
+                                <template v-for="(frame, fIdx) in currentWaveData.frames" :key="fIdx">
+                                    <!-- Оператор / связка между кадрами -->
+                                    <div v-if="frame.operatorBefore" class="d-flex align-items-center justify-content-center px-2">
+                                        <span class="badge bg-dark border border-warning text-warning rounded-0 fs-5 px-2 py-2" v-text="frame.operatorBefore"></span>
+                                    </div>
+
+                                    <!-- Позиционный кадр с разрядами или степенным выражением -->
+                                    <div class="p-2 bg-dark border rounded-0 flex-grow-1" :class="frame.accentClass || 'border-info'">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                            <span class="small fw-bold text-secondary" v-text="frame.tag"></span>
+                                            <span class="badge bg-black border border-secondary text-info rounded-0" v-text="frame.baseLabel"></span>
+                                        </div>
+
+                                        <!-- Разрядная лента входного кадра -->
+                                        <div v-if="frame.cells && frame.cells.length" class="d-flex flex-wrap align-items-end gap-1">
+                                            <template v-for="(cell, cIdx) in frame.cells" :key="cIdx">
+                                                <div v-if="cell.isRadixPoint" class="px-1 pb-1 text-warning fw-bold fs-3">,</div>
+                                                <div v-else class="bg-black border border-secondary text-center px-2 py-1" style="min-width: 44px;">
+                                                    <div class="text-secondary" style="font-size: 0.72rem;">
+                                                        <span v-text="frame.radixSymbol"></span><sup><span v-text="cell.power"></span></sup>
+                                                    </div>
+                                                    <div class="text-info fw-bold fs-3 lh-sm" v-text="cell.digit"></div>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <!-- Степенное арифметическое выражение (для волны 9) -->
+                                        <div v-else-if="frame.formulaParts && frame.formulaParts.length" class="bg-black border border-secondary px-3 py-2 text-info fw-bold fs-4 d-flex flex-wrap align-items-center gap-2">
+                                            <template v-for="(part, pIdx) in frame.formulaParts" :key="pIdx">
+                                                <span v-if="part.op" class="text-warning" v-text="part.op"></span>
+                                                <span v-else>
+                                                    <span v-text="part.base"></span><sup class="text-light" v-text="part.exp"></sup>
+                                                </span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct Surface: Аппаратная шина + 8-битный регистр и микрооперации АЛУ -->
+                    <div class="card bg-black border border-info rounded-0 mb-2">
+                        <div class="card-header bg-dark text-warning py-2 px-3 small fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <span>ПРЯМАЯ РЕГИСТРОВАЯ ШИНА И АЛУ (8-BIT DIRECT BUS):</span>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge bg-black border border-secondary text-secondary rounded-0">
+                                    HEX: <span class="text-warning" v-text="registerHex"></span>
+                                </span>
+                                <span class="badge bg-black border border-secondary text-secondary rounded-0">
+                                    BIN: <span class="text-info" v-text="registerBinary"></span>
+                                </span>
+                                <span class="badge bg-info text-dark rounded-0 fs-6">
+                                    ШИНА: <span v-text="registerValue"></span> <span v-text="currentWaveData.targetUnit"></span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-3">
+                            <!-- Реактивная SVG-коммутация 8 линий с маркерами тетрад к выходному коллектору -->
+                            <div class="mb-2 d-none d-sm-block">
+                                <svg viewBox="0 0 800 48" class="w-100" style="height: 48px;" aria-hidden="true">
+                                    <rect x="10" y="2" width="380" height="4" fill="#1f2937" />
+                                    <rect x="410" y="2" width="380" height="4" fill="#1f2937" />
+                                    <line x1="399" y1="2" x2="399" y2="42" stroke="#495057" stroke-dasharray="3 3" stroke-width="1.5" />
+                                    <line x1="40" y1="38" x2="760" y2="38" stroke="#343a40" stroke-width="4" />
+                                    <line
+                                        v-if="registerValue > 0"
+                                        x1="40"
+                                        y1="38"
+                                        x2="760"
+                                        y2="38"
+                                        :stroke="isAlarm ? '#dc3545' : (isSuccessPulse ? '#198754' : '#0dcaf0')"
+                                        stroke-width="4"
+                                    />
+                                    <g v-for="bit in bitPins" :key="'trace-' + bit.weight">
+                                        <line
+                                            :x1="bit.svgX"
+                                            y1="8"
+                                            :x2="bit.svgX"
+                                            y2="38"
+                                            :stroke="(registerMask & bit.weight) ? (isAlarm ? '#dc3545' : '#0dcaf0') : '#495057'"
+                                            :stroke-width="(registerMask & bit.weight) ? 4 : 2"
+                                        />
+                                        <circle
+                                            :cx="bit.svgX"
+                                            cy="38"
+                                            r="5"
+                                            :fill="(registerMask & bit.weight) ? (isSuccessPulse ? '#198754' : '#0dcaf0') : '#212529'"
+                                            stroke="#6c757d"
+                                            stroke-width="1.5"
+                                        />
+                                    </g>
+                                </svg>
+                                <div class="d-flex justify-content-between text-secondary px-2" style="font-size: 0.72rem;">
+                                    <span>HIGH TETRAD (2<sup>7</sup>..2<sup>4</sup>) // HEX: <span class="text-warning" v-text="highTetradHex"></span></span>
+                                    <span>LOW TETRAD (2<sup>3</sup>..2<sup>0</sup>) // HEX: <span class="text-warning" v-text="lowTetradHex"></span></span>
+                                </div>
+                            </div>
+
+                            <!-- 8 тактильных переключателей разрядов (хитбоксы >= 52x70 px) -->
+                            <div class="row g-2 mb-3">
+                                <div v-for="bit in bitPins" :key="bit.weight" class="col-3 col-md">
+                                    <button
+                                        type="button"
+                                        @click="toggleBit(bit.weight)"
+                                        :disabled="isActionBlocked"
+                                        :aria-pressed="Boolean(registerMask & bit.weight)"
+                                        class="btn w-100 rounded-0 p-2 d-flex flex-column align-items-center justify-content-between fw-bold"
+                                        :class="(registerMask & bit.weight) ? 'btn-info text-dark border-light shadow' : 'btn-outline-secondary text-light bg-dark'"
+                                        style="min-width: 52px; min-height: 70px;"
+                                    >
+                                        <span class="badge rounded-0 w-100" :class="(registerMask & bit.weight) ? 'bg-dark text-info' : 'bg-black text-secondary'">
+                                            [<span v-text="bit.hotkey"></span>] 2<sup v-text="bit.exp"></sup>
+                                        </span>
+                                        <span class="fs-5 my-1" v-text="bit.weight"></span>
+                                        <span class="small" v-text="(registerMask & bit.weight) ? 'BIT: 1' : 'BIT: 0'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Панель микроопераций АЛУ (Direct Surface) -->
+                            <div class="row g-2 mb-3">
+                                <div class="col-6 col-sm-3">
+                                    <button
+                                        type="button"
+                                        @click="applyMicroOp('shl')"
+                                        :disabled="isActionBlocked"
+                                        class="btn btn-outline-info w-100 rounded-0 fw-bold"
+                                        style="min-height: 48px;"
+                                    >
+                                        ≪ SHL ×2 [Q]
+                                    </button>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <button
+                                        type="button"
+                                        @click="applyMicroOp('shr')"
+                                        :disabled="isActionBlocked"
+                                        class="btn btn-outline-info w-100 rounded-0 fw-bold"
+                                        style="min-height: 48px;"
+                                    >
+                                        ≫ SHR ÷2 [W]
+                                    </button>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <button
+                                        type="button"
+                                        @click="applyMicroOp('inc')"
+                                        :disabled="isActionBlocked"
+                                        class="btn btn-outline-secondary text-light w-100 rounded-0 fw-bold"
+                                        style="min-height: 48px;"
+                                    >
+                                        +1 INC [E]
+                                    </button>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <button
+                                        type="button"
+                                        @click="applyMicroOp('dec')"
+                                        :disabled="isActionBlocked"
+                                        class="btn btn-outline-secondary text-light w-100 rounded-0 fw-bold"
+                                        style="min-height: 48px;"
+                                    >
+                                        −1 DEC [A]
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Панель фиксации и сброса шины -->
+                            <div class="row g-2 align-items-stretch">
+                                <div class="col-12 col-sm-4">
+                                    <button
+                                        id="clear-bus-btn"
+                                        type="button"
+                                        @click="clearRegister"
+                                        :disabled="isActionBlocked"
+                                        class="btn btn-outline-warning w-100 h-100 rounded-0 fw-bold"
+                                        style="min-height: 52px;"
+                                    >
+                                        ↺ СБРОС ШИНЫ [0]
+                                    </button>
+                                </div>
+                                <div class="col-12 col-sm-8">
+                                    <button
+                                        id="commit-frame-btn"
+                                        type="button"
+                                        @click="commitFrame"
+                                        :disabled="isActionBlocked || registerValue === 0"
+                                        class="btn w-100 h-100 rounded-0 fw-bold fs-6"
+                                        :class="registerValue > 0 ? 'btn-success text-white' : 'btn-outline-secondary text-secondary'"
+                                        style="min-height: 52px;"
+                                    >
+                                        ⚡ ПЕРЕДАТЬ В ШИНУ (<span v-text="registerValue"></span> <span v-text="currentWaveData.targetUnit"></span>) [ПРОБЕЛ]
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ЭКРАН 3: ПОБЕДА НАД БОССОМ (Victory Screen) -->
+                <div v-else-if="gameState === 'victory'" class="text-center py-4">
+                    <h2 class="display-6 text-success fw-bold mb-2">ТРАНСКОДИРОВАНИЕ ЗАВЕРШЕНО!</h2>
+                    <p class="text-light fs-6 mx-auto mb-4" style="max-width: 720px;">
+                        Все 10 волн перевода чисел, схемы Горнера, смещения смешанных дробей, калибровки неизвестного основания x
+                        и инвариантов степенных сумм выполнены без критического сбоя шины.
+                    </p>
+                    <div class="d-inline-flex flex-wrap justify-content-center gap-4 p-3 bg-black border border-success rounded-0 mb-4 text-start">
+                        <div>
+                            <span class="text-secondary small d-block">СБОЕВ (HARDCORE RESETS):</span>
+                            <span class="fs-4 fw-bold text-warning" v-text="failCount"></span>
+                        </div>
+                        <div>
+                            <span class="text-secondary small d-block">ИТОГОВОЕ ВРЕМЯ МИССИИ:</span>
+                            <span class="fs-4 fw-bold text-info" v-text="formatTime(totalSessionElapsed)"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <button
+                            type="button"
+                            @click="restartGame"
+                            class="btn btn-outline-danger rounded-0 px-4 py-2 fw-bold"
+                            style="min-height: 48px;"
+                        >
+                            ↻ Пройти аркаду заново
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+
+<script is:inline>
+document.addEventListener('DOMContentLoaded', () => {
+    const { createApp } = Vue;
+
+    const MISSION_NAME = 'Урок 33 :: Перевод чисел из одной системы счисления в другую (Уровень 3)';
+    const TOTAL_WAVES = 10;
+    const DIGITS_ALPHA = '0123456789ABCDEF';
+
+    let appInstance = null;
+    let resetTimeout = null;
+    let pulseTimeout = null;
+    let audioCtx = null;
+
+    function getAudioContext() {
+        try {
+            if (!audioCtx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) audioCtx = new AudioCtx();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function playTone(freq, type, duration, vol = 0.12) {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (err) {
+            // Игнорируем ограничения автовоспроизведения Web Audio
+        }
+    }
+
+    function playToggleSound(isOn) {
+        playTone(isOn ? 640 : 340, 'square', 0.06, 0.08);
+    }
+
+    function playMicroOpSound(op) {
+        const freqMap = { shl: 720, shr: 460, inc: 580, dec: 400 };
+        playTone(freqMap[op] || 500, 'triangle', 0.07, 0.09);
+    }
+
+    function playSuccessSound() {
+        playTone(523.25, 'triangle', 0.10, 0.12);
+        setTimeout(() => playTone(783.99, 'triangle', 0.15, 0.12), 70);
+    }
+
+    function playAlarmSiren() {
+        playTone(210, 'sawtooth', 0.25, 0.15);
+        setTimeout(() => playTone(155, 'sawtooth', 0.35, 0.16), 190);
+    }
+
+    function playVictoryFanfare() {
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+            setTimeout(() => playTone(freq, 'triangle', 0.18, 0.13), idx * 95);
+        });
+    }
+
+    function pick(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function toRadixCells(num, radix, minLen = 0) {
+        let str = num.toString(radix).toUpperCase();
+        if (minLen > 0) {
+            str = str.padStart(minLen, '0');
+        }
+        const cells = [];
+        for (let i = 0; i < str.length; i++) {
+            cells.push({
+                digit: str[i],
+                power: str.length - 1 - i,
+                isRadixPoint: false
+            });
+        }
+        return { str, cells };
+    }
+
+    function sumDigitsInBase(num, radix) {
+        let t = num;
+        let sum = 0;
+        while (t > 0) {
+            sum += t % radix;
+            t = Math.floor(t / radix);
+        }
+        return sum;
+    }
+
+    function countDigitsInBase(num, radix) {
+        let t = num;
+        let len = 0;
+        while (t > 0) {
+            len++;
+            t = Math.floor(t / radix);
+        }
+        return Math.max(1, len);
+    }
+
+    function generateWaves() {
+        // Волна 1: Диадный синтез (4 -> 2 -> 10)
+        const w1Val = randInt(18, 62);
+        const w1 = toRadixCells(w1Val, 4, 3);
+
+        // Волна 2: Триадный синтез (8 -> 2 -> 10)
+        const w2Val = randInt(19, 125);
+        const w2 = toRadixCells(w2Val, 8);
+
+        // Волна 3: Тетрадный дешифратор (16 -> 2 -> 10), хотя бы одна цифра A..F
+        let w3Val = randInt(27, 238);
+        while (w3Val % 16 === 0 || (w3Val % 16 < 10 && Math.floor(w3Val / 16) < 10)) {
+            w3Val = randInt(27, 238);
+        }
+        const w3 = toRadixCells(w3Val, 16, 2);
+
+        // Волна 4: Конвейер Горнера (q -> 10, q in {3, 5, 6, 7})
+        const w4Q = pick([3, 5, 6, 7]);
+        let w4D2 = randInt(1, w4Q - 1);
+        let w4D1 = randInt(0, w4Q - 1);
+        let w4D0 = randInt(0, w4Q - 1);
+        let w4Val = (w4D2 * w4Q + w4D1) * w4Q + w4D0;
+        while (w4Val < 15 || w4Val > 220 || (w4D1 === 0 && w4D0 === 0)) {
+            w4D2 = randInt(1, w4Q - 1);
+            w4D1 = randInt(0, w4Q - 1);
+            w4D0 = randInt(0, w4Q - 1);
+            w4Val = (w4D2 * w4Q + w4D1) * w4Q + w4D0;
+        }
+
+        // Волна 5: Последовательное деление (10 -> q): сумма цифр
+        const w5Q = pick([3, 4, 5]);
+        const w5N = randInt(25, 120);
+        const w5 = toRadixCells(w5N, 10);
+        const w5Val = sumDigitsInBase(w5N, w5Q);
+        const w5Converted = w5N.toString(w5Q);
+
+        // Волна 6: Масштабирование смешанной дроби (I,F_q * q -> 10)
+        const w6Q = pick([4, 8]);
+        let w6D1 = randInt(1, w6Q === 4 ? 3 : 2);
+        let w6D0 = randInt(0, w6Q - 1);
+        let w6F = randInt(1, w6Q - 1);
+        let w6Val = (w6D1 * w6Q + w6D0) * w6Q + w6F;
+        while (w6Val < 17 || w6Val > 180) {
+            w6D1 = randInt(1, w6Q === 4 ? 3 : 2);
+            w6D0 = randInt(0, w6Q - 1);
+            w6F = randInt(1, w6Q - 1);
+            w6Val = (w6D1 * w6Q + w6D0) * w6Q + w6F;
+        }
+
+        // Волна 7: Пик инверсии — калибровка неизвестного основания x
+        const w7X = randInt(5, 14);
+        const w7D2 = randInt(1, Math.min(3, w7X - 1));
+        const w7D1 = randInt(1, Math.min(5, w7X - 1));
+        const w7D0 = randInt(1, Math.min(6, w7X - 1));
+        const w7Decimal = w7D2 * w7X * w7X + w7D1 * w7X + w7D0;
+        const w7DecCells = toRadixCells(w7Decimal, 10).cells;
+
+        // Волна 8 (Передышка): Разрядная емкость (10 -> q)
+        const w8Q = pick([2, 3, 4]);
+        const w8N = randInt(16, 240);
+        const w8Cells = toRadixCells(w8N, 10).cells;
+        const w8Val = countDigitsInBase(w8N, w8Q);
+
+        // Волна 9: Инвариант степени (P^m + q^k - q^r в основании q)
+        const w9Q = pick([3, 4, 5, 6]);
+        const w9S = pick([2, 3]);
+        const w9M = w9S === 2 ? pick([2, 3]) : 2;
+        const maxExp = w9S * w9M; // >= 4
+        const w9K = maxExp === 4 ? 3 : randInt(3, Math.min(5, maxExp - 1));
+        const w9R = randInt(1, Math.min(2, w9K - 1));
+        const w9P = Math.pow(w9Q, w9S);
+        const w9Val = 1 + (w9K - w9R) * (w9Q - 1);
+
+        // Волна 10: Финальный босс — межосновный сумматор (16 + 8 -> 10)
+        let w10A = randInt(18, 140);
+        while (w10A % 16 < 10 && Math.floor(w10A / 16) < 10) {
+            w10A = randInt(18, 140);
+        }
+        const w10B = randInt(9, 75);
+        const w10Val = w10A + w10B;
+        const w10ACells = toRadixCells(w10A, 16, 2);
+        const w10BCells = toRadixCells(w10B, 8);
+
+        return [
+            {
+                waveNumber: 1,
+                title: 'Диадный синтез (4 → 10)',
+                directive: 'Переведите входной четверичный кадр в десятичную систему счисления и задайте результат на 8-битной шине.',
+                frames: [
+                    {
+                        tag: 'КАДР A',
+                        baseLabel: 'ОСНОВАНИЕ 4',
+                        radixSymbol: '4',
+                        accentClass: 'border-info',
+                        cells: w1.cells
+                    }
+                ],
+                targetValue: w1Val,
+                targetUnit: 'в 10-й СС',
+                maxTime: 14.0,
+                isBreather: false,
+                explanation: `${w1.str}₄ = ${w1Val}₁₀ (через пары бит: ${w1Val.toString(2).padStart(6, '0')}₂).`
+            },
+            {
+                waveNumber: 2,
+                title: 'Триадный синтез (8 → 10)',
+                directive: 'Переведите восьмеричный кадр с конвейера в десятичное значение (через двоичные триады или разложение по степеням 8).',
+                frames: [
+                    {
+                        tag: 'КАДР A',
+                        baseLabel: 'ОСНОВАНИЕ 8',
+                        radixSymbol: '8',
+                        accentClass: 'border-info',
+                        cells: w2.cells
+                    }
+                ],
+                targetValue: w2Val,
+                targetUnit: 'в 10-й СС',
+                maxTime: 13.5,
+                isBreather: false,
+                explanation: `${w2.str}₈ = ${w2Val}₁₀.`
+            },
+            {
+                waveNumber: 3,
+                title: 'Тетрадный дешифратор (16 → 10)',
+                directive: 'Дешифруйте шестнадцатеричный байт-кадр и соберите его точное десятичное значение на шине.',
+                frames: [
+                    {
+                        tag: 'HEX-КАДР',
+                        baseLabel: 'ОСНОВАНИЕ 16',
+                        radixSymbol: '16',
+                        accentClass: 'border-warning',
+                        cells: w3.cells
+                    }
+                ],
+                targetValue: w3Val,
+                targetUnit: 'в 10-й СС',
+                maxTime: 13.0,
+                isBreather: false,
+                explanation: `0x${w3.str} = ${Math.floor(w3Val / 16)}·16 + ${w3Val % 16} = ${w3Val}₁₀.`
+            },
+            {
+                waveNumber: 4,
+                title: `Конвейер Горнера (${w4Q} → 10)`,
+                directive: 'Вычислите десятичный вес кадра в произвольном основании по схеме Горнера ((d₂·q + d₁)·q + d₀).',
+                frames: [
+                    {
+                        tag: 'ПОЗИЦИОННЫЙ КАДР',
+                        baseLabel: `ОСНОВАНИЕ ${w4Q}`,
+                        radixSymbol: String(w4Q),
+                        accentClass: 'border-info',
+                        cells: [
+                            { digit: DIGITS_ALPHA[w4D2], power: 2, isRadixPoint: false },
+                            { digit: DIGITS_ALPHA[w4D1], power: 1, isRadixPoint: false },
+                            { digit: DIGITS_ALPHA[w4D0], power: 0, isRadixPoint: false }
+                        ]
+                    }
+                ],
+                targetValue: w4Val,
+                targetUnit: 'в 10-й СС',
+                maxTime: 12.0,
+                isBreather: false,
+                explanation: `((${w4D2}·${w4Q} + ${w4D1})·${w4Q} + ${w4D0}) = ${w4Val}₁₀.`
+            },
+            {
+                waveNumber: 5,
+                title: `Сумма цифр после перевода (10 → ${w5Q})`,
+                directive: 'Переведите десятичный кадр в указанное целевое основание методом последовательного деления и передайте на шину СУММУ ЦИФР записи.',
+                frames: [
+                    {
+                        tag: 'ДЕСЯТИЧНЫЙ КАДР',
+                        baseLabel: 'ОСНОВАНИЕ 10',
+                        radixSymbol: '10',
+                        accentClass: 'border-info',
+                        cells: w5.cells
+                    },
+                    {
+                        tag: 'ЦЕЛЬ ТРАНСКОДЕРА',
+                        operatorBefore: '→',
+                        baseLabel: `В ОСНОВАНИЕ ${w5Q}`,
+                        radixSymbol: 'Σ',
+                        accentClass: 'border-warning',
+                        cells: [
+                            { digit: `q=${w5Q}`, power: 'сумма цифр', isRadixPoint: false }
+                        ]
+                    }
+                ],
+                targetValue: w5Val,
+                targetUnit: 'сумма цифр',
+                maxTime: 11.5,
+                isBreather: false,
+                explanation: `${w5N}₁₀ = ${w5Converted}₍${w5Q}₎, сумма цифр = ${w5Val}.`
+            },
+            {
+                waveNumber: 6,
+                title: `Сдвиг смешанной дроби (× ${w6Q})`,
+                directive: 'Смешанное число умножается на основание своей системы счисления (сдвиг запятой на 1 разряд вправо). Передайте целое десятичное значение результата.',
+                frames: [
+                    {
+                        tag: 'СМЕШАННАЯ ДРОБЬ',
+                        baseLabel: `ОСНОВАНИЕ ${w6Q}`,
+                        radixSymbol: String(w6Q),
+                        accentClass: 'border-info',
+                        cells: [
+                            { digit: String(w6D1), power: 1, isRadixPoint: false },
+                            { digit: String(w6D0), power: 0, isRadixPoint: false },
+                            { digit: ',', power: '', isRadixPoint: true },
+                            { digit: String(w6F), power: -1, isRadixPoint: false }
+                        ]
+                    },
+                    {
+                        tag: 'МНОЖИТЕЛЬ ШИНЫ',
+                        operatorBefore: '×',
+                        baseLabel: 'СДВИГ +1 РАЗРЯД',
+                        radixSymbol: 'q',
+                        accentClass: 'border-warning',
+                        cells: [
+                            { digit: String(w6Q), power: 1, isRadixPoint: false }
+                        ]
+                    }
+                ],
+                targetValue: w6Val,
+                targetUnit: 'в 10-й СС',
+                maxTime: 11.0,
+                isBreather: false,
+                explanation: `(${w6D1}${w6D0},${w6F})₍${w6Q}₎ · ${w6Q} = ${w6D1}${w6D0}${w6F}₍${w6Q}₎ = ${w6Val}₁₀.`
+            },
+            {
+                waveNumber: 7,
+                title: 'Пик инверсии: калибровка основания x',
+                directive: 'Найдите неизвестное основание x левого кадра, при котором его десятичный вес равен правому эталонному кадру. Передайте x на шину.',
+                frames: [
+                    {
+                        tag: 'ШИФРОВАННЫЙ КАДР',
+                        baseLabel: 'ОСНОВАНИЕ x = ?',
+                        radixSymbol: 'x',
+                        accentClass: 'border-danger',
+                        cells: [
+                            { digit: String(w7D2), power: 2, isRadixPoint: false },
+                            { digit: String(w7D1), power: 1, isRadixPoint: false },
+                            { digit: String(w7D0), power: 0, isRadixPoint: false }
+                        ]
+                    },
+                    {
+                        tag: 'ЭТАЛОННЫЙ ВЕС',
+                        operatorBefore: '=',
+                        baseLabel: 'ОСНОВАНИЕ 10',
+                        radixSymbol: '10',
+                        accentClass: 'border-success',
+                        cells: w7DecCells
+                    }
+                ],
+                targetValue: w7X,
+                targetUnit: 'основание x',
+                maxTime: 10.5,
+                isBreather: false,
+                explanation: `${w7D2}·x² + ${w7D1}·x + ${w7D0} = ${w7Decimal} выполняются при x = ${w7X}.`
+            },
+            {
+                waveNumber: 8,
+                title: `Разрядная емкость (10 → ${w8Q})`,
+                directive: 'Тактическая передышка: определите минимальное количество значащих разрядов при записи входного числа в целевом основании q.',
+                frames: [
+                    {
+                        tag: 'ДЕСЯТИЧНОЕ ЧИСЛО',
+                        baseLabel: 'ОСНОВАНИЕ 10',
+                        radixSymbol: '10',
+                        accentClass: 'border-info',
+                        cells: w8Cells
+                    },
+                    {
+                        tag: 'ЦЕЛЕВАЯ СЕТКА',
+                        operatorBefore: '→',
+                        baseLabel: `ОСНОВАНИЕ ${w8Q}`,
+                        radixSymbol: 'L',
+                        accentClass: 'border-success',
+                        cells: [
+                            { digit: `q=${w8Q}`, power: 'число разрядов', isRadixPoint: false }
+                        ]
+                    }
+                ],
+                targetValue: w8Val,
+                targetUnit: 'разрядов',
+                maxTime: 11.5,
+                isBreather: true,
+                explanation: `${w8N}₁₀ = ${w8N.toString(w8Q)}₍${w8Q}₎ содержит ${w8Val} разр.`
+            },
+            {
+                waveNumber: 9,
+                title: `Инвариант степеней (в СС ${w9Q})`,
+                directive: `Выражение переводится в систему счисления с основанием q = ${w9Q}. Не возводя огромные числа вручную, вычислите и передайте СУММУ ВСЕХ ЦИФР результата.`,
+                frames: [
+                    {
+                        tag: 'АРИФМЕТИЧЕСКИЙ ИМПУЛЬС',
+                        baseLabel: `ЦЕЛЕВАЯ СС: ${w9Q} (${w9P} = ${w9Q}^${w9S})`,
+                        accentClass: 'border-danger',
+                        formulaParts: [
+                            { base: w9P, exp: w9M },
+                            { op: '+' },
+                            { base: w9Q, exp: w9K },
+                            { op: '−' },
+                            { base: w9Q, exp: w9R }
+                        ]
+                    }
+                ],
+                targetValue: w9Val,
+                targetUnit: 'сумма цифр',
+                maxTime: 9.5,
+                isBreather: false,
+                explanation: `${w9Q}^${w9S * w9M} + ${w9Q}^${w9K} − ${w9Q}^${w9R} в СС ${w9Q}: одна 1 и (${w9K}−${w9R}) цифр (${w9Q - 1}) → сумма 1 + ${w9K - w9R}·${w9Q - 1} = ${w9Val}.`
+            },
+            {
+                waveNumber: 10,
+                title: 'Финальный босс: сумматор (16 + 8 → 10)',
+                directive: 'Дешифруйте оба входных кадра в десятичную систему счисления, найдите их сумму и передайте результат на шину!',
+                frames: [
+                    {
+                        tag: 'КАДР A (HEX)',
+                        baseLabel: 'ОСНОВАНИЕ 16',
+                        radixSymbol: '16',
+                        accentClass: 'border-warning',
+                        cells: w10ACells.cells
+                    },
+                    {
+                        tag: 'КАДР B (OCT)',
+                        operatorBefore: '+',
+                        baseLabel: 'ОСНОВАНИЕ 8',
+                        radixSymbol: '8',
+                        accentClass: 'border-info',
+                        cells: w10BCells.cells
+                    }
+                ],
+                targetValue: w10Val,
+                targetUnit: 'в 10-й СС',
+                maxTime: 8.5,
+                isBreather: false,
+                explanation: `0x${w10ACells.str} (${w10A}) + ${w10BCells.str}₈ (${w10B}) = ${w10Val}₁₀.`
+            }
+        ];
+    }
+
+    const telemetry = window.LMSTelemetry.create({
+        missionName: MISSION_NAME,
+        level: 3,
+        totalWaves: TOTAL_WAVES,
+        showAfkOverlay: true,
+        onAfkStop: () => {
+            if (!appInstance) return;
+            appInstance.stopWaveTimer();
+            if (resetTimeout) clearTimeout(resetTimeout);
+            if (pulseTimeout) clearTimeout(pulseTimeout);
+            appInstance.isActionBlocked = true;
+            appInstance.isAfkPaused = true;
+        },
+        onAfkRetry: () => {
+            if (!appInstance) return;
+            appInstance.isAfkPaused = false;
+            appInstance.isAlarm = false;
+            appInstance.isActionBlocked = false;
+            appInstance.activeWaves = generateWaves();
+            appInstance.loadWave(1);
+        }
+    });
+
+    const app = createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro' | 'playing' | 'victory'
+                currentWave: 1,
+                activeWaves: generateWaves(),
+                registerMask: 0,
+                timeLeft: 14.0,
+                timerInterval: null,
+                isAlarm: false,
+                alarmMessage: '',
+                isSuccessPulse: false,
+                successMessage: '',
+                isActionBlocked: false,
+                isAfkPaused: false,
+                failCount: 0,
+                sessionStartTime: 0,
+                totalSessionElapsed: 0,
+                bitPins: [
+                    { weight: 128, exp: 7, hotkey: '1', svgX: 50 },
+                    { weight: 64, exp: 6, hotkey: '2', svgX: 150 },
+                    { weight: 32, exp: 5, hotkey: '3', svgX: 250 },
+                    { weight: 16, exp: 4, hotkey: '4', svgX: 350 },
+                    { weight: 8, exp: 3, hotkey: '5', svgX: 450 },
+                    { weight: 4, exp: 2, hotkey: '6', svgX: 550 },
+                    { weight: 2, exp: 1, hotkey: '7', svgX: 650 },
+                    { weight: 1, exp: 0, hotkey: '8', svgX: 750 }
+                ]
+            };
+        },
+
+        computed: {
+            currentWaveData() {
+                return this.activeWaves[this.currentWave - 1] || this.activeWaves[0];
+            },
+            registerValue() {
+                return this.registerMask;
+            },
+            registerBinary() {
+                return this.registerMask.toString(2).padStart(8, '0');
+            },
+            registerHex() {
+                return '0x' + this.registerMask.toString(16).toUpperCase().padStart(2, '0');
+            },
+            highTetradHex() {
+                return DIGITS_ALPHA[(this.registerMask >> 4) & 0xF];
+            },
+            lowTetradHex() {
+                return DIGITS_ALPHA[this.registerMask & 0xF];
+            }
+        },
+
+        methods: {
+            startGame() {
+                if (resetTimeout) clearTimeout(resetTimeout);
+                if (pulseTimeout) clearTimeout(pulseTimeout);
+                this.gameState = 'playing';
+                this.sessionStartTime = Date.now();
+                this.totalSessionElapsed = 0;
+                this.failCount = 0;
+                this.isAlarm = false;
+                this.isSuccessPulse = false;
+                this.isAfkPaused = false;
+                this.activeWaves = generateWaves();
+
+                telemetry.reset({ allowRecomplete: true });
+                telemetry.start();
+                telemetry.markActivity();
+                telemetry.setWave(1, TOTAL_WAVES);
+                telemetry.progress({
+                    wave: 1,
+                    total_waves: TOTAL_WAVES,
+                    stage: 1,
+                    total_stages: TOTAL_WAVES
+                });
+                this.loadWave(1);
+            },
+
+            restartGame() {
+                this.stopWaveTimer();
+                if (resetTimeout) clearTimeout(resetTimeout);
+                if (pulseTimeout) clearTimeout(pulseTimeout);
+                this.isAlarm = false;
+                this.isSuccessPulse = false;
+                this.isActionBlocked = false;
+                this.isAfkPaused = false;
+                this.registerMask = 0;
+                telemetry.reset({ allowRecomplete: true });
+                this.gameState = 'intro';
+            },
+
+            loadWave(waveNum) {
+                this.stopWaveTimer();
+                this.currentWave = waveNum;
+                this.registerMask = 0;
+                this.isAlarm = false;
+                this.isActionBlocked = false;
+                telemetry.setWave(waveNum, TOTAL_WAVES);
+
+                const waveData = this.currentWaveData;
+                this.timeLeft = waveData.maxTime;
+
+                this.timerInterval = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                    this.timeLeft = Math.max(0, +(this.timeLeft - 0.1).toFixed(1));
+                    if (this.timeLeft <= 0) {
+                        this.triggerHardcoreReset(`Время истекло! ${waveData.explanation}`, true);
+                    }
+                }, 100);
+            },
+
+            stopWaveTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            },
+
+            toggleBit(weight) {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                telemetry.markActivity();
+                this.registerMask = this.registerMask ^ weight;
+                playToggleSound(Boolean(this.registerMask & weight));
+            },
+
+            applyMicroOp(op) {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                telemetry.markActivity();
+                if (op === 'shl') {
+                    this.registerMask = (this.registerMask << 1) & 0xFF;
+                } else if (op === 'shr') {
+                    this.registerMask = (this.registerMask >> 1) & 0xFF;
+                } else if (op === 'inc') {
+                    this.registerMask = (this.registerMask + 1) & 0xFF;
+                } else if (op === 'dec') {
+                    this.registerMask = (this.registerMask + 255) & 0xFF;
+                }
+                playMicroOpSound(op);
+            },
+
+            clearRegister() {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                telemetry.markActivity();
+                this.registerMask = 0;
+                playToggleSound(false);
+            },
+
+            commitFrame() {
+                if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                if (this.registerValue === 0) return;
+
+                telemetry.markActivity();
+                const waveData = this.currentWaveData;
+
+                if (this.registerValue === waveData.targetValue) {
+                    this.stopWaveTimer();
+                    this.isActionBlocked = true;
+
+                    if (this.currentWave >= TOTAL_WAVES) {
+                        playVictoryFanfare();
+                        this.totalSessionElapsed = Math.max(1, Math.round((Date.now() - this.sessionStartTime) / 1000));
+                        this.gameState = 'victory';
+                        telemetry.complete({
+                            wave: TOTAL_WAVES,
+                            total_waves: TOTAL_WAVES,
+                            stage: TOTAL_WAVES,
+                            total_stages: TOTAL_WAVES,
+                            time_spent_sec: this.totalSessionElapsed
+                        });
+                    } else {
+                        playSuccessSound();
+                        const nextWave = this.currentWave + 1;
+                        this.successMessage = `${waveData.targetValue} (${waveData.targetUnit}) подтверждено. Переход к волне ${nextWave}...`;
+                        this.isSuccessPulse = true;
+                        telemetry.advanceWave(nextWave);
+                        pulseTimeout = setTimeout(() => {
+                            this.isSuccessPulse = false;
+                            if (this.gameState === 'playing' && !this.isAfkPaused) {
+                                this.loadWave(nextWave);
+                            }
+                        }, 240);
+                    }
+                } else {
+                    this.triggerHardcoreReset(
+                        `Передано ${this.registerValue} (${waveData.targetUnit}) вместо ${waveData.targetValue}. ${waveData.explanation}`,
+                        false
+                    );
+                }
+            },
+
+            triggerHardcoreReset(reason, isTimeout) {
+                this.stopWaveTimer();
+                this.isActionBlocked = true;
+                this.isSuccessPulse = false;
+                this.failCount += 1;
+
+                const shouldReset = telemetry.fail({
+                    wave: this.currentWave,
+                    total_waves: TOTAL_WAVES,
+                    stage: this.currentWave,
+                    total_stages: TOTAL_WAVES,
+                    isTimeout: Boolean(isTimeout)
+                });
+
+                if (shouldReset === false) {
+                    return;
+                }
+
+                playAlarmSiren();
+                this.alarmMessage = reason;
+                this.isAlarm = true;
+
+                if (resetTimeout) clearTimeout(resetTimeout);
+                resetTimeout = setTimeout(() => {
+                    if (this.gameState !== 'playing' || this.isAfkPaused) return;
+                    this.isAlarm = false;
+                    this.activeWaves = generateWaves();
+                    this.loadWave(1);
+                }, 1700);
+            },
+
+            formatTime(sec) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return `${m}м ${String(s).padStart(2, '0')}с`;
+            }
+        }
+    });
+
+    appInstance = app.mount('#arcade-app');
+
+    // Единственное навешивание глобального обработчика клавиш за всю жизнь страницы
+    window.addEventListener('keydown', (e) => {
+        if (!appInstance || e.repeat) return;
+        if (appInstance.isAfkPaused) return;
+
+        if (e.code === 'Space' || e.code === 'Enter') {
+            if (appInstance.gameState === 'intro') {
+                e.preventDefault();
+                appInstance.startGame();
+                return;
+            }
+            if (appInstance.gameState === 'playing') {
+                e.preventDefault();
+                appInstance.commitFrame();
+                return;
+            }
+        }
+
+        if (appInstance.gameState !== 'playing' || appInstance.isActionBlocked) return;
+
+        const digitMatch = e.code && (e.code.match(/^Digit([1-8])$/) || e.code.match(/^Numpad([1-8])$/));
+        const keyNum = digitMatch ? digitMatch[1] : e.key;
+        const pin = appInstance.bitPins.find((b) => b.hotkey === keyNum);
+        if (pin) {
+            e.preventDefault();
+            appInstance.toggleBit(pin.weight);
+            return;
+        }
+
+        if (e.code === 'KeyQ') {
+            e.preventDefault();
+            appInstance.applyMicroOp('shl');
+            return;
+        }
+        if (e.code === 'KeyW') {
+            e.preventDefault();
+            appInstance.applyMicroOp('shr');
+            return;
+        }
+        if (e.code === 'KeyE') {
+            e.preventDefault();
+            appInstance.applyMicroOp('inc');
+            return;
+        }
+        if (e.code === 'KeyA') {
+            e.preventDefault();
+            appInstance.applyMicroOp('dec');
+            return;
+        }
+
+        if (e.key === '0' || e.code === 'Digit0' || e.code === 'Numpad0' || e.key === 'Backspace' || e.code === 'KeyC') {
+            e.preventDefault();
+            appInstance.clearRegister();
+        }
+    });
+
+    window.__DEV_LEVEL3_STATE__ = {
+        get waves() {
+            return appInstance ? appInstance.activeWaves : [];
+        },
+        get currentWaveIndex() {
+            return appInstance ? appInstance.currentWave - 1 : 0;
+        },
+        get currentWave() {
+            return appInstance ? appInstance.currentWaveData : null;
+        },
+        solveCurrentWave() {
+            if (!appInstance || appInstance.gameState !== 'playing' || appInstance.isActionBlocked) return false;
+            appInstance.registerMask = appInstance.currentWaveData.targetValue;
+            appInstance.commitFrame();
+            return true;
+        },
+        submitAction(action, payload) {
+            if (!appInstance) return false;
+            if (typeof action === 'number') {
+                appInstance.registerMask = action;
+                appInstance.commitFrame();
+                return true;
+            }
+            if (action === 'wrong') {
+                const target = appInstance.currentWaveData.targetValue;
+                appInstance.registerMask = target === 1 ? 2 : 1;
+                appInstance.commitFrame();
+                return true;
+            }
+            if (action === 'timeout') {
+                appInstance.triggerHardcoreReset('Тайм-аут волны (тест)', true);
+                return true;
+            }
+            if (payload && typeof payload.value === 'number') {
+                appInstance.registerMask = payload.value;
+                appInstance.commitFrame();
+                return true;
+            }
+            if (action === 'commit') {
+                appInstance.commitFrame();
+                return true;
+            }
+            return false;
+        }
+    };
+});
+</script>
