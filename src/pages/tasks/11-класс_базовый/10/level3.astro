@@ -180,7 +180,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
 
                                 <!-- Интерактивный SVG-граф -->
                                 <div class="bg-black border border-secondary rounded-0 p-1">
-                                    <svg viewBox="0 0 640 340" class="w-100 d-block" style="max-height: 360px; user-select: none;">
+                                    <svg id="graph-svg" viewBox="0 0 640 340" class="w-100 d-block" style="max-height: 360px; user-select: none;">
                                         <defs>
                                             <marker id="arrow-dim" markerWidth="10" markerHeight="10" refX="26" refY="3.5" orient="auto">
                                                 <polygon points="0 0, 9 3.5, 0 7" fill="#6c757d"></polygon>
@@ -207,20 +207,20 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                                   style="transition: stroke 200ms ease, stroke-width 200ms ease;"></path>
 
                                             <!-- Подпись веса ребра (только в shortest-волнах; ? если веса скрыты в матрице) -->
-                                            <g v-if="currentWaveData.mode === 'shortest'" :transform="`translate(${edge.labelX}, ${edge.labelY})`">
+                                            <g v-if="currentWaveData.mode === 'shortest'" :transform="'translate(' + edge.labelX + ', ' + edge.labelY + ')'">
                                                 <rect x="-15" y="-11" width="30" height="22"
                                                       :fill="edge.isOnPath ? '#082c36' : '#0b0c10'"
                                                       :stroke="edge.isOnPath ? '#0dcaf0' : '#495057'"
                                                       stroke-width="1.2"></rect>
                                                 <text x="0" y="4" text-anchor="middle" font-size="12" font-weight="bold"
-                                                      :fill="edge.isOnPath ? '#0dcaf0' : (currentWaveData.showMatrix ? '#adb5bd' : '#ffc107')">
-                                                    {{ currentWaveData.showMatrix ? '?' : edge.w }}
-                                                </text>
+                                                      :fill="edge.isOnPath ? '#0dcaf0' : (currentWaveData.showMatrix ? '#adb5bd' : '#ffc107')"
+                                                      v-text="currentWaveData.showMatrix ? '?' : edge.w"></text>
                                             </g>
                                         </g>
 
                                         <!-- Вершины графа (хитбоксы r=28 => диаметр 56px >= 48px) -->
                                         <g v-for="node in currentWaveData.nodes" :key="'n-' + node.id"
+                                           :data-node-id="node.id"
                                            @click="handleNodeClick(node.id)"
                                            :style="{ cursor: isNodeInteractive(node.id) ? 'pointer' : 'default' }">
                                             <!-- Невидимый расширенный хитбокс >= 56x56 px -->
@@ -244,23 +244,20 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                             <!-- Буква вершины -->
                                             <text :x="node.x" :y="node.y + 2" text-anchor="middle" dominant-baseline="middle"
                                                   font-size="18" font-weight="bold"
-                                                  :fill="getNodeState(node.id).textColor">
-                                                {{ node.label }}
-                                            </text>
+                                                  :fill="getNodeState(node.id).textColor"
+                                                  v-text="node.label"></text>
 
                                             <!-- Номер горячей клавиши -->
-                                            <text :x="node.x - 20" :y="node.y - 21" text-anchor="middle" font-size="10" fill="#6c757d">
-                                                [{{ node.id + 1 }}]
-                                            </text>
+                                            <text :x="node.x - 20" :y="node.y - 21" text-anchor="middle" font-size="10" fill="#6c757d"
+                                                  v-text="'[' + (node.id + 1) + ']'"></text>
 
                                             <!-- Бейдж роли узла (СТАРТ / ЦЕЛЬ / РЕЛЕ / БЛОК / ЛОВУШКА / число DAG) -->
-                                            <g v-if="getNodeBadge(node.id)" :transform="`translate(${node.x}, ${node.y + 34})`">
+                                            <g v-if="getNodeBadge(node.id)" :transform="'translate(' + node.x + ', ' + (node.y + 34) + ')'">
                                                 <rect x="-28" y="-9" width="56" height="16"
                                                       fill="#000000" :stroke="getNodeBadge(node.id).color" stroke-width="1"></rect>
                                                 <text x="0" y="3" text-anchor="middle" font-size="9.5" font-weight="bold"
-                                                      :fill="getNodeBadge(node.id).color">
-                                                    {{ getNodeBadge(node.id).text }}
-                                                </text>
+                                                      :fill="getNodeBadge(node.id).color"
+                                                      v-text="getNodeBadge(node.id).text"></text>
                                             </g>
                                         </g>
                                     </svg>
@@ -329,14 +326,14 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                                         :disabled="!canFastForward || isInputLocked"
                                         class="btn btn-warning text-black rounded-0 fw-bold px-4"
                                         style="min-width: 180px; min-height: 48px;">
-                                    ⚡ ЗАВЕРШИТЬ В {{ getNodeName(currentWaveData.targetId) }} [ПРОБЕЛ]
+                                    ⚡ ЗАВЕРШИТЬ В <span v-text="getNodeName(currentWaveData.targetId)"></span> [ПРОБЕЛ]
                                 </button>
                             </div>
                         </div>
 
                         <div v-else class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="text-light small fw-bold me-1">ПУТЕЙ В {{ getNodeName(currentWaveData.targetId) }}:</span>
+                                <span class="text-light small fw-bold me-1">ПУТЕЙ В <span v-text="getNodeName(currentWaveData.targetId)"></span>:</span>
                                 <button id="dag-minus5-btn" type="button" @click="adjustDag(-5)" :disabled="isInputLocked"
                                         class="btn btn-outline-danger rounded-0 fw-bold" style="min-width: 52px; min-height: 48px;">-5</button>
                                 <button id="dag-minus1-btn" type="button" @click="adjustDag(-1)" :disabled="isInputLocked"
@@ -360,7 +357,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 <!-- ========================================== -->
                 <!-- 3. ЭКРАН ПОБЕДЫ (VICTORY)                  -->
                 <!-- ========================================== -->
-                <div v-else-if="gameState === 'victory'" class="text-center py-4">
+                <div v-else-if="gameState === 'victory'" id="victory-screen" class="text-center py-4">
                     <div class="mb-3">
                         <span class="badge bg-success text-black rounded-0 fs-5 px-4 py-2 fw-bold">
                             ПРОРЫВ СЕТИ ЗАВЕРШЁН // 10 ИЗ 10 ВОЛН ПРОЙДЕНО
@@ -970,6 +967,7 @@ import TaskLayout from '../../../../layouts/TaskLayout.astro';
                 get waves() { return self.waves; },
                 get currentWaveIndex() { return self.currentWave - 1; },
                 get currentWave() { return self.currentWave; },
+                get currentWaveData() { return self.currentWaveData; },
                 solveCurrentWave: () => self.devSolveCurrentWave(),
                 submitAction: (action, payload) => self.devSubmitAction(action, payload)
             };
