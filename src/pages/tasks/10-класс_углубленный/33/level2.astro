@@ -1,0 +1,518 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Шапка тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Аналитический перевод чисел (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок фазы и телеметрия -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Прямой перевод в десятичную систему</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span>[ОШИБКА РАСЧЕТА] <span id="feedback-text">Неверный ответ!</span> Генерируется новый вариант...</span>
+                        <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 1: ПРЯМОЙ РАСЧЕТ q -> 10 (CCS = 4) ==================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-2">
+                        Выполните прямой перевод числа из заданной позиционной системы счисления в <strong>десятичную систему</strong> (через развернутую форму или схему Горнера).
+                    </p>
+                    <div id="p1-condition" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-light">
+                        <!-- Генерируется JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p1-input" class="form-label text-warning small text-uppercase">
+                            Введите десятичное значение числа:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p1-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 349" autocomplete="off" style="min-height: 48px;">
+                            <button id="p1-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 2: ДРОБНЫЙ И СМЕШАННЫЙ ПЕРЕВОД 10 -> q (CCS = 6) ==================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Переведите смешанное десятичное число в целевую систему счисления, разделив расчет на целую часть (деление с остатком) и дробную часть (последовательное умножение).
+                    </p>
+                    <div id="p2-condition" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-light">
+                        <!-- Генерируется JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label id="p2-label" for="p2-input" class="form-label text-warning small text-uppercase">
+                            Введите результат в целевой системе (через запятую):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p2-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 31,3" autocomplete="off" style="min-height: 48px;">
+                            <button id="p2-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 3: ПИК ИНВЕРСИИ / НЕИЗВЕСТНОЕ ОСНОВАНИЕ (CCS = 7-8) ==================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Обратная задача: по свернутой записи числа и его десятичному эквиваленту восстановите <strong>неизвестное основание x</strong> позиционной системы счисления.
+                    </p>
+                    <div id="p3-condition" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-light">
+                        <!-- Генерируется JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p3-input" class="form-label text-warning small text-uppercase">
+                            Введите основание системы счисления x (целое число):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p3-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 9" autocomplete="off" style="min-height: 48px;">
+                            <button id="p3-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ / СТЕПЕННЫЕ ИНВАРИАНТЫ (CCS = 5-6) ==================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Анализ структуры длинных степенных выражений без полного вычисления значения в десятичной системе (профильный инвариант).
+                    </p>
+                    <div id="p4-condition" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-light">
+                        <!-- Генерируется JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label id="p4-label" for="p4-input" class="form-label text-warning small text-uppercase">
+                            Введите количество указанных цифр в записи результата:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p4-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 7" autocomplete="off" style="min-height: 48px;">
+                            <button id="p4-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 5: КУЛЬМИНАЦИЯ / КРОСС-ПЕРЕВОД 16 -> 8 С ДРОБЬЮ (CCS = 8-9) ==================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Финальный синтез: выполните кросс-перевод смешанного шестнадцатеричного числа с буквенными разрядами и дробной частью в <strong>восьмеричную систему счисления</strong>.
+                    </p>
+                    <div id="p5-condition" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-light">
+                        <!-- Генерируется JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p5-input" class="form-label text-warning small text-uppercase">
+                            Введите итоговое число в восьмеричной системе (с запятой, без индекса):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p5-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 132,6" autocomplete="off" style="min-height: 48px;">
+                            <button id="p5-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ЭКРАН ПОБЕДЫ ==================== -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-warning bg-black p-4 mb-3">
+                        <h3 class="text-warning mb-2">[ УРОВЕНЬ 2 ПРОЙДЕН ]</h3>
+                        <p class="text-light mb-3">Все 5 фаз аналитического перевода чисел выполнены вручную без ошибок в конечных расчетах.</p>
+                        <div class="d-flex justify-content-center gap-4 text-secondary small">
+                            <span>Ошибок: <strong id="final-attempts" class="text-warning">0</strong></span>
+                            <span>Время: <strong id="final-time" class="text-info">00:00</strong></span>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-0">Переключайтесь на вкладку «Уровень 3» для аркадного испытания на скорость и точность.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+    (function() {
+        let currentPhase = 1;
+        let isProcessingError = false;
+        let timerInterval = null;
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 33 :: Перевод чисел из одной системы счисления в другую (Уровень 2)',
+            level: 2,
+            totalStages: 5
+        });
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const phaseBadge = document.getElementById('phase-badge');
+        const phaseTitle = document.getElementById('phase-title');
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+
+        const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function formatTime(sec) {
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function toBase(num, base) {
+            if (num === 0) return '0';
+            let n = num;
+            let res = '';
+            while (n > 0) {
+                res = DIGITS[n % base] + res;
+                n = Math.floor(n / base);
+            }
+            return res;
+        }
+
+        // Нормализация числового/процентного ввода: убираем %, пробелы, заменяем запятую на точку
+        function parseUserNum(val) {
+            if (val === null || val === undefined) return NaN;
+            const normalized = String(val).replace(/%/g, '').replace(/\s+/g, '').replace(',', '.');
+            if (!normalized || !/^[+-]?\d+(?:\.\d+)?$/.test(normalized)) return NaN;
+            const num = Number(normalized);
+            return Number.isFinite(num) ? num : NaN;
+        }
+
+        // Парсинг дробного числа в позиционной системе с основанием base (2..10)
+        function parseBaseFraction(raw, base) {
+            if (raw === null || raw === undefined) return NaN;
+            const norm = String(raw).replace(/%/g, '').replace(/\s+/g, '').replace(',', '.');
+            if (!norm || !/^\d+(?:\.\d+)?$/.test(norm)) return NaN;
+            const parts = norm.split('.');
+            const intPart = parts[0];
+            const fracPart = parts[1] || '';
+
+            for (let i = 0; i < intPart.length; i++) {
+                const d = Number(intPart[i]);
+                if (!Number.isInteger(d) || d >= base) return NaN;
+            }
+            for (let i = 0; i < fracPart.length; i++) {
+                const d = Number(fracPart[i]);
+                if (!Number.isInteger(d) || d >= base) return NaN;
+            }
+
+            let val = 0;
+            for (let i = 0; i < intPart.length; i++) {
+                val = val * base + Number(intPart[i]);
+            }
+            let weight = 1 / base;
+            for (let i = 0; i < fracPart.length; i++) {
+                val += Number(fracPart[i]) * weight;
+                weight /= base;
+            }
+            return val;
+        }
+
+        timerInterval = setInterval(() => {
+            if (timerDisplay) timerDisplay.textContent = formatTime(telemetry.getTimeSpentSec());
+        }, 1000);
+
+        function triggerFailure(message, resetCallback) {
+            if (isProcessingError) return;
+            isProcessingError = true;
+            telemetry.fail({ stage: currentPhase, total_stages: 5 });
+            if (attemptsDisplay) attemptsDisplay.textContent = String(telemetry.getState().attemptsCount);
+            if (feedbackText) feedbackText.textContent = message;
+            if (feedbackBox) feedbackBox.classList.remove('d-none');
+
+            setTimeout(() => {
+                if (feedbackBox) feedbackBox.classList.add('d-none');
+                isProcessingError = false;
+                resetCallback();
+            }, 1300);
+        }
+
+        const PHASE_TITLES = {
+            1: 'Прямой перевод в десятичную систему',
+            2: 'Перевод смешанного числа с дробной частью',
+            3: 'Пик 1: Поиск неизвестного основания x',
+            4: 'Долина консолидации: Степенные инварианты',
+            5: 'Кульминация: Кросс-перевод 16 → 8 с дробью'
+        };
+
+        function switchToPhase(nextPhase) {
+            document.getElementById(`phase${currentPhase}`).classList.add('d-none');
+            currentPhase = nextPhase;
+            telemetry.advanceStage(nextPhase);
+            document.getElementById(`phase${nextPhase}`).classList.remove('d-none');
+            phaseBadge.textContent = `Шаг ${nextPhase} из 5`;
+            phaseTitle.textContent = PHASE_TITLES[nextPhase];
+
+            if (nextPhase === 2) generatePhase2();
+            else if (nextPhase === 3) generatePhase3();
+            else if (nextPhase === 4) generatePhase4();
+            else if (nextPhase === 5) generatePhase5();
+        }
+
+        function showVictory() {
+            document.getElementById('phase5').classList.add('d-none');
+            if (timerInterval) clearInterval(timerInterval);
+            telemetry.complete({ stage: 5, total_stages: 5 });
+            document.getElementById('final-attempts').textContent = String(telemetry.getState().attemptsCount);
+            document.getElementById('final-time').textContent = formatTime(telemetry.getTimeSpentSec());
+            document.getElementById('victory-screen').classList.remove('d-none');
+            phaseBadge.textContent = 'Завершено';
+            phaseTitle.textContent = 'Все 5 фаз выполнены';
+        }
+
+        /* =========================================================================
+           ФАЗА 1: ПРЯМОЙ РАСЧЕТ q -> 10 (CCS = 4)
+           ========================================================================= */
+        const p1Condition = document.getElementById('p1-condition');
+        const p1Input = document.getElementById('p1-input');
+        const p1SubmitBtn = document.getElementById('p1-submit-btn');
+        let p1Expected = 0;
+
+        function generatePhase1() {
+            const base = pickRandom([6, 7, 8, 12, 16]);
+            let d2, d1, d0;
+            if (base >= 12) {
+                d2 = randInt(1, 3);
+                d1 = randInt(10, base - 1);
+                d0 = randInt(1, base - 1);
+            } else {
+                d2 = randInt(1, base - 1);
+                d1 = randInt(1, base - 1);
+                d0 = randInt(1, base - 1);
+            }
+            p1Expected = d2 * base * base + d1 * base + d0;
+            const numStr = DIGITS[d2] + DIGITS[d1] + DIGITS[d0];
+
+            p1Condition.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>Исходное число: <strong class="text-warning fs-4">${numStr}<sub>${base}</sub></strong></span>
+                    <span class="badge bg-dark border border-secondary text-secondary rounded-0">Основание q = ${base}</span>
+                </div>
+            `;
+            p1Input.value = '';
+            p1Input.focus();
+        }
+
+        function checkPhase1() {
+            if (isProcessingError) return;
+            const val = parseUserNum(p1Input.value);
+            if (Number.isInteger(val) && val === p1Expected) {
+                switchToPhase(2);
+            } else {
+                triggerFailure('Неверное десятичное значение! Проверьте веса разрядов q² и q¹.', generatePhase1);
+            }
+        }
+
+        p1SubmitBtn.addEventListener('click', checkPhase1);
+        p1Input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase1(); });
+
+        /* =========================================================================
+           ФАЗА 2: ДРОБНЫЙ И СМЕШАННЫЙ ПЕРЕВОД 10 -> q (CCS = 6)
+           ========================================================================= */
+        const p2Condition = document.getElementById('p2-condition');
+        const p2Label = document.getElementById('p2-label');
+        const p2Input = document.getElementById('p2-input');
+        const p2SubmitBtn = document.getElementById('p2-submit-btn');
+        let p2TargetBase = 8;
+        let p2ExpectedDecimal = 0;
+
+        function generatePhase2() {
+            p2TargetBase = pickRandom([2, 4, 8]);
+            const intVal = randInt(14, 59);
+            let fracNum, fracDen;
+            if (p2TargetBase === 4) {
+                fracDen = 4;
+                fracNum = pickRandom([1, 2, 3]);
+            } else {
+                fracDen = 8;
+                fracNum = pickRandom([1, 3, 5, 6, 7]);
+            }
+            p2ExpectedDecimal = intVal + fracNum / fracDen;
+            const decStr = String(p2ExpectedDecimal).replace('.', ',');
+
+            p2Condition.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>Десятичное число: <strong class="text-warning fs-4">${decStr}<sub>10</sub></strong></span>
+                    <span class="badge bg-dark border border-warning text-warning rounded-0">Целевое основание: q = ${p2TargetBase}</span>
+                </div>
+            `;
+            p2Label.textContent = `Введите результат в ${p2TargetBase}-ной системе (с запятой, без индекса):`;
+            p2Input.value = '';
+            p2Input.focus();
+        }
+
+        function checkPhase2() {
+            if (isProcessingError) return;
+            const parsed = parseBaseFraction(p2Input.value, p2TargetBase);
+            if (!Number.isNaN(parsed) && Math.abs(parsed - p2ExpectedDecimal) < 1e-9) {
+                switchToPhase(3);
+            } else {
+                triggerFailure(`Ошибка перевода в ${p2TargetBase}-ную систему! Убедитесь, что цифры меньше ${p2TargetBase}, а дробь получена умножением на ${p2TargetBase}.`, generatePhase2);
+            }
+        }
+
+        p2SubmitBtn.addEventListener('click', checkPhase2);
+        p2Input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase2(); });
+
+        /* =========================================================================
+           ФАЗА 3: ПИК ИНВЕРСИИ / ПОИСК ОСНОВАНИЯ x (CCS = 7-8)
+           ========================================================================= */
+        const p3Condition = document.getElementById('p3-condition');
+        const p3Input = document.getElementById('p3-input');
+        const p3SubmitBtn = document.getElementById('p3-submit-btn');
+        let p3ExpectedBase = 0;
+
+        function generatePhase3() {
+            const x = randInt(5, 14);
+            const d2 = randInt(1, Math.min(3, x - 1));
+            const d1 = randInt(1, x - 1);
+            const d0 = randInt(1, x - 1);
+            const decVal = d2 * x * x + d1 * x + d0;
+            const srcStr = DIGITS[d2] + DIGITS[d1] + DIGITS[d0];
+
+            p3ExpectedBase = x;
+            p3Condition.innerHTML = `
+                <div class="fs-5 text-center py-2">
+                    <strong class="text-warning">${srcStr}<sub>x</sub></strong> = <strong class="text-info">${decVal}<sub>10</sub></strong>
+                </div>
+                <div class="text-secondary small text-center">
+                    Подсказка метода: запишите уравнение развернутой формы ${d2}&middot;x<sup>2</sup> + ${d1}&middot;x + ${d0} = ${decVal}.
+                </div>
+            `;
+            p3Input.value = '';
+            p3Input.focus();
+        }
+
+        function checkPhase3() {
+            if (isProcessingError) return;
+            const val = parseUserNum(p3Input.value);
+            if (Number.isInteger(val) && val === p3ExpectedBase) {
+                switchToPhase(4);
+            } else {
+                triggerFailure('Неверное основание x! Проверьте подстановкой в развернутую форму и условие x > max(цифр).', generatePhase3);
+            }
+        }
+
+        p3SubmitBtn.addEventListener('click', checkPhase3);
+        p3Input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase3(); });
+
+        /* =========================================================================
+           ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ / СТЕПЕННОЙ ИНВАРИАНТ (CCS = 5-6)
+           ========================================================================= */
+        const p4Condition = document.getElementById('p4-condition');
+        const p4Label = document.getElementById('p4-label');
+        const p4Input = document.getElementById('p4-input');
+        const p4SubmitBtn = document.getElementById('p4-submit-btn');
+        let p4ExpectedCount = 0;
+
+        function generatePhase4() {
+            const q = pickRandom([3, 4, 5, 6]);
+            const qSq = q * q;
+            const r = randInt(3, 8);
+            const k = r + randInt(4, 11);
+            // Гарантируем 2*m > k > r
+            const m = Math.floor(k / 2) + randInt(2, 6);
+
+            p4ExpectedCount = k - r;
+            const targetDigit = q - 1;
+
+            p4Condition.innerHTML = `
+                <div class="mb-2">
+                    Значение арифметического выражения записали в системе счисления с основанием <strong class="text-info">${q}</strong>:
+                </div>
+                <div class="fs-5 text-warning text-center py-2 border border-secondary bg-dark mb-2">
+                    ${qSq}<sup>${m}</sup> + ${q}<sup>${k}</sup> &minus; ${q}<sup>${r}</sup>
+                </div>
+                <div class="text-secondary small">
+                    Определите, сколько цифр <strong class="text-light">${targetDigit}</strong> содержится в этой ${q}-ичной записи.
+                </div>
+            `;
+            p4Label.textContent = `Введите количество цифр «${targetDigit}» в записи результата:`;
+            p4Input.value = '';
+            p4Input.focus();
+        }
+
+        function checkPhase4() {
+            if (isProcessingError) return;
+            const val = parseUserNum(p4Input.value);
+            if (Number.isInteger(val) && val === p4ExpectedCount) {
+                switchToPhase(5);
+            } else {
+                triggerFailure('Неверное количество цифр! Вспомните структуру разности q^k − q^r в системе с основанием q.', generatePhase4);
+            }
+        }
+
+        p4SubmitBtn.addEventListener('click', checkPhase4);
+        p4Input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase4(); });
+
+        /* =========================================================================
+           ФАЗА 5: КУЛЬМИНАЦИЯ / КРОСС-ПЕРЕВОД 16 -> 8 С ДРОБЬЮ (CCS = 8-9)
+           ========================================================================= */
+        const p5Condition = document.getElementById('p5-condition');
+        const p5Input = document.getElementById('p5-input');
+        const p5SubmitBtn = document.getElementById('p5-submit-btn');
+        let p5ExpectedDecimal = 0;
+
+        function generatePhase5() {
+            // Двузначное 16-ричное число с минимум одной буквой A-F + четная дробная цифра 2..E
+            const intLead = randInt(1, 9);
+            const intLow = randInt(10, 15); // буква A..F
+            const fracDigit = pickRandom([2, 4, 6, 10, 12, 14]); // 2,4,6,A,C,E -> ровно 1..7 восьмых
+
+            const intVal = intLead * 16 + intLow;
+            p5ExpectedDecimal = intVal + fracDigit / 16;
+
+            const hexStr = `${DIGITS[intLead]}${DIGITS[intLow]},${DIGITS[fracDigit]}`;
+
+            p5Condition.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span>Исходное число: <strong class="text-warning fs-4">${hexStr}<sub>16</sub></strong></span>
+                    <span class="badge bg-warning text-dark rounded-0">16 &rarr; 8 (кросс-перевод)</span>
+                </div>
+                <div class="text-secondary small">
+                    Вы можете перевести число через десятичную систему или через двоичные тетрады/триады.
+                </div>
+            `;
+            p5Input.value = '';
+            p5Input.focus();
+        }
+
+        function checkPhase5() {
+            if (isProcessingError) return;
+            const parsed = parseBaseFraction(p5Input.value, 8);
+            if (!Number.isNaN(parsed) && Math.abs(parsed - p5ExpectedDecimal) < 1e-9) {
+                showVictory();
+            } else {
+                triggerFailure('Неверная восьмеричная запись! Проверьте значения букв A–F и перевод дробной части (цифра / 16 = k / 8).', generatePhase5);
+            }
+        }
+
+        p5SubmitBtn.addEventListener('click', checkPhase5);
+        p5Input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPhase5(); });
+
+        // Инициализация Фазы 1
+        generatePhase1();
+    })();
+    </script>
+</TaskLayout>
