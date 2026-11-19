@@ -1,0 +1,1417 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h2 class="h4 text-success mb-0">Тренажер: Графы, весовые матрицы и маршруты (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок и прогресс -->
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 flex-wrap gap-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Весовая матрица ориентированного графа</span>
+                    </div>
+                    <div class="text-light small">
+                        Ошибок / попыток: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Инструкция текущей фазы -->
+                <div id="phase-instruction" class="alert alert-secondary bg-black border-secondary text-light rounded-0 py-2 px-3 mb-3 small"></div>
+
+                <!-- Сообщение о статусе -->
+                <div id="status-alert" class="alert d-none rounded-0 py-2 px-3 mb-3 fw-bold small"></div>
+
+                <!-- ==================================================== -->
+                <!-- ФАЗА 1: Слот-пазл весовой матрицы орграфа             -->
+                <!-- ==================================================== -->
+                <div id="phase-1-workspace" class="d-none">
+                    <div class="row g-3 align-items-start mb-3">
+                        <div class="col-12 col-lg-5">
+                            <div class="card bg-black border-secondary rounded-0 p-3 text-center">
+                                <div class="text-info fw-bold small mb-2">ОРИЕНТИРОВАННЫЙ ВЗВЕШЕННЫЙ ГРАФ</div>
+                                <div class="d-flex justify-content-center align-items-center" style="min-height: 230px;">
+                                    <svg id="p1-graph-svg" viewBox="0 0 360 230" class="w-100" style="max-height: 240px;"></svg>
+                                </div>
+                                <div class="text-light opacity-75 small mt-2" style="font-size: 0.78rem;">
+                                    Строка матрицы — вершина выхода, столбец — вершина входа (дуга строка → столбец).
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-7">
+                            <div class="card bg-black border-success rounded-0 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <span class="text-success fw-bold small">ВЕСОВАЯ МАТРИЦА ОРГРАФА 4×4</span>
+                                    <span class="badge border border-success text-success bg-dark rounded-0 small">Слот-пазл // Drag &amp; Drop</span>
+                                </div>
+                                <p class="text-light small mb-3" style="font-size: 0.8rem;">
+                                    Перетащите числовые веса дуг в пустые слоты <code>[ ? ]</code> таблицы (или кликните по токену, затем по слоту). Прочерк <code>—</code> означает отсутствие дуги.
+                                </p>
+
+                                <div class="table-responsive d-flex justify-content-center mb-3">
+                                    <table class="table table-bordered border-secondary text-center align-middle mb-0" style="max-width: 380px;">
+                                        <thead>
+                                            <tr class="text-info">
+                                                <th class="bg-dark text-light p-2" style="min-width: 52px;">из \ в</th>
+                                                <th class="bg-dark text-info p-2" style="min-width: 56px;">A</th>
+                                                <th class="bg-dark text-info p-2" style="min-width: 56px;">B</th>
+                                                <th class="bg-dark text-info p-2" style="min-width: 56px;">C</th>
+                                                <th class="bg-dark text-info p-2" style="min-width: 56px;">D</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="p1-matrix-tbody"></tbody>
+                                    </table>
+                                </div>
+
+                                <div class="border-top border-secondary pt-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <span class="text-light small fw-bold">Палитра весов (с дистрактором):</span>
+                                        <button id="p1-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-height: 48px;">Сбросить слоты</button>
+                                    </div>
+                                    <div id="p1-palette" class="d-flex flex-wrap gap-2 justify-content-center p-2 bg-dark border border-secondary" style="min-height: 64px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================================================== -->
+                <!-- ФАЗА 2: Трассировка пути на графе + слайдер длины    -->
+                <!-- ==================================================== -->
+                <div id="phase-2-workspace" class="d-none">
+                    <div class="row g-3 align-items-start mb-3">
+                        <div class="col-12 col-lg-7">
+                            <div class="card bg-black border-info rounded-0 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <span class="text-info fw-bold small">ИНТЕРАКТИВНАЯ КАРТА ДОРОГ (КЛИКАЙТЕ ПО ВЕРШИНАМ)</span>
+                                    <button id="p2-reset-btn" type="button" class="btn btn-outline-info btn-sm rounded-0 px-3" style="min-height: 48px;">Сбросить маршрут</button>
+                                </div>
+                                <div class="d-flex justify-content-center align-items-center bg-dark border border-secondary p-2" style="min-height: 250px;">
+                                    <svg id="p2-graph-svg" viewBox="0 0 380 230" class="w-100" style="max-height: 260px; cursor: pointer;"></svg>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                                    <div class="text-light small">
+                                        Собранный маршрут: <span id="p2-path-display" class="text-success fw-bold fs-6">A</span>
+                                    </div>
+                                    <div class="text-light opacity-75 small" style="font-size: 0.78rem;">
+                                        Клик по соседней вершине — шаг вперёд; клик по последней — шаг назад.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-5">
+                            <div class="card bg-black border-success rounded-0 p-3 h-100">
+                                <div class="text-success fw-bold small mb-2">КАЛИБРАТОР ДЛИНЫ КРАТЧАЙШЕГО ПУТИ</div>
+                                <p class="text-light small mb-3" style="font-size: 0.8rem;">
+                                    1. Проложите мышью <strong>кратчайший путь</strong> от <code>A</code> к <code>E</code> прямо по схеме.<br>
+                                    2. Вычислите сумму весов его рёбер и установите точное значение на калибраторе:
+                                </p>
+
+                                <div class="bg-dark border border-secondary p-3 mb-3 text-center">
+                                    <div class="text-light small mb-1">Выставленная длина пути (км):</div>
+                                    <div id="p2-slider-readout" class="display-6 fw-bold text-warning mb-2">0</div>
+                                    <input id="p2-length-slider" type="range" class="form-range mb-3" min="0" max="35" value="0" style="min-height: 48px; cursor: pointer;">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button id="p2-minus-btn" type="button" class="btn btn-outline-warning rounded-0 fw-bold" style="min-width: 56px; min-height: 48px;">−1</button>
+                                        <button id="p2-plus-btn" type="button" class="btn btn-outline-warning rounded-0 fw-bold" style="min-width: 56px; min-height: 48px;">+1</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================================================== -->
+                <!-- ФАЗА 3: Подсчет путей в DAG (слот-пазл вершин)       -->
+                <!-- ==================================================== -->
+                <div id="phase-3-workspace" class="d-none">
+                    <div class="row g-3 align-items-start mb-3">
+                        <div class="col-12 col-lg-6">
+                            <div class="card bg-black border-secondary rounded-0 p-3 text-center">
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <span class="text-warning fw-bold small">НАПРАВЛЕННЫЙ АЦИКЛИЧЕСКИЙ ГРАФ (DAG)</span>
+                                    <span id="p3-rule-badge" class="badge bg-dark border border-warning text-warning rounded-0 small">Все вершины открыты</span>
+                                </div>
+                                <div class="d-flex justify-content-center align-items-center" style="min-height: 240px;">
+                                    <svg id="p3-dag-svg" viewBox="0 0 420 230" class="w-100" style="max-height: 250px;"></svg>
+                                </div>
+                                <div class="text-light opacity-75 small mt-2" style="font-size: 0.78rem;">
+                                    N(V) равно сумме значений N(U) всех вершин, из которых входят стрелки в V.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <div class="card bg-black border-warning rounded-0 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <span class="text-warning fw-bold small">СЛОТЫ КОЛИЧЕСТВА ПУТЕЙ N(X)</span>
+                                    <button id="p3-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-height: 48px;">Сбросить слоты</button>
+                                </div>
+                                <p class="text-light small mb-3" style="font-size: 0.8rem;">
+                                    Заполните число путей от стартовой вершины <code>А</code> до каждой вершины. Перетащите числовые токены в слоты вершин (в палитре есть лишние числа-ловушки!).
+                                </p>
+
+                                <div id="p3-slots-grid" class="d-flex flex-wrap gap-2 justify-content-center mb-3"></div>
+
+                                <div class="border-top border-secondary pt-2">
+                                    <div class="text-light small fw-bold mb-2">Палитра значений N(X) (с дистракторами):</div>
+                                    <div id="p3-palette" class="d-flex flex-wrap gap-2 justify-content-center p-2 bg-dark border border-secondary" style="min-height: 64px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Панель управления и проверки -->
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary flex-wrap gap-2">
+                    <div class="text-light opacity-75 small">
+                        Режим: <span class="text-success">Direct Manipulation // No Multiple Choice</span>
+                    </div>
+                    <button id="verify-btn" type="button" class="btn btn-success rounded-0 px-4 py-2 fw-bold" style="min-height: 48px; min-width: 180px;">
+                        ПРОВЕРИТЬ ШАГ
+                    </button>
+                </div>
+
+                <!-- Экран завершения уровня -->
+                <div id="victory-screen" class="d-none text-center py-5">
+                    <div class="display-5 text-success mb-3 fw-bold">МИССИЯ ВЫПОЛНЕНА!</div>
+                    <p class="text-light fs-5 mb-4">
+                        Вы успешно освоили работу с весовыми матрицами ориентированных графов, прокладкой кратчайших маршрутов и динамическим подсчётом путей в направленных ациклических графах (DAG).
+                    </p>
+                    <div class="badge bg-dark border border-success text-success p-3 fs-6 rounded-0 mb-4">
+                        Телеметрия зафиксирована: action_type = 'level_complete'
+                    </div>
+                    <div>
+                        <button id="continue-btn" type="button" class="btn btn-outline-success btn-lg rounded-0 px-5 py-3 fw-bold" style="min-height: 48px;">
+                            ПЕРЕЙТИ К УРОВНЮ 2 →
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const telemetry = window.LMSTelemetry.create({
+        missionName: 'Урок 10 :: Граф. Весовая матрица графа. Длина пути между вершинами графа. Вычисление количества путей в направленном ациклическом графе (Уровень 1)',
+        level: 1,
+        totalStages: 3
+    });
+
+    let currentPhase = 1;
+    let isTransitioning = false;
+    let isLevelCompleted = false;
+    let appInitialized = false;
+
+    let phase1Data = null;
+    let phase2Data = null;
+    let phase3Data = null;
+
+    let selectedToken = null; // { phase, tokenId, value }
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = a[i];
+            a[i] = a[j];
+            a[j] = tmp;
+        }
+        return a;
+    }
+
+    function svgEl(tag, attrs = {}) {
+        const el = document.createElementNS(SVG_NS, tag);
+        for (const [k, v] of Object.entries(attrs)) {
+            el.setAttribute(k, String(v));
+        }
+        return el;
+    }
+
+    function showStatus(text, isError = false) {
+        const el = document.getElementById('status-alert');
+        if (!el) return;
+        el.className = isError
+            ? 'alert alert-danger bg-danger text-white rounded-0 py-2 px-3 mb-3 fw-bold small border-0'
+            : 'alert alert-success bg-success text-dark rounded-0 py-2 px-3 mb-3 fw-bold small border-0';
+        el.textContent = text;
+        el.classList.remove('d-none');
+    }
+
+    function hideStatus() {
+        const el = document.getElementById('status-alert');
+        if (el) el.classList.add('d-none');
+    }
+
+    function triggerFailure(message) {
+        if (isTransitioning || isLevelCompleted) return;
+        isTransitioning = true;
+        telemetry.fail({ stage: currentPhase });
+        const attemptsEl = document.getElementById('attempts-display');
+        if (attemptsEl) attemptsEl.textContent = telemetry.getState().attemptsCount;
+        showStatus('ОШИБКА: ' + message + ' Генерация нового варианта...', true);
+
+        const verifyBtn = document.getElementById('verify-btn');
+        if (verifyBtn) verifyBtn.disabled = true;
+
+        setTimeout(() => {
+            hideStatus();
+            isTransitioning = false;
+            initPhase(currentPhase);
+            if (verifyBtn) verifyBtn.disabled = false;
+        }, 1300);
+    }
+
+    // =====================================================
+    // ФАЗА 1: ВЕСОВАЯ МАТРИЦА ОРИЕНТИРОВАННОГО ГРАФА
+    // =====================================================
+    const P1_NODES = ['A', 'B', 'C', 'D'];
+    const P1_COORDS = {
+        A: { x: 65, y: 55 },
+        B: { x: 295, y: 55 },
+        C: { x: 295, y: 175 },
+        D: { x: 65, y: 175 }
+    };
+
+    function setupPhase1() {
+        document.getElementById('phase-badge').textContent = 'Шаг 1 из 3';
+        document.getElementById('phase-title').textContent = 'Весовая матрица ориентированного графа';
+        document.getElementById('phase-instruction').innerHTML =
+            '<strong>Задание:</strong> Перенесите недостающие веса дуг со схемы графа в слоты <code>[ ? ]</code> весовой матрицы. ' +
+            'Учитывайте направление стрелки: дуга <code>X → Y</code> записывается в строку <code>X</code> и столбец <code>Y</code>.';
+
+        const pairs = [
+            ['A', 'B'], ['B', 'A'],
+            ['B', 'C'], ['C', 'B'],
+            ['C', 'D'], ['D', 'C'],
+            ['A', 'D'], ['D', 'A'],
+            ['A', 'C'], ['B', 'D']
+        ];
+
+        // Гарантируем асимметрию и 5-6 дуг
+        const chosen = [];
+        const usedKeys = new Set();
+
+        // Обязательно 1 двусторонняя пара с разными весами для наглядности орграфа
+        const asymPair = shuffle([['A', 'B'], ['B', 'C'], ['C', 'D'], ['A', 'D']])[0];
+        chosen.push({ from: asymPair[0], to: asymPair[1] });
+        chosen.push({ from: asymPair[1], to: asymPair[0] });
+        usedKeys.add(asymPair[0] + '->' + asymPair[1]);
+        usedKeys.add(asymPair[1] + '->' + asymPair[0]);
+
+        const extraCandidates = shuffle(pairs).filter(p => !usedKeys.has(p[0] + '->' + p[1]));
+        for (const [u, v] of extraCandidates) {
+            if (chosen.length >= 5) break;
+            // Избегаем пересечения обеих диагоналей одновременно
+            if ((u === 'A' && v === 'C' && usedKeys.has('B->D')) || (u === 'B' && v === 'D' && usedKeys.has('A->C'))) {
+                continue;
+            }
+            chosen.push({ from: u, to: v });
+            usedKeys.add(u + '->' + v);
+        }
+
+        // Назначаем веса
+        const matrix = {};
+        for (const r of P1_NODES) {
+            matrix[r] = {};
+            for (const c of P1_NODES) matrix[r][c] = null;
+        }
+
+        const usedWeights = new Set();
+        chosen.forEach(edge => {
+            let w = randInt(2, 12);
+            while (usedWeights.has(w)) w = randInt(2, 15);
+            usedWeights.add(w);
+            edge.weight = w;
+            matrix[edge.from][edge.to] = w;
+        });
+
+        // Выбираем 3 дуги в слоты (включая хотя бы 1 из асимметричной пары)
+        const slotEdges = [chosen[0], ...shuffle(chosen.slice(1)).slice(0, 2)];
+        const slotKeys = new Set(slotEdges.map(e => e.from + '-' + e.to));
+
+        // Палитра: 3 верных веса + 1 дистрактор
+        let distractor = randInt(2, 15);
+        while (usedWeights.has(distractor)) distractor = randInt(2, 18);
+
+        const tokens = shuffle([
+            ...slotEdges.map((e, idx) => ({ id: 'p1-tok-' + idx, value: e.weight })),
+            { id: 'p1-tok-dist', value: distractor }
+        ]);
+
+        phase1Data = {
+            edges: chosen,
+            matrix,
+            slotKeys,
+            slotsState: {}, // key -> { tokenId, value }
+            tokens
+        };
+        selectedToken = null;
+
+        renderPhase1Graph();
+        renderPhase1Matrix();
+        renderPhase1Palette();
+    }
+
+    function renderPhase1Graph() {
+        const svg = document.getElementById('p1-graph-svg');
+        svg.innerHTML = '';
+
+        const defs = svgEl('defs');
+        const marker = svgEl('marker', {
+            id: 'p1-arrow',
+            viewBox: '0 0 10 10',
+            refX: '9',
+            refY: '5',
+            markerWidth: '6',
+            markerHeight: '6',
+            orient: 'auto-start-reverse'
+        });
+        marker.appendChild(svgEl('path', { d: 'M 0 1 L 10 5 L 0 9 z', fill: '#38bdf8' }));
+        defs.appendChild(marker);
+        svg.appendChild(defs);
+
+        const edgeSet = new Set(phase1Data.edges.map(e => e.from + '->' + e.to));
+
+        phase1Data.edges.forEach(edge => {
+            const p1 = P1_COORDS[edge.from];
+            const p2 = P1_COORDS[edge.to];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.hypot(dx, dy);
+            const ux = dx / dist;
+            const uy = dy / dist;
+
+            // Нормаль для искривления, если есть обратная дуга
+            const hasReverse = edgeSet.has(edge.to + '->' + edge.from);
+            const curveOffset = hasReverse ? 24 : 10;
+            const nx = -uy;
+            const ny = ux;
+
+            const sx = p1.x + ux * 22 + nx * (hasReverse ? 6 : 0);
+            const sy = p1.y + uy * 22 + ny * (hasReverse ? 6 : 0);
+            const ex = p2.x - ux * 24 + nx * (hasReverse ? 6 : 0);
+            const ey = p2.y - uy * 24 + ny * (hasReverse ? 6 : 0);
+
+            const cx = (p1.x + p2.x) / 2 + nx * curveOffset;
+            const cy = (p1.y + p2.y) / 2 + ny * curveOffset;
+
+            const path = svgEl('path', {
+                d: `M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`,
+                fill: 'none',
+                stroke: '#38bdf8',
+                'stroke-width': '2.5',
+                'marker-end': 'url(#p1-arrow)'
+            });
+            svg.appendChild(path);
+
+            // Позиция метки веса на кривой Безье (t = 0.5)
+            const lx = 0.25 * sx + 0.5 * cx + 0.25 * ex;
+            const ly = 0.25 * sy + 0.5 * cy + 0.25 * ey;
+
+            svg.appendChild(svgEl('rect', {
+                x: lx - 12,
+                y: ly - 10,
+                width: 24,
+                height: 20,
+                fill: '#000000',
+                stroke: '#198754',
+                'stroke-width': '1.5'
+            }));
+            const lbl = svgEl('text', {
+                x: lx,
+                y: ly + 4,
+                'text-anchor': 'middle',
+                fill: '#ffc107',
+                'font-size': '13',
+                'font-weight': 'bold'
+            });
+            lbl.textContent = String(edge.weight);
+            svg.appendChild(lbl);
+        });
+
+        for (const node of P1_NODES) {
+            const { x, y } = P1_COORDS[node];
+            svg.appendChild(svgEl('circle', {
+                cx: x, cy: y, r: 20,
+                fill: '#111827',
+                stroke: '#22c55e',
+                'stroke-width': '2.5'
+            }));
+            const txt = svgEl('text', {
+                x, y: y + 5,
+                'text-anchor': 'middle',
+                fill: '#f8fafc',
+                'font-size': '15',
+                'font-weight': 'bold'
+            });
+            txt.textContent = node;
+            svg.appendChild(txt);
+        }
+    }
+
+    function renderPhase1Matrix() {
+        const tbody = document.getElementById('p1-matrix-tbody');
+        tbody.innerHTML = '';
+
+        for (const r of P1_NODES) {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-info p-2';
+            th.textContent = r;
+            tr.appendChild(th);
+
+            for (const c of P1_NODES) {
+                const td = document.createElement('td');
+                td.className = 'p-1 bg-dark';
+                const key = r + '-' + c;
+
+                if (r === c) {
+                    td.className = 'p-2 bg-black text-secondary';
+                    td.textContent = '×';
+                } else if (phase1Data.slotKeys.has(key)) {
+                    const placed = phase1Data.slotsState[key];
+                    const slotBtn = document.createElement('button');
+                    slotBtn.type = 'button';
+                    slotBtn.dataset.slotKey = key;
+                    slotBtn.className = placed
+                        ? 'btn btn-success text-dark fw-bold rounded-0 w-100 p-0 d-flex align-items-center justify-content-center'
+                        : 'btn btn-outline-warning text-warning fw-bold rounded-0 w-100 p-0 d-flex align-items-center justify-content-center';
+                    slotBtn.style.cssText = 'min-width: 52px; min-height: 48px;';
+                    slotBtn.textContent = placed ? String(placed.value) : '?';
+                    slotBtn.title = placed ? 'Кликните, чтобы убрать токен' : `Слот ${r} → ${c}`;
+                    td.appendChild(slotBtn);
+                } else {
+                    const val = phase1Data.matrix[r][c];
+                    td.className = val !== null ? 'p-2 bg-dark text-light fw-bold' : 'p-2 bg-dark text-secondary';
+                    td.textContent = val !== null ? String(val) : '—';
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+    }
+
+    function renderPhase1Palette() {
+        const palette = document.getElementById('p1-palette');
+        palette.innerHTML = '';
+        const usedIds = new Set(Object.values(phase1Data.slotsState).map(s => s.tokenId));
+
+        phase1Data.tokens.forEach(tok => {
+            if (usedIds.has(tok.id)) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.draggable = true;
+            btn.dataset.tokenId = tok.id;
+            btn.dataset.tokenVal = String(tok.value);
+            const isSel = selectedToken && selectedToken.phase === 1 && selectedToken.tokenId === tok.id;
+            btn.className = isSel
+                ? 'btn btn-warning text-dark fw-bold rounded-0 fs-5 px-3'
+                : 'btn btn-outline-success text-success fw-bold rounded-0 fs-5 px-3';
+            btn.style.cssText = 'min-width: 56px; min-height: 48px; cursor: grab;';
+            btn.textContent = String(tok.value);
+            palette.appendChild(btn);
+        });
+    }
+
+    function placePhase1Token(slotKey, tokenId, value) {
+        for (const k of Object.keys(phase1Data.slotsState)) {
+            if (phase1Data.slotsState[k].tokenId === tokenId) {
+                delete phase1Data.slotsState[k];
+            }
+        }
+        phase1Data.slotsState[slotKey] = { tokenId, value: Number(value) };
+        selectedToken = null;
+        renderPhase1Matrix();
+        renderPhase1Palette();
+    }
+
+    function verifyPhase1() {
+        for (const key of phase1Data.slotKeys) {
+            if (!phase1Data.slotsState[key]) {
+                triggerFailure('Заполните все слоты [ ? ] в весовой матрице.');
+                return;
+            }
+        }
+        for (const key of phase1Data.slotKeys) {
+            const [r, c] = key.split('-');
+            const expected = phase1Data.matrix[r][c];
+            const actual = phase1Data.slotsState[key].value;
+            if (actual !== expected) {
+                triggerFailure(`Неверный вес в ячейке (${r} → ${c}). Проверьте направление стрелки на схеме.`);
+                return;
+            }
+        }
+
+        showStatus('Весовая матрица орграфа откалибрована верно! Переход к Шагу 2...', false);
+        isTransitioning = true;
+        setTimeout(() => {
+            hideStatus();
+            isTransitioning = false;
+            currentPhase = 2;
+            telemetry.advanceStage(2);
+            initPhase(2);
+        }, 900);
+    }
+
+    // =====================================================
+    // ФАЗА 2: ТРАССИРОВКА КРАТЧАЙШЕГО ПУТИ + СЛАЙДЕР
+    // =====================================================
+    const P2_NODES = ['A', 'B', 'C', 'D', 'E'];
+    const P2_COORDS = {
+        A: { x: 48, y: 115 },
+        B: { x: 150, y: 42 },
+        C: { x: 150, y: 188 },
+        D: { x: 268, y: 42 },
+        E: { x: 334, y: 115 }
+    };
+    const P2_EDGE_LIST = [
+        ['A', 'B'],
+        ['A', 'C'],
+        ['B', 'C'],
+        ['B', 'D'],
+        ['C', 'D'],
+        ['C', 'E'],
+        ['D', 'E']
+    ];
+
+    function findAllSimplePathsP2(adj, curr, target, visited, path, dist, results) {
+        if (curr === target) {
+            results.push({ path: path.slice(), dist });
+            return;
+        }
+        for (const [next, w] of Object.entries(adj[curr])) {
+            if (!visited.has(next)) {
+                visited.add(next);
+                path.push(next);
+                findAllSimplePathsP2(adj, next, target, visited, path, dist + w, results);
+                path.pop();
+                visited.delete(next);
+            }
+        }
+    }
+
+    function setupPhase2() {
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+        document.getElementById('phase-title').textContent = 'Кратчайший путь и измерение его длины';
+        document.getElementById('phase-instruction').innerHTML =
+            '<strong>Задание:</strong> Проложите <strong>кратчайший путь</strong> от старта <code>A</code> к финишу <code>E</code> (кликая по соседним вершинам на графе), ' +
+            'вычислите суммарный вес маршрута и установите его на слайдере.';
+
+        let adj = null;
+        let edgeWeights = null;
+        let best = null;
+
+        for (let attempt = 0; attempt < 250; attempt++) {
+            const weights = {};
+            const curAdj = { A: {}, B: {}, C: {}, D: {}, E: {} };
+            P2_EDGE_LIST.forEach(([u, v]) => {
+                // Делаем прямое ребро C-E чуть тяжелее, чтобы поощрять поиск обхода
+                const w = (u === 'C' && v === 'E') ? randInt(8, 15) : randInt(2, 9);
+                weights[u + '-' + v] = w;
+                weights[v + '-' + u] = w;
+                curAdj[u][v] = w;
+                curAdj[v][u] = w;
+            });
+
+            const results = [];
+            findAllSimplePathsP2(curAdj, 'A', 'E', new Set(['A']), ['A'], 0, results);
+            results.sort((a, b) => a.dist - b.dist);
+
+            if (results.length >= 2 && results[0].dist < results[1].dist && results[0].path.length >= 4 && results[0].dist <= 30) {
+                adj = curAdj;
+                edgeWeights = weights;
+                best = results[0];
+                break;
+            }
+        }
+
+        // Гарантированный резерв на случай редкого расклада
+        if (!best) {
+            edgeWeights = { 'A-B': 3, 'B-A': 3, 'A-C': 7, 'C-A': 7, 'B-C': 2, 'C-B': 2, 'B-D': 8, 'D-B': 8, 'C-D': 3, 'D-C': 3, 'C-E': 11, 'E-C': 11, 'D-E': 2, 'E-D': 2 };
+            adj = {
+                A: { B: 3, C: 7 },
+                B: { A: 3, C: 2, D: 8 },
+                C: { A: 7, B: 2, D: 3, E: 11 },
+                D: { B: 8, C: 3, E: 2 },
+                E: { C: 11, D: 2 }
+            };
+            best = { path: ['A', 'B', 'C', 'D', 'E'], dist: 10 };
+        }
+
+        phase2Data = {
+            adj,
+            edgeWeights,
+            bestPath: best.path,
+            minDist: best.dist,
+            userPath: ['A']
+        };
+
+        const slider = document.getElementById('p2-length-slider');
+        if (slider) slider.value = '0';
+        const readout = document.getElementById('p2-slider-readout');
+        if (readout) readout.textContent = '0';
+
+        renderPhase2Graph();
+        updatePhase2PathDisplay();
+    }
+
+    function renderPhase2Graph() {
+        const svg = document.getElementById('p2-graph-svg');
+        svg.innerHTML = '';
+
+        const userEdges = new Set();
+        for (let i = 0; i < phase2Data.userPath.length - 1; i++) {
+            const u = phase2Data.userPath[i];
+            const v = phase2Data.userPath[i + 1];
+            userEdges.add(u + '-' + v);
+            userEdges.add(v + '-' + u);
+        }
+
+        P2_EDGE_LIST.forEach(([u, v]) => {
+            const p1 = P2_COORDS[u];
+            const p2 = P2_COORDS[v];
+            const active = userEdges.has(u + '-' + v);
+
+            svg.appendChild(svgEl('line', {
+                x1: p1.x, y1: p1.y,
+                x2: p2.x, y2: p2.y,
+                stroke: active ? '#22c55e' : '#64748b',
+                'stroke-width': active ? '4.5' : '2.5'
+            }));
+
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2;
+            svg.appendChild(svgEl('rect', {
+                x: mx - 12,
+                y: my - 10,
+                width: 24,
+                height: 20,
+                fill: '#000000',
+                stroke: active ? '#22c55e' : '#475569',
+                'stroke-width': '1.5'
+            }));
+            const lbl = svgEl('text', {
+                x: mx,
+                y: my + 4,
+                'text-anchor': 'middle',
+                fill: active ? '#22c55e' : '#facc15',
+                'font-size': '13',
+                'font-weight': 'bold'
+            });
+            lbl.textContent = String(phase2Data.edgeWeights[u + '-' + v]);
+            svg.appendChild(lbl);
+        });
+
+        const tip = phase2Data.userPath[phase2Data.userPath.length - 1];
+        const visitedSet = new Set(phase2Data.userPath);
+
+        P2_NODES.forEach(node => {
+            const { x, y } = P2_COORDS[node];
+            const isTip = node === tip;
+            const isVisited = visitedSet.has(node);
+            const isReachable = !isVisited && phase2Data.adj[tip] && phase2Data.adj[tip][node] !== undefined;
+
+            const g = svgEl('g', {
+                'data-node': node,
+                style: 'cursor: pointer;'
+            });
+
+            // Хитбокс >= 48x48 px (r = 28 -> диаметр 56)
+            g.appendChild(svgEl('circle', {
+                cx: x, cy: y, r: 28,
+                fill: 'transparent',
+                'data-node': node
+            }));
+
+            let strokeColor = '#64748b';
+            let fillColor = '#111827';
+            if (isTip) {
+                strokeColor = '#facc15';
+                fillColor = '#14532d';
+            } else if (isVisited) {
+                strokeColor = '#22c55e';
+                fillColor = '#052e16';
+            } else if (isReachable) {
+                strokeColor = '#38bdf8';
+                fillColor = '#0f172a';
+            }
+
+            g.appendChild(svgEl('circle', {
+                cx: x, cy: y, r: 20,
+                fill: fillColor,
+                stroke: strokeColor,
+                'stroke-width': isTip ? '3.5' : '2.5',
+                'data-node': node
+            }));
+
+            const txt = svgEl('text', {
+                x, y: y + 5,
+                'text-anchor': 'middle',
+                fill: '#f8fafc',
+                'font-size': '15',
+                'font-weight': 'bold',
+                'data-node': node
+            });
+            txt.textContent = node;
+            g.appendChild(txt);
+
+            svg.appendChild(g);
+        });
+    }
+
+    function updatePhase2PathDisplay() {
+        const el = document.getElementById('p2-path-display');
+        if (el) el.textContent = phase2Data.userPath.join(' → ');
+    }
+
+    function setSliderValue(val) {
+        const clamped = Math.max(0, Math.min(35, Number(val)));
+        const slider = document.getElementById('p2-length-slider');
+        const readout = document.getElementById('p2-slider-readout');
+        if (slider) slider.value = String(clamped);
+        if (readout) readout.textContent = String(clamped);
+    }
+
+    function verifyPhase2() {
+        const path = phase2Data.userPath;
+        if (path[path.length - 1] !== 'E') {
+            triggerFailure('Маршрут должен заканчиваться в вершине E.');
+            return;
+        }
+
+        let userDist = 0;
+        for (let i = 0; i < path.length - 1; i++) {
+            const w = phase2Data.adj[path[i]][path[i + 1]];
+            if (w === undefined) {
+                triggerFailure('Обнаружен некорректный переход между вершинами.');
+                return;
+            }
+            userDist += w;
+        }
+
+        const sliderVal = Number(document.getElementById('p2-length-slider').value);
+        if (userDist !== phase2Data.minDist) {
+            triggerFailure(`Выбранный путь (${path.join(' → ')}) имеет длину ${userDist}, но существует более короткий маршрут!`);
+            return;
+        }
+        if (sliderVal !== phase2Data.minDist) {
+            triggerFailure(`Маршрут найден верно, но на калибраторе указано ${sliderVal} вместо точной суммы весов.`);
+            return;
+        }
+
+        showStatus('Кратчайший маршрут и его длина определены безупречно! Переход к Шагу 3...', false);
+        isTransitioning = true;
+        setTimeout(() => {
+            hideStatus();
+            isTransitioning = false;
+            currentPhase = 3;
+            telemetry.advanceStage(3);
+            initPhase(3);
+        }, 900);
+    }
+
+    // =====================================================
+    // ФАЗА 3: КОЛИЧЕСТВО ПУТЕЙ В DAG (СЛОТ-ПАЗЛ)
+    // =====================================================
+    const P3_ORDER = ['А', 'Б', 'Г', 'В', 'Д', 'Е'];
+    const P3_COORDS = {
+        А: { x: 42, y: 115 },
+        Б: { x: 138, y: 45 },
+        Г: { x: 138, y: 185 },
+        В: { x: 222, y: 115 },
+        Д: { x: 306, y: 115 },
+        Е: { x: 382, y: 115 }
+    };
+
+    function computeDagCounts(edges, bannedNode) {
+        const incoming = {};
+        for (const v of P3_ORDER) incoming[v] = [];
+        edges.forEach(([u, v]) => incoming[v].push(u));
+
+        const counts = { А: 1 };
+        for (const v of P3_ORDER.slice(1)) {
+            if (v === bannedNode) {
+                counts[v] = 0;
+            } else {
+                counts[v] = incoming[v].reduce((sum, u) => sum + counts[u], 0);
+            }
+        }
+        return counts;
+    }
+
+    function setupPhase3() {
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+        document.getElementById('phase-title').textContent = 'Вычисление количества путей в направленном ациклическом графе (DAG)';
+
+        // Базовый каркас + случайные перемычки строго слева направо
+        const edges = [
+            ['А', 'Б'],
+            ['А', 'Г'],
+            ['Б', 'Д'],
+            ['Г', 'Д'],
+            ['В', 'Д'],
+            ['Д', 'Е']
+        ];
+
+        const optionalPool = [
+            ['А', 'В'],
+            ['Б', 'В'],
+            ['Г', 'В'],
+            ['Б', 'Е'],
+            ['Г', 'Е']
+        ];
+
+        // В В входят хотя бы 2 дуги
+        const intoV = shuffle([['А', 'В'], ['Б', 'В'], ['Г', 'В']]).slice(0, randInt(2, 3));
+        intoV.forEach(e => edges.push(e));
+
+        // Опционально 1-2 дуги напрямую к Е
+        const bypass = shuffle([['Б', 'Е'], ['Г', 'Е']]).slice(0, randInt(1, 2));
+        bypass.forEach(e => edges.push(e));
+
+        // 50% шанс: запрещенная вершина В или Г
+        const bannedNode = Math.random() > 0.5 ? (Math.random() > 0.5 ? 'В' : 'Г') : null;
+        const counts = computeDagCounts(edges, bannedNode);
+
+        const ruleBadge = document.getElementById('p3-rule-badge');
+        if (bannedNode) {
+            ruleBadge.textContent = `Запрещённый пункт: ${bannedNode} (N = 0)`;
+            ruleBadge.className = 'badge bg-danger text-white rounded-0 small';
+            document.getElementById('phase-instruction').innerHTML =
+                `<strong>Задание (Твист):</strong> Подсчитайте количество путей из <code>А</code> в <code>Е</code>, ` +
+                `<strong>НЕ проходящих</strong> через закрытый пункт <code>${bannedNode}</code> (его вклад равен <code>0</code>). Заполните слоты <code>N(X)</code>!`;
+        } else {
+            ruleBadge.textContent = 'Все пункты открыты';
+            ruleBadge.className = 'badge bg-dark border border-warning text-warning rounded-0 small';
+            document.getElementById('phase-instruction').innerHTML =
+                '<strong>Задание:</strong> Применяя правило суммы входящих стрелок <code>N(V) = Σ N(U)</code>, ' +
+                'заполните слоты количества путей из вершины <code>А</code> в каждую вершину DAG до финиша <code>Е</code>.';
+        }
+
+        const activeSlots = P3_ORDER.slice(1).filter(v => v !== bannedNode);
+        const neededValues = activeSlots.map(v => ({ node: v, value: counts[v] }));
+
+        // Генерируем 3-4 правдоподобных дистрактора
+        const allValidSet = new Set(neededValues.map(x => x.value));
+        const distractors = [];
+        const unbannedCounts = bannedNode ? computeDagCounts(edges, null) : null;
+        const candidateDistractors = [
+            ...(unbannedCounts ? [unbannedCounts['Д'], unbannedCounts['Е']] : []),
+            counts['Е'] + 1,
+            Math.max(1, counts['Е'] - 1),
+            counts['Д'] + 2,
+            counts['В'] + 2,
+            counts['Е'] * 2
+        ];
+
+        for (const d of candidateDistractors) {
+            if (distractors.length >= 3) break;
+            if (d > 0 && !allValidSet.has(d) && !distractors.includes(d)) {
+                distractors.push(d);
+            }
+        }
+        while (distractors.length < 3) {
+            const d = randInt(2, counts['Е'] + 5);
+            if (!allValidSet.has(d) && !distractors.includes(d)) distractors.push(d);
+        }
+
+        const tokens = shuffle([
+            ...neededValues.map((x, idx) => ({ id: 'p3-tok-' + idx, value: x.value })),
+            ...distractors.map((d, idx) => ({ id: 'p3-dist-' + idx, value: d }))
+        ]);
+
+        phase3Data = {
+            edges,
+            bannedNode,
+            counts,
+            activeSlots,
+            slotsState: {}, // node -> { tokenId, value }
+            tokens
+        };
+        selectedToken = null;
+
+        renderPhase3Dag();
+        renderPhase3Slots();
+        renderPhase3Palette();
+    }
+
+    function renderPhase3Dag() {
+        const svg = document.getElementById('p3-dag-svg');
+        svg.innerHTML = '';
+
+        const defs = svgEl('defs');
+        const mkActive = svgEl('marker', {
+            id: 'p3-arrow',
+            viewBox: '0 0 10 10',
+            refX: '9',
+            refY: '5',
+            markerWidth: '6',
+            markerHeight: '6',
+            orient: 'auto-start-reverse'
+        });
+        mkActive.appendChild(svgEl('path', { d: 'M 0 1 L 10 5 L 0 9 z', fill: '#facc15' }));
+        defs.appendChild(mkActive);
+
+        const mkMuted = svgEl('marker', {
+            id: 'p3-arrow-muted',
+            viewBox: '0 0 10 10',
+            refX: '9',
+            refY: '5',
+            markerWidth: '6',
+            markerHeight: '6',
+            orient: 'auto-start-reverse'
+        });
+        mkMuted.appendChild(svgEl('path', { d: 'M 0 1 L 10 5 L 0 9 z', fill: '#475569' }));
+        defs.appendChild(mkMuted);
+        svg.appendChild(defs);
+
+        phase3Data.edges.forEach(([u, v]) => {
+            const p1 = P3_COORDS[u];
+            const p2 = P3_COORDS[v];
+            const isBlocked = phase3Data.bannedNode === u || phase3Data.bannedNode === v;
+
+            // Дуги Б->Е и Г->Е рисуем плавной обходной кривой мимо Д
+            if ((u === 'Б' && v === 'Е') || (u === 'Г' && v === 'Е')) {
+                const ctrlY = u === 'Б' ? 14 : 216;
+                const sx = p1.x + 18;
+                const sy = p1.y + (u === 'Б' ? -8 : 8);
+                const ex = p2.x - 10;
+                const ey = p2.y + (u === 'Б' ? -20 : 20);
+                svg.appendChild(svgEl('path', {
+                    d: `M ${sx} ${sy} Q ${(p1.x + p2.x) / 2} ${ctrlY} ${ex} ${ey}`,
+                    fill: 'none',
+                    stroke: isBlocked ? '#475569' : '#facc15',
+                    'stroke-width': isBlocked ? '1.8' : '2.3',
+                    'stroke-dasharray': isBlocked ? '4 4' : 'none',
+                    'marker-end': isBlocked ? 'url(#p3-arrow-muted)' : 'url(#p3-arrow)'
+                }));
+                return;
+            }
+
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.hypot(dx, dy);
+            const ux = dx / dist;
+            const uy = dy / dist;
+
+            svg.appendChild(svgEl('line', {
+                x1: p1.x + ux * 22,
+                y1: p1.y + uy * 22,
+                x2: p2.x - ux * 23,
+                y2: p2.y - uy * 23,
+                stroke: isBlocked ? '#475569' : '#facc15',
+                'stroke-width': isBlocked ? '1.8' : '2.3',
+                'stroke-dasharray': isBlocked ? '4 4' : 'none',
+                'marker-end': isBlocked ? 'url(#p3-arrow-muted)' : 'url(#p3-arrow)'
+            }));
+        });
+
+        P3_ORDER.forEach(node => {
+            const { x, y } = P3_COORDS[node];
+            const isBanned = node === phase3Data.bannedNode;
+            const isStart = node === 'А';
+            const placed = phase3Data.slotsState[node];
+
+            let stroke = '#22c55e';
+            let fill = '#111827';
+            if (isBanned) {
+                stroke = '#ef4444';
+                fill = '#450a0a';
+            } else if (isStart) {
+                stroke = '#38bdf8';
+                fill = '#0c4a6e';
+            } else if (placed) {
+                stroke = '#facc15';
+                fill = '#1e293b';
+            }
+
+            svg.appendChild(svgEl('circle', {
+                cx: x, cy: y, r: 20,
+                fill, stroke, 'stroke-width': '2.5'
+            }));
+
+            const txt = svgEl('text', {
+                x, y: y + 5,
+                'text-anchor': 'middle',
+                fill: isBanned ? '#fca5a5' : '#f8fafc',
+                'font-size': '15',
+                'font-weight': 'bold'
+            });
+            txt.textContent = node;
+            svg.appendChild(txt);
+
+            // Подпись значения N над/под вершиной
+            const badgeY = y >= 150 ? y + 34 : y - 26;
+            const badgeText = isStart ? '1' : (isBanned ? '0 (X)' : (placed ? String(placed.value) : '?'));
+            const sub = svgEl('text', {
+                x, y: badgeY,
+                'text-anchor': 'middle',
+                fill: isBanned ? '#f87171' : (isStart || placed ? '#4ade80' : '#94a3b8'),
+                'font-size': '12',
+                'font-weight': 'bold'
+            });
+            sub.textContent = badgeText;
+            svg.appendChild(sub);
+        });
+    }
+
+    function renderPhase3Slots() {
+        const grid = document.getElementById('p3-slots-grid');
+        grid.innerHTML = '';
+
+        P3_ORDER.forEach(node => {
+            const box = document.createElement('div');
+            box.className = 'd-flex flex-column align-items-center bg-dark border border-secondary p-2';
+            box.style.minWidth = '72px';
+
+            const lbl = document.createElement('span');
+            lbl.className = 'small fw-bold mb-1 ' + (node === phase3Data.bannedNode ? 'text-danger' : 'text-info');
+            lbl.textContent = `N(${node})`;
+            box.appendChild(lbl);
+
+            if (node === 'А') {
+                const fixed = document.createElement('div');
+                fixed.className = 'bg-info text-dark fw-bold d-flex align-items-center justify-content-center';
+                fixed.style.cssText = 'min-width: 54px; min-height: 48px;';
+                fixed.textContent = '1';
+                box.appendChild(fixed);
+            } else if (node === phase3Data.bannedNode) {
+                const banned = document.createElement('div');
+                banned.className = 'bg-danger text-white fw-bold d-flex align-items-center justify-content-center';
+                banned.style.cssText = 'min-width: 54px; min-height: 48px;';
+                banned.textContent = '0';
+                box.appendChild(banned);
+            } else {
+                const placed = phase3Data.slotsState[node];
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.dagSlot = node;
+                btn.className = placed
+                    ? 'btn btn-warning text-dark fw-bold rounded-0 d-flex align-items-center justify-content-center p-0'
+                    : 'btn btn-outline-warning text-warning fw-bold rounded-0 d-flex align-items-center justify-content-center p-0';
+                btn.style.cssText = 'min-width: 54px; min-height: 48px;';
+                btn.textContent = placed ? String(placed.value) : '?';
+                box.appendChild(btn);
+            }
+
+            grid.appendChild(box);
+        });
+    }
+
+    function renderPhase3Palette() {
+        const palette = document.getElementById('p3-palette');
+        palette.innerHTML = '';
+        const usedIds = new Set(Object.values(phase3Data.slotsState).map(s => s.tokenId));
+
+        phase3Data.tokens.forEach(tok => {
+            if (usedIds.has(tok.id)) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.draggable = true;
+            btn.dataset.tokenId = tok.id;
+            btn.dataset.tokenVal = String(tok.value);
+            const isSel = selectedToken && selectedToken.phase === 3 && selectedToken.tokenId === tok.id;
+            btn.className = isSel
+                ? 'btn btn-warning text-dark fw-bold rounded-0 fs-5 px-3'
+                : 'btn btn-outline-success text-success fw-bold rounded-0 fs-5 px-3';
+            btn.style.cssText = 'min-width: 56px; min-height: 48px; cursor: grab;';
+            btn.textContent = String(tok.value);
+            palette.appendChild(btn);
+        });
+    }
+
+    function placePhase3Token(node, tokenId, value) {
+        for (const k of Object.keys(phase3Data.slotsState)) {
+            if (phase3Data.slotsState[k].tokenId === tokenId) {
+                delete phase3Data.slotsState[k];
+            }
+        }
+        phase3Data.slotsState[node] = { tokenId, value: Number(value) };
+        selectedToken = null;
+        renderPhase3Dag();
+        renderPhase3Slots();
+        renderPhase3Palette();
+    }
+
+    function verifyPhase3() {
+        for (const node of phase3Data.activeSlots) {
+            if (!phase3Data.slotsState[node]) {
+                triggerFailure(`Заполните слот N(${node}) значением количества путей.`);
+                return;
+            }
+        }
+        for (const node of phase3Data.activeSlots) {
+            const actual = phase3Data.slotsState[node].value;
+            const expected = phase3Data.counts[node];
+            if (actual !== expected) {
+                triggerFailure(`Ошибка в вершине ${node}: пересчитайте сумму N(U) всех входящих стрелок.`);
+                return;
+            }
+        }
+
+        finishLevel();
+    }
+
+    function finishLevel() {
+        if (isLevelCompleted) return;
+        isLevelCompleted = true;
+
+        document.getElementById('phase-1-workspace').classList.add('d-none');
+        document.getElementById('phase-2-workspace').classList.add('d-none');
+        document.getElementById('phase-3-workspace').classList.add('d-none');
+        document.getElementById('verify-btn').classList.add('d-none');
+        document.getElementById('phase-instruction').classList.add('d-none');
+
+        document.getElementById('phase-badge').textContent = 'Успешно';
+        document.getElementById('phase-badge').className = 'badge bg-success text-dark rounded-0 fs-6 me-2';
+        document.getElementById('phase-title').textContent = 'Уровень 1 завершён';
+
+        document.getElementById('victory-screen').classList.remove('d-none');
+        telemetry.complete({ stage: 3 });
+    }
+
+    function initPhase(phase) {
+        document.getElementById('phase-1-workspace').classList.add('d-none');
+        document.getElementById('phase-2-workspace').classList.add('d-none');
+        document.getElementById('phase-3-workspace').classList.add('d-none');
+        selectedToken = null;
+
+        if (phase === 1) {
+            document.getElementById('phase-1-workspace').classList.remove('d-none');
+            setupPhase1();
+        } else if (phase === 2) {
+            document.getElementById('phase-2-workspace').classList.remove('d-none');
+            setupPhase2();
+        } else if (phase === 3) {
+            document.getElementById('phase-3-workspace').classList.remove('d-none');
+            setupPhase3();
+        }
+    }
+
+    // Однократная привязка всех обработчиков через делегирование
+    function bindGlobalListenersOnce() {
+        // --- Фаза 1: клик и D&D делегирование ---
+        const p1Palette = document.getElementById('p1-palette');
+        const p1Matrix = document.getElementById('p1-matrix-tbody');
+
+        p1Palette.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-token-id]');
+            if (!btn || isTransitioning) return;
+            telemetry.markActivity();
+            if (selectedToken && selectedToken.phase === 1 && selectedToken.tokenId === btn.dataset.tokenId) {
+                selectedToken = null;
+            } else {
+                selectedToken = { phase: 1, tokenId: btn.dataset.tokenId, value: Number(btn.dataset.tokenVal) };
+            }
+            renderPhase1Palette();
+        });
+
+        p1Palette.addEventListener('dragstart', (e) => {
+            const btn = e.target.closest('button[data-token-id]');
+            if (!btn) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+                phase: 1,
+                tokenId: btn.dataset.tokenId,
+                value: Number(btn.dataset.tokenVal)
+            }));
+        });
+
+        p1Matrix.addEventListener('dragover', (e) => {
+            if (e.target.closest('button[data-slot-key]')) e.preventDefault();
+        });
+
+        p1Matrix.addEventListener('drop', (e) => {
+            const slot = e.target.closest('button[data-slot-key]');
+            if (!slot || isTransitioning) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            try {
+                const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (payload.phase === 1) placePhase1Token(slot.dataset.slotKey, payload.tokenId, payload.value);
+            } catch (_) {}
+        });
+
+        p1Matrix.addEventListener('click', (e) => {
+            const slot = e.target.closest('button[data-slot-key]');
+            if (!slot || isTransitioning) return;
+            telemetry.markActivity();
+            const key = slot.dataset.slotKey;
+            if (selectedToken && selectedToken.phase === 1) {
+                placePhase1Token(key, selectedToken.tokenId, selectedToken.value);
+            } else if (phase1Data && phase1Data.slotsState[key]) {
+                delete phase1Data.slotsState[key];
+                renderPhase1Matrix();
+                renderPhase1Palette();
+            }
+        });
+
+        document.getElementById('p1-reset-btn').addEventListener('click', () => {
+            if (!phase1Data || isTransitioning) return;
+            telemetry.markActivity();
+            phase1Data.slotsState = {};
+            selectedToken = null;
+            renderPhase1Matrix();
+            renderPhase1Palette();
+        });
+
+        // --- Фаза 2: клик по SVG-вершинам + слайдер ---
+        const p2Svg = document.getElementById('p2-graph-svg');
+        p2Svg.addEventListener('click', (e) => {
+            if (!phase2Data || isTransitioning) return;
+            const target = e.target.closest('[data-node]');
+            if (!target) return;
+            telemetry.markActivity();
+            const node = target.getAttribute('data-node');
+            const path = phase2Data.userPath;
+            const tip = path[path.length - 1];
+
+            if (node === tip && path.length > 1) {
+                path.pop();
+                renderPhase2Graph();
+                updatePhase2PathDisplay();
+                return;
+            }
+            if (!path.includes(node) && phase2Data.adj[tip] && phase2Data.adj[tip][node] !== undefined) {
+                path.push(node);
+                renderPhase2Graph();
+                updatePhase2PathDisplay();
+            }
+        });
+
+        document.getElementById('p2-reset-btn').addEventListener('click', () => {
+            if (!phase2Data || isTransitioning) return;
+            telemetry.markActivity();
+            phase2Data.userPath = ['A'];
+            renderPhase2Graph();
+            updatePhase2PathDisplay();
+        });
+
+        const slider = document.getElementById('p2-length-slider');
+        slider.addEventListener('input', () => {
+            telemetry.markActivity();
+            setSliderValue(slider.value);
+        });
+        document.getElementById('p2-minus-btn').addEventListener('click', () => {
+            telemetry.markActivity();
+            setSliderValue(Number(slider.value) - 1);
+        });
+        document.getElementById('p2-plus-btn').addEventListener('click', () => {
+            telemetry.markActivity();
+            setSliderValue(Number(slider.value) + 1);
+        });
+
+        // --- Фаза 3: клик и D&D делегирование ---
+        const p3Palette = document.getElementById('p3-palette');
+        const p3Grid = document.getElementById('p3-slots-grid');
+
+        p3Palette.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-token-id]');
+            if (!btn || isTransitioning) return;
+            telemetry.markActivity();
+            if (selectedToken && selectedToken.phase === 3 && selectedToken.tokenId === btn.dataset.tokenId) {
+                selectedToken = null;
+            } else {
+                selectedToken = { phase: 3, tokenId: btn.dataset.tokenId, value: Number(btn.dataset.tokenVal) };
+            }
+            renderPhase3Palette();
+        });
+
+        p3Palette.addEventListener('dragstart', (e) => {
+            const btn = e.target.closest('button[data-token-id]');
+            if (!btn) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+                phase: 3,
+                tokenId: btn.dataset.tokenId,
+                value: Number(btn.dataset.tokenVal)
+            }));
+        });
+
+        p3Grid.addEventListener('dragover', (e) => {
+            if (e.target.closest('button[data-dag-slot]')) e.preventDefault();
+        });
+
+        p3Grid.addEventListener('drop', (e) => {
+            const slot = e.target.closest('button[data-dag-slot]');
+            if (!slot || isTransitioning) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            try {
+                const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (payload.phase === 3) placePhase3Token(slot.dataset.dagSlot, payload.tokenId, payload.value);
+            } catch (_) {}
+        });
+
+        p3Grid.addEventListener('click', (e) => {
+            const slot = e.target.closest('button[data-dag-slot]');
+            if (!slot || isTransitioning) return;
+            telemetry.markActivity();
+            const node = slot.dataset.dagSlot;
+            if (selectedToken && selectedToken.phase === 3) {
+                placePhase3Token(node, selectedToken.tokenId, selectedToken.value);
+            } else if (phase3Data && phase3Data.slotsState[node]) {
+                delete phase3Data.slotsState[node];
+                renderPhase3Dag();
+                renderPhase3Slots();
+                renderPhase3Palette();
+            }
+        });
+
+        document.getElementById('p3-reset-btn').addEventListener('click', () => {
+            if (!phase3Data || isTransitioning) return;
+            telemetry.markActivity();
+            phase3Data.slotsState = {};
+            selectedToken = null;
+            renderPhase3Dag();
+            renderPhase3Slots();
+            renderPhase3Palette();
+        });
+
+        // --- Проверка и переход ---
+        document.getElementById('verify-btn').addEventListener('click', () => {
+            if (isTransitioning || isLevelCompleted) return;
+            telemetry.markActivity();
+            if (currentPhase === 1) verifyPhase1();
+            else if (currentPhase === 2) verifyPhase2();
+            else if (currentPhase === 3) verifyPhase3();
+        });
+
+        document.getElementById('continue-btn').addEventListener('click', () => {
+            window.location.href = '/tasks/9-класс/10/level2';
+        });
+    }
+
+    function initApp() {
+        if (appInitialized) return;
+        appInitialized = true;
+        bindGlobalListenersOnce();
+        initPhase(1);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp, { once: true });
+    } else {
+        initApp();
+    }
+})();
+</script>

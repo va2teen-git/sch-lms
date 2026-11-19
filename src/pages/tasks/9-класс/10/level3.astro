@@ -1,0 +1,1352 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="app" class="container-fluid px-2 px-md-3 my-3 font-monospace" v-cloak>
+
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (БРИФИНГ ХАРДКОРА)      -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="card bg-black border-danger rounded-0 p-3 p-md-4 text-center shadow-lg">
+            <div class="fs-2 fs-md-1 text-danger fw-bold mb-2">⚡ ICE NODE RACE // SUBNET INFILTRATION ⚡</div>
+            <h2 class="h4 text-light mb-2">ГОНКА С АНТИВИРУСОМ В ГРАФЕ И КАСКАД DAG // АРХЕТИП 7</h2>
+            <p class="text-secondary mb-3 small mx-auto" style="max-width: 780px;">
+                Вы проводите кибер-инфильтрацию магистрального графа сети под давлением красного фронта антивируса ICE.
+                Пройдите 10 процедурных волн, переключаясь между анализом весовой матрицы, поиском кратчайшего пути и точным расчётом количества маршрутов в DAG.
+            </p>
+
+            <div class="card bg-dark border-secondary rounded-0 p-3 mx-auto mb-3 text-start small" style="max-width: 760px;">
+                <div class="text-danger fw-bold mb-2">[ИНСТРУКЦИЯ БОЕВОГО ОПЕРАТОРА // 10 ВОЛН]:</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Трассировка маршрута (Волны 1–3, 5–6, 8–9):</span> Кликайте прямо по смежным вершинам графа от <strong class="text-info">А</strong> к целевому узлу (≥ 50×50 px или клавишами <code>1</code>..<code>6</code>), чтобы проложить <strong>кратчайший путь</strong>.</div>
+                <div class="text-light mb-1">• <span class="text-info fw-bold">Матричные волны:</span> Если веса на рёбрах графа скрыты (<code>?</code>), считывайте стоимость переходов напрямую из <strong>Весовой матрицы</strong> справа!</div>
+                <div class="text-light mb-1">• <span class="text-success fw-bold">Каскад DAG (Волны 4, 7, 10):</span> Вычислите точное количество путей от <strong class="text-info">А</strong> к цели с учётом красных заблокированных (<code>БЛОК</code>) и зелёных обязательных (<code>РЕЛЕ</code>) узлов, откалибруйте импульс и кликните по целевому узлу (или <code>ПРОБЕЛ</code>).</div>
+                <div class="text-light mb-1">• <span class="text-warning fw-bold">Хоткеи управления:</span> <code>1</code>..<code>7</code> — шаг в вершину, <code>Backspace</code> — откат на шаг назад, <code>←</code>/<code>→</code> — настройка импульсов DAG, <code>ПРОБЕЛ</code> / <code>Enter</code> — форсаж-пуск.</div>
+                <div class="text-danger fw-bold mt-2">• ХАРДКОР-СБРОС (Full Wipeout): Ложный узел HONEYPOT, неоптимальный маршрут, промах по сумме путей DAG или тайм-аут включают сирену (#alarm-box) и СБРАСЫВАЮТ ВСЁ НА ВОЛНУ 1!</div>
+            </div>
+
+            <div>
+                <button id="start-btn" type="button" @click="startGame" class="btn btn-danger rounded-0 fw-bold px-4 py-3 shadow" style="min-height: 48px;">
+                    ИНИЦИИРОВАТЬ ПРОНИКНОВЕНИЕ (ВОЛНА 1) →
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (АРКАДНЫЙ ПРОЦЕСС)        -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'playing'" class="card bg-black border-danger rounded-0 p-2 p-md-3 shadow-lg">
+
+            <!-- Верхняя панель статуса и таймера -->
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                    <span class="text-secondary small d-block">СЕКТОР МАРШРУТИЗАЦИИ:</span>
+                    <span id="phase-counter" class="text-danger fw-bold fs-5">ВОЛНА <span v-text="currentWave"></span> ИЗ <span v-text="totalWaves"></span></span>
+                </div>
+                <div class="text-center">
+                    <span class="badge border rounded-0 px-2 px-md-3 py-1"
+                          :class="currentWaveData.mode === 'dag' ? 'border-info text-info bg-dark' : 'border-danger text-danger bg-dark'"
+                          v-text="currentWaveData.mode === 'dag' ? 'АРХЕТИП 7 :: КАСКАД DAG' : 'АРХЕТИП 7 :: ICE NODE RACE'">
+                    </span>
+                    <div class="text-secondary small mt-1">Попытка #<span v-text="attempts + 1"></span></div>
+                </div>
+                <div class="text-end">
+                    <span class="text-secondary small d-block">ДО ПЕРЕХВАТА ICE:</span>
+                    <span id="timer-display" class="fw-bold fs-5" :class="phaseTimeLeft <= 5.0 ? 'text-danger' : 'text-warning'">
+                        <span v-text="phaseTimeLeft.toFixed(1)"></span> сек
+                    </span>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар таймера -->
+            <div class="progress mb-2 bg-dark border border-secondary rounded-0" style="height: 8px;">
+                <div class="progress-bar"
+                     :class="phaseTimeLeft <= 5.0 ? 'bg-danger' : 'bg-warning'"
+                     role="progressbar"
+                     :style="progressBarStyle">
+                </div>
+            </div>
+
+            <!-- Индикатор приближения фронта антивируса ICE (синхронизирован с волной) -->
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-3 px-2 py-1 bg-dark border border-secondary rounded-0 small">
+                <span class="text-danger fw-bold">ФРОНТ ICE:</span>
+                <div class="d-flex gap-1 flex-grow-1">
+                    <div v-for="seg in 5" :key="seg"
+                         class="flex-fill rounded-0 border"
+                         style="height: 10px;"
+                         :class="seg <= iceProgressLevel ? 'bg-danger border-danger' : 'bg-black border-secondary opacity-50'">
+                    </div>
+                </div>
+                <span class="text-secondary" v-text="iceStatusLabel"></span>
+            </div>
+
+            <!-- Аварийная сирена хардкор-сброса (#alarm-box) -->
+            <div v-if="alarmActive" id="alarm-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 py-3 text-center shadow-lg mb-3">
+                <div class="fs-5 fw-bold mb-1">🚨 ТРЕВОГА ICE // КРИТИЧЕСКИЙ СБОЙ МАРШРУТИЗАЦИИ 🚨</div>
+                <div class="small text-light mb-2" v-text="alarmReason"></div>
+                <div class="badge bg-danger text-black rounded-0 fs-6 px-3 py-1 fw-bold">
+                    СБРОС НА ВОЛНУ 1 И ПЕРЕГЕНЕРАЦИЯ ГРАФОВ (Сбой #<span id="alarm-count" v-text="attempts"></span>)
+                </div>
+            </div>
+
+            <!-- Задание волны + текущие модификаторы -->
+            <div class="card bg-dark border-secondary rounded-0 p-2 p-md-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fs-6 text-warning fw-bold" v-text="currentWaveData.title"></div>
+                        <div class="text-light small" v-text="currentWaveData.directive"></div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <span v-if="currentWaveData.directed" class="badge bg-black border border-info text-info rounded-0 px-2 py-1">ОРИЕНТИРОВАННЫЙ (→)</span>
+                        <span v-if="currentWaveData.honeypotNode !== null" class="badge bg-black border border-danger text-danger rounded-0 px-2 py-1">
+                            ЛОВУШКА: <span v-text="getNodeLabel(currentWaveData.honeypotNode)"></span>
+                        </span>
+                        <span v-if="currentWaveData.forbiddenNode !== null" class="badge bg-black border border-danger text-danger rounded-0 px-2 py-1">
+                            ЗАПРЕТ: <span v-text="getNodeLabel(currentWaveData.forbiddenNode)"></span>
+                        </span>
+                        <span v-if="currentWaveData.requiredNode !== null" class="badge bg-black border border-success text-success rounded-0 px-2 py-1">
+                            ЧЕРЕЗ УЗЕЛ: <span v-text="getNodeLabel(currentWaveData.requiredNode)"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Основная рабочая область: Интерактивный SVG-граф + Весовая матрица (когда веса скрыты) -->
+            <div class="row g-2 g-md-3 align-items-stretch mb-3">
+                <div :class="currentWaveData.showMatrix ? 'col-12 col-lg-7' : 'col-12'">
+                    <div class="card bg-dark border-secondary rounded-0 p-2 h-100 text-center">
+                        <div class="d-flex justify-content-between align-items-center small mb-1 px-1 flex-wrap gap-1">
+                            <span class="text-secondary">
+                                <span v-if="currentWaveData.mode === 'dag'">СХЕМА DAG (клик по цели <strong class="text-warning" v-text="getNodeLabel(currentWaveData.targetId)"></strong> запускает импульс)</span>
+                                <span v-else>ИНТЕРАКТИВНЫЙ ГРАФ (клик по смежным вершинам или <code>1</code>..<span v-text="currentWaveData.nodes.length"></span>)</span>
+                            </span>
+                            <span v-if="currentWaveData.mode === 'shortest'" class="text-info fw-bold">
+                                ТРАССА: <span v-text="formattedPlayerPath"></span> | ВЕС: <span class="text-warning" v-text="currentPathWeight"></span>
+                            </span>
+                        </div>
+
+                        <div class="bg-black border border-secondary rounded-0 p-1 d-flex justify-content-center align-items-center">
+                            <svg id="graph-svg" viewBox="0 0 580 310" class="w-100" style="max-width: 680px; height: auto; user-select: none;">
+                                <defs>
+                                    <marker id="arrow-base" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                                        <path d="M 0 0 L 10 4 L 0 8 z" fill="#6c757d"></path>
+                                    </marker>
+                                    <marker id="arrow-active" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                                        <path d="M 0 0 L 10 4 L 0 8 z" fill="#0dcaf0"></path>
+                                    </marker>
+                                    <marker id="arrow-blocked" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                                        <path d="M 0 0 L 10 4 L 0 8 z" fill="#dc3545"></path>
+                                    </marker>
+                                </defs>
+
+                                <!-- Рёбра / дуги графа -->
+                                <g v-for="(edge, eIdx) in renderedEdges" :key="'e-' + eIdx">
+                                    <line
+                                        :x1="edge.x1" :y1="edge.y1"
+                                        :x2="edge.x2" :y2="edge.y2"
+                                        :stroke="edge.stroke"
+                                        :stroke-width="edge.strokeWidth"
+                                        :stroke-dasharray="edge.dash"
+                                        :marker-end="edge.markerEnd" />
+                                    <g v-if="currentWaveData.mode === 'shortest'">
+                                        <rect :x="edge.lx - 15" :y="edge.ly - 11" width="30" height="22" fill="#000000" :stroke="edge.labelStroke" stroke-width="1"></rect>
+                                        <text :x="edge.lx" :y="edge.ly + 5" text-anchor="middle" font-size="13" font-weight="bold"
+                                              :fill="edge.labelFill" v-text="currentWaveData.showWeightsOnSvg ? edge.w : '?'"></text>
+                                    </g>
+                                </g>
+
+                                <!-- Вершины графа (Direct Manipulation Organs >= 50x50) -->
+                                <g v-for="node in currentWaveData.nodes" :key="'n-' + node.id"
+                                   :data-node-id="node.id"
+                                   :style="getNodeCursorStyle(node.id)"
+                                   @click="handleNodeClick(node.id)">
+                                    <circle
+                                        :cx="node.x" :cy="node.y" r="29"
+                                        :fill="getNodeFill(node.id)"
+                                        :stroke="getNodeStroke(node.id)"
+                                        :stroke-width="getNodeStrokeWidth(node.id)" />
+                                    <!-- Метка вершины (А, Б, В...) -->
+                                    <text :x="node.x" :y="node.y + 4" text-anchor="middle" font-size="18" font-weight="bold"
+                                          :fill="getNodeTextFill(node.id)" v-text="node.label"></text>
+                                    <!-- Номер горячей клавиши (1..7) или роль узла -->
+                                    <text :x="node.x" :y="node.y + 21" text-anchor="middle" font-size="10" font-weight="bold"
+                                          :fill="getNodeSubFill(node.id)" v-text="getNodeSubLabel(node.id)"></text>
+                                    <!-- Счетчик источника А=1 в режиме DAG -->
+                                    <g v-if="currentWaveData.mode === 'dag' && node.id === 0">
+                                        <rect :x="node.x - 16" :y="node.y - 40" width="32" height="16" fill="#0d6efd" stroke="#ffffff" stroke-width="1"></rect>
+                                        <text :x="node.x" :y="node.y - 28" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff">N=1</text>
+                                    </g>
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Весовая матрица графа (Data Source для матричных волн) -->
+                <div v-if="currentWaveData.showMatrix" class="col-12 col-lg-5">
+                    <div class="card bg-dark border-info rounded-0 p-2 h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-info fw-bold small">ВЕСОВАЯ МАТРИЦА (ИСТОЧНИК ВЕСОВ):</span>
+                                <span class="badge bg-black border border-secondary text-secondary rounded-0 small"
+                                      v-text="currentWaveData.directed ? 'СТРОКА → СТОЛБЕЦ' : 'СИММЕТРИЧНАЯ'"></span>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-dark table-bordered border-secondary text-center align-middle mb-0 small font-monospace">
+                                    <thead>
+                                        <tr>
+                                            <th class="bg-black text-secondary p-1">→</th>
+                                            <th v-for="colNode in currentWaveData.nodes" :key="'mh-' + colNode.id"
+                                                class="p-1"
+                                                :class="isAdjacentToCurrent(colNode.id) ? 'bg-black text-warning' : 'bg-black text-info'"
+                                                v-text="colNode.label">
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(rowArr, rIdx) in currentWaveData.matrix" :key="'mr-' + rIdx">
+                                            <th class="p-1"
+                                                :class="currentNodeId === rIdx ? 'bg-info text-dark fw-bold' : 'bg-black text-info'"
+                                                v-text="getNodeLabel(rIdx)">
+                                            </th>
+                                            <td v-for="(val, cIdx) in rowArr" :key="'mc-' + rIdx + '-' + cIdx"
+                                                class="p-1"
+                                                :class="getMatrixCellClass(rIdx, cIdx, val)"
+                                                v-text="rIdx === cIdx ? '—' : (val === null ? '·' : val)">
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="text-secondary small mt-2 border-top border-secondary pt-2">
+                            Подсвеченная строка показывает исходящие рёбра из текущего узла <strong class="text-info" v-text="getNodeLabel(currentNodeId)"></strong>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Нижняя панель прямого управления (Откат/Форсаж в Shortest или Калибратор импульсов в DAG) -->
+            <div v-if="currentWaveData.mode === 'shortest'" class="card bg-dark border-secondary rounded-0 p-2">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="small text-secondary">
+                        Активный узел: <strong class="text-info" v-text="getNodeLabel(currentNodeId)"></strong>.
+                        Кликните по смежной вершине или <strong class="text-warning" v-text="getNodeLabel(currentWaveData.targetId)"></strong> для захвата.
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button"
+                                class="btn btn-outline-secondary rounded-0 fw-bold px-3"
+                                style="min-height: 48px; min-width: 110px;"
+                                :disabled="playerPath.length <= 1 || alarmActive"
+                                @click="stepBack">
+                            ← ОТКАТ (Bksp)
+                        </button>
+                        <button id="commit-pulse-btn"
+                                type="button"
+                                class="btn btn-outline-info rounded-0 fw-bold px-3"
+                                style="min-height: 48px;"
+                                :disabled="!canFastForwardTarget || alarmActive"
+                                @click="handleNodeClick(currentWaveData.targetId)">
+                            ⚡ ФОРСАЖ В <span v-text="getNodeLabel(currentWaveData.targetId)"></span> (Space)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else class="card bg-dark border-info rounded-0 p-2 p-md-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <div>
+                        <span class="text-info fw-bold small d-block">КАЛИБРАТОР КОЛИЧЕСТВА ПУТЕЙ DAG (N(<span v-text="getNodeLabel(currentWaveData.targetId)"></span>)):</span>
+                        <span class="text-secondary small">Выставьте точное число маршрутов и кликните по узлу <strong class="text-warning" v-text="getNodeLabel(currentWaveData.targetId)"></strong> (или <code>Space</code>)</span>
+                    </div>
+                    <div class="bg-black border border-info px-3 py-1 text-center" style="min-width: 120px;">
+                        <span class="text-secondary small d-block">ПУЛЬСОВ:</span>
+                        <span id="dag-counter-val" class="fs-4 fw-bold text-warning" v-text="dagGuess"></span>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-secondary rounded-0 fw-bold" style="min-width: 52px; min-height: 48px;" :disabled="alarmActive" @click="adjustDag(-5)">-5</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-0 fw-bold" style="min-width: 52px; min-height: 48px;" :disabled="alarmActive" @click="adjustDag(-1)">-1</button>
+                    <input id="dag-slider" type="range" class="form-range flex-grow-1 mx-1" style="min-width: 140px; min-height: 48px;" min="1" max="30" step="1" v-model.number="dagGuess" @input="onSliderInput" :disabled="alarmActive" />
+                    <button type="button" class="btn btn-outline-secondary rounded-0 fw-bold" style="min-width: 52px; min-height: 48px;" :disabled="alarmActive" @click="adjustDag(1)">+1</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-0 fw-bold" style="min-width: 52px; min-height: 48px;" :disabled="alarmActive" @click="adjustDag(5)">+5</button>
+                    <button id="dag-fire-btn" type="button" class="btn btn-info text-dark rounded-0 fw-bold px-3" style="min-height: 48px;" :disabled="alarmActive" @click="submitDagPulse">
+                        ПУСК В <span v-text="getNodeLabel(currentWaveData.targetId)"></span> (Space) →
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ (ХАРДКОР ЗАВЕРШЕН)         -->
+        <!-- ========================================== -->
+        <div v-else-if="gameState === 'victory'" id="victory-screen" class="card bg-black border-success rounded-0 p-3 p-md-5 text-center shadow-lg">
+            <div class="display-5 text-success mb-2 fw-bold">ИНФИЛЬТРАЦИЯ УСПЕШНА!</div>
+            <div class="h5 text-success mb-2">✓ SUBNET &amp; DAG BREACH COMPLETED ✓</div>
+            <h2 class="h4 text-light mb-2">ГРАФЫ, ВЕСОВЫЕ МАТРИЦЫ И ПУТИ DAG ПОД ПОЛНЫМ КОНТРОЛЕМ</h2>
+            <p class="text-secondary small mb-3 mx-auto" style="max-width: 720px;">
+                Все 10 волн гонки с антивирусом ICE пройдены без единого перехвата. Вы уверенно считываете весовые матрицы,
+                мгновенно находите кратчайшие пути и безошибочно подсчитываете маршруты в направленных ациклических графах с ограничениями.
+            </p>
+
+            <div class="card bg-dark border-success rounded-0 p-3 mx-auto mb-3 text-start font-monospace small" style="max-width: 520px;">
+                <div class="text-success fw-bold mb-2">ОТЧЁТ ОПЕРАЦИИ:</div>
+                <div class="text-light">СТАТУС: <span class="text-success fw-bold">УРОВЕНЬ 3 (АРКАДА) ПРОЙДЕН</span></div>
+                <div class="text-light">ПРОЙДЕНО ВОЛН: <span class="text-warning"><span v-text="totalWaves"></span> из <span v-text="totalWaves"></span></span></div>
+                <div class="text-light">ПЕРЕХВАТОВ ICE (СБРОСОВ): <span class="text-warning" v-text="attempts"></span></div>
+                <div class="text-light">ОБЩЕЕ ВРЕМЯ: <span class="text-warning" v-text="totalTimeSec"></span> СЕК</div>
+            </div>
+
+            <div>
+                <button type="button" @click="startGame" class="btn btn-outline-success rounded-0 px-4 py-2" style="min-height: 48px;">
+                    ПОВТОРИТЬ ЗАБЕГ НА РЕКОРД ↺
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Подключение локального Vue 3 -->
+    <script is:inline src="/static/vue.global.js"></script>
+
+    <script is:inline>
+        // --- WEB AUDIO API ЗВУКОВОЙ ДВИЖОК ---
+        let audioCtx = null;
+        function getAudioContext() {
+            try {
+                if (!audioCtx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) audioCtx = new AudioCtx();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (e) {}
+            return audioCtx;
+        }
+
+        function playSound(type) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'step') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(620, now);
+                    osc.frequency.exponentialRampToValueAtTime(920, now + 0.08);
+                    gain.gain.setValueAtTime(0.11, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'undo') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(420, now);
+                    osc.frequency.exponentialRampToValueAtTime(260, now + 0.08);
+                    gain.gain.setValueAtTime(0.09, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'dial') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(520, now);
+                    gain.gain.setValueAtTime(0.04, now);
+                    gain.gain.exponentialRampToValueAtTime(0.008, now + 0.04);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'wave_complete') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(660, now + 0.09);
+                    osc.frequency.setValueAtTime(880, now + 0.18);
+                    gain.gain.setValueAtTime(0.14, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.34);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'alarm') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.linearRampToValueAtTime(125, now + 0.18);
+                    osc.frequency.linearRampToValueAtTime(250, now + 0.34);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.46);
+                } else if (type === 'victory') {
+                    osc.type = 'triangle';
+                    [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+                    });
+                    gain.gain.setValueAtTime(0.16, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.52);
+                    osc.start(now);
+                    osc.stop(now + 0.54);
+                }
+            } catch (e) {}
+        }
+
+        // --- БАЗОВЫЕ ТОПОЛОГИИ SVG (БЕЗ ПЕРЕКРЫТИЯ УЗЛОВ, ДИАМЕТР >= 58 ед.) ---
+        const LABELS_SHORTEST = ['А', 'Б', 'В', 'Г', 'Д', 'Е'];
+        const LABELS_DAG = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж'];
+
+        const LAYOUT_5 = [
+            { id: 0, label: 'А', x: 58,  y: 155 },
+            { id: 1, label: 'Б', x: 205, y: 58 },
+            { id: 2, label: 'В', x: 205, y: 252 },
+            { id: 3, label: 'Г', x: 375, y: 155 },
+            { id: 4, label: 'Д', x: 522, y: 155 }
+        ];
+        const EDGES_5 = [
+            [0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]
+        ];
+
+        const LAYOUT_6 = [
+            { id: 0, label: 'А', x: 55,  y: 155 },
+            { id: 1, label: 'Б', x: 195, y: 58 },
+            { id: 2, label: 'В', x: 195, y: 252 },
+            { id: 3, label: 'Г', x: 375, y: 58 },
+            { id: 4, label: 'Д', x: 375, y: 252 },
+            { id: 5, label: 'Е', x: 525, y: 155 }
+        ];
+        const EDGES_6 = [
+            [0, 1], [0, 2], [1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4], [3, 5], [4, 5]
+        ];
+
+        const LAYOUT_7_DAG = [
+            { id: 0, label: 'А', x: 52,  y: 155 },
+            { id: 1, label: 'Б', x: 175, y: 62 },
+            { id: 2, label: 'В', x: 175, y: 248 },
+            { id: 3, label: 'Г', x: 305, y: 155 },
+            { id: 4, label: 'Д', x: 435, y: 62 },
+            { id: 5, label: 'Е', x: 435, y: 248 },
+            { id: 6, label: 'Ж', x: 532, y: 155 }
+        ];
+
+        // Конфигурация 10 волн (Таймер: Волна 1 >= 30с, минимум >= 15с, передышка на Волне 8)
+        const WAVE_SPECS = [
+            { wave: 1, mode: 'shortest', nodeCount: 5, directed: false, showWeightsOnSvg: true,  showMatrix: false, useHoneypot: false, useForbidden: false, useRequired: false, timeLimit: 32.0, title: 'ВОЛНА 1 :: КАЛИБРОВКА ТРАССЫ', directive: 'Найдите кратчайший путь от А до Д по весам на рёбрах графа.' },
+            { wave: 2, mode: 'shortest', nodeCount: 5, directed: false, showWeightsOnSvg: false, showMatrix: true,  useHoneypot: false, useForbidden: false, useRequired: false, timeLimit: 30.0, title: 'ВОЛНА 2 :: МАТРИЧНАЯ СИНХРОНИЗАЦИЯ', directive: 'Веса скрыты на схеме — считайте их из Весовой матрицы и проложите кратчайший путь А → Д.' },
+            { wave: 3, mode: 'shortest', nodeCount: 6, directed: false, showWeightsOnSvg: true,  showMatrix: false, useHoneypot: true,  useForbidden: false, useRequired: false, timeLimit: 26.0, title: 'ВОЛНА 3 :: ЛОВУШКА HONEYPOT', directive: 'Дойдите от А до Е с минимальной длиной пути, избегая красной ловушки ICE!' },
+            { wave: 4, mode: 'dag',      nodeCount: 6, directed: true,  showWeightsOnSvg: false, showMatrix: false, useHoneypot: false, useForbidden: false, useRequired: false, timeLimit: 24.0, title: 'ВОЛНА 4 :: КАСКАД DAG #1', directive: 'Вычислите точное количество различных путей в ациклическом графе от А до Е.' },
+            { wave: 5, mode: 'shortest', nodeCount: 6, directed: true,  showWeightsOnSvg: false, showMatrix: true,  useHoneypot: false, useForbidden: false, useRequired: false, timeLimit: 22.0, title: 'ВОЛНА 5 :: ОРИЕНТИРОВАННАЯ МАТРИЦА', directive: 'Асимметричная матрица (строка → столбец)! Проложите кратчайший направленный путь А → Е.' },
+            { wave: 6, mode: 'shortest', nodeCount: 6, directed: false, showWeightsOnSvg: false, showMatrix: true,  useHoneypot: true,  useForbidden: false, useRequired: false, timeLimit: 19.5, title: 'ВОЛНА 6 :: ПИК СЛЕПОЙ ТРАССИРОВКИ', directive: 'Веса только в матрице + активна ловушка HONEYPOT. Найдите кратчайший безопасный маршрут А → Е.' },
+            { wave: 7, mode: 'dag',      nodeCount: 7, directed: true,  showWeightsOnSvg: false, showMatrix: false, useHoneypot: false, useForbidden: true,  useRequired: false, timeLimit: 18.5, title: 'ВОЛНА 7 :: ОБХОД БЛОКИРОВКИ DAG', directive: 'Подсчитайте число путей из А в Ж, НЕ проходящих через заблокированный узел!' },
+            { wave: 8, mode: 'shortest', nodeCount: 6, directed: false, showWeightsOnSvg: true,  showMatrix: false, useHoneypot: false, useForbidden: false, useRequired: true,  timeLimit: 21.5, title: 'ВОЛНА 8 :: ПЕРЕДЫШКА // ОБЯЗАТЕЛЬНОЕ РЕЛЕ', directive: 'Смена правил (+3 сек): кратчайший путь А → Е ОБЯЗАН пройти через зелёный узел-реле!' },
+            { wave: 9, mode: 'shortest', nodeCount: 6, directed: true,  showWeightsOnSvg: false, showMatrix: true,  useHoneypot: false, useForbidden: false, useRequired: true,  timeLimit: 16.5, title: 'ВОЛНА 9 :: МАТРИЧНЫЙ ТРАНЗИТ', directive: 'По асимметричной матрице найдите кратчайший путь А → Е с обязательным заездом в зелёное реле!' },
+            { wave: 10, mode: 'dag',     nodeCount: 7, directed: true,  showWeightsOnSvg: false, showMatrix: false, useHoneypot: false, useForbidden: true,  useRequired: true,  timeLimit: 15.5, title: 'ВОЛНА 10 :: ФИНАЛЬНЫЙ БОСС DAG', directive: 'Вычислите число путей А → Ж, проходящих ЧЕРЕЗ зелёный узел и ИЗБЕГАЮЩИХ красного блока!' }
+        ];
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function findExactShortestSimplePath(nodeCount, matrix, targetId, bannedNode, requiredNode) {
+            let bestCost = Infinity;
+            let bestPath = null;
+            const visited = new Array(nodeCount).fill(false);
+
+            function dfs(u, cost, path, hasReq) {
+                if (cost >= bestCost) return;
+                if (u === targetId) {
+                    if (requiredNode === null || hasReq) {
+                        bestCost = cost;
+                        bestPath = path.slice();
+                    }
+                    return;
+                }
+                for (let v = 0; v < nodeCount; v++) {
+                    if (visited[v] || v === bannedNode) continue;
+                    const w = matrix[u][v];
+                    if (w === null || w === undefined) continue;
+                    visited[v] = true;
+                    path.push(v);
+                    dfs(v, cost + w, path, hasReq || v === requiredNode);
+                    path.pop();
+                    visited[v] = false;
+                }
+            }
+
+            visited[0] = true;
+            dfs(0, 0, [0], requiredNode === 0);
+            return { bestCost, bestPath };
+        }
+
+        function countDagPaths(nodeCount, adj, startNode, endNode, bannedNode) {
+            if (startNode === bannedNode || endNode === bannedNode) return 0;
+            const dp = new Array(nodeCount).fill(0);
+            dp[startNode] = 1;
+            for (let u = 0; u < nodeCount; u++) {
+                if (u === bannedNode || dp[u] === 0) continue;
+                for (const v of adj[u]) {
+                    if (v !== bannedNode) {
+                        dp[v] += dp[u];
+                    }
+                }
+            }
+            return dp[endNode];
+        }
+
+        function generateShortestWave(spec) {
+            const is5 = spec.nodeCount === 5;
+            const nodes = (is5 ? LAYOUT_5 : LAYOUT_6).map(n => ({ ...n }));
+            const basePairs = is5 ? EDGES_5 : EDGES_6;
+            const targetId = spec.nodeCount - 1;
+
+            for (let attempt = 0; attempt < 40; attempt++) {
+                const matrix = Array.from({ length: spec.nodeCount }, () => Array(spec.nodeCount).fill(null));
+                const edges = [];
+
+                for (const [u, v] of basePairs) {
+                    // В 5-узловом варианте оставляем ~75-85% рёбер; в 6-узловом ~85%
+                    const keepEdge = attempt > 20 || Math.random() < 0.85 || (u === 0) || (v === targetId);
+                    if (!keepEdge) continue;
+
+                    if (spec.directed) {
+                        // Направленная дуга u -> v плюс возможная обратная дуга другого веса
+                        const wFwd = randInt(2, 13);
+                        matrix[u][v] = wFwd;
+                        edges.push({ u, v, w: wFwd });
+                        if (u > 0 && v < targetId && Math.random() < 0.45) {
+                            let wRev = randInt(3, 15);
+                            if (wRev === wFwd) wRev += 1;
+                            matrix[v][u] = wRev;
+                            // Для компактности матрицы в ориентированном режиме рисуем дугу u->v, а обратную показываем при необходимости:
+                            // Чтобы визуал 100% совпадал с матрицей (когда showWeightsOnSvg=false или в матричном режиме), добавим только в edges если отличается
+                        }
+                    } else {
+                        const w = randInt(2, 12);
+                        matrix[u][v] = w;
+                        matrix[v][u] = w;
+                        edges.push({ u, v, w });
+                    }
+                }
+
+                // В ориентированном режиме синхронизируем обратные дуги в матрице строго с edges, чтобы матрица и SVG не расходились
+                if (spec.directed) {
+                    for (let r = 0; r < spec.nodeCount; r++) {
+                        for (let c = 0; c < spec.nodeCount; c++) {
+                            if (matrix[r][c] !== null && !edges.some(e => e.u === r && e.v === c)) {
+                                edges.push({ u: r, v: c, w: matrix[r][c], isReverse: true });
+                            }
+                        }
+                    }
+                }
+
+                const midPool = is5 ? [1, 2, 3] : [1, 2, 3, 4];
+                const honeypotNode = spec.useHoneypot ? midPool[randInt(0, midPool.length - 1)] : null;
+                let requiredNode = null;
+                if (spec.useRequired) {
+                    const reqPool = midPool.filter(n => n !== honeypotNode);
+                    requiredNode = reqPool[randInt(0, reqPool.length - 1)];
+                }
+
+                const { bestCost, bestPath } = findExactShortestSimplePath(
+                    spec.nodeCount, matrix, targetId, honeypotNode, requiredNode
+                );
+
+                // Проверим, что путь содержательный (>= 2 рёбер) и для requiredNode действительно меняет выбор или достижим
+                if (bestPath && bestCost < Infinity && bestPath.length >= 3) {
+                    return {
+                        ...spec,
+                        nodes,
+                        edges,
+                        matrix,
+                        targetId,
+                        honeypotNode,
+                        forbiddenNode: null,
+                        requiredNode,
+                        optimalCost: bestCost,
+                        solutionPath: bestPath,
+                        exactDagCount: null
+                    };
+                }
+            }
+
+            // Детерминированный надёжный запасной вариант
+            const fallbackMatrix = Array.from({ length: spec.nodeCount }, () => Array(spec.nodeCount).fill(null));
+            const fallbackEdges = [];
+            for (const [u, v] of basePairs) {
+                const w = (u + v) % 7 + 3;
+                fallbackMatrix[u][v] = w;
+                if (!spec.directed) fallbackMatrix[v][u] = w;
+                fallbackEdges.push({ u, v, w });
+            }
+            const hp = spec.useHoneypot ? 2 : null;
+            const rq = spec.useRequired ? 1 : null;
+            const res = findExactShortestSimplePath(spec.nodeCount, fallbackMatrix, targetId, hp, rq);
+            return {
+                ...spec,
+                nodes,
+                edges: fallbackEdges,
+                matrix: fallbackMatrix,
+                targetId,
+                honeypotNode: hp,
+                forbiddenNode: null,
+                requiredNode: rq,
+                optimalCost: res.bestCost,
+                solutionPath: res.bestPath,
+                exactDagCount: null
+            };
+        }
+
+        function generateDagWave(spec) {
+            const is6 = spec.nodeCount === 6;
+            const nodes = (is6 ? LAYOUT_6 : LAYOUT_7_DAG).map(n => ({ ...n }));
+            const targetId = spec.nodeCount - 1;
+
+            const candidateEdges = is6
+                ? [[0, 1], [0, 2], [1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4], [3, 5], [4, 5]]
+                : [[0, 1], [0, 2], [0, 3], [1, 3], [1, 4], [2, 3], [2, 5], [3, 4], [3, 5], [3, 6], [4, 6], [5, 6]];
+
+            for (let attempt = 0; attempt < 80; attempt++) {
+                const edges = [];
+                const adj = Array.from({ length: spec.nodeCount }, () => []);
+                for (const [u, v] of candidateEdges) {
+                    const mustKeep = (u === 0 && (v === 1 || v === 2)) || (v === targetId && (u === targetId - 1 || u === targetId - 2));
+                    if (mustKeep || Math.random() < 0.78) {
+                        edges.push({ u, v, w: 1 });
+                        adj[u].push(v);
+                    }
+                }
+
+                const midPool = is6 ? [1, 2, 3, 4] : [1, 2, 3, 4, 5];
+                const forbiddenNode = spec.useForbidden ? midPool[randInt(0, midPool.length - 1)] : null;
+                let requiredNode = null;
+                if (spec.useRequired) {
+                    const reqPool = midPool.filter(n => n !== forbiddenNode);
+                    requiredNode = reqPool[randInt(0, reqPool.length - 1)];
+                }
+
+                let exactCount = 0;
+                if (requiredNode !== null) {
+                    const firstHalf = countDagPaths(spec.nodeCount, adj, 0, requiredNode, forbiddenNode);
+                    const secondHalf = countDagPaths(spec.nodeCount, adj, requiredNode, targetId, forbiddenNode);
+                    exactCount = firstHalf * secondHalf;
+                } else {
+                    exactCount = countDagPaths(spec.nodeCount, adj, 0, targetId, forbiddenNode);
+                }
+
+                const totalRaw = countDagPaths(spec.nodeCount, adj, 0, targetId, null);
+                const constraintMeaningful = (!forbiddenNode || totalRaw > exactCount) && (!requiredNode || countDagPaths(spec.nodeCount, adj, 0, targetId, forbiddenNode) > exactCount || attempt > 40);
+
+                if (exactCount >= 3 && exactCount <= 22 && constraintMeaningful) {
+                    return {
+                        ...spec,
+                        nodes,
+                        edges,
+                        matrix: null,
+                        targetId,
+                        honeypotNode: null,
+                        forbiddenNode,
+                        requiredNode,
+                        optimalCost: null,
+                        solutionPath: null,
+                        exactDagCount: exactCount
+                    };
+                }
+            }
+
+            // Детерминированный запасной DAG
+            const adjFb = Array.from({ length: spec.nodeCount }, () => []);
+            const edgesFb = [];
+            for (const [u, v] of candidateEdges) {
+                edgesFb.push({ u, v, w: 1 });
+                adjFb[u].push(v);
+            }
+            const fbForb = spec.useForbidden ? 2 : null;
+            const fbReq = spec.useRequired ? 3 : null;
+            const countFb = fbReq !== null
+                ? countDagPaths(spec.nodeCount, adjFb, 0, fbReq, fbForb) * countDagPaths(spec.nodeCount, adjFb, fbReq, targetId, fbForb)
+                : countDagPaths(spec.nodeCount, adjFb, 0, targetId, fbForb);
+
+            return {
+                ...spec,
+                nodes,
+                edges: edgesFb,
+                matrix: null,
+                targetId,
+                honeypotNode: null,
+                forbiddenNode: fbForb,
+                requiredNode: fbReq,
+                optimalCost: null,
+                solutionPath: null,
+                exactDagCount: countFb
+            };
+        }
+
+        const { createApp } = Vue;
+
+        const app = createApp({
+            data() {
+                return {
+                    gameState: 'intro', // 'intro' | 'playing' | 'victory'
+                    currentWave: 1,
+                    totalWaves: 10,
+                    attempts: 0,
+                    startTime: 0,
+                    totalTimeSec: 0,
+
+                    // Таймеры
+                    phaseTimeLeft: 32.0,
+                    phaseTimeTotal: 32.0,
+                    timerInterval: null,
+                    resetTimeout: null,
+                    waveTimeout: null,
+                    fxTimeout: null,
+                    telemetry: null,
+
+                    // Сгенерированные волны
+                    wavesList: [],
+                    currentWaveData: {
+                        wave: 1,
+                        mode: 'shortest',
+                        nodeCount: 5,
+                        directed: false,
+                        showWeightsOnSvg: true,
+                        showMatrix: false,
+                        title: '',
+                        directive: '',
+                        nodes: [],
+                        edges: [],
+                        matrix: null,
+                        targetId: 4,
+                        honeypotNode: null,
+                        forbiddenNode: null,
+                        requiredNode: null,
+                        optimalCost: 0,
+                        solutionPath: [],
+                        exactDagCount: null,
+                        timeLimit: 32.0
+                    },
+
+                    // Состояние активной волны
+                    playerPath: [0],
+                    currentPathWeight: 0,
+                    dagGuess: 1,
+                    fxEdgeKey: '',
+
+                    // Аварийная сирена
+                    alarmActive: false,
+                    alarmReason: ''
+                };
+            },
+
+            computed: {
+                progressBarStyle() {
+                    const pct = Math.max(0, Math.min(100, (this.phaseTimeLeft / this.phaseTimeTotal) * 100));
+                    return { width: pct + '%' };
+                },
+
+                currentNodeId() {
+                    if (!this.playerPath || this.playerPath.length === 0) return 0;
+                    return this.playerPath[this.playerPath.length - 1];
+                },
+
+                formattedPlayerPath() {
+                    return this.playerPath.map(id => this.getNodeLabel(id)).join(' → ');
+                },
+
+                canFastForwardTarget() {
+                    if (this.currentWaveData.mode !== 'shortest') return false;
+                    const u = this.currentNodeId;
+                    const target = this.currentWaveData.targetId;
+                    if (u === target) return false;
+                    return this.getEdgeWeight(u, target) !== null;
+                },
+
+                iceProgressLevel() {
+                    if (this.phaseTimeTotal <= 0) return 0;
+                    const elapsedRatio = 1 - (this.phaseTimeLeft / this.phaseTimeTotal);
+                    return Math.min(5, Math.max(0, Math.floor(elapsedRatio * 5) + (elapsedRatio > 0.05 ? 1 : 0)));
+                },
+
+                iceStatusLabel() {
+                    const lvl = this.iceProgressLevel;
+                    if (lvl <= 1) return 'ПЕРИМЕТР ЧИСТ';
+                    if (lvl <= 3) return 'СКАНИРОВАНИЕ ПОРТОВ';
+                    if (lvl === 4) return 'БЛИЗКИЙ ПЕРЕХВАТ!';
+                    return 'КРИТИЧЕСКОЕ СБЛИЖЕНИЕ!';
+                },
+
+                renderedEdges() {
+                    const nodes = this.currentWaveData.nodes || [];
+                    const edges = this.currentWaveData.edges || [];
+                    const result = [];
+
+                    for (const edge of edges) {
+                        const n1 = nodes[edge.u];
+                        const n2 = nodes[edge.v];
+                        if (!n1 || !n2) continue;
+
+                        const dx = n2.x - n1.x;
+                        const dy = n2.y - n1.y;
+                        const dist = Math.hypot(dx, dy) || 1;
+                        const ux = dx / dist;
+                        const uy = dy / dist;
+
+                        // Для ориентированных дуг укорачиваем конец до кромки окружности r=29 (+4px под наконечник стрелки)
+                        const startPad = 29;
+                        const endPad = this.currentWaveData.directed ? 33 : 29;
+
+                        // Если это обратная направленная дуга, слегка сдвигаем нормаль, чтобы две встречные стрелки не сливались
+                        let nx = 0;
+                        let ny = 0;
+                        if (edge.isReverse) {
+                            nx = -uy * 12;
+                            ny = ux * 12;
+                        }
+
+                        const x1 = n1.x + ux * startPad + nx;
+                        const y1 = n1.y + uy * startPad + ny;
+                        const x2 = n2.x - ux * endPad + nx;
+                        const y2 = n2.y - uy * endPad + ny;
+
+                        // Смещение метки веса на пересекающихся диагоналях и встречных дугах
+                        let t = 0.5;
+                        if ((edge.u === 1 && edge.v === 4) || (edge.u === 4 && edge.v === 1)) t = 0.34;
+                        if ((edge.u === 2 && edge.v === 3) || (edge.u === 3 && edge.v === 2)) t = 0.34;
+                        if (edge.isReverse) t = 0.35;
+
+                        const lx = n1.x + dx * t + nx * 1.4;
+                        const ly = n1.y + dy * t + ny * 1.4;
+
+                        const isTraversed = this.isEdgeInPlayerPath(edge.u, edge.v);
+                        const edgeKey = edge.u + '-' + edge.v;
+                        const isFx = this.fxEdgeKey === edgeKey || (!this.currentWaveData.directed && this.fxEdgeKey === (edge.v + '-' + edge.u));
+                        const touchesBlocked = this.currentWaveData.forbiddenNode !== null &&
+                            (edge.u === this.currentWaveData.forbiddenNode || edge.v === this.currentWaveData.forbiddenNode);
+
+                        let stroke = '#6c757d';
+                        let strokeWidth = 2.5;
+                        let dash = this.currentWaveData.showMatrix ? '5 4' : '';
+                        let markerEnd = '';
+                        let labelStroke = '#495057';
+                        let labelFill = this.currentWaveData.showWeightsOnSvg ? '#ffc107' : '#6c757d';
+
+                        if (touchesBlocked) {
+                            stroke = '#5c1a20';
+                            dash = '4 4';
+                            if (this.currentWaveData.directed) markerEnd = 'url(#arrow-blocked)';
+                        } else if (isFx) {
+                            stroke = '#0dcaf0';
+                            strokeWidth = 5;
+                            dash = '';
+                            labelStroke = '#0dcaf0';
+                            if (this.currentWaveData.directed) markerEnd = 'url(#arrow-active)';
+                        } else if (isTraversed) {
+                            stroke = '#0dcaf0';
+                            strokeWidth = 4;
+                            dash = '';
+                            labelStroke = '#0dcaf0';
+                            labelFill = '#0dcaf0';
+                            if (this.currentWaveData.directed) markerEnd = 'url(#arrow-active)';
+                        } else if (this.currentWaveData.directed) {
+                            markerEnd = 'url(#arrow-base)';
+                        }
+
+                        result.push({
+                            u: edge.u,
+                            v: edge.v,
+                            w: edge.w,
+                            x1, y1, x2, y2, lx, ly,
+                            stroke, strokeWidth, dash, markerEnd,
+                            labelStroke, labelFill
+                        });
+                    }
+
+                    return result;
+                }
+            },
+
+            mounted() {
+                window.addEventListener('keydown', this.handleKeydown);
+
+                this.telemetry = window.LMSTelemetry.create({
+                    missionName: 'Урок 10 :: Граф. Весовая матрица графа. Длина пути между вершинами графа. Вычисление количества путей в направленном ациклическом графе (Уровень 3)',
+                    level: 3,
+                    totalWaves: this.totalWaves,
+                    showAfkOverlay: true,
+                    onAfkStop: () => {
+                        this.stopTimer();
+                        this.clearPendingTimeouts();
+                        this.alarmActive = false;
+                        this.alarmReason = '';
+                    },
+                    onAfkRetry: () => {
+                        this.alarmActive = false;
+                        this.alarmReason = '';
+                        if (this.gameState === 'playing') {
+                            this.generateAllWaves();
+                            this.telemetry.setWave(1, this.totalWaves);
+                            this.initWave(1);
+                        }
+                    }
+                });
+
+                // Экспорт тестового хука для E2E Playwright
+                const self = this;
+                window.__DEV_LEVEL3_STATE__ = {
+                    get waves() { return self.wavesList; },
+                    get currentWaveIndex() { return self.currentWave - 1; },
+                    get currentWave() { return self.currentWaveData; },
+                    getCurrentWaveNumber: () => self.currentWave,
+                    getAttempts: () => self.attempts,
+                    solveCurrentWave: () => self.devSolveCurrentWave(),
+                    submitAction: (action, payload) => self.devSubmitAction(action, payload)
+                };
+            },
+
+            beforeUnmount() {
+                window.removeEventListener('keydown', this.handleKeydown);
+                this.stopTimer();
+                this.clearPendingTimeouts();
+                if (this.telemetry) {
+                    this.telemetry.destroy();
+                }
+            },
+
+            methods: {
+                clearPendingTimeouts() {
+                    if (this.resetTimeout) {
+                        clearTimeout(this.resetTimeout);
+                        this.resetTimeout = null;
+                    }
+                    if (this.waveTimeout) {
+                        clearTimeout(this.waveTimeout);
+                        this.waveTimeout = null;
+                    }
+                    if (this.fxTimeout) {
+                        clearTimeout(this.fxTimeout);
+                        this.fxTimeout = null;
+                    }
+                },
+
+                getNodeLabel(id) {
+                    if (id === null || id === undefined) return '';
+                    const n = this.currentWaveData.nodes && this.currentWaveData.nodes[id];
+                    return n ? n.label : (LABELS_DAG[id] || String(id));
+                },
+
+                startGame() {
+                    this.stopTimer();
+                    this.clearPendingTimeouts();
+                    this.startTime = Date.now();
+                    this.attempts = 0;
+                    this.alarmActive = false;
+                    this.alarmReason = '';
+                    this.generateAllWaves();
+                    this.gameState = 'playing';
+
+                    if (this.telemetry) {
+                        this.telemetry.reset({ allowRecomplete: true });
+                        this.telemetry.start();
+                        this.telemetry.markActivity();
+                        this.telemetry.setWave(1, this.totalWaves);
+                        this.telemetry.progress({
+                            wave: 1,
+                            total_waves: this.totalWaves,
+                            stage: 1,
+                            total_stages: this.totalWaves
+                        });
+                    }
+                    this.initWave(1);
+                },
+
+                generateAllWaves() {
+                    this.wavesList = WAVE_SPECS.map(spec => {
+                        return spec.mode === 'dag' ? generateDagWave(spec) : generateShortestWave(spec);
+                    });
+                },
+
+                initWave(waveNum) {
+                    this.currentWave = waveNum;
+                    const waveObj = this.wavesList[waveNum - 1];
+                    this.currentWaveData = waveObj;
+                    this.phaseTimeTotal = waveObj.timeLimit;
+                    this.phaseTimeLeft = waveObj.timeLimit;
+
+                    this.playerPath = [0];
+                    this.currentPathWeight = 0;
+                    this.dagGuess = 1;
+                    this.fxEdgeKey = '';
+                    this.startTimer();
+                },
+
+                startTimer() {
+                    this.stopTimer();
+                    const intervalMs = 100;
+                    this.timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
+                        this.phaseTimeLeft -= (intervalMs / 1000);
+                        if (this.phaseTimeLeft <= 0) {
+                            this.phaseTimeLeft = 0;
+                            this.triggerHardcoreReset('Время волны истекло! Фронт ICE перехватил канал связи.', true);
+                        }
+                    }, intervalMs);
+                },
+
+                stopTimer() {
+                    if (this.timerInterval) {
+                        clearInterval(this.timerInterval);
+                        this.timerInterval = null;
+                    }
+                },
+
+                getEdgeWeight(u, v) {
+                    const m = this.currentWaveData.matrix;
+                    if (!m || !m[u]) return null;
+                    return m[u][v] !== undefined ? m[u][v] : null;
+                },
+
+                isAdjacentToCurrent(nodeId) {
+                    if (this.currentWaveData.mode !== 'shortest') return false;
+                    const u = this.currentNodeId;
+                    if (u === nodeId) return false;
+                    return this.getEdgeWeight(u, nodeId) !== null;
+                },
+
+                isEdgeInPlayerPath(u, v) {
+                    if (this.currentWaveData.mode !== 'shortest') return false;
+                    for (let i = 0; i < this.playerPath.length - 1; i++) {
+                        const a = this.playerPath[i];
+                        const b = this.playerPath[i + 1];
+                        if (a === u && b === v) return true;
+                        if (!this.currentWaveData.directed && a === v && b === u) return true;
+                    }
+                    return false;
+                },
+
+                getMatrixCellClass(r, c, val) {
+                    if (r === c) return 'bg-black text-secondary opacity-50';
+                    if (val === null) return 'bg-black text-secondary opacity-25';
+                    if (r === this.currentNodeId) {
+                        return 'bg-black text-warning border-warning fw-bold';
+                    }
+                    return 'bg-dark text-light';
+                },
+
+                getNodeCursorStyle(id) {
+                    if (this.alarmActive) return { cursor: 'not-allowed' };
+                    if (this.currentWaveData.mode === 'dag') {
+                        return id === this.currentWaveData.targetId ? { cursor: 'pointer' } : { cursor: 'default' };
+                    }
+                    return (this.isAdjacentToCurrent(id) || (this.playerPath.length > 1 && id === this.playerPath[this.playerPath.length - 2]))
+                        ? { cursor: 'pointer' }
+                        : { cursor: 'default' };
+                },
+
+                getNodeFill(id) {
+                    if (id === this.currentWaveData.honeypotNode || id === this.currentWaveData.forbiddenNode) return '#3b0a0f';
+                    if (this.currentWaveData.mode === 'shortest' && id === this.currentNodeId) return '#083344';
+                    if (this.currentWaveData.mode === 'shortest' && this.playerPath.includes(id)) return '#052c65';
+                    if (id === this.currentWaveData.requiredNode) return '#0a3622';
+                    if (id === this.currentWaveData.targetId) return '#2c2200';
+                    return '#111418';
+                },
+
+                getNodeStroke(id) {
+                    if (id === this.currentWaveData.honeypotNode || id === this.currentWaveData.forbiddenNode) return '#dc3545';
+                    if (this.currentWaveData.mode === 'shortest' && id === this.currentNodeId) return '#0dcaf0';
+                    if (id === this.currentWaveData.requiredNode) return '#198754';
+                    if (id === this.currentWaveData.targetId) return '#ffc107';
+                    if (this.currentWaveData.mode === 'shortest' && this.isAdjacentToCurrent(id)) return '#0dcaf0';
+                    return '#6c757d';
+                },
+
+                getNodeStrokeWidth(id) {
+                    if (this.currentWaveData.mode === 'shortest' && (id === this.currentNodeId || this.isAdjacentToCurrent(id))) return 3.5;
+                    if (id === this.currentWaveData.targetId || id === this.currentWaveData.honeypotNode || id === this.currentWaveData.forbiddenNode || id === this.currentWaveData.requiredNode) return 3;
+                    return 2;
+                },
+
+                getNodeTextFill(id) {
+                    if (id === this.currentWaveData.honeypotNode || id === this.currentWaveData.forbiddenNode) return '#ff6b6b';
+                    if (id === this.currentWaveData.requiredNode) return '#75b798';
+                    if (id === this.currentWaveData.targetId) return '#ffc107';
+                    if (this.currentWaveData.mode === 'shortest' && (id === this.currentNodeId || this.isAdjacentToCurrent(id))) return '#0dcaf0';
+                    return '#f8f9fa';
+                },
+
+                getNodeSubFill(id) {
+                    if (id === this.currentWaveData.honeypotNode || id === this.currentWaveData.forbiddenNode) return '#ff8787';
+                    if (id === this.currentWaveData.requiredNode) return '#75b798';
+                    if (id === this.currentWaveData.targetId) return '#ffda6a';
+                    return '#adb5bd';
+                },
+
+                getNodeSubLabel(id) {
+                    if (id === this.currentWaveData.honeypotNode) return 'ЛОВУШКА';
+                    if (id === this.currentWaveData.forbiddenNode) return 'БЛОК';
+                    if (id === this.currentWaveData.requiredNode) return this.currentWaveData.mode === 'dag' ? 'РЕЛЕ' : 'РЕЛЕ [' + (id + 1) + ']';
+                    if (id === this.currentWaveData.targetId) return this.currentWaveData.mode === 'dag' ? 'ПУСК' : 'ЦЕЛЬ [' + (id + 1) + ']';
+                    if (id === 0) return 'СТАРТ';
+                    return this.currentWaveData.mode === 'dag' ? 'УЗЕЛ' : '[' + (id + 1) + ']';
+                },
+
+                triggerEdgeFx(u, v) {
+                    this.fxEdgeKey = u + '-' + v;
+                    if (this.fxTimeout) clearTimeout(this.fxTimeout);
+                    this.fxTimeout = setTimeout(() => {
+                        this.fxEdgeKey = '';
+                    }, 240);
+                },
+
+                stepBack() {
+                    if (this.gameState !== 'playing' || this.alarmActive || this.currentWaveData.mode !== 'shortest') return;
+                    if (this.playerPath.length <= 1) return;
+                    if (this.telemetry) this.telemetry.markActivity();
+
+                    const last = this.playerPath.pop();
+                    const prev = this.playerPath[this.playerPath.length - 1];
+                    const w = this.getEdgeWeight(prev, last);
+                    if (w !== null) {
+                        this.currentPathWeight -= w;
+                    }
+                    playSound('undo');
+                },
+
+                handleNodeClick(nodeId) {
+                    if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
+
+                    if (this.currentWaveData.mode === 'dag') {
+                        if (nodeId === this.currentWaveData.targetId) {
+                            this.submitDagPulse();
+                        }
+                        return;
+                    }
+
+                    const cur = this.currentNodeId;
+                    // Повторный клик по предыдущему узлу делает удобный шаг назад
+                    if (this.playerPath.length > 1 && nodeId === this.playerPath[this.playerPath.length - 2]) {
+                        this.stepBack();
+                        return;
+                    }
+
+                    const edgeWeight = this.getEdgeWeight(cur, nodeId);
+                    if (edgeWeight === null) {
+                        return;
+                    }
+                    // Запрещаем повторный заезд в уже посещённую вершину (кроме отката выше)
+                    if (this.playerPath.includes(nodeId)) {
+                        return;
+                    }
+
+                    if (this.telemetry) this.telemetry.markActivity();
+
+                    // Мгновенный провал при наезде на Honeypot
+                    if (nodeId === this.currentWaveData.honeypotNode) {
+                        this.triggerHardcoreReset(
+                            `Перехват на ловушке HONEYPOT (${this.getNodeLabel(nodeId)})! Антивирус ICE заблокировал узел.`
+                        );
+                        return;
+                    }
+
+                    this.triggerEdgeFx(cur, nodeId);
+                    this.playerPath.push(nodeId);
+                    this.currentPathWeight += edgeWeight;
+                    playSound('step');
+
+                    // Проверка при достижении целевого сервера
+                    if (nodeId === this.currentWaveData.targetId) {
+                        if (this.currentWaveData.requiredNode !== null && !this.playerPath.includes(this.currentWaveData.requiredNode)) {
+                            this.triggerHardcoreReset(
+                                `Нарушен транзитный протокол: маршрут не прошёл через обязательное зелёное реле ${this.getNodeLabel(this.currentWaveData.requiredNode)}!`
+                            );
+                            return;
+                        }
+                        if (this.currentPathWeight !== this.currentWaveData.optimalCost) {
+                            this.triggerHardcoreReset(
+                                `Неоптимальный маршрут! Ваша длина: ${this.currentPathWeight}, кратчайшая возможная: ${this.currentWaveData.optimalCost}.`
+                            );
+                            return;
+                        }
+                        this.completeWave();
+                    }
+                },
+
+                adjustDag(delta) {
+                    if (this.gameState !== 'playing' || this.alarmActive || this.currentWaveData.mode !== 'dag') return;
+                    if (this.telemetry) this.telemetry.markActivity();
+                    const next = Math.max(1, Math.min(30, Number(this.dagGuess || 1) + delta));
+                    this.dagGuess = next;
+                    playSound('dial');
+                },
+
+                onSliderInput() {
+                    if (this.telemetry) this.telemetry.markActivity();
+                    playSound('dial');
+                },
+
+                submitDagPulse() {
+                    if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) return;
+                    if (this.currentWaveData.mode !== 'dag') return;
+                    if (this.telemetry) this.telemetry.markActivity();
+
+                    const guess = Number(this.dagGuess);
+                    const expected = Number(this.currentWaveData.exactDagCount);
+
+                    if (guess === expected) {
+                        this.completeWave();
+                    } else {
+                        this.triggerHardcoreReset(
+                            `Ошибка калибровки DAG! Передано путей: ${guess}, истинное количество путей до ${this.getNodeLabel(this.currentWaveData.targetId)}: ${expected}.`
+                        );
+                    }
+                },
+
+                completeWave() {
+                    this.stopTimer();
+                    this.clearPendingTimeouts();
+                    playSound('wave_complete');
+
+                    if (this.currentWave >= this.totalWaves) {
+                        this.finishLevel();
+                    } else {
+                        const nextWave = this.currentWave + 1;
+                        this.waveTimeout = setTimeout(() => {
+                            if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                                return;
+                            }
+                            this.initWave(nextWave);
+                            if (this.telemetry) {
+                                this.telemetry.advanceWave(nextWave);
+                            }
+                        }, 400);
+                    }
+                },
+
+                triggerHardcoreReset(reason, isTimeout = false) {
+                    this.stopTimer();
+                    this.clearPendingTimeouts();
+
+                    if (this.telemetry) {
+                        const sent = this.telemetry.fail({
+                            wave: this.currentWave,
+                            isTimeout: Boolean(isTimeout)
+                        });
+                        this.attempts = this.telemetry.getState().attemptsCount;
+                        if (sent === false) {
+                            this.alarmActive = false;
+                            this.alarmReason = '';
+                            return;
+                        }
+                    } else {
+                        this.attempts++;
+                    }
+
+                    playSound('alarm');
+                    this.alarmActive = true;
+                    this.alarmReason = reason;
+                    this.generateAllWaves();
+
+                    this.resetTimeout = setTimeout(() => {
+                        if (this.gameState !== 'playing' || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                            return;
+                        }
+                        this.alarmActive = false;
+                        this.alarmReason = '';
+                        if (this.telemetry) {
+                            this.telemetry.setWave(1, this.totalWaves);
+                        }
+                        this.initWave(1);
+                    }, 1400);
+                },
+
+                finishLevel() {
+                    this.stopTimer();
+                    this.clearPendingTimeouts();
+                    this.gameState = 'victory';
+                    this.totalTimeSec = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
+                    playSound('victory');
+                    if (this.telemetry) {
+                        this.telemetry.complete({ wave: this.totalWaves });
+                    }
+                },
+
+                handleKeydown(e) {
+                    if (this.gameState !== 'playing' || this.alarmActive || (this.telemetry && this.telemetry.getState().isAfkPaused)) {
+                        return;
+                    }
+
+                    if (this.currentWaveData.mode === 'shortest') {
+                        const keyNum = parseInt(e.key, 10);
+                        if (keyNum >= 1 && keyNum <= this.currentWaveData.nodes.length) {
+                            this.handleNodeClick(keyNum - 1);
+                            return;
+                        }
+                        if (e.key === 'Backspace') {
+                            e.preventDefault();
+                            this.stepBack();
+                            return;
+                        }
+                        if (e.key === ' ' || e.key === 'Enter') {
+                            if (this.canFastForwardTarget) {
+                                e.preventDefault();
+                                this.handleNodeClick(this.currentWaveData.targetId);
+                            }
+                        }
+                    } else {
+                        if (e.key === 'ArrowLeft' || e.key === '-') {
+                            e.preventDefault();
+                            this.adjustDag(e.shiftKey ? -5 : -1);
+                        } else if (e.key === 'ArrowRight' || e.key === '+' || e.key === '=') {
+                            e.preventDefault();
+                            this.adjustDag(e.shiftKey ? 5 : 1);
+                        } else if (e.key === ' ' || e.key === 'Enter') {
+                            e.preventDefault();
+                            this.submitDagPulse();
+                        }
+                    }
+                },
+
+                // --- ТЕСТОВЫЕ МЕТОДЫ ДЛЯ E2E PLAYWRIGHT ---
+                devSolveCurrentWave() {
+                    if (this.gameState !== 'playing' || this.alarmActive) return;
+                    if (this.currentWaveData.mode === 'dag') {
+                        this.dagGuess = this.currentWaveData.exactDagCount;
+                        this.submitDagPulse();
+                        return;
+                    }
+                    const path = this.currentWaveData.solutionPath;
+                    if (Array.isArray(path) && path.length > 1) {
+                        this.playerPath = [0];
+                        this.currentPathWeight = 0;
+                        for (let i = 1; i < path.length; i++) {
+                            if (this.alarmActive || this.gameState !== 'playing') break;
+                            this.handleNodeClick(path[i]);
+                        }
+                    }
+                },
+
+                devSubmitAction(action, payload) {
+                    if (action === 'click_node' && payload !== undefined) {
+                        this.handleNodeClick(typeof payload === 'object' ? payload.nodeId : payload);
+                    } else if (action === 'set_dag' && payload !== undefined) {
+                        this.dagGuess = Number(payload);
+                        this.submitDagPulse();
+                    } else if (action === 'solve') {
+                        this.devSolveCurrentWave();
+                    } else if (action === 'fail') {
+                        this.triggerHardcoreReset(payload || 'Тестовый принудительный сбой', false);
+                    } else if (action === 'timeout') {
+                        this.triggerHardcoreReset('Тестовый таймаут волны', true);
+                    }
+                }
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</TaskLayout>
