@@ -1,0 +1,959 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout title="Урок 10 :: Графы. Решение алгоритмических задач (Уровень 2)" level={2}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Верхняя панель заголовка -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 text-warning mb-0 fw-bold">Тренажер: Алгоритмический анализ графов (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Anti-Paste // Sawtooth 2-1-2</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Шапка и индикаторы текущей фазы -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2 gap-2">
+                    <div>
+                        <span id="level-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="level-title" class="text-light fw-bold fs-6">Прямой расчёт: лемма о рукопожатиях</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках -->
+                <div id="error-feedback" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span>[ОШИБКА РАСЧЁТА] <span id="error-msg">Неверное значение!</span> Генерация нового варианта...</span>
+                        <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 1: ПРЯМОЙ РАСЧЕТ (ЛЕММА О РУКОПОЖАТИЯХ) ================= -->
+                <div id="phase1">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 1 — ПРЯМОЙ РАСЧЁТ]:</strong>
+                        Дан граф деловых контактов участников конференции (взаимные переговоры без петель).
+                        По приведённым степеням всех вершин вычислите суммарную степень графа и общее количество рёбер.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="text-secondary small mb-2">Степени вершин графа (количество связей у каждого участника):</div>
+                        <div id="p1-degrees-box" class="d-flex flex-wrap gap-2 mb-3">
+                            <!-- Процедурные карточки степеней -->
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="p1-input-sum" class="form-label text-light small fw-bold mb-1">
+                                    1. Сумма степеней всех вершин:
+                                </label>
+                                <input id="p1-input-sum" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите целое число..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="p1-input-edges" class="form-label text-light small fw-bold mb-1">
+                                    2. Количество рёбер в графе:
+                                </label>
+                                <input id="p1-input-edges" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите целое число..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p1-submit-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ПРОВЕРИТЬ РАСЧЁТ [ФАЗА 1]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 2: МНОГОШАГОВЫЙ РАСЧЕТ С КОНВЕРТАЦИЕЙ ================= -->
+                <div id="phase2" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 2 — КОНВЕРТАЦИЯ ЕДИНИЦ И КРАТЧАЙШИЙ ПУТЬ]:</strong>
+                        В весовой матрице указаны длины перегонов между пунктами <code>А–Д</code> в <strong>метрах</strong>.
+                        Автономный курьер движется по кратчайшему маршруту из <strong>А</strong> в <strong>Д</strong> со скоростью <strong id="p2-speed-text" class="text-info">12 км/ч</strong>.
+                        Найдите длину кратчайшего пути (в метрах) и время в пути (в <strong>минутах</strong>; допускается десятичная дробь через запятую).
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-3 align-items-center mb-3">
+                            <div class="col-12 col-lg-7">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-bordered border-secondary text-center align-middle mb-0 small">
+                                        <thead>
+                                            <tr>
+                                                <th class="bg-dark text-secondary">Пункт</th>
+                                                <th class="bg-dark text-warning">А</th>
+                                                <th class="bg-dark text-warning">Б</th>
+                                                <th class="bg-dark text-warning">В</th>
+                                                <th class="bg-dark text-warning">Г</th>
+                                                <th class="bg-dark text-warning">Д</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="p2-matrix-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="border border-secondary bg-dark p-3">
+                                    <div class="text-secondary small">Маршрут:</div>
+                                    <div class="text-light fw-bold fs-5 mb-2">А → ... → Д</div>
+                                    <div class="text-secondary small">Скорость курьера:</div>
+                                    <div id="p2-speed-card" class="text-info fw-bold fs-4">12 км/ч</div>
+                                    <div class="text-secondary small mt-2">Справка: 1 км = 1000 м, 1 ч = 60 мин.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="p2-input-dist" class="form-label text-light small fw-bold mb-1">
+                                    1. Длина кратчайшего пути (м):
+                                </label>
+                                <input id="p2-input-dist" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Например: 2700" style="max-width: 480px; min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="p2-input-time" class="form-label text-light small fw-bold mb-1">
+                                    2. Время прохождения маршрута (мин):
+                                </label>
+                                <input id="p2-input-time" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Например: 13,5" style="max-width: 480px; min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p2-submit-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ПРОВЕРИТЬ МАРШРУТ [ФАЗА 2]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 3: ПИК ИНВЕРСИИ (ОБРАТНАЯ ЗАДАЧА) ================= -->
+                <div id="phase3" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 3 — ПИК ИНВЕРСИИ]:</strong>
+                        На схеме задана сеть дорог между узлами <code>А–Д</code>, но пропускной вес перегона <code>Б — Г</code> скрыт (обозначен как <strong>X</strong>).
+                        Известно, что длина маршрута <strong>А → Б → Г → Д</strong> составляет ровно <strong id="p3-pct-text" class="text-info">80%</strong> от длины альтернативного пути <strong>А → В → Д</strong>.
+                        Восстановите неизвестный вес <strong>X</strong>.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-3 align-items-center mb-3">
+                            <div class="col-12 col-lg-7">
+                                <svg id="p3-svg" viewBox="0 0 420 220" width="100%" height="220" class="d-block border border-secondary bg-dark">
+                                    <g id="p3-svg-edges"></g>
+                                    <g id="p3-svg-nodes"></g>
+                                </svg>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="border border-secondary bg-dark p-3 d-flex flex-column gap-2">
+                                    <div>
+                                        <div class="text-secondary small">Альтернативный маршрут:</div>
+                                        <div class="text-light fw-bold">А → В → Д</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small">Целевой маршрут:</div>
+                                        <div class="text-warning fw-bold">А → Б → Г → Д</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-secondary small">Соотношение длин:</div>
+                                        <div id="p3-ratio-box" class="text-info fw-bold">Длина(А→Б→Г→Д) = 80% от Длина(А→В→Д)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="p3-input-x" class="form-label text-light small fw-bold mb-1">
+                                Неизвестный вес ребра X (Б — Г):
+                            </label>
+                            <input id="p3-input-x" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите число X..." style="max-width: 580px; min-height: 48px;">
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p3-submit-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ПРОВЕРИТЬ ИНВЕРСИЮ [ФАЗА 3]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ (ИНВАРИАНТЫ ГРАФА) ================= -->
+                <div id="phase4" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 4 — ДОЛИНА КОНСОЛИДАЦИИ]:</strong>
+                        Изучите структуру изображённого неориентированного графа без тяжёлых вычислений.
+                        Определите два структурных инварианта: сколько в графе вершин с <strong>нечётной степенью</strong> и сколько рёбер не хватает, чтобы сделать этот граф <strong>полным</strong> (каждый с каждым).
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="row g-3 align-items-center mb-3">
+                            <div class="col-12 col-lg-7">
+                                <svg id="p4-svg" viewBox="0 0 420 220" width="100%" height="220" class="d-block border border-secondary bg-dark">
+                                    <g id="p4-svg-edges"></g>
+                                    <g id="p4-svg-nodes"></g>
+                                </svg>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="border border-secondary bg-dark p-3 small">
+                                    <div class="text-info fw-bold mb-2">Параметры графа:</div>
+                                    <div class="mb-1">Число вершин N: <strong id="p4-n-val" class="text-light">6</strong></div>
+                                    <div class="mb-2">Текущих рёбер E: <strong id="p4-e-val" class="text-warning">7</strong></div>
+                                    <div class="text-secondary">
+                                        Подсказка: в полном графе из N вершин ровно <code>N × (N − 1) / 2</code> рёбер.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="p4-input-odd" class="form-label text-light small fw-bold mb-1">
+                                    1. Количество вершин нечётной степени:
+                                </label>
+                                <input id="p4-input-odd" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Чётное число..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="p4-input-missing" class="form-label text-light small fw-bold mb-1">
+                                    2. Сколько рёбер не хватает до полного графа:
+                                </label>
+                                <input id="p4-input-missing" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите число рёбер..." style="max-width: 480px; min-height: 48px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p4-submit-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ПРОВЕРИТЬ ИНВАРИАНТЫ [ФАЗА 4]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФАЗА 5: КУЛЬМИНАЦИЯ (ПОДСЧЕТ ПУТЕЙ В DAG С ОГРАНИЧЕНИЯМИ) ================= -->
+                <div id="phase5" class="d-none">
+                    <div class="alert alert-dark bg-black border-secondary rounded-0 text-secondary mb-3 small">
+                        <strong class="text-warning">[ФАЗА 5 — КУЛЬМИНАЦИЯ // ДИНАМИЧЕСКИЙ ПОДСЧЁТ ПУТЕЙ]:</strong>
+                        Найдите количество различных направленных путей из города <strong>А</strong> в город <strong>З</strong>,
+                        проходящих через город <strong id="p5-req-label" class="text-success">Д</strong>,
+                        но <strong>НЕ проходящих</strong> через город <strong id="p5-forb-label" class="text-danger">В</strong>.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="mb-3">
+                            <svg id="p5-svg" viewBox="0 0 430 260" width="100%" height="260" class="d-block border border-secondary bg-dark">
+                                <defs>
+                                    <marker id="p5-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#ffc107"></path>
+                                    </marker>
+                                </defs>
+                                <g id="p5-svg-edges"></g>
+                                <g id="p5-svg-nodes"></g>
+                            </svg>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-3 small mb-3">
+                            <span class="badge bg-dark border border-success text-success rounded-0 px-2 py-1">
+                                Обязательная вершина: <span id="p5-req-badge">Д</span>
+                            </span>
+                            <span class="badge bg-dark border border-danger text-danger rounded-0 px-2 py-1">
+                                Запрещённая вершина: <span id="p5-forb-badge">В</span>
+                            </span>
+                        </div>
+
+                        <div>
+                            <label for="p5-input-paths" class="form-label text-light small fw-bold mb-1">
+                                Итоговое количество допустимых путей N(З):
+                            </label>
+                            <input id="p5-input-paths" type="text" inputmode="decimal" autocomplete="off" onpaste="return false;" class="form-control bg-dark text-warning border-secondary rounded-0 font-monospace" placeholder="Введите число путей..." style="max-width: 580px; min-height: 48px;">
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button id="p5-submit-btn" type="button" class="btn btn-outline-warning rounded-0 px-4 py-2 fw-bold" style="min-height: 48px;">
+                            ЗАФИКСИРОВАТЬ РЕШЕНИЕ [ФАЗА 5]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ФИНАЛЬНЫЙ ЭКРАН ПОБЕДЫ ================= -->
+                <div id="final-screen" class="d-none text-center py-4">
+                    <div class="badge bg-warning text-dark fs-5 rounded-0 px-4 py-2 mb-3">
+                        МИССИЯ УСПЕШНО ВЫПОЛНЕНА // УРОВЕНЬ 2 ПРОЙДЕН
+                    </div>
+                    <h3 class="h4 text-warning mb-3 fw-bold">Все 5 аналитических фаз решены</h3>
+                    <p class="text-secondary mb-4 mx-auto" style="max-width: 620px;">
+                        Вы уверенно применили лемму о рукопожатиях, перевели метрики весовой матрицы, решили обратную задачу, проверили структурные инварианты и выполнили динамический подсчёт путей с ограничениями.
+                    </p>
+                    <div class="d-inline-flex flex-wrap justify-content-center gap-4 border border-secondary bg-black p-3 rounded-0 mb-2">
+                        <div>
+                            <div class="text-secondary small">Затраченное время:</div>
+                            <div id="stat-time" class="text-warning fs-5 fw-bold">0 с</div>
+                        </div>
+                        <div class="border-end border-secondary d-none d-sm-block"></div>
+                        <div>
+                            <div class="text-secondary small">Ошибки расчётов:</div>
+                            <div id="stat-attempts" class="text-danger fs-5 fw-bold">0</div>
+                        </div>
+                        <div class="border-end border-secondary d-none d-sm-block"></div>
+                        <div>
+                            <div class="text-secondary small">Статус:</div>
+                            <div class="text-info fs-5 fw-bold">100% ЗАЧЕТ</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    const missionName = 'Урок 10 :: Графы. Решение алгоритмических задач, связанных с анализом графов (Уровень 2)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 2,
+        totalStages: 5
+    });
+
+    let currentPhase = 1;
+    let isLocked = false;
+
+    const gameContainer = document.getElementById('game-container');
+    const errorBox = document.getElementById('error-feedback');
+    const errorMsg = document.getElementById('error-msg');
+    const attemptsDisplay = document.getElementById('attempts-display');
+    const levelBadge = document.getElementById('level-badge');
+    const levelTitle = document.getElementById('level-title');
+
+    function parseDecimal(raw) {
+        if (raw === null || raw === undefined) return NaN;
+        const clean = String(raw).replace(/%/g, '').replace(/,/g, '.').replace(/\s+/g, '').trim();
+        if (!clean || !/^-?\d+(\.\d+)?$/.test(clean)) return NaN;
+        return Number(clean);
+    }
+
+    function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+        const copy = arr.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = copy[i];
+            copy[i] = copy[j];
+            copy[j] = tmp;
+        }
+        return copy;
+    }
+
+    function recordError(msg, retryFn) {
+        if (isLocked) return;
+        isLocked = true;
+        telemetry.fail({ stage: currentPhase, total_stages: 5 });
+        attemptsDisplay.textContent = String(telemetry.getState().attemptsCount);
+        errorMsg.textContent = msg;
+        errorBox.classList.remove('d-none');
+        setTimeout(() => {
+            errorBox.classList.add('d-none');
+            isLocked = false;
+            retryFn();
+        }, 1250);
+    }
+
+    function advancePhase(currNum, nextNum, nextSetupFn, nextTitle) {
+        currentPhase = nextNum;
+        telemetry.advanceStage(nextNum);
+        document.getElementById(`phase${currNum}`).classList.add('d-none');
+        document.getElementById(`phase${nextNum}`).classList.remove('d-none');
+        levelBadge.textContent = `Шаг ${nextNum} из 5`;
+        levelTitle.textContent = nextTitle;
+        nextSetupFn();
+    }
+
+    // Глобальная защита Anti-Paste и Enter-отправка (навешиваются один раз)
+    ['paste', 'drop'].forEach(evtName => {
+        gameContainer.addEventListener(evtName, (e) => {
+            if (e.target && e.target.tagName === 'INPUT') {
+                e.preventDefault();
+            }
+        });
+    });
+
+    gameContainer.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT' && !isLocked) {
+            e.preventDefault();
+            const submitBtn = document.getElementById(`p${currentPhase}-submit-btn`);
+            if (submitBtn) submitBtn.click();
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 1: ЛЕММА О РУКОПОЖАТИЯХ (CCS = 4)
+    // =========================================================================
+    let p1Target = { sum: 0, edges: 0 };
+
+    function setupPhase1() {
+        const names = ['А', 'Б', 'В', 'Г', 'Д', 'Е'];
+        const n = randInt(5, 6);
+        const possible = [];
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) possible.push([i, j]);
+        }
+        const edgeCount = randInt(n, Math.min(possible.length - 1, n + 5));
+        const chosen = shuffleArray(possible).slice(0, edgeCount);
+        const degs = new Array(n).fill(0);
+        chosen.forEach(([u, v]) => {
+            degs[u]++;
+            degs[v]++;
+        });
+
+        p1Target = {
+            sum: edgeCount * 2,
+            edges: edgeCount
+        };
+
+        const box = document.getElementById('p1-degrees-box');
+        box.innerHTML = '';
+        for (let i = 0; i < n; i++) {
+            const chip = document.createElement('div');
+            chip.className = 'border border-secondary bg-dark px-3 py-2';
+            chip.innerHTML = `<span class="text-info fw-bold">deg(${names[i]})</span> = <span class="text-warning fw-bold">${degs[i]}</span>`;
+            box.appendChild(chip);
+        }
+
+        document.getElementById('p1-input-sum').value = '';
+        document.getElementById('p1-input-edges').value = '';
+    }
+
+    document.getElementById('p1-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        const uSum = parseDecimal(document.getElementById('p1-input-sum').value);
+        const uEdges = parseDecimal(document.getElementById('p1-input-edges').value);
+        if (uSum === p1Target.sum && uEdges === p1Target.edges) {
+            advancePhase(1, 2, setupPhase2, 'Многошаговый расчёт: весовая матрица и конвертация скорости');
+        } else {
+            recordError('Проверьте сумму степеней и деление пополам (лемма о рукопожатиях)!', setupPhase1);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 2: КОНВЕРТАЦИЯ ЕДИНИЦ + КРАТЧАЙШИЙ ПУТЬ ПО ВЕСОВОЙ МАТРИЦЕ (CCS = 6)
+    // =========================================================================
+    let p2Target = { dist: 0, timeMin: 0 };
+
+    function setupPhase2() {
+        // Скорости в км/ч с точным переводом в м/мин: 6->100, 12->200, 15->250, 24->400, 30->500
+        // Деление любого числа, кратного 100 м, на эти значения всегда даёт точную конечную десятичную дробь
+        const speedOptions = [
+            { kmh: 6,  mpm: 100 },
+            { kmh: 12, mpm: 200 },
+            { kmh: 15, mpm: 250 },
+            { kmh: 24, mpm: 400 },
+            { kmh: 30, mpm: 500 }
+        ];
+        const spd = speedOptions[randInt(0, speedOptions.length - 1)];
+
+        // Процедурно строим 5-вершинный взвешенный граф (А=0, Б=1, В=2, Г=3, Д=4)
+        // Сгенерируем все рёбра кратными 100 м так, чтобы маршрут определялся нетривиально
+        const wAB = randInt(5, 9) * 100;
+        const wAC = randInt(10, 16) * 100;
+        const wBC = randInt(3, 7) * 100;
+        const wBD = randInt(12, 18) * 100;
+        const wCD = randInt(4, 8) * 100;
+        const wCE = randInt(14, 21) * 100;
+        const wDE = randInt(3, 7) * 100;
+
+        const mat = Array.from({ length: 5 }, () => [0, 0, 0, 0, 0]);
+        const setEdge = (u, v, w) => { mat[u][v] = w; mat[v][u] = w; };
+        setEdge(0, 1, wAB);
+        setEdge(0, 2, wAC);
+        setEdge(1, 2, wBC);
+        setEdge(1, 3, wBD);
+        setEdge(2, 3, wCD);
+        setEdge(2, 4, wCE);
+        setEdge(3, 4, wDE);
+
+        // Алгоритм Дейкстры от А(0) до Д(4)
+        const dist = [0, Infinity, Infinity, Infinity, Infinity];
+        const used = [false, false, false, false, false];
+        for (let iter = 0; iter < 5; iter++) {
+            let v = -1;
+            for (let i = 0; i < 5; i++) {
+                if (!used[i] && (v === -1 || dist[i] < dist[v])) v = i;
+            }
+            if (dist[v] === Infinity) break;
+            used[v] = true;
+            for (let to = 0; to < 5; to++) {
+                if (mat[v][to] > 0 && dist[v] + mat[v][to] < dist[to]) {
+                    dist[to] = dist[v] + mat[v][to];
+                }
+            }
+        }
+
+        const shortestDist = dist[4];
+        const timeMin = Math.round((shortestDist / spd.mpm) * 100) / 100;
+
+        p2Target = {
+            dist: shortestDist,
+            timeMin: timeMin
+        };
+
+        document.getElementById('p2-speed-text').textContent = `${spd.kmh} км/ч`;
+        document.getElementById('p2-speed-card').textContent = `${spd.kmh} км/ч`;
+
+        const labels = ['А', 'Б', 'В', 'Г', 'Д'];
+        const tbody = document.getElementById('p2-matrix-body');
+        tbody.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.className = 'bg-dark text-warning';
+            th.textContent = labels[i];
+            tr.appendChild(th);
+            for (let j = 0; j < 5; j++) {
+                const td = document.createElement('td');
+                if (mat[i][j] > 0) {
+                    td.className = 'text-light fw-bold';
+                    td.textContent = String(mat[i][j]);
+                } else {
+                    td.className = 'text-secondary';
+                    td.textContent = '—';
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        document.getElementById('p2-input-dist').value = '';
+        document.getElementById('p2-input-time').value = '';
+    }
+
+    document.getElementById('p2-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        const uDist = parseDecimal(document.getElementById('p2-input-dist').value);
+        const uTime = parseDecimal(document.getElementById('p2-input-time').value);
+        if (uDist === p2Target.dist && Math.abs(uTime - p2Target.timeMin) < 0.001) {
+            advancePhase(2, 3, setupPhase3, 'Пик инверсии: восстановление скрытого веса ребра');
+        } else {
+            recordError('Неверная длина пути или ошибка при переводе км/ч в м/мин!', setupPhase2);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 3: ПИК ИНВЕРСИИ — СКРЫТЫЙ ВЕС X ПО ИЗВЕСТНОМУ % (CCS = 7-8)
+    // =========================================================================
+    let p3TargetX = 0;
+
+    function setupPhase3() {
+        const pctOptions = [60, 75, 80, 90];
+        const pct = pctOptions[randInt(0, pctOptions.length - 1)];
+
+        // Подбираем L_alt так, чтобы L_opt = L_alt * pct / 100 было целым и > wAB + wGD
+        let lAlt, lOpt, wAV, wVD, wAB, wGD, xVal, wBG_decoy;
+        for (let t = 0; t < 100; t++) {
+            const mult = pct === 75 ? 4 : (pct === 80 || pct === 60 ? 5 : 10);
+            lAlt = mult * randInt(4, 10); // например 20..50
+            lOpt = (lAlt * pct) / 100;
+            wAV = randInt(Math.floor(lAlt * 0.35), Math.floor(lAlt * 0.65));
+            wVD = lAlt - wAV;
+            wAB = randInt(2, Math.max(3, Math.floor(lOpt * 0.35)));
+            wGD = randInt(2, Math.max(3, Math.floor(lOpt * 0.35)));
+            xVal = lOpt - wAB - wGD;
+            if (xVal >= 2 && xVal <= 25 && wAV >= 3 && wVD >= 3) {
+                wBG_decoy = lAlt + randInt(4, 12); // длинная хорда А->Г для отвлечения внимания
+                break;
+            }
+        }
+
+        p3TargetX = xVal;
+        document.getElementById('p3-pct-text').textContent = `${pct}%`;
+        document.getElementById('p3-ratio-box').textContent = `Длина(А→Б→Г→Д) = ${pct}% от Длина(А→В→Д)`;
+
+        // Отрисовка SVG графа (5 вершин: А слева, Б сверху, В снизу, Г справа-сверху, Д справа)
+        const nodes = [
+            { label: 'А', x: 50,  y: 110 },
+            { label: 'Б', x: 165, y: 45 },
+            { label: 'Г', x: 280, y: 45 },
+            { label: 'В', x: 210, y: 175 },
+            { label: 'Д', x: 370, y: 110 }
+        ];
+        const edges = [
+            { u: 0, v: 1, w: String(wAB), color: '#ffc107', lx: 95,  ly: 65 },
+            { u: 1, v: 2, w: 'X',         color: '#0dcaf0', lx: 222, ly: 32 },
+            { u: 2, v: 4, w: String(wGD), color: '#ffc107', lx: 335, ly: 65 },
+            { u: 0, v: 3, w: String(wAV), color: '#6c757d', lx: 115, ly: 158 },
+            { u: 3, v: 4, w: String(wVD), color: '#6c757d', lx: 305, ly: 158 },
+            { u: 0, v: 2, w: String(wBG_decoy), color: '#495057', lx: 185, ly: 92 }
+        ];
+
+        const edgesG = document.getElementById('p3-svg-edges');
+        const nodesG = document.getElementById('p3-svg-nodes');
+        edgesG.innerHTML = '';
+        nodesG.innerHTML = '';
+
+        edges.forEach(ed => {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', String(nodes[ed.u].x));
+            line.setAttribute('y1', String(nodes[ed.u].y));
+            line.setAttribute('x2', String(nodes[ed.v].x));
+            line.setAttribute('y2', String(nodes[ed.v].y));
+            line.setAttribute('stroke', ed.color);
+            line.setAttribute('stroke-width', ed.w === 'X' ? '3' : '2');
+            if (ed.w === 'X') line.setAttribute('stroke-dasharray', '5 4');
+            edgesG.appendChild(line);
+
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bg.setAttribute('x', String(ed.lx - 14));
+            bg.setAttribute('y', String(ed.ly - 11));
+            bg.setAttribute('width', '28');
+            bg.setAttribute('height', '18');
+            bg.setAttribute('fill', '#0b0e14');
+            bg.setAttribute('stroke', ed.w === 'X' ? '#0dcaf0' : '#495057');
+            edgesG.appendChild(bg);
+
+            const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            txt.setAttribute('x', String(ed.lx));
+            txt.setAttribute('y', String(ed.ly + 2));
+            txt.setAttribute('text-anchor', 'middle');
+            txt.setAttribute('fill', ed.w === 'X' ? '#0dcaf0' : '#f8f9fa');
+            txt.setAttribute('font-size', '12');
+            txt.setAttribute('font-weight', 'bold');
+            txt.setAttribute('font-family', 'monospace');
+            txt.textContent = ed.w;
+            edgesG.appendChild(txt);
+        });
+
+        nodes.forEach(n => {
+            const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            c.setAttribute('cx', String(n.x));
+            c.setAttribute('cy', String(n.y));
+            c.setAttribute('r', '18');
+            c.setAttribute('fill', '#11151c');
+            c.setAttribute('stroke', '#ffc107');
+            c.setAttribute('stroke-width', '2');
+
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', String(n.x));
+            t.setAttribute('y', String(n.y + 5));
+            t.setAttribute('text-anchor', 'middle');
+            t.setAttribute('fill', '#f8f9fa');
+            t.setAttribute('font-size', '15');
+            t.setAttribute('font-weight', 'bold');
+            t.setAttribute('font-family', 'monospace');
+            t.textContent = n.label;
+
+            nodesG.appendChild(c);
+            nodesG.appendChild(t);
+        });
+
+        document.getElementById('p3-input-x').value = '';
+    }
+
+    document.getElementById('p3-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        const uX = parseDecimal(document.getElementById('p3-input-x').value);
+        if (uX === p3TargetX) {
+            advancePhase(3, 4, setupPhase4, 'Долина консолидации: инварианты степеней и полного графа');
+        } else {
+            recordError('Неверное значение X! Вычислите длину А→В→Д, возьмите процент и вычтите известные участки.', setupPhase3);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ — ИНВАРИАНТЫ ГРАФА (CCS = 5-6)
+    // =========================================================================
+    let p4Target = { oddCount: 0, missingEdges: 0 };
+
+    function setupPhase4() {
+        const useSix = Math.random() < 0.65;
+        const n = useSix ? 6 : 5;
+        const labels = useSix ? ['А', 'Б', 'В', 'Г', 'Д', 'Е'] : ['А', 'Б', 'В', 'Г', 'Д'];
+        const coords = useSix
+            ? [
+                { x: 130, y: 40 }, { x: 290, y: 40 }, { x: 365, y: 110 },
+                { x: 290, y: 180 }, { x: 130, y: 180 }, { x: 55, y: 110 }
+              ]
+            : [
+                { x: 210, y: 35 }, { x: 345, y: 95 }, { x: 295, y: 185 },
+                { x: 125, y: 185 }, { x: 75, y: 95 }
+              ];
+
+        const allPairs = [];
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) allPairs.push([i, j]);
+        }
+        const edgeCount = randInt(n, n + 3);
+        const edges = shuffleArray(allPairs).slice(0, edgeCount);
+        const degs = new Array(n).fill(0);
+        edges.forEach(([u, v]) => {
+            degs[u]++;
+            degs[v]++;
+        });
+
+        const oddCount = degs.filter(d => d % 2 === 1).length;
+        const completeEdges = (n * (n - 1)) / 2;
+        const missingEdges = completeEdges - edgeCount;
+
+        p4Target = { oddCount, missingEdges };
+        document.getElementById('p4-n-val').textContent = String(n);
+        document.getElementById('p4-e-val').textContent = String(edgeCount);
+
+        const edgesG = document.getElementById('p4-svg-edges');
+        const nodesG = document.getElementById('p4-svg-nodes');
+        edgesG.innerHTML = '';
+        nodesG.innerHTML = '';
+
+        edges.forEach(([u, v]) => {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', String(coords[u].x));
+            line.setAttribute('y1', String(coords[u].y));
+            line.setAttribute('x2', String(coords[v].x));
+            line.setAttribute('y2', String(coords[v].y));
+            line.setAttribute('stroke', '#ffc107');
+            line.setAttribute('stroke-width', '2.5');
+            edgesG.appendChild(line);
+        });
+
+        coords.forEach((c, idx) => {
+            const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circ.setAttribute('cx', String(c.x));
+            circ.setAttribute('cy', String(c.y));
+            circ.setAttribute('r', '18');
+            circ.setAttribute('fill', '#11151c');
+            circ.setAttribute('stroke', '#0dcaf0');
+            circ.setAttribute('stroke-width', '2');
+
+            const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            txt.setAttribute('x', String(c.x));
+            txt.setAttribute('y', String(c.y + 5));
+            txt.setAttribute('text-anchor', 'middle');
+            txt.setAttribute('fill', '#f8f9fa');
+            txt.setAttribute('font-size', '15');
+            txt.setAttribute('font-weight', 'bold');
+            txt.setAttribute('font-family', 'monospace');
+            txt.textContent = labels[idx];
+
+            nodesG.appendChild(circ);
+            nodesG.appendChild(txt);
+        });
+
+        document.getElementById('p4-input-odd').value = '';
+        document.getElementById('p4-input-missing').value = '';
+    }
+
+    document.getElementById('p4-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        const uOdd = parseDecimal(document.getElementById('p4-input-odd').value);
+        const uMiss = parseDecimal(document.getElementById('p4-input-missing').value);
+        if (uOdd === p4Target.oddCount && uMiss === p4Target.missingEdges) {
+            advancePhase(4, 5, setupPhase5, 'Кульминация: динамический подсчёт путей в орграфе с ограничениями');
+        } else {
+            recordError('Пересчитайте степени вершин на схеме и число рёбер полного графа N×(N−1)/2!', setupPhase4);
+        }
+    });
+
+    // =========================================================================
+    // ФАЗА 5: КУЛЬМИНАЦИЯ — ПОДСЧЕТ ПУТЕЙ В DAG С ОБЯЗАТЕЛЬНОЙ И ЗАПРЕЩЕННОЙ ВЕРШИНОЙ (CCS = 8-9)
+    // =========================================================================
+    let p5TargetPaths = 0;
+
+    function countDagPaths(n, edges, start, end, forbidden) {
+        if (start === forbidden || end === forbidden) return 0;
+        const dp = new Array(n).fill(0);
+        dp[start] = 1;
+        // Вершины упорядочены топологически: слой0(0) -> слой1(1,2,3) -> слой2(4,5,6) -> слой3(7)
+        // Внутри слоя1 возможны дуги 1->2, 3->2; внутри слоя2: 4->5, 6->5
+        const topoOrder = [0, 1, 3, 2, 4, 6, 5, 7];
+        for (const u of topoOrder) {
+            if (u === forbidden) continue;
+            for (const [a, b] of edges) {
+                if (a === u && b !== forbidden) {
+                    dp[b] += dp[a];
+                }
+            }
+        }
+        return dp[end];
+    }
+
+    function setupPhase5() {
+        const labels = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З'];
+        const coords = [
+            { x: 42,  y: 130 }, // 0: А
+            { x: 150, y: 42 },  // 1: Б
+            { x: 150, y: 116 }, // 2: В (смещена от центра 130 для исключения наложения линий)
+            { x: 150, y: 216 }, // 3: Г
+            { x: 275, y: 48 },  // 4: Д
+            { x: 275, y: 146 }, // 5: Е (смещена от центра 130)
+            { x: 275, y: 216 }, // 6: Ж
+            { x: 388, y: 130 }  // 7: З
+        ];
+
+        let chosenCfg = null;
+        for (let attempt = 0; attempt < 150; attempt++) {
+            const edges = [[0, 1], [0, 2], [0, 3], [4, 7], [5, 7], [6, 7]];
+            if (Math.random() < 0.72) edges.push([1, 2]);
+            if (Math.random() < 0.72) edges.push([3, 2]);
+            if (Math.random() < 0.72) edges.push([4, 5]);
+            if (Math.random() < 0.72) edges.push([6, 5]);
+
+            for (let u = 1; u <= 3; u++) {
+                for (let v = 4; v <= 6; v++) {
+                    if (Math.abs(u - (v - 3)) <= 1 && Math.random() < 0.8) {
+                        edges.push([u, v]);
+                    }
+                }
+            }
+
+            const totalAll = countDagPaths(8, edges, 0, 7, -1);
+            const candidates = [];
+            for (const req of [4, 5, 6]) {
+                for (const forb of [1, 2, 3]) {
+                    const noForb = countDagPaths(8, edges, 0, req, -1) * countDagPaths(8, edges, req, 7, -1);
+                    const ans = countDagPaths(8, edges, 0, req, forb) * countDagPaths(8, edges, req, 7, forb);
+                    if (ans >= 3 && ans <= 32 && ans < noForb && noForb < totalAll) {
+                        candidates.push({ edges, req, forb, ans });
+                    }
+                }
+            }
+            if (candidates.length > 0) {
+                chosenCfg = candidates[randInt(0, candidates.length - 1)];
+                break;
+            }
+        }
+
+        if (!chosenCfg) {
+            // Резервный проверенный DAG без пересечения промежуточных вершин
+            const fbEdges = [
+                [0, 1], [0, 2], [0, 3], [1, 2], [3, 2],
+                [1, 4], [2, 4], [2, 5], [3, 5], [3, 6], [4, 5], [6, 5],
+                [4, 7], [5, 7], [6, 7]
+            ];
+            chosenCfg = {
+                edges: fbEdges,
+                req: 5,
+                forb: 3,
+                ans: countDagPaths(8, fbEdges, 0, 5, 3) * countDagPaths(8, fbEdges, 5, 7, 3)
+            };
+        }
+
+        p5TargetPaths = chosenCfg.ans;
+        const reqLabel = labels[chosenCfg.req];
+        const forbLabel = labels[chosenCfg.forb];
+        document.getElementById('p5-req-label').textContent = reqLabel;
+        document.getElementById('p5-forb-label').textContent = forbLabel;
+        document.getElementById('p5-req-badge').textContent = reqLabel;
+        document.getElementById('p5-forb-badge').textContent = forbLabel;
+
+        const edgesG = document.getElementById('p5-svg-edges');
+        const nodesG = document.getElementById('p5-svg-nodes');
+        edgesG.innerHTML = '';
+        nodesG.innerHTML = '';
+
+        const R = 17;
+        chosenCfg.edges.forEach(([u, v]) => {
+            const n1 = coords[u];
+            const n2 = coords[v];
+            const dx = n2.x - n1.x;
+            const dy = n2.y - n1.y;
+            const len = Math.hypot(dx, dy);
+            const sx = n1.x + (dx / len) * (R + 2);
+            const sy = n1.y + (dy / len) * (R + 2);
+            const ex = n2.x - (dx / len) * (R + 4);
+            const ey = n2.y - (dy / len) * (R + 4);
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', sx.toFixed(1));
+            line.setAttribute('y1', sy.toFixed(1));
+            line.setAttribute('x2', ex.toFixed(1));
+            line.setAttribute('y2', ey.toFixed(1));
+            line.setAttribute('stroke', '#ffc107');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('marker-end', 'url(#p5-arrow)');
+            edgesG.appendChild(line);
+        });
+
+        coords.forEach((c, idx) => {
+            let strokeColor = '#0dcaf0';
+            if (idx === chosenCfg.req) strokeColor = '#198754';
+            else if (idx === chosenCfg.forb) strokeColor = '#dc3545';
+
+            const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circ.setAttribute('cx', String(c.x));
+            circ.setAttribute('cy', String(c.y));
+            circ.setAttribute('r', String(R));
+            circ.setAttribute('fill', '#11151c');
+            circ.setAttribute('stroke', strokeColor);
+            circ.setAttribute('stroke-width', '2.5');
+
+            const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            txt.setAttribute('x', String(c.x));
+            txt.setAttribute('y', String(c.y + 5));
+            txt.setAttribute('text-anchor', 'middle');
+            txt.setAttribute('fill', '#f8f9fa');
+            txt.setAttribute('font-size', '14');
+            txt.setAttribute('font-weight', 'bold');
+            txt.setAttribute('font-family', 'monospace');
+            txt.textContent = labels[idx];
+
+            nodesG.appendChild(circ);
+            nodesG.appendChild(txt);
+        });
+
+        document.getElementById('p5-input-paths').value = '';
+    }
+
+    document.getElementById('p5-submit-btn').addEventListener('click', () => {
+        if (isLocked) return;
+        const uPaths = parseDecimal(document.getElementById('p5-input-paths').value);
+        if (uPaths === p5TargetPaths) {
+            const completePayload = telemetry.complete({ stage: 5, total_stages: 5 });
+            const timeSpent = completePayload ? completePayload.time_spent_sec : telemetry.getTimeSpentSec();
+            document.getElementById('phase5').classList.add('d-none');
+            document.getElementById('final-screen').classList.remove('d-none');
+            levelBadge.textContent = 'Завершено';
+            levelBadge.className = 'badge bg-warning text-dark rounded-0 fs-6 me-2';
+            levelTitle.textContent = 'Уровень 2 успешно пройден';
+            document.getElementById('stat-time').textContent = `${timeSpent} с`;
+            document.getElementById('stat-attempts').textContent = String(telemetry.getState().attemptsCount);
+        } else {
+            recordError('Неверное количество путей! Вычеркните запрещённую вершину и дуги, минующие обязательную.', setupPhase5);
+        }
+    });
+
+    // Инициализация Фазы 1
+    setupPhase1();
+
+    // Dev / E2E hooks
+    window.__DEV_LEVEL2_STATE__ = {
+        getTargets() {
+            return { p1Target, p2Target, p3TargetX, p4Target, p5TargetPaths };
+        },
+        solveCurrentPhase() {
+            if (currentPhase === 1) {
+                document.getElementById('p1-input-sum').value = String(p1Target.sum);
+                document.getElementById('p1-input-edges').value = String(p1Target.edges);
+                document.getElementById('p1-submit-btn').click();
+            } else if (currentPhase === 2) {
+                document.getElementById('p2-input-dist').value = String(p2Target.dist);
+                document.getElementById('p2-input-time').value = String(p2Target.timeMin).replace('.', ',');
+                document.getElementById('p2-submit-btn').click();
+            } else if (currentPhase === 3) {
+                document.getElementById('p3-input-x').value = String(p3TargetX);
+                document.getElementById('p3-submit-btn').click();
+            } else if (currentPhase === 4) {
+                document.getElementById('p4-input-odd').value = String(p4Target.oddCount);
+                document.getElementById('p4-input-missing').value = String(p4Target.missingEdges);
+                document.getElementById('p4-submit-btn').click();
+            } else if (currentPhase === 5) {
+                document.getElementById('p5-input-paths').value = String(p5TargetPaths);
+                document.getElementById('p5-submit-btn').click();
+            }
+        }
+    };
+})();
+</script>
