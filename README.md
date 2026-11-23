@@ -13,7 +13,7 @@
    * Полный запрет на тесты с выбором вариантов (радиокнопки, дропдауны с ответами).
    * **Уровень 1 (Манипуляции):** Drag-and-Drop, коммутация цепей, прямое редактирование лент/сеток, сортировка.
    * **Уровень 2 (Аналитика):** Ручной ввод вычисленных значений, трассировка алгоритмов, консольные команды.
-   * **Уровень 3 (Аркада):** Аркадные механики с таймерами, банк уникальных архетипов, мгновенная реакция.
+   * **Уровень 3 (Аркада):** Аркадные механики на **Vue 3** (`/static/vue.global.js`, исключение — 2 консольных урока ИБ на `Terminal.astro`) с динамическими таймерами (Волна 1 $\ge 30$ с, любая волна $\ge 15$ с), банком из 12 архетипов, прямым манипулированием мышью ($\ge 48\times 48\text{ px}$), **обязательным клавиатурным управлением (10–20 клавиш: `W/A/S/D`, стрелки, `Shift`, `Space`, `0–9`)**, экраном `intro` и AFK-защитой.
 2. **Глобальный Режим Хардкора:**
    * Прохождение всех трёх уровней без единой ошибки на одном дыхании. Любая ошибка вызывает полный сброс на шаг 1 и процедурную перегенерацию данных.
 3. **Матрица Уроков (`/courses`) и Нормализованная Телеметрия (xAPI / IMS Caliper Analytics):**
@@ -36,11 +36,11 @@
 
 ## 🛠 Стек Технологий
 
-* **Фреймворк:** [Astro 5](https://astro.build/) (режим SSR, `@astrojs/node` адаптер).
+* **Фреймворк:** [Astro 7](https://astro.build/) (режим SSR, `@astrojs/node` адаптер) + локальный **Vue 3** (`/static/vue.global.js`) для аркад Уровня 3.
 * **База данных:** SQLite via `better-sqlite3`.
-* **Стилизация:** Tailwind CSS v4, киберпанк / терминальный UI.
-* **Песочницы:** Pyodide (Python в браузере), Web Workers, изолированные `<iframe>`.
-* **Тестирование:** Playwright (трехуровневая пирамида тестов: линтинг теории, контракты телеметрии, сквозные E2E).
+* **Стилизация:** Локальный Bootstrap 5 (`/static/bootstrap.min.css`), Tailwind CSS v4, киберпанк / терминальный UI (`bg-black`, `rounded-0`).
+* **Песочницы и эмуляторы:** Pyodide (Python в браузере), Jodit + Colibre (`WriterEmulator.astro`), Luckysheet (`CalcEmulator.astro`), PrinceJS (`PrinceEmulator.astro`), изолированные `<iframe>`.
+* **Тестирование:** Playwright (многоуровневая пирамида тестов: аудит стандартов `STRICT_STANDARDS_AUDIT=1`, контракты генераторов и телеметрии, цифровые персоны, `DifficultyBenchmarker`, сквозные E2E).
 
 ---
 
@@ -53,16 +53,21 @@ school-lms/
 │   ├── testing.md        # Пирамида тестирования, Playwright, CI/CD
 │   ├── curriculum.md     # Учебный план, соответствие Полякову, Zero-LaTeX
 │   ├── design-levels-1-2.md # Геймдизайн 1 и 2 уровней
-│   ├── design-level-3.md # Геймдизайн 3 уровня (аркада)
-│   ├── ui-styling.md     # UI-гайдлайны и стилизация
-│   ├── components.md     # Встроенные компоненты (Terminal, PythonIDE, PrinceEmulator)
+│   ├── design-level-3.md # Геймдизайн 3 уровня (аркада, 12 архетипов, клавиатура 10–20 клавиш)
+│   ├── difficulty-curve.md  # Методика CCS (1–10), кривая обучения и тайминги
+│   ├── ui-styling.md     # UI-гайдлайны, эргономика и стилизация
+│   ├── components.md     # Встроенные компоненты (Terminal, PythonIDE, Writer, Calc, PrinceEmulator)
 │   └── ai-workflow.md    # Регламент работы автономных ИИ-агентов
+├── dev_scripts/
+│   └── add_prompts_to_wp.cjs # Генератор поурочных промптов для таблиц КТП (wp/*.xlsx)
 ├── scripts/
 │   └── migrate_telemetry.js # Скрипт нормализации и миграции базы данных
+├── public/static/        # Локальные ассеты (Zero-Dependency: vue.global.js, lms-telemetry.js, bootstrap)
 ├── src/
 │   ├── content/lessons/  # Теоретические материалы уроков (theory.md)
 │   ├── pages/
 │   │   ├── api/          # Серверные эндпоинты (telemetry, progress, matrix-progress, teacher/stats)
+│   │   ├── tasks/        # Изолированные тренажеры level1.astro, level2.astro, level3.astro
 │   │   ├── courses.astro # Минималистичная матрица курсов/уроков и прогресс ученика
 │   │   ├── teacher.astro # Панель мониторинга учителя
 │   │   └── lesson/       # Динамический роутинг уроков
@@ -70,6 +75,7 @@ school-lms/
 │       ├── courses.json        # Реестр учебных курсов и уроков
 │       └── prince-campaign.json # Конфигурация сквозной кампании Prince of Persia
 ├── tests/                # Набор автотестов Playwright
+├── wp/                   # Рабочие книги КТП (.xlsx) со встроенными промптами
 ├── AGENTS.md             # Диспетчер инструкций для ИИ-агентов
 └── telemetry.db          # База данных SQLite (в .gitignore)
 ```
@@ -156,5 +162,7 @@ run-as-root "systemctl restart school-lms.service" "<пароль_root>"
 * [docs/testing.md](docs/testing.md) — Руководство по автоматическому тестированию и CI/CD.
 * [docs/curriculum.md](docs/curriculum.md) — Учебный план и правила оформления формул.
 * [docs/design-levels-1-2.md](docs/design-levels-1-2.md) — Геймдизайн уровней 1 и 2.
-* [docs/design-level-3.md](docs/design-level-3.md) — Геймдизайн уровня 3 (аркада).
+* [docs/design-level-3.md](docs/design-level-3.md) — Геймдизайн уровня 3 (аркада, банк архетипов, клавиатура 10–20 клавиш).
+* [docs/ui-styling.md](docs/ui-styling.md) — UI-гайдлайны, эргономика Direct Manipulation и регламент анимаций.
+* [docs/components.md](docs/components.md) — Готовые компоненты (`Terminal`, `PythonIDE`, `WriterEmulator`, `CalcEmulator`, `PrinceEmulator`).
 * [AGENTS.md](AGENTS.md) — Диспетчер правил для автономных ИИ-ассистентов.
