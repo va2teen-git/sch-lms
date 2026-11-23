@@ -1,0 +1,1307 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3} title="Урок 36 :: Вычисление арифметического выражения, записанного в постфиксной форме (Уровень 3)" bodyClass="font-monospace m-0 p-0">
+    <div id="vue-app" class="container-fluid min-vh-100 p-2 p-md-3 bg-black text-danger font-monospace" :style="{ transform: shakeTransform, transition: 'transform 60ms linear' }" v-cloak>
+
+        <!-- ========================================== -->
+        <!-- 1. СТАРТОВЫЙ ЭКРАН (INTRO / БРИФИНГ)       -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'intro'" class="text-center py-3 py-md-4">
+            <div class="d-inline-block border border-danger p-3 p-md-4 bg-dark rounded-0 mb-3 text-start shadow-lg w-100" style="max-width: 880px;">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom border-danger pb-2 mb-3">
+                    <h1 class="h4 text-danger mb-0 fw-bold">⚡ RPN STACK REACTOR // КОНВЕЙЕР ПОСТФИКСНОГО СТЕКА</h1>
+                    <span class="badge bg-danger text-black rounded-0 fw-bold px-3 py-2">АРКАДНЫЙ БОСС</span>
+                </div>
+
+                <p class="text-light mb-3">
+                    На стековый вычислитель поступают <span class="text-danger fw-bold">10 скоростных волн</span> постфиксных выражений (RPN) с модификаторами <code>SWAP</code> и унарным минусом <code>u-</code>.
+                    Глубина аппаратного стакана ограничена <strong>6 слотами</strong>. Управление в игровом цикле — <strong>строго с клавиатуры</strong> (мышь в арене отключена).
+                </p>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-12 col-md-6">
+                        <div class="border border-secondary bg-black p-2 p-md-3 h-100 rounded-0 small text-light">
+                            <div class="fw-bold text-info mb-2 text-uppercase">[4 АППАРАТНЫЕ СТАНЦИИ]:</div>
+                            <ul class="mb-0 ps-3">
+                                <li class="mb-1"><strong class="text-info">PUSH</strong> — загрузить число с ленты на вершину стека (если глубина &lt; 6).</li>
+                                <li class="mb-1"><strong class="text-warning">EVAL</strong> — вычислить оператор над <code>A (TOP-1)</code> и <code>B (TOP)</code>, предварительно набрав итог в регистре <strong>ACC</strong> (<code>A op B</code>, или <code>-TOP</code> для <code>u-</code>).</li>
+                                <li class="mb-1"><strong class="text-primary">SWAP</strong> — обменять местами два верхних слота <code>A ↔ B</code> на команде <code>SWAP</code>.</li>
+                                <li><strong class="text-danger">DEFUSE</strong> — перехватить аварию: <code>STACK UNDERFLOW</code>, <code>DIV/MOD BY ZERO</code>, <code>STACK OVERFLOW</code> (&gt; 6 слотов) или <code>LEFTOVER AT END</code> (≠ 1 элемент на <code>END</code>).</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="border border-danger bg-black p-2 p-md-3 h-100 rounded-0 small text-light">
+                            <div class="fw-bold text-danger mb-2 text-uppercase">[KEYCAP HUD // 20 КЛАВИШ]:</div>
+                            <div class="d-flex flex-column gap-2">
+                                <div><kbd class="bg-dark text-info border border-info px-2">A</kbd> <kbd class="bg-dark text-info border border-info px-2">D</kbd> / <kbd class="bg-dark text-info border border-info px-2">←</kbd> <kbd class="bg-dark text-info border border-info px-2">→</kbd> — выбор станции (<code>PUSH / EVAL / SWAP / DEFUSE</code>)</div>
+                                <div><kbd class="bg-dark text-warning border border-warning px-2">0</kbd>–<kbd class="bg-dark text-warning border border-warning px-2">9</kbd> — 2-разрядный сдвиговый ввод в регистр <code>ACC</code> (сразу фокусирует <code>EVAL</code>)</div>
+                                <div><kbd class="bg-dark text-warning border border-warning px-2">W</kbd> <kbd class="bg-dark text-warning border border-warning px-2">S</kbd> / <kbd class="bg-dark text-warning border border-warning px-2">↑</kbd> <kbd class="bg-dark text-warning border border-warning px-2">↓</kbd> — точная подстройка <code>ACC</code> на <code>+1 / -1</code></div>
+                                <div><kbd class="bg-dark text-danger border border-danger px-2">Shift</kbd> — переключение знака <code>ACC (+/-)</code></div>
+                                <div><kbd class="bg-dark text-success border border-success px-2">Space</kbd> — запуск миссии / выполнение выбранной станции</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger bg-black border border-danger rounded-0 mb-3 py-2 small text-warning">
+                    <strong>РЕЖИМ ХАРДКОР:</strong> неверная станция, ошибка в расчёте <code>ACC</code>, попытка обработать аварию без <code>DEFUSE</code> или тайм-аут включают сирену и <strong>СБРАСЫВАЮТ ПРОГРЕСС НА ВОЛНУ 1</strong>.
+                </div>
+
+                <button id="start-btn" type="button" class="btn btn-danger btn-lg rounded-0 w-100 fw-bold font-monospace py-3 text-uppercase" style="min-height: 54px;" @click="startGame">
+                    ▶ ЗАПУСТИТЬ СТЕКОВЫЙ РЕАКТОР (SPACE)
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. ИГРОВОЙ ЭКРАН (KEYBOARD-ONLY ARENA)     -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'playing'" class="mx-auto" style="max-width: 1020px; pointer-events: none; user-select: none;">
+
+            <!-- ВЕРХНИЙ HUD -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom border-danger pb-2 mb-2 gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span id="wave-counter-badge" class="badge bg-danger text-black rounded-0 fs-6 px-3 py-2 fw-bold">
+                        Волна <span v-text="currentWave"></span> из <span v-text="totalWaves"></span>
+                    </span>
+                    <span class="text-light fw-bold small" v-if="currentWaveData" v-text="currentWaveData.title"></span>
+                    <span v-if="currentWaveData && currentWaveData.isBreather" class="badge bg-info text-black rounded-0 fw-bold">ПЕРЕДЫШКА</span>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge bg-dark border border-secondary text-light rounded-0 px-2 py-2">
+                        Сбоев: <span class="text-warning fw-bold" v-text="attempts"></span> | <span v-text="formatTime(sessionTime)"></span>
+                    </span>
+                    <span class="badge bg-black border rounded-0 px-3 py-2 fs-6 fw-bold" :class="timeLeft < 5.0 ? 'border-danger text-danger' : 'border-warning text-warning'">
+                        <span v-text="timeLeft.toFixed(1)"></span> с / <span v-text="currentWaveDuration.toFixed(1)"></span> с
+                    </span>
+                </div>
+            </div>
+
+            <!-- ДИНАМИЧЕСКИЙ ТАЙМЕР ВОЛНЫ -->
+            <div class="progress rounded-0 bg-dark border border-secondary mb-2" style="height: 12px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                     :class="timerBarClass"
+                     role="progressbar"
+                     :style="{ width: Math.max(0, Math.min(100, (timeLeft / currentWaveDuration) * 100)) + '%', transition: 'width 100ms linear' }">
+                </div>
+            </div>
+
+            <!-- АВАРИЙНАЯ СИРЕНА (#alarm-box) -->
+            <div id="alarm-box" v-if="alarmActive" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-2 py-2 text-center" role="alert">
+                <div class="fw-bold">🚨 [СИРЕНА // STACK REACTOR MELTDOWN] <span v-text="alarmReason"></span></div>
+                <div class="small text-warning">
+                    СБОЙ #<span id="alarm-count" class="fw-bold text-danger" v-text="attempts"></span> — СБРОС НА ВОЛНУ 1 И ПЕРЕГЕНЕРАЦИЯ КОНВЕЙЕРА...
+                </div>
+            </div>
+
+            <!-- ВСПЫШКА УСПЕШНОГО ЗАВЕРШЕНИЯ ВОЛНЫ -->
+            <div v-if="waveClearMsg" class="alert alert-success bg-black text-success border border-success rounded-0 mb-2 py-2 text-center fw-bold">
+                ✔ <span v-text="waveClearMsg"></span>
+            </div>
+
+            <!-- ОСНОВНАЯ АРЕНА: DATA SOURCE + DIRECT SURFACE -->
+            <div v-if="currentWaveData" class="row g-2 align-items-stretch">
+
+                <!-- ЛЕВАЯ/ВЕРХНЯЯ ЗОНА: ЛЕНТА ТОКЕНОВ + АППАРАТНЫЙ СТАКАН СТЕКА -->
+                <div class="col-12 col-lg-7 d-flex flex-column gap-2">
+
+                    <!-- Лента входных RPN-токенов (Conveyor Belt) -->
+                    <div class="card bg-dark border border-danger rounded-0 p-2 p-md-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <span class="small text-light fw-bold text-uppercase">
+                                Входная лента RPN-токенов (позиция <span class="text-warning" v-text="Math.min(headIdx + 1, currentWaveData.tokens.length)"></span>/<span v-text="currentWaveData.tokens.length"></span>):
+                            </span>
+                            <span class="badge bg-black border border-secondary text-info rounded-0" v-text="currentWaveData.profileBadge"></span>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 align-items-center py-2">
+                            <div v-for="(tok, idx) in currentWaveData.tokens"
+                                 :key="idx"
+                                 class="px-2 py-2 text-center fw-bold rounded-0 border"
+                                 :style="{
+                                     minWidth: '52px',
+                                     minHeight: '50px',
+                                     transition: 'all 180ms ease',
+                                     boxShadow: idx === headIdx ? '0 0 12px rgba(255, 193, 7, 0.75)' : 'none'
+                                 }"
+                                 :class="getTokenClass(tok, idx)">
+                                <div class="text-secondary" style="font-size: 0.65rem;">
+                                    <span v-if="idx === headIdx" class="text-warning fw-bold">▼ HEAD</span>
+                                    <span v-else-if="idx < headIdx" class="text-success">DONE</span>
+                                    <span v-else>#<span v-text="idx + 1"></span></span>
+                                </div>
+                                <div class="fs-5 lh-sm" v-text="formatTokenLabel(tok)"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вертикальный 6-слотовый стакан стека LIFO -->
+                    <div class="card bg-black border border-secondary rounded-0 p-2 p-md-3 flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small text-info fw-bold text-uppercase">
+                                Аппаратный стакан стека LIFO (<span v-text="stack.length"></span> / 6 слотов)
+                            </span>
+                            <span class="badge rounded-0" :class="stack.length >= 5 ? 'bg-danger text-black fw-bold' : 'bg-dark border border-secondary text-secondary'">
+                                <span v-if="stack.length >= 5">⚠ КРИТИЧЕСКАЯ ЗОНА ПЕРЕПОЛНЕНИЯ</span>
+                                <span v-else>ГЛУБИНА В НОРМЕ</span>
+                            </span>
+                        </div>
+
+                        <div class="d-flex flex-column gap-1">
+                            <div v-for="slotNum in [6, 5, 4, 3, 2, 1]"
+                                 :key="slotNum"
+                                 class="d-flex justify-content-between align-items-center px-3 py-2 border rounded-0"
+                                 :style="{
+                                     minHeight: '42px',
+                                     transition: 'all 180ms ease',
+                                     boxShadow: flashSlotIndex === (slotNum - 1) ? '0 0 14px rgba(13, 202, 240, 0.8)' : 'none'
+                                 }"
+                                 :class="getSlotClass(slotNum - 1)">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small fw-bold text-secondary">SLOT <span v-text="slotNum"></span></span>
+                                    <span v-if="slotNum >= 5" class="badge bg-dark border border-danger text-danger rounded-0" style="font-size: 0.65rem;">DANGER</span>
+                                </div>
+
+                                <div v-if="stack.length >= slotNum" class="d-flex align-items-center gap-2">
+                                    <span v-if="slotNum === stack.length" class="badge bg-warning text-black rounded-0 fw-bold">B (TOP)</span>
+                                    <span v-else-if="slotNum === stack.length - 1" class="badge bg-info text-black rounded-0 fw-bold">A (TOP-1)</span>
+                                    <span class="fs-5 fw-bold text-light" v-text="stack[slotNum - 1]"></span>
+                                </div>
+                                <div v-else class="small text-secondary">— пусто —</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ПРАВАЯ/НИЖНЯЯ ЗОНА: АЛУ-ШИНА, РЕГИСТР ACC, 4 СТАНЦИИ И KEYCAP HUD -->
+                <div class="col-12 col-lg-5 d-flex flex-column gap-2">
+
+                    <!-- Панель АЛУ-шины -->
+                    <div class="card bg-dark border border-info rounded-0 p-2 p-md-3">
+                        <div class="small text-info fw-bold text-uppercase mb-2">Шина АЛУ и текущая операция</div>
+                        <div class="bg-black border border-secondary p-2 text-center rounded-0 mb-2">
+                            <div class="small text-secondary mb-1">Текущий токен под головкой:</div>
+                            <div class="fs-4 fw-bold text-warning" v-text="aluPreviewFormula"></div>
+                        </div>
+
+                        <!-- Двухразрядный знаковый регистр ACC -->
+                        <div class="bg-black border p-2 p-md-3 rounded-0 text-center" :class="stationIdx === 1 ? 'border-warning' : 'border-secondary'" :style="{ boxShadow: stationIdx === 1 ? '0 0 12px rgba(255, 193, 7, 0.4)' : 'none', transition: 'all 160ms ease' }">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small text-secondary text-uppercase">Регистр результата ACC [-99..+99]</span>
+                                <span class="badge bg-dark border border-warning text-warning rounded-0" v-text="accFresh ? 'ГОТОВ К ВВОДУ' : 'ВВЕДЕНО'"></span>
+                            </div>
+                            <div class="display-6 fw-bold text-warning mb-1" v-text="formattedAcc"></div>
+                            <div class="small text-secondary">
+                                Клавиши <span class="text-light fw-bold">0–9</span> задают цифры, <span class="text-light fw-bold">W/S (↑/↓)</span> ±1, <span class="text-danger fw-bold">Shift</span> меняет знак
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4 горизонтальные аппаратные станции с неоновым курсором -->
+                    <div class="card bg-black border border-danger rounded-0 p-2 p-md-3 flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small text-danger fw-bold text-uppercase">Аппаратные станции управления</span>
+                            <span class="badge bg-dark border border-info text-info rounded-0">Курсор: <span v-text="stations[stationIdx].label"></span></span>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div v-for="(st, sIdx) in stations" :key="st.id" class="col-6">
+                                <div class="p-2 border rounded-0 text-center h-100 d-flex flex-column justify-content-center"
+                                     :style="{
+                                         minHeight: '72px',
+                                         transition: 'all 160ms ease',
+                                         boxShadow: stationIdx === sIdx ? '0 0 14px rgba(13, 202, 240, 0.85)' : 'none'
+                                     }"
+                                     :class="getStationClass(sIdx)">
+                                    <div class="fw-bold fs-5">
+                                        <span v-if="stationIdx === sIdx" class="text-warning">▶ </span>
+                                        <span v-text="st.label"></span>
+                                    </div>
+                                    <div class="small" :class="stationIdx === sIdx ? 'text-light' : 'text-secondary'" v-text="st.hint"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Последнее событие -->
+                        <div class="bg-dark border border-secondary p-2 rounded-0 small text-light mb-2">
+                            <span class="text-info fw-bold">ЛОГ РЕАКТОРА:</span>
+                            <span class="ms-1" v-text="lastStatusMsg"></span>
+                        </div>
+
+                        <!-- Компактный Keycap HUD -->
+                        <div class="bg-dark border border-secondary p-2 rounded-0 small text-secondary mt-auto">
+                            <div class="text-light fw-bold mb-1">KEYCAP HUD (KEYBOARD-ONLY):</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span><kbd class="bg-black text-info border border-info px-1">A/D</kbd> <kbd class="bg-black text-info border border-info px-1">←/→</kbd> Станция</span>
+                                <span><kbd class="bg-black text-warning border border-warning px-1">0..9</kbd> Цифры ACC</span>
+                                <span><kbd class="bg-black text-warning border border-warning px-1">W/S</kbd> <kbd class="bg-black text-warning border border-warning px-1">↑/↓</kbd> ±1 ACC</span>
+                                <span><kbd class="bg-black text-danger border border-danger px-1">Shift</kbd> Знак ±</span>
+                                <span><kbd class="bg-black text-success border border-success px-1">Space</kbd> Выполнить</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. ЭКРАН ПОБЕДЫ (VICTORY)                  -->
+        <!-- ========================================== -->
+        <div v-if="gameState === 'victory'" class="text-center py-4">
+            <div class="d-inline-block border border-success p-4 bg-dark rounded-0 shadow-lg w-100" style="max-width: 720px;">
+                <h2 class="h3 text-success fw-bold mb-3">🏆 СТЕКОВЫЙ РЕАКТОР СТАБИЛИЗИРОВАН (10 / 10 ВОЛН)</h2>
+                <p class="text-light mb-3">
+                    Все 10 волн постфиксных выражений, модификаций <code>SWAP</code> / <code>u-</code> / <code>^</code> и перехватов стековых аварий пройдены без единого необработанного сбоя!
+                </p>
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-6">
+                        <div class="bg-black border border-success p-2 rounded-0">
+                            <div class="small text-secondary">ВРЕМЯ СЕССИИ</div>
+                            <div class="fs-4 fw-bold text-success" v-text="formatTime(sessionTime)"></div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="bg-black border border-warning p-2 rounded-0">
+                            <div class="small text-secondary">ХАРДКОР-СБОЕВ</div>
+                            <div class="fs-4 fw-bold text-warning" v-text="attempts"></div>
+                        </div>
+                    </div>
+                </div>
+                <a href="/lessons/11-класс_углубленный/36/" class="btn btn-success btn-lg rounded-0 w-100 fw-bold text-uppercase">
+                    Вернуться к уроку 36
+                </a>
+            </div>
+        </div>
+
+    </div>
+</TaskLayout>
+
+<script is:inline src="/static/vue.global.js"></script>
+<script is:inline>
+(function () {
+    const { createApp } = Vue;
+
+    // =========================================================================
+    // WEB AUDIO API (Синтез звука без внешних файлов)
+    // =========================================================================
+    let audioCtx = null;
+
+    function getAudioCtx() {
+        if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new Ctx();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+        return audioCtx;
+    }
+
+    function playTone(freq, type, duration, gainVal) {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(gainVal || 0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (duration || 0.08));
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + (duration || 0.08));
+    }
+
+    function playMoveSound() { playTone(460, 'triangle', 0.045, 0.04); }
+    function playDigitSound() { playTone(620, 'sine', 0.04, 0.04); }
+    function playPushSound() { playTone(520, 'sine', 0.07, 0.05); }
+    function playEvalSound() { playTone(740, 'triangle', 0.09, 0.06); }
+    function playSwapSound() {
+        playTone(580, 'sine', 0.06, 0.05);
+        setTimeout(() => playTone(690, 'sine', 0.06, 0.05), 45);
+    }
+    function playDefuseSound() {
+        playTone(880, 'square', 0.07, 0.04);
+        setTimeout(() => playTone(1120, 'sine', 0.1, 0.05), 60);
+    }
+    function playWaveClearSound() {
+        playTone(660, 'sine', 0.08, 0.06);
+        setTimeout(() => playTone(880, 'sine', 0.1, 0.06), 70);
+        setTimeout(() => playTone(1100, 'triangle', 0.14, 0.07), 140);
+    }
+    function playAlarmSiren() {
+        playTone(220, 'sawtooth', 0.16, 0.09);
+        setTimeout(() => playTone(165, 'sawtooth', 0.22, 0.1), 160);
+        setTimeout(() => playTone(130, 'sawtooth', 0.24, 0.1), 360);
+    }
+    function playVictoryFanfare() {
+        [523, 659, 784, 1046].forEach((f, idx) => {
+            setTimeout(() => playTone(f, 'triangle', 0.16, 0.07), idx * 90);
+        });
+    }
+
+    // =========================================================================
+    // ЯДРО ЭТАЛОННОГО СТЕКОВОГО СИМУЛЯТОРА И ПРОЦЕДУРНЫЙ ГЕНЕРАТОР 10 ВОЛН
+    // =========================================================================
+    const MAX_STACK_DEPTH = 6;
+    const MIN_ACC = -99;
+    const MAX_ACC = 99;
+
+    function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function pickRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function evalBinaryOp(a, b, op) {
+        if (op === '+') return a + b;
+        if (op === '-') return a - b;
+        if (op === '*') return a * b;
+        if (op === '//') {
+            if (b === 0) return null;
+            return Math.floor(a / b);
+        }
+        if (op === '%') {
+            if (b === 0) return null;
+            return ((a % b) + b) % b;
+        }
+        if (op === '^') {
+            if (b < 0 || b > 6) return null;
+            return Math.pow(a, b);
+        }
+        return null;
+    }
+
+    function inspectStep(tokens, headIdx, stack, maxStack) {
+        const limit = maxStack || MAX_STACK_DEPTH;
+        if (headIdx >= tokens.length) {
+            return { action: 'DONE', hazard: null };
+        }
+        const tok = tokens[headIdx];
+
+        if (tok === 'END') {
+            if (stack.length === 1) {
+                return { action: 'DONE', hazard: null, finalResult: stack[0] };
+            }
+            return {
+                action: 'DEFUSE',
+                hazard: 'LEFTOVER_STACK',
+                reason: 'На маркере END в стеке должно остаться ровно 1 значение (сейчас: ' + stack.length + ')'
+            };
+        }
+
+        if (typeof tok === 'number') {
+            if (stack.length >= limit) {
+                return {
+                    action: 'DEFUSE',
+                    hazard: 'STACK_OVERFLOW',
+                    reason: 'Переполнение 6-слотового стека (STACK OVERFLOW) при попытке PUSH ' + tok
+                };
+            }
+            return { action: 'PUSH', value: tok, hazard: null };
+        }
+
+        if (tok === 'SWAP') {
+            if (stack.length < 2) {
+                return {
+                    action: 'DEFUSE',
+                    hazard: 'STACK_UNDERFLOW',
+                    reason: 'Недостаточно операндов для SWAP (в стеке меньше 2 элементов)'
+                };
+            }
+            return { action: 'SWAP', hazard: null };
+        }
+
+        if (tok === 'u-') {
+            if (stack.length < 1) {
+                return {
+                    action: 'DEFUSE',
+                    hazard: 'STACK_UNDERFLOW',
+                    reason: 'Пустой стек при попытке выполнить унарный минус u-'
+                };
+            }
+            const topVal = stack[stack.length - 1];
+            return {
+                action: 'EVAL',
+                op: 'u-',
+                a: topVal,
+                b: null,
+                expectedAcc: -topVal,
+                hazard: null
+            };
+        }
+
+        if (stack.length < 2) {
+            return {
+                action: 'DEFUSE',
+                hazard: 'STACK_UNDERFLOW',
+                reason: 'Нехватка операндов для "' + tok + '" (STACK UNDERFLOW)'
+            };
+        }
+
+        const b = stack[stack.length - 1];
+        const a = stack[stack.length - 2];
+
+        if ((tok === '//' || tok === '%') && b === 0) {
+            return {
+                action: 'DEFUSE',
+                hazard: 'DIV_BY_ZERO',
+                reason: 'Деление / остаток на ноль (' + a + ' ' + tok + ' 0)'
+            };
+        }
+
+        const res = evalBinaryOp(a, b, tok);
+        return {
+            action: 'EVAL',
+            op: tok,
+            a: a,
+            b: b,
+            expectedAcc: res,
+            hazard: null
+        };
+    }
+
+    function simulateWave(tokens, maxStack) {
+        const limit = maxStack || MAX_STACK_DEPTH;
+        const stack = [];
+        let headIdx = 0;
+        let stepCount = 0;
+
+        while (headIdx < tokens.length && stepCount < 40) {
+            stepCount++;
+            const step = inspectStep(tokens, headIdx, stack, limit);
+            if (step.action === 'DONE') {
+                return { valid: true, hazard: null, finalResult: step.finalResult };
+            }
+            if (step.action === 'DEFUSE') {
+                return { valid: false, hazard: step.hazard, hazardIndex: headIdx };
+            }
+            if (step.action === 'PUSH') {
+                stack.push(step.value);
+                headIdx++;
+            } else if (step.action === 'SWAP') {
+                const len = stack.length;
+                const tmp = stack[len - 1];
+                stack[len - 1] = stack[len - 2];
+                stack[len - 2] = tmp;
+                headIdx++;
+            } else if (step.action === 'EVAL') {
+                if (step.op === 'u-') {
+                    stack.pop();
+                } else {
+                    if ((step.op === '//' || step.op === '%') && !(step.a >= 0 && step.b > 0)) {
+                        return { valid: false, hazard: 'SIGN_RULE', hazardIndex: headIdx };
+                    }
+                    stack.pop();
+                    stack.pop();
+                }
+                const val = step.expectedAcc;
+                if (val === null || !Number.isInteger(val) || val < MIN_ACC || val > MAX_ACC) {
+                    return { valid: false, hazard: 'OUT_OF_RANGE', hazardIndex: headIdx };
+                }
+                stack.push(val);
+                headIdx++;
+            }
+        }
+        return { valid: false, hazard: 'INCOMPLETE', hazardIndex: headIdx };
+    }
+
+    function buildWave1() {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const a = randInt(2, 12);
+            const b = randInt(2, 9);
+            const c = randInt(2, 8);
+            const op1 = pickRandom(['+', '-']);
+            const op2 = pickRandom(['+', '-', '*']);
+            const tokens = [a, b, op1, c, op2, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [8, 3, '+', 4, '*', 'END'];
+    }
+
+    function buildWave2() {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const b = randInt(10, 45);
+            const c = randInt(3, 9);
+            const a = randInt(2, 20);
+            const op1 = pickRandom(['//', '%', '-']);
+            const op2 = pickRandom(['-', '+', '*']);
+            const tokens = [a, b, c, op1, op2, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [12, 29, 5, '//', '-', 'END'];
+    }
+
+    function buildWave3() {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const a = randInt(3, 14);
+            const b = randInt(2, 11);
+            const op1 = pickRandom(['+', '-', '*']);
+            const op2 = pickRandom(['-', '+', '*', '//']);
+            const tokens = [a, b, op1, op2, randInt(2, 9), 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (!sim.valid && sim.hazard === 'STACK_UNDERFLOW') return tokens;
+        }
+        return [9, 4, '+', '-', 3, 'END'];
+    }
+
+    function buildWave4() {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const a = randInt(2, 7);
+            const b = randInt(14, 38);
+            const c = randInt(2, 6);
+            const op1 = pickRandom(['//', '%', '-']);
+            const op2 = pickRandom(['+', '-', '*']);
+            const tokens = [a, b, 'SWAP', op1, c, op2, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [5, 23, 'SWAP', '//', 3, '*', 'END'];
+    }
+
+    function buildWave5() {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const a = randInt(3, 15);
+            const b = randInt(2, 9);
+            const c = randInt(2, 12);
+            const op1 = pickRandom(['+', '*']);
+            const op2 = pickRandom(['+', '-']);
+            const tokens = [a, b, op1, 'u-', c, op2, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [4, 5, '+', 'u-', 12, '+', 'END'];
+    }
+
+    function buildWave6() {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const x = randInt(2, 18);
+            const k = randInt(2, 12);
+            const opZero = pickRandom(['-', '%']);
+            const divOp = pickRandom(['//', '%']);
+            const tokens = opZero === '-'
+                ? [x, k, k, '-', divOp, randInt(1, 5), '+', 'END']
+                : [x, k * randInt(2, 4), k, '%', divOp, randInt(1, 5), '+', 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (!sim.valid && sim.hazard === 'DIV_BY_ZERO') return tokens;
+        }
+        return [14, 7, 7, '-', '//', 3, '+', 'END'];
+    }
+
+    function buildWave7() {
+        const pairs = [
+            [2, 3], [3, 2], [2, 4], [2, 5], [3, 3], [4, 2], [5, 2], [-2, 3], [-3, 2], [-2, 4]
+        ];
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const [base, exp] = pickRandom(pairs);
+            const tail = randInt(2, 12);
+            const op2 = pickRandom(['+', '-']);
+            const tokens = base < 0
+                ? [Math.abs(base), 'u-', exp, '^', tail, op2, 'END']
+                : [base, exp, '^', tail, op2, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [2, 4, '^', 5, '-', 'END'];
+    }
+
+    function buildWave8() {
+        const isOverflow = Math.random() < 0.5;
+        if (isOverflow) {
+            return [
+                randInt(1, 9), randInt(1, 9), randInt(1, 9),
+                randInt(1, 9), randInt(1, 9), randInt(1, 9),
+                randInt(1, 9), '+', '+', 'END'
+            ];
+        }
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const a = randInt(2, 12);
+            const b = randInt(2, 12);
+            const c = randInt(2, 12);
+            const op = pickRandom(['+', '-', '*']);
+            const tokens = [a, b, c, op, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (!sim.valid && sim.hazard === 'LEFTOVER_STACK') return tokens;
+        }
+        return [7, 5, 3, '+', 'END'];
+    }
+
+    function buildWave9() {
+        const powBases = [[2, 3], [3, 2], [2, 4], [4, 2]];
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const [base, exp] = pickRandom(powBases);
+            const x = randInt(2, 6);
+            const opAfter = pickRandom(['+', '-']);
+            const tokens = [exp, base, 'SWAP', '^', 'u-', x, opAfter, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [3, 2, 'SWAP', '^', 'u-', 5, '+', 'END'];
+    }
+
+    function buildWave10() {
+        const roll = Math.random();
+        if (roll < 0.3) {
+            const useZero = Math.random() < 0.5;
+            if (useZero) {
+                const x = randInt(5, 25);
+                const k = randInt(2, 9);
+                const tokens = [x, k, k, 'u-', '+', '//', randInt(2, 7), '+', 'END'];
+                const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+                if (!sim.valid && sim.hazard === 'DIV_BY_ZERO') return tokens;
+            } else {
+                const a = randInt(3, 12);
+                const b = randInt(2, 8);
+                const tokens = [a, b, '*', 'u-', '-', randInt(1, 5), '+', 'END'];
+                const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+                if (!sim.valid && sim.hazard === 'STACK_UNDERFLOW') return tokens;
+            }
+        }
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const a = randInt(2, 5);
+            const b = randInt(2, 3);
+            const k = randInt(10, 28);
+            const op = pickRandom(['+', '-']);
+            const tokens = [k, a, b, '^', 'SWAP', 'u-', op, 'END'];
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            if (sim.valid) return tokens;
+        }
+        return [18, 2, 3, '^', 'SWAP', 'u-', '+', 'END'];
+    }
+
+    function generateAll10Waves() {
+        const specs = [
+            { wave: 1, duration: 35.0, isBreather: false, title: 'Конвейер I: базовая RPN (+, -, *)', profileBadge: 'БАЗОВАЯ RPN', builder: buildWave1 },
+            { wave: 2, duration: 31.0, isBreather: false, title: 'Конвейер II: некоммутативные (-, //, %)', profileBadge: 'A op B', builder: buildWave2 },
+            { wave: 3, duration: 28.0, isBreather: false, title: 'Аномалия I: поиск STACK UNDERFLOW', profileBadge: 'ОПАСНОСТЬ', builder: buildWave3 },
+            { wave: 4, duration: 25.0, isBreather: false, title: 'Модификация: команда SWAP (A ↔ B)', profileBadge: 'SWAP + RPN', builder: buildWave4 },
+            { wave: 5, duration: 23.0, isBreather: false, title: 'Инверсия: унарный минус u- и Shift', profileBadge: 'УНАРНЫЙ u-', builder: buildWave5 },
+            { wave: 6, duration: 21.0, isBreather: false, title: 'Аномалия II: перехват деления на 0', profileBadge: 'ОПАСНОСТЬ', builder: buildWave6 },
+            { wave: 7, duration: 24.0, isBreather: true,  title: 'Передышка: возведение в степень ^', profileBadge: 'ПЕРЕДЫШКА', builder: buildWave7 },
+            { wave: 8, duration: 22.0, isBreather: true,  title: 'Контроль стакана: Overflow / Leftover', profileBadge: 'СТРУКТУРА', builder: buildWave8 },
+            { wave: 9, duration: 18.0, isBreather: false, title: 'Форсаж: SWAP + ^ + u- в одном потоке', profileBadge: 'ХАРД-ЦЕПЬ', builder: buildWave9 },
+            { wave: 10, duration: 16.0, isBreather: false, title: 'Финальный босс: гибридный поток 7+1', profileBadge: 'БОСС ВОЛНА 10', builder: buildWave10 }
+        ];
+
+        return specs.map((s) => {
+            const tokens = s.builder();
+            const sim = simulateWave(tokens, MAX_STACK_DEPTH);
+            return {
+                wave: s.wave,
+                duration: s.duration,
+                isBreather: s.isBreather,
+                title: s.title,
+                profileBadge: s.profileBadge,
+                tokens: tokens,
+                expectedValid: sim.valid,
+                expectedHazard: sim.hazard
+            };
+        });
+    }
+
+    // =========================================================================
+    // VUE 3 ПРИЛОЖЕНИЕ
+    // =========================================================================
+    const app = createApp({
+        data() {
+            return {
+                gameState: 'intro', // 'intro', 'playing', 'victory'
+                totalWaves: 10,
+                currentWave: 1,
+                wavesList: [],
+                attempts: 0,
+                sessionTime: 0,
+                startTimeMs: 0,
+                timeLeft: 35.0,
+                currentWaveDuration: 35.0,
+
+                headIdx: 0,
+                stack: [],
+                stationIdx: 0, // 0: PUSH, 1: EVAL, 2: SWAP, 3: DEFUSE
+                accAbs: 0,
+                accSign: 1,
+                accFresh: true,
+
+                alarmActive: false,
+                alarmReason: '',
+                isWaveTransition: false,
+                waveClearMsg: '',
+                lastStatusMsg: 'Ожидание команды с клавиатуры...',
+                flashSlotIndex: -1,
+                shakeTransform: 'translate3d(0px, 0px, 0)',
+
+                stations: [
+                    { id: 'PUSH', label: 'PUSH', hint: 'Число в стек' },
+                    { id: 'EVAL', label: 'EVAL', hint: 'Схлопнуть с ACC' },
+                    { id: 'SWAP', label: 'SWAP', hint: 'Обмен A ↔ B' },
+                    { id: 'DEFUSE', label: 'DEFUSE', hint: 'Перехват аварии' }
+                ],
+
+                waveTimerId: null,
+                sessionTimerId: null,
+                resetTimeoutId: null,
+                flashTimerId: null,
+                shakeTimerIds: [],
+                telemetry: null
+            };
+        },
+        computed: {
+            currentWaveData() {
+                return this.wavesList[this.currentWave - 1] || null;
+            },
+            accValue() {
+                return this.accAbs === 0 ? 0 : this.accSign * this.accAbs;
+            },
+            formattedAcc() {
+                const signChar = this.accSign < 0 ? '-' : '+';
+                return signChar + String(this.accAbs).padStart(2, '0');
+            },
+            expectedStep() {
+                if (!this.currentWaveData) return null;
+                return inspectStep(this.currentWaveData.tokens, this.headIdx, this.stack, MAX_STACK_DEPTH);
+            },
+            aluPreviewFormula() {
+                const data = this.currentWaveData;
+                if (!data || this.headIdx >= data.tokens.length) return 'ОЖИДАНИЕ';
+                const tok = data.tokens[this.headIdx];
+                if (tok === 'END') {
+                    return 'END (в стеке: ' + this.stack.length + ')';
+                }
+                if (typeof tok === 'number') {
+                    return 'PUSH [ ' + tok + ' ] → СТЕК';
+                }
+                if (tok === 'SWAP') {
+                    if (this.stack.length < 2) return 'SWAP [ ОШИБКА: СТЕК < 2 ]';
+                    const a = this.stack[this.stack.length - 2];
+                    const b = this.stack[this.stack.length - 1];
+                    return 'SWAP: ' + a + ' ↔ ' + b;
+                }
+                if (tok === 'u-') {
+                    if (this.stack.length < 1) return 'u- [ ОШИБКА: ПУСТОЙ СТЕК ]';
+                    const topVal = this.stack[this.stack.length - 1];
+                    return 'u- ( ' + topVal + ' ) → ACC';
+                }
+                if (this.stack.length < 2) {
+                    return '[ ? ] ' + tok + ' [ ? ] (UNDERFLOW!)';
+                }
+                const a = this.stack[this.stack.length - 2];
+                const b = this.stack[this.stack.length - 1];
+                return '( ' + a + ' ) ' + tok + ' ( ' + b + ' ) → ACC';
+            },
+            timerBarClass() {
+                if (!this.currentWaveDuration) return 'bg-success';
+                const ratio = this.timeLeft / this.currentWaveDuration;
+                if (ratio > 0.5) return 'bg-success';
+                if (ratio > 0.25) return 'bg-warning';
+                return 'bg-danger';
+            }
+        },
+        mounted() {
+            const self = this;
+            this.telemetry = window.LMSTelemetry.create({
+                missionName: 'Урок 36 :: Вычисление арифметического выражения, записанного в постфиксной форме (Уровень 3)',
+                level: 3,
+                totalWaves: this.totalWaves,
+                showAfkOverlay: true,
+                onAfkStop: () => {
+                    self.stopAllTimers();
+                    self.alarmActive = false;
+                },
+                onAfkRetry: () => {
+                    self.alarmActive = false;
+                    self.isWaveTransition = false;
+                    self.wavesList = generateAll10Waves();
+                    self.currentWave = 1;
+                    self.telemetry.setWave(1, self.totalWaves);
+                    self.initWave(1);
+                }
+            });
+
+            window.addEventListener('keydown', this.handleKeydown);
+
+            window.__DEV_LEVEL3_STATE__ = {
+                get waves() { return self.wavesList; },
+                get currentWaveIndex() { return self.currentWave - 1; },
+                get currentWave() { return self.currentWave; },
+                get currentWaveData() { return self.currentWaveData; },
+                get stack() { return self.stack; },
+                get headIdx() { return self.headIdx; },
+                get expectedStep() { return self.expectedStep; },
+                solveCurrentWave: () => self.devSolveCurrentWave(),
+                submitAction: (action, payload) => self.devSubmitAction(action, payload)
+            };
+        },
+        beforeUnmount() {
+            window.removeEventListener('keydown', this.handleKeydown);
+            this.stopAllTimers();
+            if (this.telemetry) {
+                this.telemetry.destroy();
+            }
+        },
+        methods: {
+            formatTime(sec) {
+                const m = String(Math.floor(sec / 60)).padStart(2, '0');
+                const s = String(sec % 60).padStart(2, '0');
+                return m + ':' + s;
+            },
+
+            formatTokenLabel(tok) {
+                if (tok === 'END') return 'END';
+                return String(tok);
+            },
+
+            getTokenClass(tok, idx) {
+                if (idx === this.headIdx) {
+                    return 'bg-black border-warning text-warning';
+                }
+                if (idx < this.headIdx) {
+                    return 'bg-black border-success text-success opacity-75';
+                }
+                if (tok === 'END') {
+                    return 'bg-dark border-danger text-danger';
+                }
+                if (typeof tok === 'number') {
+                    return 'bg-black border-info text-info';
+                }
+                return 'bg-black border-secondary text-light';
+            },
+
+            getSlotClass(slotIdx) {
+                if (slotIdx < this.stack.length) {
+                    if (slotIdx === this.stack.length - 1) {
+                        return 'bg-dark border-warning text-light';
+                    }
+                    if (slotIdx >= 4) {
+                        return 'bg-dark border-danger text-light';
+                    }
+                    return 'bg-dark border-info text-light';
+                }
+                if (slotIdx >= 4) {
+                    return 'bg-black border-danger opacity-50';
+                }
+                return 'bg-black border-secondary';
+            },
+
+            getStationClass(sIdx) {
+                const active = this.stationIdx === sIdx;
+                if (active) {
+                    return 'bg-dark border-info text-info';
+                }
+                return 'bg-black border-secondary text-secondary';
+            },
+
+            triggerSlotFlash(slotIndex) {
+                if (this.flashTimerId) clearTimeout(this.flashTimerId);
+                this.flashSlotIndex = slotIndex;
+                this.flashTimerId = setTimeout(() => {
+                    this.flashSlotIndex = -1;
+                }, 200);
+            },
+
+            triggerScreenShake() {
+                this.shakeTimerIds.forEach((id) => clearTimeout(id));
+                this.shakeTimerIds = [];
+                const offsets = [
+                    'translate3d(-7px, 3px, 0)',
+                    'translate3d(7px, -4px, 0)',
+                    'translate3d(-5px, -2px, 0)',
+                    'translate3d(0px, 0px, 0)'
+                ];
+                offsets.forEach((t, i) => {
+                    const tid = setTimeout(() => {
+                        this.shakeTransform = t;
+                    }, i * 60);
+                    this.shakeTimerIds.push(tid);
+                });
+            },
+
+            resetAcc() {
+                this.accAbs = 0;
+                this.accSign = 1;
+                this.accFresh = true;
+            },
+
+            setAccDirect(val) {
+                const clamped = Math.max(MIN_ACC, Math.min(MAX_ACC, val));
+                this.accSign = clamped < 0 ? -1 : 1;
+                this.accAbs = Math.abs(clamped);
+                this.accFresh = false;
+            },
+
+            stopAllTimers() {
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                if (this.sessionTimerId) { clearInterval(this.sessionTimerId); this.sessionTimerId = null; }
+                if (this.resetTimeoutId) { clearTimeout(this.resetTimeoutId); this.resetTimeoutId = null; }
+                if (this.flashTimerId) { clearTimeout(this.flashTimerId); this.flashTimerId = null; }
+                this.shakeTimerIds.forEach((id) => clearTimeout(id));
+                this.shakeTimerIds = [];
+            },
+
+            startGame() {
+                getAudioCtx();
+                playWaveClearSound();
+                this.attempts = 0;
+                this.wavesList = generateAll10Waves();
+                this.currentWave = 1;
+                this.gameState = 'playing';
+                this.startTimeMs = Date.now();
+                this.sessionTime = 0;
+
+                if (this.telemetry) {
+                    this.telemetry.start();
+                    this.telemetry.setWave(1, this.totalWaves);
+                }
+
+                if (this.sessionTimerId) clearInterval(this.sessionTimerId);
+                this.sessionTimerId = setInterval(() => {
+                    if (this.gameState === 'playing' && (!this.telemetry || !this.telemetry.getState().isAfkPaused)) {
+                        this.sessionTime = Math.floor((Date.now() - this.startTimeMs) / 1000);
+                    }
+                }, 500);
+
+                this.initWave(1);
+            },
+
+            initWave(waveNum) {
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                this.currentWave = waveNum;
+                const data = this.currentWaveData;
+                this.headIdx = 0;
+                this.stack = [];
+                this.stationIdx = 0;
+                this.resetAcc();
+                this.alarmActive = false;
+                this.alarmReason = '';
+                this.isWaveTransition = false;
+                this.waveClearMsg = '';
+                this.lastStatusMsg = 'Волна ' + waveNum + ': готов к обработке ленты.';
+
+                this.currentWaveDuration = data ? data.duration : 30.0;
+                this.timeLeft = this.currentWaveDuration;
+
+                this.waveTimerId = setInterval(() => {
+                    if (this.gameState !== 'playing' || this.alarmActive || this.isWaveTransition) return;
+                    if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+                    this.timeLeft = Math.max(0, Number((this.timeLeft - 0.1).toFixed(1)));
+                    if (this.timeLeft <= 0) {
+                        this.triggerHardcoreReset('Тайм-аут волны ' + this.currentWave + ' — конвейер перегрелся!', true);
+                    }
+                }, 100);
+            },
+
+            executeStation(stIdx, instantMode) {
+                if (this.gameState !== 'playing' || this.alarmActive || this.isWaveTransition) return;
+                const data = this.currentWaveData;
+                if (!data) return;
+
+                if (this.telemetry) this.telemetry.markActivity();
+
+                const stationId = this.stations[stIdx].id;
+                const expected = this.expectedStep;
+                if (!expected) return;
+
+                // Если в данном состоянии ожидается перехват аварии (DEFUSE)
+                if (expected.action === 'DEFUSE') {
+                    if (stationId !== 'DEFUSE') {
+                        this.triggerHardcoreReset('Пропущена авария (' + expected.hazard + '): требовался DEFUSE вместо ' + stationId + '!', false);
+                        return;
+                    }
+                    playDefuseSound();
+                    this.lastStatusMsg = 'Перехвачена авария: ' + expected.reason;
+                    this.completeCurrentWave(Boolean(instantMode));
+                    return;
+                }
+
+                // Аварии на ленте нет — нажатие DEFUSE ошибочно
+                if (stationId === 'DEFUSE') {
+                    this.triggerHardcoreReset('Ложная тревога DEFUSE: поток на текущем шаге корректен!', false);
+                    return;
+                }
+
+                if (stationId !== expected.action) {
+                    this.triggerHardcoreReset('Неверная станция: для текущего токена требуется ' + expected.action + ', а выбрана ' + stationId + '.', false);
+                    return;
+                }
+
+                if (stationId === 'PUSH') {
+                    this.stack.push(expected.value);
+                    this.headIdx++;
+                    playPushSound();
+                    this.triggerSlotFlash(this.stack.length - 1);
+                    this.lastStatusMsg = 'PUSH ' + expected.value + ' выполнен.';
+                    this.autoFocusStationForNextToken();
+                    this.checkPostStepCompletion(Boolean(instantMode));
+                    return;
+                }
+
+                if (stationId === 'SWAP') {
+                    const len = this.stack.length;
+                    const tmp = this.stack[len - 1];
+                    this.stack[len - 1] = this.stack[len - 2];
+                    this.stack[len - 2] = tmp;
+                    this.headIdx++;
+                    playSwapSound();
+                    this.triggerSlotFlash(len - 1);
+                    this.lastStatusMsg = 'SWAP: два верхних слота обменялись значениями.';
+                    this.autoFocusStationForNextToken();
+                    this.checkPostStepCompletion(Boolean(instantMode));
+                    return;
+                }
+
+                if (stationId === 'EVAL') {
+                    const userAcc = this.accValue;
+                    if (userAcc !== expected.expectedAcc) {
+                        this.triggerHardcoreReset('Неверное вычисление ACC: получено ' + userAcc + ', ожидалось ' + expected.expectedAcc + '.', false);
+                        return;
+                    }
+                    if (expected.op === 'u-') {
+                        this.stack.pop();
+                    } else {
+                        this.stack.pop();
+                        this.stack.pop();
+                    }
+                    this.stack.push(expected.expectedAcc);
+                    this.headIdx++;
+                    this.resetAcc();
+                    playEvalSound();
+                    this.triggerSlotFlash(this.stack.length - 1);
+                    this.lastStatusMsg = 'EVAL выполнен → в стек записано ' + expected.expectedAcc + '.';
+                    this.autoFocusStationForNextToken();
+                    this.checkPostStepCompletion(Boolean(instantMode));
+                }
+            },
+
+            autoFocusStationForNextToken() {
+                this.resetAcc();
+            },
+
+            checkPostStepCompletion(instantMode) {
+                const nextExpected = this.expectedStep;
+                if (nextExpected && nextExpected.action === 'DONE') {
+                    this.completeCurrentWave(instantMode);
+                }
+            },
+
+            completeCurrentWave(instantMode) {
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                playWaveClearSound();
+
+                if (this.currentWave >= this.totalWaves) {
+                    this.finishLevel();
+                    return;
+                }
+
+                const nextWave = this.currentWave + 1;
+                if (this.telemetry) {
+                    this.telemetry.advanceWave(nextWave);
+                }
+
+                if (instantMode) {
+                    this.initWave(nextWave);
+                    return;
+                }
+
+                this.isWaveTransition = true;
+                this.waveClearMsg = 'Волна ' + this.currentWave + ' стабилизирована! Переход к волне ' + nextWave + '...';
+                setTimeout(() => {
+                    if (this.gameState === 'playing' && !this.alarmActive) {
+                        this.initWave(nextWave);
+                    }
+                }, 260);
+            },
+
+            triggerHardcoreReset(reason, isTimeout) {
+                if (this.waveTimerId) { clearInterval(this.waveTimerId); this.waveTimerId = null; }
+                if (this.resetTimeoutId) { clearTimeout(this.resetTimeoutId); this.resetTimeoutId = null; }
+
+                this.attempts++;
+                this.alarmReason = reason;
+                this.alarmActive = true;
+                this.isWaveTransition = false;
+                playAlarmSiren();
+                this.triggerScreenShake();
+
+                if (this.telemetry) {
+                    this.telemetry.fail({ wave: this.currentWave, isTimeout: Boolean(isTimeout) });
+                    if (this.telemetry.getState().isAfkPaused) {
+                        return;
+                    }
+                }
+
+                this.resetTimeoutId = setTimeout(() => {
+                    this.alarmActive = false;
+                    this.wavesList = generateAll10Waves();
+                    if (this.telemetry) {
+                        this.telemetry.setWave(1, this.totalWaves);
+                    }
+                    this.initWave(1);
+                }, 1400);
+            },
+
+            finishLevel() {
+                this.stopAllTimers();
+                this.gameState = 'victory';
+                playVictoryFanfare();
+                this.sessionTime = this.telemetry
+                    ? Math.max(1, this.telemetry.getTimeSpentSec())
+                    : Math.max(1, Math.round((Date.now() - this.startTimeMs) / 1000));
+                if (this.telemetry) {
+                    this.telemetry.complete({ wave: this.totalWaves });
+                }
+            },
+
+            handleKeydown(e) {
+                if (this.gameState === 'intro') {
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        this.startGame();
+                    }
+                    return;
+                }
+
+                if (this.gameState !== 'playing' || this.alarmActive || this.isWaveTransition) return;
+                if (this.telemetry && this.telemetry.getState().isAfkPaused) return;
+
+                if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
+                    e.preventDefault();
+                    if (this.telemetry) this.telemetry.markActivity();
+                    this.stationIdx = (this.stationIdx + 3) % 4;
+                    playMoveSound();
+                    return;
+                }
+
+                if (e.code === 'KeyD' || e.code === 'ArrowRight') {
+                    e.preventDefault();
+                    if (this.telemetry) this.telemetry.markActivity();
+                    this.stationIdx = (this.stationIdx + 1) % 4;
+                    playMoveSound();
+                    return;
+                }
+
+                if (e.code === 'KeyW' || e.code === 'ArrowUp') {
+                    e.preventDefault();
+                    if (this.telemetry) this.telemetry.markActivity();
+                    this.setAccDirect(this.accValue + 1);
+                    this.stationIdx = 1;
+                    playDigitSound();
+                    return;
+                }
+
+                if (e.code === 'KeyS' || e.code === 'ArrowDown') {
+                    e.preventDefault();
+                    if (this.telemetry) this.telemetry.markActivity();
+                    this.setAccDirect(this.accValue - 1);
+                    this.stationIdx = 1;
+                    playDigitSound();
+                    return;
+                }
+
+                if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                    e.preventDefault();
+                    if (this.telemetry) this.telemetry.markActivity();
+                    this.accSign = this.accSign * -1;
+                    this.stationIdx = 1;
+                    playDigitSound();
+                    return;
+                }
+
+                const digitMatch = e.code && (e.code.match(/^Digit([0-9])$/) || e.code.match(/^Numpad([0-9])$/));
+                if (digitMatch) {
+                    e.preventDefault();
+                    if (this.telemetry) this.telemetry.markActivity();
+                    const d = Number(digitMatch[1]);
+                    if (this.accFresh) {
+                        this.accAbs = d;
+                        this.accFresh = false;
+                    } else {
+                        this.accAbs = (this.accAbs % 10) * 10 + d;
+                    }
+                    this.stationIdx = 1;
+                    playDigitSound();
+                    return;
+                }
+
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    this.executeStation(this.stationIdx, false);
+                }
+            },
+
+            devSolveCurrentWave() {
+                if (this.gameState !== 'playing' || this.alarmActive || this.isWaveTransition) return false;
+                const targetWave = this.currentWave;
+                let guard = 0;
+                while (this.gameState === 'playing' && this.currentWave === targetWave && !this.alarmActive && guard < 25) {
+                    guard++;
+                    const exp = this.expectedStep;
+                    if (!exp || exp.action === 'DONE') break;
+                    if (exp.action === 'PUSH') {
+                        this.stationIdx = 0;
+                        this.executeStation(0, true);
+                    } else if (exp.action === 'EVAL') {
+                        this.stationIdx = 1;
+                        this.setAccDirect(exp.expectedAcc);
+                        this.executeStation(1, true);
+                    } else if (exp.action === 'SWAP') {
+                        this.stationIdx = 2;
+                        this.executeStation(2, true);
+                    } else if (exp.action === 'DEFUSE') {
+                        this.stationIdx = 3;
+                        this.executeStation(3, true);
+                    }
+                }
+                return true;
+            },
+
+            devSubmitAction(action, payload) {
+                if (action === 'solve') {
+                    return this.devSolveCurrentWave();
+                }
+                if (action === 'push') {
+                    this.stationIdx = 0;
+                    this.executeStation(0, Boolean(payload && payload.instant));
+                    return true;
+                }
+                if (action === 'eval') {
+                    this.stationIdx = 1;
+                    if (payload && typeof payload.acc === 'number') {
+                        this.setAccDirect(payload.acc);
+                    }
+                    this.executeStation(1, Boolean(payload && payload.instant));
+                    return true;
+                }
+                if (action === 'swap') {
+                    this.stationIdx = 2;
+                    this.executeStation(2, Boolean(payload && payload.instant));
+                    return true;
+                }
+                if (action === 'defuse') {
+                    this.stationIdx = 3;
+                    this.executeStation(3, Boolean(payload && payload.instant));
+                    return true;
+                }
+                if (action === 'fail') {
+                    this.triggerHardcoreReset((payload && payload.reason) || 'Тестовый принудительный сбой', false);
+                    return true;
+                }
+                if (action === 'timeout') {
+                    this.triggerHardcoreReset('Тайм-аут волны (тест)', true);
+                    return true;
+                }
+                return false;
+            }
+        }
+    });
+
+    app.mount('#vue-app');
+})();
+</script>
