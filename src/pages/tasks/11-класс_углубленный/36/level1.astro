@@ -1,0 +1,1286 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1} title="Урок 36 :: Вычисление арифметического выражения, записанного в постфиксной форме (Уровень 1)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-success mb-0 fw-bold">Тренажер: Постфиксная запись и стековый вычислитель (Уровень 1)</h1>
+                <div class="text-secondary small">Урок 36 // 11 класс (углубленный уровень, технологический профиль)</div>
+            </div>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">
+                Прямое манипулирование // Zero Multiple Choice
+            </span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0 shadow">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Индикатор прогресса, счетчик ошибок и таймер -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Классификация нотаций и диагностика стека ОПЗ</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning fw-bold">0</span> |
+                        Время: <span id="timer-display" class="text-info fw-bold">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Блок оповещений об ошибках -->
+                <div id="feedback-box" class="alert alert-danger bg-black border border-danger text-danger rounded-0 d-none mb-3 py-2 px-3 small">
+                    <span class="fw-bold">⚠️ СБОЙ СИСТЕМЫ:</span> <span id="feedback-text"></span>
+                </div>
+
+                <!-- Блок успешного шага -->
+                <div id="success-box" class="alert alert-success bg-black border border-success text-success rounded-0 d-none mb-3 py-2 px-3 small">
+                    <span class="fw-bold">✓ УСПЕХ:</span> <span id="success-text"></span>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 1: Сортировка выражений и диагностика стека ОПЗ по шлюзам   -->
+                <!-- ================================================================= -->
+                <div id="phase1" class="phase-view">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (Фаза 1 из 3):</span>
+                        Распределите перетаскиванием мыши (или кликом: карточка → шлюз) все поступившие выражения по трем функциональным шлюзам:
+                        <ul class="mb-0 mt-1 ps-3 text-secondary">
+                            <li><strong class="text-info">Префиксная (Польская)</strong> — оператор строго <em>перед</em> своими операндами, без скобок.</li>
+                            <li><strong class="text-success">Постфиксная (ОПЗ / RPN)</strong> — оператор следует строго <em>после</em> своих операндов, стек сходится к 1 числу.</li>
+                            <li><strong class="text-danger">Инфиксная / Ошибка ОПЗ</strong> — наличие скобок, оператор между операндами, дефицит (Underflow) или избыток операндов.</li>
+                        </ul>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ВХОДНОЙ БУФЕР ВЫРАЖЕНИЙ (перетащите или кликните карточку, затем шлюз):</span>
+                            <span id="p1-queue-count" class="badge bg-secondary rounded-0">0</span>
+                        </div>
+                        <div id="p1-token-palette" class="card-body p-2 d-flex flex-wrap gap-2 align-items-center" style="min-height: 76px;">
+                        </div>
+                    </div>
+
+                    <!-- 3 функциональных контейнера-шлюза (col-12 col-sm-4 по ui-styling.md) -->
+                    <div id="p1-buckets-row" class="row g-2 mb-3">
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border border-info rounded-0 h-100 p1-bucket-drop" data-bucket="0" id="p1-bucket-card-0" style="cursor: pointer;">
+                                <div class="card-header bg-dark text-info py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" style="min-height: 48px;">
+                                    <span>📐 Префиксная</span>
+                                    <span id="p1-count-0" class="badge bg-info text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-0" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 150px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border border-success rounded-0 h-100 p1-bucket-drop" data-bucket="1" id="p1-bucket-card-1" style="cursor: pointer;">
+                                <div class="card-header bg-dark text-success py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" style="min-height: 48px;">
+                                    <span>🔄 Постфиксная (ОПЗ)</span>
+                                    <span id="p1-count-1" class="badge bg-success text-dark rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-1" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 150px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border border-danger rounded-0 h-100 p1-bucket-drop" data-bucket="2" id="p1-bucket-card-2" style="cursor: pointer;">
+                                <div class="card-header bg-dark text-danger py-2 px-2 d-flex justify-content-between align-items-center small fw-bold" style="min-height: 48px;">
+                                    <span>⚠️ Инфикс / Сбой ОПЗ</span>
+                                    <span id="p1-count-2" class="badge bg-danger text-white rounded-0">0</span>
+                                </div>
+                                <div id="p1-bucket-2" class="card-body p-2 d-flex flex-column gap-2" style="min-height: 150px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <button type="button" id="p1-reset-btn" class="btn btn-outline-secondary rounded-0 px-3" style="min-height: 48px;">
+                            ↺ Вернуть все в буфер
+                        </button>
+                        <button type="button" id="p1-check-btn" class="btn btn-success rounded-0 fw-bold px-4" style="min-height: 48px;">
+                            ✓ Проверить распределение
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 2: Прямое управление стековым вычислителем ОПЗ             -->
+                <!-- ================================================================= -->
+                <div id="phase2" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (Фаза 2 из 3):</span>
+                        Выполните пошаговое вычисление постфиксного выражения, управляя лентой и стеком вручную:
+                        <ul class="mb-0 mt-1 ps-3 text-secondary">
+                            <li>Когда активный токен ленты — <strong class="text-info">число</strong>: кликните по нему (или перетащите в стек), чтобы выполнить <code class="text-success">PUSH</code>.</li>
+                            <li>Когда активный токен — <strong class="text-warning">бинарный оператор</strong>: сначала снимите вершину стека (<code class="text-warning">POP</code>) в правый регистр <strong class="text-warning">B</strong>, затем новую вершину — в левый регистр <strong class="text-info">A</strong>, и кликните по узлу АЛУ для вычисления <code class="text-light">A op B → PUSH</code>!</li>
+                        </ul>
+                    </div>
+
+                    <!-- Входная лента токенов -->
+                    <div class="card bg-black border border-info rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ВХОДНАЯ ЛЕНТА ТОКЕНОВ ОПЗ (активный токен подсвечен):</span>
+                            <span id="p2-progress-label" class="badge bg-info text-dark rounded-0">Токен 1 / 7</span>
+                        </div>
+                        <div id="p2-tape" class="card-body p-2 p-md-3 d-flex flex-wrap gap-2 justify-content-center align-items-center">
+                        </div>
+                    </div>
+
+                    <!-- Рабочая зона: Стек значений + Блок АЛУ -->
+                    <div class="row g-3 mb-3">
+                        <!-- Стек -->
+                        <div class="col-12 col-sm-5">
+                            <div class="card bg-black border border-success rounded-0 h-100">
+                                <div class="card-header bg-dark text-success py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                                    <span>СТЕК ОПЕРАНДОВ (LIFO)</span>
+                                    <span id="p2-stack-size" class="badge bg-success text-dark rounded-0">size: 0</span>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                    <div id="p2-stack-dropzone" class="border border-secondary border-dashed p-2 d-flex flex-column-reverse gap-2 align-items-stretch justify-content-start" style="min-height: 210px;">
+                                    </div>
+                                    <div class="text-center text-secondary small mt-2 border-top border-secondary pt-1">
+                                        ▲ Клик / D&amp;D верхнего элемента стека = <code class="text-warning">POP()</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- АЛУ и регистры операндов -->
+                        <div class="col-12 col-sm-7">
+                            <div class="card bg-black border border-warning rounded-0 h-100">
+                                <div class="card-header bg-dark text-warning py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                                    <span>АЛУ // ПОРЯДОК ИЗВЛЕЧЕНИЯ ОПЕРАНДОВ</span>
+                                    <span id="p2-alu-op-badge" class="badge bg-secondary rounded-0">Ожидание числа</span>
+                                </div>
+                                <div class="card-body p-3 d-flex flex-column justify-content-between gap-3">
+                                    <div id="p2-alu-hint" class="small text-secondary border border-secondary p-2 bg-dark">
+                                        Текущий токен — число. Кликните по подсвеченному числу на ленте или перетащите его в стек.
+                                    </div>
+
+                                    <!-- Регистры A (левый) и B (правый) -->
+                                    <div class="d-flex align-items-stretch justify-content-center gap-2">
+                                        <div id="p2-reg-a" data-reg="A" class="flex-fill border border-info bg-dark p-2 text-center d-flex flex-column justify-content-center align-items-center p2-reg-drop" style="min-height: 82px; min-width: 0; cursor: pointer;">
+                                            <div class="text-info small fw-bold">ЛЕВЫЙ (A)</div>
+                                            <div class="text-secondary" style="font-size: 0.7rem;">2-й POP()</div>
+                                            <div id="p2-reg-a-val" class="fs-4 fw-bold text-light mt-1">—</div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center justify-content-center px-1">
+                                            <span id="p2-alu-symbol" class="badge bg-dark border border-warning text-warning fs-4 rounded-0 px-3 py-2">?</span>
+                                        </div>
+
+                                        <div id="p2-reg-b" data-reg="B" class="flex-fill border border-warning bg-dark p-2 text-center d-flex flex-column justify-content-center align-items-center p2-reg-drop" style="min-height: 82px; min-width: 0; cursor: pointer;">
+                                            <div class="text-warning small fw-bold">ПРАВЫЙ (B)</div>
+                                            <div class="text-secondary" style="font-size: 0.7rem;">1-й POP()</div>
+                                            <div id="p2-reg-b-val" class="fs-4 fw-bold text-light mt-1">—</div>
+                                        </div>
+                                    </div>
+
+                                    <button type="button" id="p2-exec-btn" class="btn btn-warning text-dark rounded-0 fw-bold w-100" style="min-height: 48px;" disabled>
+                                        ⚡ Выполнить операцию (A op B) → PUSH
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-black border border-secondary rounded-0">
+                        <div class="card-header bg-dark text-secondary py-1 px-3 small fw-bold">
+                            ЖУРНАЛ ТРАССИРОВКИ ВЫЧИСЛИТЕЛЯ
+                        </div>
+                        <div id="p2-log" class="card-body p-2 small text-secondary" style="max-height: 96px; overflow-y: auto;">
+                            Инициализация стековой машины...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФАЗА 3: Конструирование ОПЗ (Slot & Snap) с дистракторами         -->
+                <!-- ================================================================= -->
+                <div id="phase3" class="phase-view d-none">
+                    <div class="alert alert-dark bg-black border border-secondary rounded-0 small text-light mb-3">
+                        <span class="text-success fw-bold">ДИДАКТИЧЕСКАЯ ЗАДАЧА (Фаза 3 из 3):</span>
+                        Примените алгоритм сортировочной станции Дейкстры и соберите в слотах точную постфиксную запись (ОПЗ) для заданного инфиксного выражения. В палитре присутствуют лишние токены-ловушки (включая скобки и неверные операторы)!
+                    </div>
+
+                    <!-- Исходное инфиксное выражение -->
+                    <div class="card bg-black border border-info rounded-0 mb-3">
+                        <div class="card-header bg-dark text-info py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ИСХОДНОЕ ИНФИКСНОЕ ВЫРАЖЕНИЕ:</span>
+                            <span id="p3-rule-tag" class="badge bg-info text-dark rounded-0">Приоритет + Скобки</span>
+                        </div>
+                        <div class="card-body p-3 text-center">
+                            <div id="p3-infix-display" class="fs-4 fw-bold text-light"></div>
+                            <div id="p3-note-display" class="small text-secondary mt-1"></div>
+                        </div>
+                    </div>
+
+                    <!-- Целевые слоты выходной ленты ОПЗ -->
+                    <div class="card bg-black border border-success rounded-0 mb-3">
+                        <div class="card-header bg-dark text-success py-2 px-3 small fw-bold d-flex justify-content-between align-items-center">
+                            <span>ВЫХОДНАЯ ЛЕНТА ОПЗ (перетащите токены в слоты слева направо):</span>
+                            <span id="p3-slot-progress" class="badge bg-success text-dark rounded-0">0 / 0</span>
+                        </div>
+                        <div id="p3-slots" class="card-body p-2 p-md-3 d-flex flex-wrap gap-2 justify-content-center align-items-center">
+                        </div>
+                    </div>
+
+                    <!-- Палитра токенов с дистракторами -->
+                    <div class="card bg-black border border-warning rounded-0 mb-3">
+                        <div class="card-header bg-dark text-warning py-2 px-3 small fw-bold">
+                            ПАЛИТРА ТОКЕНОВ (содержит 3–4 ловушки — выберите только нужные; клик по слоту снимает токен):
+                        </div>
+                        <div id="p3-palette" class="card-body p-2 p-md-3 d-flex flex-wrap gap-2 justify-content-center align-items-center" style="min-height: 76px;">
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <button type="button" id="p3-reset-btn" class="btn btn-outline-secondary rounded-0 px-3" style="min-height: 48px;">
+                            ↺ Очистить ленту ОПЗ
+                        </button>
+                        <button type="button" id="p3-check-btn" class="btn btn-success rounded-0 fw-bold px-4" style="min-height: 48px;">
+                            ✓ Запустить постфиксный конвейер
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================================= -->
+                <!-- ФИНАЛЬНЫЙ ЭКРАН УРОВНЯ 1                                          -->
+                <!-- ================================================================= -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="display-6 text-success fw-bold mb-2">УРОВЕНЬ 1 ПРОЙДЕН!</div>
+                    <p class="text-light mb-3">
+                        Вы успешно освоили распознавание нотаций, физический порядок снятия операндов со стека при вычислении ОПЗ и перевод инфиксных формул методом сортировочной станции.
+                    </p>
+                    <div class="d-inline-flex flex-wrap justify-content-center gap-3 border border-success bg-black px-4 py-3 mb-3">
+                        <div>
+                            <div class="text-secondary small">Ошибок допущено</div>
+                            <div id="final-attempts" class="fs-4 text-warning fw-bold">0</div>
+                        </div>
+                        <div class="border-start border-secondary ps-3">
+                            <div class="text-secondary small">Затраченное время</div>
+                            <div id="final-time" class="fs-4 text-info fw-bold">00:00</div>
+                        </div>
+                    </div>
+                    <div class="text-success small">
+                        Переходите ко 2-му уровню сложности во вкладках сверху для аналитической трассировки выражений.
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</TaskLayout>
+
+<script is:inline>
+(function() {
+    'use strict';
+
+    const missionName = 'Урок 36 :: Вычисление арифметического выражения, записанного в постфиксной форме (Уровень 1)';
+    const telemetry = window.LMSTelemetry.create({
+        missionName: missionName,
+        level: 1,
+        totalStages: 3
+    });
+
+    let currentPhase = 1;
+    let isLocked = false;
+    let timerInterval = null;
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+        const copy = arr.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = copy[i];
+            copy[i] = copy[j];
+            copy[j] = tmp;
+        }
+        return copy;
+    }
+
+    function sampleDistinct(pool, count) {
+        return shuffleArray(pool).slice(0, count);
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function updateAttemptsDisplay() {
+        const el = document.getElementById('attempts-display');
+        if (el) el.textContent = String(telemetry.getState().attemptsCount || 0);
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerDisplay = document.getElementById('timer-display');
+        timerInterval = setInterval(function() {
+            const elapsed = telemetry.getTimeSpentSec();
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            if (timerDisplay) timerDisplay.textContent = mins + ':' + secs;
+        }, 1000);
+    }
+
+    function triggerErrorReset(msg, regenerateFn) {
+        if (isLocked) return;
+        isLocked = true;
+        telemetry.markActivity();
+        telemetry.fail({ stage: currentPhase });
+        updateAttemptsDisplay();
+
+        const fb = document.getElementById('feedback-box');
+        const ft = document.getElementById('feedback-text');
+        if (fb && ft) {
+            ft.textContent = msg;
+            fb.classList.remove('d-none');
+        }
+
+        setTimeout(function() {
+            if (fb) fb.classList.add('d-none');
+            isLocked = false;
+            if (regenerateFn) regenerateFn();
+        }, 1400);
+    }
+
+    function showSuccessFeedback(msg, nextFn) {
+        if (isLocked) return;
+        isLocked = true;
+        const sb = document.getElementById('success-box');
+        const st = document.getElementById('success-text');
+        if (sb && st) {
+            st.textContent = msg;
+            sb.classList.remove('d-none');
+        }
+        setTimeout(function() {
+            if (sb) sb.classList.add('d-none');
+            isLocked = false;
+            if (nextFn) nextFn();
+        }, 950);
+    }
+
+    function completeLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        const evt = telemetry.complete({ stage: 3 });
+        const elapsed = evt ? evt.time_spent_sec : telemetry.getTimeSpentSec();
+        const attempts = telemetry.getState().attemptsCount || 0;
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('victory-screen').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Пройдено';
+
+        const fa = document.getElementById('final-attempts');
+        const ft = document.getElementById('final-time');
+        if (fa) fa.textContent = String(attempts);
+        if (ft) ft.textContent = mins + ':' + secs;
+    }
+
+    // =========================================================================
+    // ФАЗА 1: Классификация нотаций и ошибок ОПЗ по 3 шлюзам
+    // =========================================================================
+    let p1Items = [];
+    let p1SelectedId = null;
+
+    function buildP1Scenarios() {
+        const nums = sampleDistinct([2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 17, 19, 21], 14);
+        const ops = ['+', '-', '×'];
+        const opA = ops[getRandomInt(0, ops.length - 1)];
+        const opB = ops[getRandomInt(0, ops.length - 1)];
+
+        // Шлюз 0: Префиксная (Польская нотация)
+        const prefixPool = [
+            {
+                text: '+ ' + nums[0] + ' × ' + nums[1] + ' ' + nums[2],
+                bucket: 0,
+                reason: 'Операторы + и × стоят строго перед своими операндами — это прямая польская запись'
+            },
+            {
+                text: '- × ' + nums[3] + ' ' + nums[4] + ' ' + nums[5],
+                bucket: 0,
+                reason: 'Оба оператора записаны слева от операндов — корректная префиксная форма'
+            },
+            {
+                text: '× + ' + nums[0] + ' ' + nums[2] + ' - ' + nums[4] + ' ' + nums[1],
+                bucket: 0,
+                reason: 'Каждый оператор предшествует двум подвыражениям — префиксная запись'
+            }
+        ];
+
+        // Шлюз 1: Постфиксная (Обратная польская запись, ОПЗ)
+        const postfixPool = [
+            {
+                text: nums[6] + ' ' + nums[7] + ' ' + nums[8] + ' × +',
+                bucket: 1,
+                reason: 'Каждый оператор следует после пары операндов; в конце на стеке остается 1 число'
+            },
+            {
+                text: nums[9] + ' ' + nums[10] + ' - ' + nums[11] + ' ×',
+                bucket: 1,
+                reason: 'Корректная постфиксная форма (ОПЗ): стек обработает разность, затем произведение'
+            },
+            {
+                text: nums[6] + ' ' + nums[9] + ' + ' + nums[7] + ' ' + nums[8] + ' - ×',
+                bucket: 1,
+                reason: 'Сбалансированная постфиксная последовательность из 4 чисел и 3 бинарных операторов'
+            }
+        ];
+
+        // Шлюз 2: Инфиксная нотация или некорректная ОПЗ (ошибка стека)
+        const errorPool = [
+            {
+                text: '(' + nums[12] + ' ' + opA + ' ' + nums[13] + ') × ' + nums[1],
+                bucket: 2,
+                reason: 'Содержит скобки и операторы между операндами — это инфиксная запись'
+            },
+            {
+                text: nums[12] + ' ' + nums[13] + ' - +',
+                bucket: 2,
+                reason: 'Stack Underflow: для второго оператора + в стеке останется только один операнд'
+            },
+            {
+                text: nums[10] + ' ' + nums[11] + ' ' + nums[12] + ' ' + opB,
+                bucket: 2,
+                reason: 'Нарушен баланс ОПЗ: 3 операнда и 1 бинарный оператор оставят в стеке 2 числа вместо 1'
+            },
+            {
+                text: nums[13] + ' ' + opA + ' ' + nums[0] + ' × ' + nums[2],
+                bucket: 2,
+                reason: 'Операторы расположены между операндами — это инфиксная запись без скобок'
+            }
+        ];
+
+        const picked = [
+            ...sampleDistinct(prefixPool, 2),
+            ...sampleDistinct(postfixPool, 2),
+            ...sampleDistinct(errorPool, 2)
+        ];
+
+        return shuffleArray(picked).map(function(item, idx) {
+            return {
+                id: 'p1_item_' + idx,
+                text: item.text,
+                bucket: item.bucket,
+                reason: item.reason,
+                assigned: null
+            };
+        });
+    }
+
+    function initPhase1() {
+        currentPhase = 1;
+        p1SelectedId = null;
+        p1Items = buildP1Scenarios();
+
+        document.getElementById('phase1').classList.remove('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 1 из 3';
+        document.getElementById('phase-title').textContent = 'Классификация нотаций и диагностика стека ОПЗ';
+
+        renderPhase1();
+    }
+
+    function renderPhase1() {
+        const palette = document.getElementById('p1-token-palette');
+        const buckets = [
+            document.getElementById('p1-bucket-0'),
+            document.getElementById('p1-bucket-1'),
+            document.getElementById('p1-bucket-2')
+        ];
+        palette.innerHTML = '';
+        buckets.forEach(function(b) { b.innerHTML = ''; });
+
+        let queueCount = 0;
+        const bucketCounts = [0, 0, 0];
+
+        p1Items.forEach(function(item) {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.draggable = true;
+            card.setAttribute('data-item-id', item.id);
+            const isSelected = p1SelectedId === item.id;
+            card.className = 'btn btn-sm rounded-0 text-start font-monospace p-2 ' +
+                (isSelected ? 'btn-warning text-dark border-warning fw-bold' : 'btn-outline-light bg-dark border-secondary');
+            card.style.minHeight = '48px';
+            card.style.minWidth = '48px';
+            card.style.wordBreak = 'break-word';
+            card.innerHTML = '<span class="small fw-bold">' + escapeHtml(item.text) + '</span>';
+
+            if (item.assigned === null) {
+                palette.appendChild(card);
+                queueCount++;
+            } else {
+                card.className = 'btn btn-sm rounded-0 text-start font-monospace p-2 w-100 ' +
+                    (isSelected ? 'btn-warning text-dark fw-bold' : 'btn-dark border-secondary text-light');
+                buckets[item.assigned].appendChild(card);
+                bucketCounts[item.assigned]++;
+            }
+        });
+
+        if (queueCount === 0) {
+            const emptyHint = document.createElement('span');
+            emptyHint.className = 'text-secondary small px-2';
+            emptyHint.textContent = 'Все выражения распределены по шлюзам. Нажмите «Проверить распределение».';
+            palette.appendChild(emptyHint);
+        }
+
+        document.getElementById('p1-queue-count').textContent = String(queueCount);
+        document.getElementById('p1-count-0').textContent = String(bucketCounts[0]);
+        document.getElementById('p1-count-1').textContent = String(bucketCounts[1]);
+        document.getElementById('p1-count-2').textContent = String(bucketCounts[2]);
+    }
+
+    function checkPhase1() {
+        if (isLocked) return;
+        telemetry.markActivity();
+
+        const unassigned = p1Items.filter(function(i) { return i.assigned === null; });
+        if (unassigned.length > 0) {
+            triggerErrorReset('Распределите все 6 карточек из буфера по шлюзам перед проверкой!', initPhase1);
+            return;
+        }
+
+        const wrong = p1Items.find(function(i) { return i.assigned !== i.bucket; });
+        if (wrong) {
+            triggerErrorReset(
+                'Неверная классификация «' + wrong.text + '»: ' + wrong.reason + '. Генерируется новый набор...',
+                initPhase1
+            );
+            return;
+        }
+
+        telemetry.advanceStage(2);
+        showSuccessFeedback('Нотации и состояния стека распознаны безошибочно! Переход к стековому вычислителю...', initPhase2);
+    }
+
+    // =========================================================================
+    // ФАЗА 2: Прямое управление стековым вычислителем ОПЗ (PUSH / POP B / POP A)
+    // =========================================================================
+    let p2Tokens = [];
+    let p2Cursor = 0;
+    let p2Stack = [];
+    let p2RegA = null;
+    let p2RegB = null;
+    let p2Logs = [];
+
+    function generateP2Expression() {
+        const variant = getRandomInt(0, 2);
+
+        if (variant === 0) {
+            // (a1 - a2) / (b1 + b2) -> a1 a2 - b1 b2 + /
+            const rightSum = getRandomInt(2, 6);
+            const b1 = getRandomInt(1, rightSum - 1);
+            const b2 = rightSum - b1;
+            const quot = getRandomInt(2, 9);
+            const leftDiff = quot * rightSum;
+            const a2 = getRandomInt(2, 12);
+            const a1 = leftDiff + a2;
+            return [String(a1), String(a2), '-', String(b1), String(b2), '+', '/'];
+        }
+
+        if (variant === 1) {
+            // (a1 - a2) * (b1 + b2) -> a1 a2 - b1 b2 + ×
+            const a2 = getRandomInt(2, 11);
+            const diff = getRandomInt(2, 8);
+            const a1 = a2 + diff;
+            const b1 = getRandomInt(2, 8);
+            const b2 = getRandomInt(2, 7);
+            return [String(a1), String(a2), '-', String(b1), String(b2), '+', '×'];
+        }
+
+        // a1 * b1 - c1 / d1 -> a1 b1 × c1 d1 / -
+        const d1 = getRandomInt(2, 5);
+        const quot = getRandomInt(2, 7);
+        const c1 = d1 * quot;
+        const a1 = getRandomInt(3, 8);
+        const b1 = getRandomInt(3, 7);
+        return [String(a1), String(b1), '×', String(c1), String(d1), '/', '-'];
+    }
+
+    function isP2Operator(tok) {
+        return tok === '+' || tok === '-' || tok === '×' || tok === '/';
+    }
+
+    function initPhase2() {
+        currentPhase = 2;
+        p2Tokens = generateP2Expression();
+        p2Cursor = 0;
+        p2Stack = [];
+        p2RegA = null;
+        p2RegB = null;
+        p2Logs = ['Загружено выражение ОПЗ: ' + p2Tokens.join(' ')];
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.remove('d-none');
+        document.getElementById('phase3').classList.add('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 2 из 3';
+        document.getElementById('phase-title').textContent = 'Симуляция стекового вычислителя ОПЗ';
+
+        renderPhase2();
+    }
+
+    function renderPhase2() {
+        const tapeEl = document.getElementById('p2-tape');
+        const stackEl = document.getElementById('p2-stack-dropzone');
+        const logEl = document.getElementById('p2-log');
+        const progressEl = document.getElementById('p2-progress-label');
+        const stackSizeEl = document.getElementById('p2-stack-size');
+        const aluBadgeEl = document.getElementById('p2-alu-op-badge');
+        const aluHintEl = document.getElementById('p2-alu-hint');
+        const aluSymEl = document.getElementById('p2-alu-symbol');
+        const regAVal = document.getElementById('p2-reg-a-val');
+        const regBVal = document.getElementById('p2-reg-b-val');
+        const execBtn = document.getElementById('p2-exec-btn');
+
+        const activeTok = p2Cursor < p2Tokens.length ? p2Tokens[p2Cursor] : null;
+        const needOp = activeTok !== null && isP2Operator(activeTok);
+
+        progressEl.textContent = p2Cursor < p2Tokens.length
+            ? ('Токен ' + (p2Cursor + 1) + ' / ' + p2Tokens.length)
+            : 'Завершено';
+
+        // Отрисовка ленты токенов
+        tapeEl.innerHTML = '';
+        p2Tokens.forEach(function(tok, idx) {
+            const isDone = idx < p2Cursor;
+            const isActive = idx === p2Cursor;
+            const el = document.createElement('button');
+            el.type = 'button';
+            el.setAttribute('data-tape-idx', String(idx));
+
+            if (isActive && !needOp) {
+                el.draggable = true;
+                el.className = 'btn btn-success text-dark fw-bold rounded-0 px-3 py-2 font-monospace';
+                el.style.cursor = 'grab';
+            } else if (isActive && needOp) {
+                el.className = 'btn btn-warning text-dark fw-bold rounded-0 px-3 py-2 font-monospace';
+            } else if (isDone) {
+                el.className = 'btn btn-outline-secondary text-secondary rounded-0 px-3 py-2 font-monospace';
+                el.disabled = true;
+            } else {
+                el.className = 'btn btn-dark border-secondary text-light rounded-0 px-3 py-2 font-monospace';
+            }
+            el.style.minWidth = '48px';
+            el.style.minHeight = '48px';
+            el.textContent = tok;
+            tapeEl.appendChild(el);
+        });
+
+        // Отрисовка стека (снизу вверх через flex-column-reverse)
+        stackEl.innerHTML = '';
+        if (p2Stack.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'text-center text-secondary small my-auto';
+            emptyMsg.textContent = '[ Стек пуст ]';
+            stackEl.appendChild(emptyMsg);
+        } else {
+            p2Stack.forEach(function(val, idx) {
+                const isTop = idx === p2Stack.length - 1;
+                const cell = document.createElement('button');
+                cell.type = 'button';
+                cell.setAttribute('data-stack-top', isTop ? '1' : '0');
+                if (isTop) cell.draggable = true;
+                cell.className = 'btn rounded-0 fw-bold font-monospace d-flex justify-content-between align-items-center px-3 ' +
+                    (isTop ? 'btn-outline-warning bg-dark text-warning border-2' : 'btn-dark border-secondary text-light');
+                cell.style.minHeight = '48px';
+                cell.innerHTML = '<span>' + escapeHtml(val) + '</span>' +
+                    (isTop ? '<span class="badge bg-warning text-dark rounded-0">TOP</span>' : '<span class="text-secondary small">[' + idx + ']</span>');
+                stackEl.appendChild(cell);
+            });
+        }
+        stackSizeEl.textContent = 'size: ' + p2Stack.length;
+
+        // Отрисовка регистров АЛУ
+        regAVal.textContent = p2RegA !== null ? String(p2RegA) : '—';
+        regBVal.textContent = p2RegB !== null ? String(p2RegB) : '—';
+
+        if (!activeTok) {
+            aluBadgeEl.textContent = 'Готово';
+            aluBadgeEl.className = 'badge bg-success text-dark rounded-0';
+            aluSymEl.textContent = '✓';
+            execBtn.disabled = true;
+        } else if (!needOp) {
+            aluBadgeEl.textContent = 'Требуется PUSH';
+            aluBadgeEl.className = 'badge bg-success text-dark rounded-0';
+            aluSymEl.textContent = '→';
+            aluHintEl.innerHTML = 'Активен операнд <strong class="text-success">' + escapeHtml(activeTok) + '</strong>. Кликните по нему на ленте или перетащите в стек (<code>PUSH</code>).';
+            execBtn.disabled = true;
+        } else {
+            aluBadgeEl.textContent = 'Оператор: ' + activeTok;
+            aluBadgeEl.className = 'badge bg-warning text-dark rounded-0';
+            aluSymEl.textContent = activeTok;
+
+            if (p2RegB === null) {
+                aluHintEl.innerHTML = 'Шаг 1 для <code>' + escapeHtml(activeTok) + '</code>: снимите вершину стека (<code>POP</code>) в <strong>ПРАВЫЙ (B)</strong> регистр (кликните по TOP стека или перетащите в слот B).';
+                execBtn.disabled = true;
+            } else if (p2RegA === null) {
+                aluHintEl.innerHTML = 'Шаг 2 для <code>' + escapeHtml(activeTok) + '</code>: снимите новую вершину стека в <strong>ЛЕВЫЙ (A)</strong> регистр (кликните по TOP стека или перетащите в слот A).';
+                execBtn.disabled = true;
+            } else {
+                aluHintEl.innerHTML = 'Оба регистра заполнены: <code>' + p2RegA + ' ' + escapeHtml(activeTok) + ' ' + p2RegB + '</code>. Нажмите кнопку выполнения ниже!';
+                execBtn.disabled = false;
+            }
+        }
+
+        logEl.innerHTML = p2Logs.slice(-5).map(function(line) {
+            return '<div>&gt; ' + escapeHtml(line) + '</div>';
+        }).join('');
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function pushActiveOperandToStack() {
+        if (isLocked || p2Cursor >= p2Tokens.length) return;
+        const activeTok = p2Tokens[p2Cursor];
+        if (isP2Operator(activeTok)) {
+            triggerErrorReset(
+                'Активный токен «' + activeTok + '» — это оператор! Его нельзя класть в стек чисел, нужно снять два операнда в АЛУ.',
+                initPhase2
+            );
+            return;
+        }
+        p2Stack.push(Number(activeTok));
+        p2Logs.push('PUSH(' + activeTok + ') → стек: [' + p2Stack.join(', ') + ']');
+        p2Cursor++;
+        renderPhase2();
+    }
+
+    function popTopToRegister(targetReg) {
+        if (isLocked || p2Cursor >= p2Tokens.length) return;
+        const activeTok = p2Tokens[p2Cursor];
+        if (!isP2Operator(activeTok)) {
+            triggerErrorReset(
+                'Сначала поместите число «' + activeTok + '» с ленты в стек (PUSH)!',
+                initPhase2
+            );
+            return;
+        }
+        if (p2Stack.length === 0) {
+            triggerErrorReset('Стек пуст — невозможно выполнить POP!', initPhase2);
+            return;
+        }
+
+        if (targetReg === 'A' && p2RegB === null) {
+            triggerErrorReset(
+                'Нарушен порядок снятия операндов! Первый POP() обязан извлекать ПРАВЫЙ операнд (B), а не левый (A).',
+                initPhase2
+            );
+            return;
+        }
+
+        if (targetReg === 'B' && p2RegB !== null) {
+            triggerErrorReset('Правый регистр B уже заполнен! Теперь снимите со стека левый операнд в регистр A.', initPhase2);
+            return;
+        }
+
+        if (targetReg === 'A' && p2RegA !== null) {
+            triggerErrorReset('Оба регистра АЛУ уже заполнены — выполните операцию!', initPhase2);
+            return;
+        }
+
+        const val = p2Stack.pop();
+        if (targetReg === 'B') {
+            p2RegB = val;
+            p2Logs.push('POP() → B = ' + val + ' (правый операнд)');
+        } else {
+            p2RegA = val;
+            p2Logs.push('POP() → A = ' + val + ' (левый операнд)');
+        }
+        renderPhase2();
+    }
+
+    function executeP2Alu() {
+        if (isLocked || p2Cursor >= p2Tokens.length) return;
+        const op = p2Tokens[p2Cursor];
+        if (!isP2Operator(op) || p2RegA === null || p2RegB === null) return;
+
+        let res = 0;
+        if (op === '+') res = p2RegA + p2RegB;
+        else if (op === '-') res = p2RegA - p2RegB;
+        else if (op === '×') res = p2RegA * p2RegB;
+        else if (op === '/') res = p2RegA / p2RegB;
+
+        p2Stack.push(res);
+        p2Logs.push('ALU: ' + p2RegA + ' ' + op + ' ' + p2RegB + ' = ' + res + ' → PUSH(' + res + ')');
+        p2RegA = null;
+        p2RegB = null;
+        p2Cursor++;
+        renderPhase2();
+
+        if (p2Cursor >= p2Tokens.length) {
+            if (p2Stack.length === 1) {
+                telemetry.advanceStage(3);
+                showSuccessFeedback(
+                    'Стековый вычислитель завершил работу! Итог: ' + p2Stack[0] + '. Переход к финальному синтезу...',
+                    initPhase3
+                );
+            } else {
+                triggerErrorReset('Ошибка финального инварианта стека!', initPhase2);
+            }
+        }
+    }
+
+    // =========================================================================
+    // ФАЗА 3: Конструирование ОПЗ (Slot & Snap) с дистракторами
+    // =========================================================================
+    let p3Slots = [];
+    let p3Palette = [];
+    let p3Expected = [];
+    let p3SelectedPaletteId = null;
+
+    function buildP3Task() {
+        const nums = sampleDistinct([2, 3, 4, 5, 6, 7, 8, 9], 5);
+        const variant = getRandomInt(0, 3);
+
+        if (variant === 0) {
+            // (A + B) × C - D  ->  A B + C × D -
+            const expected = [String(nums[0]), String(nums[1]), '+', String(nums[2]), '×', String(nums[3]), '-'];
+            return {
+                infix: '(' + nums[0] + ' + ' + nums[1] + ') × ' + nums[2] + ' - ' + nums[3],
+                ruleTag: 'Скобки и приоритет операций',
+                note: 'Выполните сложение в скобках, затем умножение, затем вычитание.',
+                expected: expected,
+                distractors: ['(', ')', '/']
+            };
+        }
+
+        if (variant === 1) {
+            // A + B ^ C ^ D  ->  A B C D ^ ^ +
+            const expected = [String(nums[0]), String(nums[1]), String(nums[2]), String(nums[3]), '^', '^', '+'];
+            return {
+                infix: nums[0] + ' + ' + nums[1] + ' ^ ' + nums[2] + ' ^ ' + nums[3],
+                ruleTag: 'Правоассоциативность степени ^',
+                note: 'Степень правоассоциативна: вычисляется справа налево как ' + nums[1] + ' ^ (' + nums[2] + ' ^ ' + nums[3] + ').',
+                expected: expected,
+                distractors: ['(', ')', '×', '-']
+            };
+        }
+
+        if (variant === 2) {
+            // -A × (B + C) + D  ->  A u- B C + × D +
+            const expected = [String(nums[0]), 'u-', String(nums[1]), String(nums[2]), '+', '×', String(nums[3]), '+'];
+            return {
+                infix: '-' + nums[0] + ' × (' + nums[1] + ' + ' + nums[2] + ') + ' + nums[3],
+                ruleTag: 'Унарный минус (u-) + Скобки',
+                note: 'Для смены знака перед ' + nums[0] + ' используйте токен унарного минуса u-, а не бинарный «-».',
+                expected: expected,
+                distractors: ['(', ')', '-', '^']
+            };
+        }
+
+        // (A - B) / C + D ^ E  ->  A B - C / D E ^ +
+        const expected = [String(nums[0]), String(nums[1]), '-', String(nums[2]), '/', String(nums[3]), String(nums[4]), '^', '+'];
+        return {
+            infix: '(' + nums[0] + ' - ' + nums[1] + ') / ' + nums[2] + ' + ' + nums[3] + ' ^ ' + nums[4],
+            ruleTag: 'Скобки + Деление + Степень',
+            note: 'Разделите разность на ' + nums[2] + ', затем прибавьте ' + nums[3] + ' в степени ' + nums[4] + '.',
+            expected: expected,
+            distractors: ['(', ')', '×', 'u-']
+        };
+    }
+
+    function initPhase3() {
+        currentPhase = 3;
+        p3SelectedPaletteId = null;
+        const task = buildP3Task();
+        p3Expected = task.expected.slice();
+        p3Slots = new Array(p3Expected.length).fill(null);
+
+        const allTokens = p3Expected.concat(task.distractors);
+        p3Palette = shuffleArray(allTokens).map(function(tok, idx) {
+            return {
+                id: 'p3_tok_' + idx,
+                text: tok,
+                used: false
+            };
+        });
+
+        document.getElementById('phase1').classList.add('d-none');
+        document.getElementById('phase2').classList.add('d-none');
+        document.getElementById('phase3').classList.remove('d-none');
+        document.getElementById('phase-badge').textContent = 'Шаг 3 из 3';
+        document.getElementById('phase-title').textContent = 'Алгоритм сортировочной станции (Slot & Snap)';
+
+        document.getElementById('p3-rule-tag').textContent = task.ruleTag;
+        document.getElementById('p3-infix-display').textContent = task.infix;
+        document.getElementById('p3-note-display').textContent = task.note;
+
+        renderPhase3();
+    }
+
+    function getP3TokenById(id) {
+        return p3Palette.find(function(t) { return t.id === id; });
+    }
+
+    function renderPhase3() {
+        const slotsEl = document.getElementById('p3-slots');
+        const paletteEl = document.getElementById('p3-palette');
+        slotsEl.innerHTML = '';
+        paletteEl.innerHTML = '';
+
+        let filledCount = 0;
+        p3Slots.forEach(function(tokId, idx) {
+            const slot = document.createElement('button');
+            slot.type = 'button';
+            slot.setAttribute('data-slot-idx', String(idx));
+            slot.style.minWidth = '56px';
+            slot.style.minHeight = '56px';
+
+            if (tokId) {
+                const tok = getP3TokenById(tokId);
+                filledCount++;
+                slot.className = 'btn btn-success text-dark fw-bold rounded-0 px-3 py-2 font-monospace d-flex flex-column align-items-center justify-content-center';
+                slot.innerHTML = '<span style="font-size: 0.65rem;">#' + (idx + 1) + '</span><span class="fs-5">' + escapeHtml(tok.text) + '</span>';
+            } else {
+                slot.className = 'btn btn-outline-secondary bg-dark text-secondary rounded-0 px-3 py-2 font-monospace d-flex flex-column align-items-center justify-content-center';
+                slot.innerHTML = '<span style="font-size: 0.65rem;">#' + (idx + 1) + '</span><span>[ ? ]</span>';
+            }
+            slotsEl.appendChild(slot);
+        });
+
+        document.getElementById('p3-slot-progress').textContent = filledCount + ' / ' + p3Slots.length;
+
+        p3Palette.forEach(function(tok) {
+            if (tok.used) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.draggable = true;
+            btn.setAttribute('data-p3-tok', tok.id);
+            const isSel = p3SelectedPaletteId === tok.id;
+            btn.className = 'btn rounded-0 fw-bold font-monospace px-3 py-2 ' +
+                (isSel ? 'btn-warning text-dark border-warning' : 'btn-outline-info bg-dark text-info');
+            btn.style.minWidth = '52px';
+            btn.style.minHeight = '52px';
+            btn.textContent = tok.text;
+            paletteEl.appendChild(btn);
+        });
+    }
+
+    function assignP3TokenToSlot(tokId, slotIdx) {
+        const tok = getP3TokenById(tokId);
+        if (!tok || tok.used) return;
+        if (p3Slots[slotIdx] !== null) {
+            const prev = getP3TokenById(p3Slots[slotIdx]);
+            if (prev) prev.used = false;
+        }
+        tok.used = true;
+        p3Slots[slotIdx] = tok.id;
+        p3SelectedPaletteId = null;
+        renderPhase3();
+    }
+
+    function checkPhase3() {
+        if (isLocked) return;
+        telemetry.markActivity();
+
+        if (p3Slots.some(function(s) { return s === null; })) {
+            triggerErrorReset('Заполните все слоты выходной ленты ОПЗ перед запуском!', initPhase3);
+            return;
+        }
+
+        const built = p3Slots.map(function(id) { return getP3TokenById(id).text; });
+
+        if (built.includes('(') || built.includes(')')) {
+            triggerErrorReset(
+                'Критическая ошибка ОПЗ: скобки никогда не попадают в постфиксную запись! Генерируется новое выражение...',
+                initPhase3
+            );
+            return;
+        }
+
+        for (let i = 0; i < p3Expected.length; i++) {
+            if (built[i] !== p3Expected[i]) {
+                triggerErrorReset(
+                    'Неверный порядок токенов в позиции #' + (i + 1) + ' (ожидался «' + p3Expected[i] + '», получен «' + built[i] + '»). Проверьте приоритет и ассоциативность! Генерируется новое выражение...',
+                    initPhase3
+                );
+                return;
+            }
+        }
+
+        showSuccessFeedback('Постфиксное выражение построено точно по алгоритму Дейкстры!', completeLevel);
+    }
+
+    // =========================================================================
+    // ОДНОКРАТНАЯ ПРИВЯЗКА СЛУШАТЕЛЕЙ ЧЕРЕЗ ДЕЛЕГИРОВАНИЕ СОБЫТИЙ
+    // =========================================================================
+    function bindAllEventsOnce() {
+        // --- Фаза 1 ---
+        const p1Palette = document.getElementById('p1-token-palette');
+        const p1BucketsRow = document.getElementById('p1-buckets-row');
+
+        p1Palette.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const btn = e.target.closest('[data-item-id]');
+            if (!btn) return;
+            telemetry.markActivity();
+            const id = btn.getAttribute('data-item-id');
+            p1SelectedId = (p1SelectedId === id) ? null : id;
+            renderPhase1();
+        });
+
+        p1Palette.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-item-id]');
+            if (!btn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', btn.getAttribute('data-item-id'));
+        });
+
+        p1BucketsRow.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-item-id]');
+            if (!btn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', btn.getAttribute('data-item-id'));
+        });
+
+        p1BucketsRow.addEventListener('dragover', function(e) {
+            if (e.target.closest('.p1-bucket-drop')) e.preventDefault();
+        });
+
+        p1BucketsRow.addEventListener('drop', function(e) {
+            const bucketEl = e.target.closest('.p1-bucket-drop');
+            if (!bucketEl || isLocked) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            const itemId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : p1SelectedId;
+            const bIdx = Number(bucketEl.getAttribute('data-bucket'));
+            const item = p1Items.find(function(i) { return i.id === itemId; });
+            if (item) {
+                item.assigned = bIdx;
+                p1SelectedId = null;
+                renderPhase1();
+            }
+        });
+
+        p1Palette.addEventListener('dragover', function(e) { e.preventDefault(); });
+
+        p1Palette.addEventListener('drop', function(e) {
+            if (isLocked) return;
+            e.preventDefault();
+            const itemId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : null;
+            const item = p1Items.find(function(i) { return i.id === itemId; });
+            if (item) {
+                item.assigned = null;
+                p1SelectedId = null;
+                renderPhase1();
+            }
+        });
+
+        p1BucketsRow.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const itemBtn = e.target.closest('[data-item-id]');
+            if (itemBtn && !p1SelectedId) {
+                telemetry.markActivity();
+                const id = itemBtn.getAttribute('data-item-id');
+                const item = p1Items.find(function(i) { return i.id === id; });
+                if (item) {
+                    item.assigned = null;
+                    renderPhase1();
+                }
+                return;
+            }
+            const bucketEl = e.target.closest('.p1-bucket-drop');
+            if (bucketEl && p1SelectedId) {
+                telemetry.markActivity();
+                const bIdx = Number(bucketEl.getAttribute('data-bucket'));
+                const item = p1Items.find(function(i) { return i.id === p1SelectedId; });
+                if (item) {
+                    item.assigned = bIdx;
+                    p1SelectedId = null;
+                    renderPhase1();
+                }
+            }
+        });
+
+        document.getElementById('p1-reset-btn').addEventListener('click', function() {
+            if (isLocked) return;
+            telemetry.markActivity();
+            p1Items.forEach(function(i) { i.assigned = null; });
+            p1SelectedId = null;
+            renderPhase1();
+        });
+
+        document.getElementById('p1-check-btn').addEventListener('click', checkPhase1);
+
+        // --- Фаза 2 ---
+        const p2Tape = document.getElementById('p2-tape');
+        const p2StackDrop = document.getElementById('p2-stack-dropzone');
+        const p2RegA = document.getElementById('p2-reg-a');
+        const p2RegB = document.getElementById('p2-reg-b');
+
+        p2Tape.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const btn = e.target.closest('[data-tape-idx]');
+            if (!btn) return;
+            telemetry.markActivity();
+            const idx = Number(btn.getAttribute('data-tape-idx'));
+            if (idx !== p2Cursor) {
+                triggerErrorReset('Обрабатывайте токены ОПЗ строго слева направо!', initPhase2);
+                return;
+            }
+            const tok = p2Tokens[p2Cursor];
+            if (!isP2Operator(tok)) {
+                pushActiveOperandToStack();
+            } else if (p2RegA !== null && p2RegB !== null) {
+                executeP2Alu();
+            } else {
+                triggerErrorReset('Сначала снимите со стека оба операнда в регистры B и A!', initPhase2);
+            }
+        });
+
+        p2Tape.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-tape-idx]');
+            if (!btn || !e.dataTransfer) return;
+            if (Number(btn.getAttribute('data-tape-idx')) !== p2Cursor) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', 'TAPE_PUSH');
+        });
+
+        p2StackDrop.addEventListener('dragover', function(e) { e.preventDefault(); });
+
+        p2StackDrop.addEventListener('drop', function(e) {
+            if (isLocked) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            const payload = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+            if (payload === 'TAPE_PUSH') {
+                pushActiveOperandToStack();
+            }
+        });
+
+        p2StackDrop.addEventListener('dragstart', function(e) {
+            const topBtn = e.target.closest('[data-stack-top="1"]');
+            if (!topBtn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', 'STACK_POP');
+        });
+
+        p2StackDrop.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const btn = e.target.closest('[data-stack-top]');
+            if (!btn) return;
+            telemetry.markActivity();
+            if (btn.getAttribute('data-stack-top') !== '1') {
+                triggerErrorReset('По принципу LIFO снимать можно только верхний элемент (TOP) стека!', initPhase2);
+                return;
+            }
+            if (p2RegB === null) popTopToRegister('B');
+            else if (p2RegA === null) popTopToRegister('A');
+            else triggerErrorReset('Оба регистра АЛУ уже заполнены — нажмите кнопку выполнения!', initPhase2);
+        });
+
+        [p2RegA, p2RegB].forEach(function(regEl) {
+            regEl.addEventListener('dragover', function(e) { e.preventDefault(); });
+            regEl.addEventListener('drop', function(e) {
+                if (isLocked) return;
+                e.preventDefault();
+                telemetry.markActivity();
+                const payload = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+                if (payload === 'STACK_POP') {
+                    popTopToRegister(regEl.getAttribute('data-reg'));
+                }
+            });
+            regEl.addEventListener('click', function() {
+                if (isLocked) return;
+                telemetry.markActivity();
+                popTopToRegister(regEl.getAttribute('data-reg'));
+            });
+        });
+
+        document.getElementById('p2-exec-btn').addEventListener('click', function() {
+            if (isLocked) return;
+            telemetry.markActivity();
+            executeP2Alu();
+        });
+
+        // --- Фаза 3 ---
+        const p3PaletteEl = document.getElementById('p3-palette');
+        const p3SlotsEl = document.getElementById('p3-slots');
+
+        p3PaletteEl.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const btn = e.target.closest('[data-p3-tok]');
+            if (!btn) return;
+            telemetry.markActivity();
+            const tokId = btn.getAttribute('data-p3-tok');
+            const firstEmptyIdx = p3Slots.indexOf(null);
+            if (p3SelectedPaletteId === tokId && firstEmptyIdx !== -1) {
+                assignP3TokenToSlot(tokId, firstEmptyIdx);
+                return;
+            }
+            p3SelectedPaletteId = (p3SelectedPaletteId === tokId) ? null : tokId;
+            renderPhase3();
+        });
+
+        p3PaletteEl.addEventListener('dragstart', function(e) {
+            const btn = e.target.closest('[data-p3-tok]');
+            if (!btn || !e.dataTransfer) return;
+            telemetry.markActivity();
+            e.dataTransfer.setData('text/plain', btn.getAttribute('data-p3-tok'));
+        });
+
+        p3SlotsEl.addEventListener('dragover', function(e) {
+            if (e.target.closest('[data-slot-idx]')) e.preventDefault();
+        });
+
+        p3SlotsEl.addEventListener('drop', function(e) {
+            const slotEl = e.target.closest('[data-slot-idx]');
+            if (!slotEl || isLocked) return;
+            e.preventDefault();
+            telemetry.markActivity();
+            const tokId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : p3SelectedPaletteId;
+            const slotIdx = Number(slotEl.getAttribute('data-slot-idx'));
+            if (tokId) assignP3TokenToSlot(tokId, slotIdx);
+        });
+
+        p3SlotsEl.addEventListener('click', function(e) {
+            if (isLocked) return;
+            const slotEl = e.target.closest('[data-slot-idx]');
+            if (!slotEl) return;
+            telemetry.markActivity();
+            const slotIdx = Number(slotEl.getAttribute('data-slot-idx'));
+            if (p3SelectedPaletteId) {
+                assignP3TokenToSlot(p3SelectedPaletteId, slotIdx);
+            } else if (p3Slots[slotIdx] !== null) {
+                const tok = getP3TokenById(p3Slots[slotIdx]);
+                if (tok) tok.used = false;
+                p3Slots[slotIdx] = null;
+                renderPhase3();
+            }
+        });
+
+        document.getElementById('p3-reset-btn').addEventListener('click', function() {
+            if (isLocked) return;
+            telemetry.markActivity();
+            p3Slots = new Array(p3Expected.length).fill(null);
+            p3Palette.forEach(function(t) { t.used = false; });
+            p3SelectedPaletteId = null;
+            renderPhase3();
+        });
+
+        document.getElementById('p3-check-btn').addEventListener('click', checkPhase3);
+    }
+
+    bindAllEventsOnce();
+    initPhase1();
+    startTimer();
+})();
+</script>
