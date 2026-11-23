@@ -1,0 +1,1565 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout
+    level={3}
+    title="Урок 34 :: Двоичная, восьмеричная и шестнадцатеричная системы счисления, связь между ними (Уровень 3)"
+    bodyClass="font-monospace m-0 p-0"
+>
+    <div id="arcade-app" v-cloak class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Заголовок арены -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h1 class="h4 text-danger mb-0 fw-bold">Арена: Кибер-матрица перекодировки (Protocol Breach 2 ↔ 8 ↔ 16)</h1>
+                <div class="text-secondary small">Урок 34 // 10 класс (углубленный, технологический профиль)</div>
+            </div>
+            <span class="badge border border-danger text-danger bg-dark rounded-0 px-3 py-2">
+                Аркада Keyboard-Only // Хардкор-сброс
+            </span>
+        </div>
+
+        <div
+            class="card bg-dark rounded-0 shadow"
+            :class="alarmActive ? 'border-danger border-2' : (isSuccessPulse ? 'border-success border-2' : 'border-danger')"
+            :style="{ transform: shakeOffsetPx ? 'translateX(' + shakeOffsetPx + 'px)' : 'none', transition: 'transform 60ms linear' }"
+        >
+            <div class="card-body p-3 p-md-4">
+
+                <!-- ЭКРАН 1: ВВОДНЫЙ БРИФИНГ (Intro) -->
+                <div v-if="gameState === 'intro'" class="text-center py-3">
+                    <div class="display-6 text-danger fw-bold mb-2">КИБЕР-МАТРИЦА ПЕРЕКОДИРОВКИ</div>
+                    <p class="text-light fs-6 mx-auto mb-4" style="max-width: 780px;">
+                        Взломайте протокол шины данных <span class="text-info">2 ↔ 8 ↔ 16</span> за 10 волн.
+                        На каждом шаге активна строго одна <span class="text-info">строка</span> или один <span class="text-warning">столбец</span>:
+                        после захвата ячейки шина поворачивается на 90° через выбранную координату.
+                        Совпасть должны <strong>и значение, и целевое основание</strong> (<code>BIN / OCT / HEX</code>)!
+                    </p>
+
+                    <div class="row g-3 justify-content-center text-start mx-auto mb-4" style="max-width: 860px;">
+                        <div class="col-md-6">
+                            <div class="alert alert-dark bg-black border border-danger text-light rounded-0 h-100 p-3 mb-0">
+                                <div class="text-danger fw-bold mb-2">⚡ РЕГЛАМЕНТ ХАРДКОР-БОССА</div>
+                                <ul class="mb-0 text-secondary small ps-3">
+                                    <li><strong class="text-light">10 волн (34.0 с → 16.0 с):</strong> матрицы от <code>4×4</code> до <code>6×6</code>, на 8-й волне — тактическая передышка.</li>
+                                    <li><strong class="text-info">Двоичный мост и дробные/маски:</strong> прямые переводы по триадам и тетрадам, <code>8 ↔ 16</code>, дроби с нулями и сдвиги/маски.</li>
+                                    <li><strong class="text-danger">Тотальный сброс:</strong> захват неверного значения, неверного основания, ячейки вне активной шины или таймаут включает сирену <code>#alarm-box</code> и <em>сбрасывает прогресс на Волну 1</em>.</li>
+                                    <li><strong class="text-warning">Строго без мыши:</strong> во время волны мышь отключена — управление только с клавиатуры.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-dark bg-black border border-info text-light rounded-0 h-100 p-3 mb-0">
+                                <div class="text-info fw-bold mb-2">⌨ КАРТА УПРАВЛЕНИЯ (16 КЛАВИШ, RU/EN)</div>
+                                <div class="d-flex flex-column gap-2 small">
+                                    <div>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">W</kbd>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">S</kbd>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">A</kbd>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">D</kbd>
+                                        /
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">↑</kbd>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">↓</kbd>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">←</kbd>
+                                        <kbd class="bg-dark border border-secondary text-info rounded-0 px-2 py-1">→</kbd>
+                                        <span class="text-secondary ms-1">— движение курсора</span>
+                                    </div>
+                                    <div>
+                                        <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2 py-1">1</kbd>…<kbd class="bg-dark border border-secondary text-warning rounded-0 px-2 py-1">6</kbd>
+                                        <span class="text-secondary ms-1">— прыжок курсора к слоту активной строки/столбца</span>
+                                    </div>
+                                    <div>
+                                        <kbd class="bg-dark border border-secondary text-light rounded-0 px-2 py-1">Shift</kbd>
+                                        <span class="text-secondary ms-1">— анализатор бит: RAW → 3-бит (триады) → 4-бит (тетрады)</span>
+                                    </div>
+                                    <div>
+                                        <kbd class="bg-danger border border-light text-white rounded-0 px-2 py-1">Space</kbd>
+                                        <span class="text-secondary ms-1">— захват ячейки под курсором / старт волны</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        id="start-btn"
+                        type="button"
+                        @click="startGame"
+                        class="btn btn-danger btn-lg rounded-0 px-5 py-3 fw-bold text-white shadow"
+                        style="min-height: 54px;"
+                    >
+                        ▶ НАЧАТЬ ВЗЛОМ ПРОТОКОЛА [ПРОБЕЛ]
+                    </button>
+                </div>
+
+                <!-- ЭКРАН 2: АКТИВНАЯ АРЕНА (Строгий Keyboard-Only, ноль обработчиков мыши) -->
+                <div v-else-if="gameState === 'playing'" style="pointer-events: none; user-select: none;">
+
+                    <!-- Верхняя панель статуса -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 border-bottom border-secondary pb-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span id="phase-counter" class="badge bg-danger text-white rounded-0 fs-6">
+                                ВОЛНА <span v-text="currentWave"></span> ИЗ 10
+                            </span>
+                            <span class="text-light fw-bold fs-6" v-text="currentWaveData.title"></span>
+                            <span v-if="currentWaveData.isBreather" class="badge bg-info text-dark rounded-0">ПЕРЕДЫШКА</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-secondary small">
+                                Сбои: <span class="text-warning fw-bold" v-text="failCount"></span>
+                            </div>
+                            <div class="text-secondary small">
+                                Таймер: <span class="fw-bold fs-5" :class="timeLeft <= 5.0 ? 'text-danger' : 'text-warning'" v-text="timeLeft.toFixed(1) + 's'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Полоса таймера волны -->
+                    <div class="progress rounded-0 bg-black border border-secondary mb-3" style="height: 10px;">
+                        <div
+                            class="progress-bar"
+                            :class="timeLeft <= 5.0 ? 'bg-danger' : 'bg-warning'"
+                            role="progressbar"
+                            :style="{ width: Math.max(0, Math.min(100, (timeLeft / currentWaveData.maxTime) * 100)) + '%', transition: 'width 100ms linear' }"
+                        ></div>
+                    </div>
+
+                    <!-- Аварийный баннер тревоги (#alarm-box + #alarm-count) -->
+                    <div id="alarm-box" v-if="alarmActive" class="alert alert-danger bg-black border border-danger text-danger rounded-0 mb-3 py-2 px-3">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <div class="fw-bold fs-6">
+                                    🚨 ПРОТОКОЛ НАРУШЕН // СБОЙ #<span id="alarm-count" v-text="failCount"></span> — СБРОС НА ВОЛНУ 1
+                                </div>
+                                <div class="small mt-1 text-light" v-text="alarmMessage"></div>
+                            </div>
+                            <div class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></div>
+                        </div>
+                    </div>
+
+                    <!-- Реактивный баннер подтверждения волны -->
+                    <div v-if="isSuccessPulse" class="alert alert-success bg-black border border-success text-success rounded-0 mb-3 py-2 px-3 fw-bold">
+                        ✓ <span v-text="successMessage"></span>
+                    </div>
+
+                    <!-- Панель целевого конвейера протокола (Data Source) + Индикатор группировки бит -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div class="text-secondary small text-uppercase fw-bold">
+                            БУФЕР ПЕРЕХВАТА ПРОТОКОЛА (ВЫПОЛНИТЬ ПОСЛЕДОВАТЕЛЬНО):
+                        </div>
+                        <div class="badge bg-black border border-info text-info rounded-0 px-2 py-1">
+                            АНАЛИЗАТОР [SHIFT]:
+                            <span v-if="bitGroupMode === 'raw'" class="text-light">RAW (СПЛОШНОЙ)</span>
+                            <span v-else-if="bitGroupMode === 'triad'" class="text-warning">3-БИТ (ТРИАДЫ / OCT)</span>
+                            <span v-else class="text-info">4-БИТ (ТЕТРАДЫ / HEX)</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div
+                            v-for="(step, idx) in currentWaveData.steps"
+                            :key="idx"
+                            class="col-12"
+                            :class="currentWaveData.steps.length === 2 ? 'col-md-6' : 'col-md-4'"
+                        >
+                            <div
+                                class="p-2 px-3 border rounded-0 h-100 d-flex flex-column justify-content-between"
+                                :data-target-step="idx"
+                                :data-active-step="idx === currentStepIdx ? 'true' : 'false'"
+                                :data-src-kind="step.srcKind"
+                                :data-target-base="step.targetBase"
+                                :class="idx < currentStepIdx ? 'bg-black border-success text-success' : (idx === currentStepIdx ? 'bg-black border-info text-light' : 'bg-black border-secondary text-secondary')"
+                                :style="idx === currentStepIdx ? 'box-shadow: 0 0 12px rgba(13, 202, 240, 0.35);' : ''"
+                            >
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1 small">
+                                    <span class="fw-bold">
+                                        ШАГ <span v-text="idx + 1"></span> //
+                                        <span v-if="idx === currentStepIdx">
+                                            <span v-if="activeAxis === 'row'" class="text-info" v-text="'СТРОКА R' + (activeRailIndex + 1)"></span>
+                                            <span v-else class="text-warning" v-text="'СТОЛБЕЦ C' + (activeRailIndex + 1)"></span>
+                                        </span>
+                                        <span v-else-if="idx < currentStepIdx" class="text-success">ЗАХВАЧЕНО</span>
+                                        <span v-else v-text="step.axis === 'row' ? 'СТРОКА (ПОСЛЕ ПОВОРОТА)' : 'СТОЛБЕЦ (ПОСЛЕ ПОВОРОТА)'"></span>
+                                    </span>
+                                    <span
+                                        class="badge rounded-0"
+                                        :class="step.targetBase === 16 ? 'bg-warning text-dark' : (step.targetBase === 8 ? 'bg-info text-dark' : 'bg-success text-white')"
+                                        v-text="'→ [' + baseLabel(step.targetBase) + ' / ' + step.targetBase + ']'"
+                                    ></span>
+                                </div>
+
+                                <div class="fs-5 fw-bold text-break">
+                                    <span v-if="step.srcKind === 'direct'">
+                                        <span v-text="formatDisplaySource(step)"></span><sub v-text="step.srcBase"></sub>
+                                    </span>
+                                    <span v-else-if="step.srcKind === 'shift'">
+                                        (<span v-text="formatDisplaySource(step)"></span><sub v-text="step.srcBase"></sub>)
+                                        <span class="text-warning ms-1" v-text="step.opLabel"></span>
+                                    </span>
+                                    <span v-else>
+                                        <span v-text="formatDisplaySource(step)"></span><sub v-text="step.srcBase"></sub>
+                                        <span class="text-warning mx-1" v-text="step.opSymbol"></span>
+                                        <span v-text="step.maskDisplay"></span><sub v-text="step.maskBase"></sub>
+                                    </span>
+                                    <span class="text-secondary ms-1">→ ?<sub v-text="step.targetBase"></sub></span>
+                                </div>
+
+                                <div class="small mt-1">
+                                    <span v-if="idx < currentStepIdx" class="text-success fw-bold">
+                                        ✓ <span v-text="lockedDisplays[idx]"></span><sub v-text="step.targetBase"></sub>
+                                    </span>
+                                    <span v-else-if="idx === currentStepIdx" class="text-info">
+                                        ▶ ВЫБЕРИТЕ ЯЧЕЙКУ НА ШИНЕ И НАЖМИТЕ [SPACE]
+                                    </span>
+                                    <span v-else class="text-secondary">ОЖИДАНИЕ ПРЕДЫДУЩЕГО УЗЛА</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Пространственная матрица (#matrix-board) + Реактивный SVG-трассер сигнала -->
+                    <div id="matrix-board" class="bg-black border border-secondary p-2 p-md-3 mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <div style="width: 42px;" class="text-center small text-secondary fw-bold">BUS</div>
+                            <div
+                                class="flex-grow-1 gap-2"
+                                :style="{ display: 'grid', gridTemplateColumns: 'repeat(' + currentWaveData.size + ', minmax(0, 1fr))' }"
+                            >
+                                <div
+                                    v-for="cIdx in currentWaveData.size"
+                                    :key="'ch-' + cIdx"
+                                    class="text-center small fw-bold py-1 border"
+                                    :class="(activeAxis === 'col' && activeRailIndex === (cIdx - 1)) ? 'border-warning text-warning bg-dark' : 'border-secondary text-secondary'"
+                                    v-text="'C' + cIdx"
+                                ></div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-stretch">
+                            <!-- Метки строк R1..RN -->
+                            <div
+                                style="width: 42px;"
+                                class="d-flex flex-column justify-content-between gap-2 pe-2"
+                            >
+                                <div
+                                    v-for="rIdx in currentWaveData.size"
+                                    :key="'rh-' + rIdx"
+                                    class="flex-grow-1 d-flex align-items-center justify-content-center small fw-bold border"
+                                    :class="(activeAxis === 'row' && activeRailIndex === (rIdx - 1)) ? 'border-info text-info bg-dark' : 'border-secondary text-secondary'"
+                                    v-text="'R' + rIdx"
+                                ></div>
+                            </div>
+
+                            <!-- Сетка ячеек + SVG-трассер захваченного пути -->
+                            <div class="flex-grow-1 position-relative">
+                                <svg
+                                    class="position-absolute top-0 start-0 w-100 h-100"
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                    style="pointer-events: none; z-index: 2;"
+                                >
+                                    <line
+                                        v-for="(seg, sIdx) in traceSegments"
+                                        :key="'seg-' + sIdx"
+                                        :x1="seg.x1"
+                                        :y1="seg.y1"
+                                        :x2="seg.x2"
+                                        :y2="seg.y2"
+                                        stroke="#20c997"
+                                        stroke-width="1.2"
+                                        stroke-dasharray="2,1"
+                                    ></line>
+                                    <circle
+                                        v-for="(pt, pIdx) in tracePoints"
+                                        :key="'pt-' + pIdx"
+                                        :cx="pt.x"
+                                        :cy="pt.y"
+                                        r="1.6"
+                                        fill="#20c997"
+                                    ></circle>
+                                </svg>
+
+                                <div
+                                    class="gap-2 position-relative"
+                                    style="z-index: 1;"
+                                    :style="{ display: 'grid', gridTemplateColumns: 'repeat(' + currentWaveData.size + ', minmax(0, 1fr))' }"
+                                >
+                                    <template v-for="(rowArr, rIdx) in matrixGrid" :key="'row-' + rIdx">
+                                        <div
+                                            v-for="(cell, cIdx) in rowArr"
+                                            :key="'cell-' + rIdx + '-' + cIdx"
+                                            class="p-2 rounded-0 d-flex flex-column justify-content-between"
+                                            :data-cell-row="rIdx"
+                                            :data-cell-col="cIdx"
+                                            :data-in-rail="isCellInActiveRail(rIdx, cIdx) ? 'true' : 'false'"
+                                            :data-cursor="isCursorAt(rIdx, cIdx) ? 'true' : 'false'"
+                                            :data-locked="cell.locked ? 'true' : 'false'"
+                                            :data-cell-base="cell.base"
+                                            :data-cell-text="cell.rawDisplay"
+                                            :style="getCellStyle(rIdx, cIdx, cell)"
+                                        >
+                                            <div class="d-flex justify-content-between align-items-center gap-1" style="font-size: 0.7rem;">
+                                                <span
+                                                    v-if="cell.locked"
+                                                    class="badge bg-success text-white rounded-0"
+                                                    v-text="'#' + cell.lockedStep"
+                                                ></span>
+                                                <span
+                                                    v-else-if="isCursorAt(rIdx, cIdx)"
+                                                    class="fw-bold"
+                                                    :class="isCellInActiveRail(rIdx, cIdx) ? 'text-info' : 'text-danger'"
+                                                    v-text="'▶ ' + slotLabelForCell(rIdx, cIdx)"
+                                                ></span>
+                                                <span
+                                                    v-else
+                                                    class="text-secondary"
+                                                    v-text="slotLabelForCell(rIdx, cIdx)"
+                                                ></span>
+
+                                                <span
+                                                    class="badge rounded-0"
+                                                    :class="cell.base === 16 ? 'border border-warning text-warning' : (cell.base === 8 ? 'border border-info text-info' : 'border border-success text-success')"
+                                                    v-text="baseLabel(cell.base)"
+                                                ></span>
+                                            </div>
+
+                                            <div class="text-center fw-bold my-1 text-break" :class="currentWaveData.size >= 6 ? 'small' : 'fs-6'">
+                                                <span class="text-light" v-text="formatCellDisplay(cell)"></span><sub class="text-secondary" v-text="cell.base"></sub>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Компактный Keycap HUD + Координаты курсора -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 bg-black border border-secondary px-3 py-2 small">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="badge bg-dark border border-info text-info rounded-0">
+                                КУРСОР: <span v-text="'R' + (cursorRow + 1) + ' : C' + (cursorCol + 1)"></span>
+                            </span>
+                            <span
+                                class="badge rounded-0"
+                                :class="isCursorOnActiveRail ? 'bg-success text-white' : 'bg-danger text-white'"
+                                v-text="isCursorOnActiveRail ? 'НА АКТИВНОЙ ШИНЕ' : 'ВНЕ ШИНЫ (ОПАСНОСТЬ СБРОСА)'"
+                            ></span>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2 text-secondary">
+                            <span><code>[W/S/A/D]</code> / <code>[↑/↓/←/→]</code> — курсор</span>
+                            <span><code>[1..<span v-text="currentWaveData.size"></span>]</code> — слот шины</span>
+                            <span><code>[Shift]</code> — 3/4 бита</span>
+                            <span><code>[Space]</code> — захват</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ЭКРАН 3: ПОБЕДА (Victory Screen) -->
+                <div v-else-if="gameState === 'victory'" class="text-center py-4">
+                    <div class="display-5 text-success fw-bold mb-2">ПРОТОКОЛ 2 ↔ 8 ↔ 16 ВЗЛОМАН!</div>
+                    <p class="text-light fs-6 mx-auto mb-4" style="max-width: 680px;">
+                        Все 10 волн кибер-матрицы успешно пройдены в хардкор-режиме без единой незакрытой ошибки.
+                    </p>
+
+                    <div class="row g-3 justify-content-center mx-auto mb-4" style="max-width: 620px;">
+                        <div class="col-4">
+                            <div class="p-3 bg-black border border-success rounded-0">
+                                <div class="text-secondary small">ВОЛНЫ</div>
+                                <div class="fs-4 fw-bold text-success">10 / 10</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 bg-black border border-info rounded-0">
+                                <div class="text-secondary small">ВРЕМЯ</div>
+                                <div class="fs-4 fw-bold text-info" v-text="formatTime(totalSessionElapsed)"></div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 bg-black border border-warning rounded-0">
+                                <div class="text-secondary small">СБОЕВ</div>
+                                <div class="fs-4 fw-bold text-warning" v-text="failCount"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        id="restart-btn"
+                        type="button"
+                        @click="restartGame"
+                        class="btn btn-outline-success btn-lg rounded-0 px-5 py-3 fw-bold"
+                        style="min-height: 54px;"
+                    >
+                        ↺ ПРОЙТИ ЗАНОВО [ПРОБЕЛ]
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline src="/static/vue.global.js"></script>
+    <script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+        const TOTAL_WAVES = 10;
+        const MISSION_NAME = 'Урок 34 :: Двоичная, восьмеричная и шестнадцатеричная системы счисления, связь между ними (Уровень 3)';
+        const BASE_LABELS = { 2: 'BIN', 8: 'OCT', 16: 'HEX' };
+        const MASKS_POOL = [
+            { val: 0xF0, hex: 'F0' },
+            { val: 0x0F, hex: '0F' },
+            { val: 0x3C, hex: '3C' },
+            { val: 0xC3, hex: 'C3' },
+            { val: 0xAA, hex: 'AA' },
+            { val: 0x55, hex: '55' }
+        ];
+
+        // --- Web Audio API (без внешних аудиофайлов) ---
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioCls = window.AudioContext || window.webkitAudioContext;
+                if (AudioCls) audioCtx = new AudioCls();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        function playTone(freq, type, duration, vol = 0.1) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                gain.gain.setValueAtTime(vol, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        function playStepSound() {
+            playTone(620, 'triangle', 0.045, 0.06);
+        }
+
+        function playShiftModeSound() {
+            playTone(480, 'sine', 0.07, 0.08);
+        }
+
+        function playLockSound(stepIdx) {
+            playTone(540 + stepIdx * 130, 'triangle', 0.11, 0.11);
+        }
+
+        function playWaveClearSound() {
+            playTone(587.33, 'triangle', 0.09, 0.12);
+            setTimeout(() => playTone(783.99, 'triangle', 0.11, 0.12), 75);
+            setTimeout(() => playTone(1046.5, 'triangle', 0.16, 0.12), 145);
+        }
+
+        function playAlarmSiren() {
+            playTone(230, 'sawtooth', 0.22, 0.16);
+            setTimeout(() => playTone(165, 'sawtooth', 0.30, 0.16), 210);
+        }
+
+        function playVictoryFanfare() {
+            [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+                setTimeout(() => playTone(freq, 'triangle', 0.2, 0.13), idx * 100);
+            });
+        }
+
+        // --- Утилиты генерации и форматирования ---
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pick(arr) {
+            return arr[randInt(0, arr.length - 1)];
+        }
+
+        function formatIntValue(val, base, minBinBits = 8) {
+            if (base === 2) return val.toString(2).padStart(minBinBits, '0');
+            if (base === 8) return val.toString(8);
+            return val.toString(16).toUpperCase();
+        }
+
+        function formatFracValue(num16, base) {
+            if (base === 2) {
+                const raw4 = num16.toString(2).padStart(4, '0');
+                return '0,' + (num16 % 2 === 1 ? raw4 : raw4.replace(/0+$/, ''));
+            }
+            if (base === 8) {
+                const bits6 = num16 << 2;
+                const o1 = (bits6 >> 3) & 7;
+                const o2 = bits6 & 7;
+                return '0,' + (o2 === 0 ? o1.toString(8) : o1.toString(8) + o2.toString(8));
+            }
+            return '0,' + num16.toString(16).toUpperCase();
+        }
+
+        function groupBinaryString(str, mode, isFraction) {
+            if (mode === 'raw') return str;
+            const g = mode === 'triad' ? 3 : 4;
+            if (isFraction && str.includes(',')) {
+                const parts = str.split(',');
+                const frac = parts[1];
+                const padNeed = (g - (frac.length % g)) % g;
+                const padded = frac + '0'.repeat(padNeed);
+                const chunks = [];
+                for (let i = 0; i < padded.length; i += g) {
+                    chunks.push(padded.slice(i, i + g));
+                }
+                return parts[0] + ',' + chunks.join(' ');
+            }
+            const padNeed = (g - (str.length % g)) % g;
+            const padded = '0'.repeat(padNeed) + str;
+            const chunks = [];
+            for (let i = 0; i < padded.length; i += g) {
+                chunks.push(padded.slice(i, i + g));
+            }
+            return chunks.join(' ');
+        }
+
+        function makeIntStep(axis, railIndex, row, col, srcBase, targetBase, mode, minVal, maxVal) {
+            if (mode === 'direct') {
+                let val = randInt(minVal, maxVal);
+                if (srcBase === 16 || targetBase === 16) {
+                    let guard = 0;
+                    while (guard < 12 && !/[A-F]/.test(val.toString(16).toUpperCase())) {
+                        val = randInt(minVal, maxVal);
+                        guard += 1;
+                    }
+                }
+                return {
+                    axis,
+                    railIndex,
+                    row,
+                    col,
+                    srcKind: 'direct',
+                    isFraction: false,
+                    srcBase,
+                    targetBase,
+                    srcDisplay: formatIntValue(val, srcBase, 8),
+                    answerKey: 'int:' + val,
+                    answerVal: val,
+                    rawDisplay: formatIntValue(val, targetBase, 8)
+                };
+            }
+
+            if (mode === 'shift') {
+                const isLeft = Math.random() < 0.5;
+                const operand = isLeft ? randInt(16, 120) : randInt(32, 240) & ~1;
+                const res = isLeft ? (operand << 1) : (operand >> 1);
+                return {
+                    axis,
+                    railIndex,
+                    row,
+                    col,
+                    srcKind: 'shift',
+                    isFraction: false,
+                    srcBase,
+                    targetBase,
+                    srcDisplay: formatIntValue(operand, srcBase, 8),
+                    opLabel: isLeft ? '<< 1' : '>> 1',
+                    answerKey: 'int:' + res,
+                    answerVal: res,
+                    rawDisplay: formatIntValue(res, targetBase, 8)
+                };
+            }
+
+            // Побитовая маска (AND / OR / XOR)
+            const maskObj = pick(MASKS_POOL);
+            const opKind = pick(['AND', 'OR', 'XOR']);
+            let operand = randInt(32, 245);
+            let res = operand;
+            let opSymbol = '&';
+            if (opKind === 'AND') {
+                res = operand & maskObj.val;
+                opSymbol = '&';
+            } else if (opKind === 'OR') {
+                res = operand | maskObj.val;
+                opSymbol = '|';
+            } else {
+                res = operand ^ maskObj.val;
+                opSymbol = '⊕';
+            }
+            // Избегаем тривиального нуля при маске
+            if (res === 0) {
+                operand = operand | 0x5A;
+                res = opKind === 'AND' ? (operand & maskObj.val) : (opKind === 'OR' ? (operand | maskObj.val) : (operand ^ maskObj.val));
+            }
+            const maskBase = srcBase === 8 ? 16 : pick([16, 2]);
+            const maskDisplay = maskBase === 16 ? maskObj.hex : formatIntValue(maskObj.val, 2, 8);
+            return {
+                axis,
+                railIndex,
+                row,
+                col,
+                srcKind: 'mask',
+                isFraction: false,
+                srcBase,
+                targetBase,
+                srcDisplay: formatIntValue(operand, srcBase, 8),
+                opSymbol,
+                maskBase,
+                maskDisplay,
+                answerKey: 'int:' + res,
+                answerVal: res,
+                rawDisplay: formatIntValue(res, targetBase, 8)
+            };
+        }
+
+        function makeFracStep(axis, railIndex, row, col, srcBase, targetBase) {
+            const oddNums = [1, 3, 5, 7, 9, 11, 13, 15];
+            const num16 = pick(oddNums);
+            return {
+                axis,
+                railIndex,
+                row,
+                col,
+                srcKind: 'direct',
+                isFraction: true,
+                srcBase,
+                targetBase,
+                srcDisplay: formatFracValue(num16, srcBase),
+                answerKey: 'frac:' + num16,
+                answerVal: num16,
+                rawDisplay: formatFracValue(num16, targetBase)
+            };
+        }
+
+        function pickDistractorCell(stepPool, forbiddenPairs, usedInCellRow, usedInCellCol, wantWrongBaseFromStep) {
+            if (wantWrongBaseFromStep) {
+                const altBases = [2, 8, 16].filter((b) => b !== wantWrongBaseFromStep.targetBase);
+                for (const altBase of altBases) {
+                    const pairSig = wantWrongBaseFromStep.answerKey + '@' + altBase;
+                    if (
+                        !forbiddenPairs.has(pairSig) &&
+                        !usedInCellRow.has(pairSig) &&
+                        !usedInCellCol.has(pairSig)
+                    ) {
+                        return {
+                            key: wantWrongBaseFromStep.answerKey,
+                            base: altBase,
+                            isFraction: wantWrongBaseFromStep.isFraction,
+                            rawDisplay: wantWrongBaseFromStep.isFraction
+                                ? formatFracValue(wantWrongBaseFromStep.answerVal, altBase)
+                                : formatIntValue(wantWrongBaseFromStep.answerVal, altBase, 8)
+                        };
+                    }
+                }
+            }
+
+            const sampleStep = pick(stepPool);
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+                const isFrac = sampleStep.isFraction;
+                const base = pick([2, 8, 16]);
+                let val;
+                let key;
+                let rawDisplay;
+
+                if (isFrac) {
+                    val = attempt < 24
+                        ? Math.max(1, Math.min(15, sampleStep.answerVal + pick([-4, -2, -1, 1, 2, 4])))
+                        : randInt(1, 15);
+                    key = 'frac:' + val;
+                    rawDisplay = formatFracValue(val, base);
+                } else {
+                    if (attempt < 24) {
+                        const bitFlip = 1 << randInt(0, 6);
+                        const cand = sampleStep.answerVal ^ bitFlip;
+                        val = cand >= 1 && cand <= 255 ? cand : randInt(16, 255);
+                    } else {
+                        val = randInt(16, 255);
+                    }
+                    key = 'int:' + val;
+                    rawDisplay = formatIntValue(val, base, 8);
+                }
+
+                const pairSig = key + '@' + base;
+                if (!forbiddenPairs.has(pairSig) && !usedInCellRow.has(pairSig) && !usedInCellCol.has(pairSig)) {
+                    return { key, base, isFraction: isFrac, rawDisplay };
+                }
+            }
+
+            // Аварийный детерминированный перебор, гарантирующий отсутствие коллизий
+            const fallbackBase = 16;
+            for (let v = 16; v <= 255; v += 1) {
+                const k = 'int:' + v;
+                const sig = k + '@' + fallbackBase;
+                if (!forbiddenPairs.has(sig) && !usedInCellRow.has(sig) && !usedInCellCol.has(sig)) {
+                    return { key: k, base: fallbackBase, isFraction: false, rawDisplay: formatIntValue(v, fallbackBase, 8) };
+                }
+            }
+            return { key: 'int:1', base: 16, isFraction: false, rawDisplay: '1' };
+        }
+
+        function buildWave(spec) {
+            const size = spec.size;
+            const c0 = randInt(0, size - 1);
+            const r1 = randInt(1, size - 1);
+            const pathCoords = [
+                { axis: 'row', railIndex: 0, row: 0, col: c0 },
+                { axis: 'col', railIndex: c0, row: r1, col: c0 }
+            ];
+            if (spec.steps.length === 3) {
+                const cChoices = [];
+                for (let c = 0; c < size; c += 1) {
+                    if (c !== c0) cChoices.push(c);
+                }
+                const c1 = pick(cChoices);
+                pathCoords.push({ axis: 'row', railIndex: r1, row: r1, col: c1 });
+            }
+
+            // Строим шаги; гарантируем, что разные шаги на одной шине не конфликтуют
+            const steps = [];
+            const usedTargetSigs = new Set();
+            for (let i = 0; i < spec.steps.length; i += 1) {
+                const stCfg = spec.steps[i];
+                const coord = pathCoords[i];
+                let stepObj = null;
+                for (let tries = 0; tries < 40; tries += 1) {
+                    const candidate = stCfg.frac
+                        ? makeFracStep(coord.axis, coord.railIndex, coord.row, coord.col, stCfg.srcBase, stCfg.targetBase)
+                        : makeIntStep(
+                            coord.axis,
+                            coord.railIndex,
+                            coord.row,
+                            coord.col,
+                            stCfg.srcBase,
+                            stCfg.targetBase,
+                            stCfg.kind,
+                            stCfg.minVal || 40,
+                            stCfg.maxVal || 255
+                        );
+                    const sig = candidate.answerKey + '@' + candidate.targetBase;
+                    if (!usedTargetSigs.has(sig)) {
+                        usedTargetSigs.add(sig);
+                        stepObj = candidate;
+                        break;
+                    }
+                }
+                if (!stepObj) {
+                    stepObj = makeIntStep(coord.axis, coord.railIndex, coord.row, coord.col, stCfg.srcBase, stCfg.targetBase, 'direct', 20, 250);
+                }
+                steps.push(stepObj);
+            }
+
+            const grid = Array.from({ length: size }, () => Array(size).fill(null));
+            const rowSigs = Array.from({ length: size }, () => new Set());
+            const colSigs = Array.from({ length: size }, () => new Set());
+
+            for (let i = 0; i < steps.length; i += 1) {
+                const st = steps[i];
+                const sig = st.answerKey + '@' + st.targetBase;
+                grid[st.row][st.col] = {
+                    key: st.answerKey,
+                    base: st.targetBase,
+                    isFraction: st.isFraction,
+                    rawDisplay: st.rawDisplay,
+                    locked: false,
+                    lockedStep: null
+                };
+                rowSigs[st.row].add(sig);
+                colSigs[st.col].add(sig);
+            }
+
+            // Для каждой ячейки (r, c) запрещаем (answerKey, targetBase) всех шагов, чья шина проходит через (r, c)
+            function getForbiddenPairsForCell(r, c) {
+                const set = new Set();
+                for (const st of steps) {
+                    if ((st.axis === 'row' && st.railIndex === r) || (st.axis === 'col' && st.railIndex === c)) {
+                        set.add(st.answerKey + '@' + st.targetBase);
+                    }
+                }
+                return set;
+            }
+
+            // На волнах 4+ внедряем дистрактор «то же число, но неверная система счисления» на активной шине
+            let placedWrongBaseTrap = false;
+            if (spec.wrongBaseTrap) {
+                for (const st of steps) {
+                    if (placedWrongBaseTrap) break;
+                    for (let k = 0; k < size; k += 1) {
+                        const rr = st.axis === 'row' ? st.railIndex : k;
+                        const cc = st.axis === 'col' ? st.railIndex : k;
+                        if (grid[rr][cc]) continue;
+                        const forbidden = getForbiddenPairsForCell(rr, cc);
+                        const cellObj = pickDistractorCell(steps, forbidden, rowSigs[rr], colSigs[cc], st);
+                        grid[rr][cc] = {
+                            ...cellObj,
+                            locked: false,
+                            lockedStep: null
+                        };
+                        rowSigs[rr].add(cellObj.key + '@' + cellObj.base);
+                        colSigs[cc].add(cellObj.key + '@' + cellObj.base);
+                        placedWrongBaseTrap = true;
+                        break;
+                    }
+                }
+            }
+
+            for (let r = 0; r < size; r += 1) {
+                for (let c = 0; c < size; c += 1) {
+                    if (grid[r][c]) continue;
+                    const forbidden = getForbiddenPairsForCell(r, c);
+                    const cellObj = pickDistractorCell(steps, forbidden, rowSigs[r], colSigs[c], null);
+                    grid[r][c] = {
+                        ...cellObj,
+                        locked: false,
+                        lockedStep: null
+                    };
+                    rowSigs[r].add(cellObj.key + '@' + cellObj.base);
+                    colSigs[c].add(cellObj.key + '@' + cellObj.base);
+                }
+            }
+
+            return {
+                wave: spec.wave,
+                title: spec.title,
+                size,
+                maxTime: spec.maxTime,
+                isBreather: Boolean(spec.isBreather),
+                steps,
+                grid
+            };
+        }
+
+        function generateWaves() {
+            const specs = [
+                {
+                    wave: 1,
+                    title: 'Триады (2 ↔ 8)',
+                    size: 4,
+                    maxTime: 34.0,
+                    wrongBaseTrap: false,
+                    steps: [
+                        { kind: 'direct', srcBase: 2, targetBase: 8, minVal: 64, maxVal: 255 },
+                        { kind: 'direct', srcBase: 8, targetBase: 2, minVal: 64, maxVal: 255 }
+                    ]
+                },
+                {
+                    wave: 2,
+                    title: 'Тетрады (2 ↔ 16)',
+                    size: 4,
+                    maxTime: 31.0,
+                    wrongBaseTrap: false,
+                    steps: [
+                        { kind: 'direct', srcBase: 2, targetBase: 16, minVal: 64, maxVal: 255 },
+                        { kind: 'direct', srcBase: 16, targetBase: 2, minVal: 64, maxVal: 255 }
+                    ]
+                },
+                {
+                    wave: 3,
+                    title: 'Микс триад и тетрад',
+                    size: 4,
+                    maxTime: 28.0,
+                    wrongBaseTrap: false,
+                    steps: [
+                        pick([
+                            { kind: 'direct', srcBase: 2, targetBase: 8, minVal: 64, maxVal: 255 },
+                            { kind: 'direct', srcBase: 2, targetBase: 16, minVal: 64, maxVal: 255 }
+                        ]),
+                        pick([
+                            { kind: 'direct', srcBase: 16, targetBase: 2, minVal: 64, maxVal: 255 },
+                            { kind: 'direct', srcBase: 8, targetBase: 2, minVal: 64, maxVal: 255 }
+                        ])
+                    ]
+                },
+                {
+                    wave: 4,
+                    title: 'Двоичный мост (8 ↔ 16)',
+                    size: 5,
+                    maxTime: 27.0,
+                    wrongBaseTrap: true,
+                    steps: [
+                        { kind: 'direct', srcBase: 8, targetBase: 16, minVal: 64, maxVal: 255 },
+                        { kind: 'direct', srcBase: 16, targetBase: 8, minVal: 64, maxVal: 255 },
+                        { kind: 'direct', srcBase: 2, targetBase: 16, minVal: 64, maxVal: 255 }
+                    ]
+                },
+                {
+                    wave: 5,
+                    title: 'Каскад шин 8 ↔ 16 ↔ 2',
+                    size: 5,
+                    maxTime: 25.0,
+                    wrongBaseTrap: true,
+                    steps: [
+                        { kind: 'direct', srcBase: 8, targetBase: 16, minVal: 40, maxVal: 255 },
+                        { kind: 'direct', srcBase: 16, targetBase: 2, minVal: 40, maxVal: 255 },
+                        { kind: 'direct', srcBase: 2, targetBase: 8, minVal: 40, maxVal: 255 }
+                    ]
+                },
+                {
+                    wave: 6,
+                    title: 'Дробный двоичный мост (0,xxxx)',
+                    size: 5,
+                    maxTime: 24.0,
+                    wrongBaseTrap: true,
+                    steps: [
+                        { frac: true, srcBase: 2, targetBase: 16 },
+                        { frac: true, srcBase: 16, targetBase: 8 },
+                        { frac: true, srcBase: 8, targetBase: 2 }
+                    ]
+                },
+                {
+                    wave: 7,
+                    title: 'Сдвиги (<< 1, >> 1) и битовые маски',
+                    size: 5,
+                    maxTime: 22.0,
+                    wrongBaseTrap: true,
+                    steps: [
+                        { kind: 'shift', srcBase: 2, targetBase: 16 },
+                        { kind: 'mask', srcBase: 16, targetBase: 8 },
+                        { kind: 'shift', srcBase: 8, targetBase: 2 }
+                    ]
+                },
+                {
+                    wave: 8,
+                    title: 'Тактовая стабилизация (Передышка)',
+                    size: 4,
+                    maxTime: 25.0,
+                    isBreather: true,
+                    wrongBaseTrap: false,
+                    steps: [
+                        { kind: 'direct', srcBase: 2, targetBase: 16, minVal: 48, maxVal: 255 },
+                        { kind: 'direct', srcBase: 2, targetBase: 8, minVal: 48, maxVal: 255 }
+                    ]
+                },
+                {
+                    wave: 9,
+                    title: 'Кибер-штурм 6×6: мост и маски',
+                    size: 6,
+                    maxTime: 19.0,
+                    wrongBaseTrap: true,
+                    steps: [
+                        { kind: 'direct', srcBase: 8, targetBase: 16, minVal: 64, maxVal: 255 },
+                        { kind: 'mask', srcBase: 16, targetBase: 2 },
+                        { kind: 'direct', srcBase: 16, targetBase: 8, minVal: 64, maxVal: 255 }
+                    ]
+                },
+                {
+                    wave: 10,
+                    title: 'Финальный взлом ядра 6×6',
+                    size: 6,
+                    maxTime: 16.0,
+                    wrongBaseTrap: true,
+                    steps: [
+                        { kind: 'direct', srcBase: 8, targetBase: 16, minVal: 64, maxVal: 255 },
+                        { frac: true, srcBase: 2, targetBase: 8 },
+                        { kind: 'mask', srcBase: 8, targetBase: 16 }
+                    ]
+                }
+            ];
+            return specs.map(buildWave);
+        }
+
+        // --- Единая телеметрия и AFK-защита ---
+        let appInstance = null;
+        const telemetry = window.LMSTelemetry.create({
+            missionName: MISSION_NAME,
+            level: 3,
+            totalWaves: TOTAL_WAVES,
+            showAfkOverlay: true,
+            onAfkStop: () => {
+                if (appInstance) appInstance.handleAfkStop();
+            },
+            onAfkRetry: () => {
+                if (appInstance) appInstance.handleAfkRetry();
+            }
+        });
+
+        let timerInterval = null;
+        let resetTimeout = null;
+        let pulseTimeout = null;
+        let flashTimeout = null;
+        let shakeTimeouts = [];
+
+        function cloneMatrixGrid(grid) {
+            return grid.map((row) => row.map((cell) => ({ ...cell, locked: false, lockedStep: null })));
+        }
+
+        const app = Vue.createApp({
+            data() {
+                return {
+                    gameState: 'intro',
+                    activeWaves: generateWaves(),
+                    currentWave: 1,
+                    currentStepIdx: 0,
+                    activeAxis: 'row',
+                    activeRailIndex: 0,
+                    cursorRow: 0,
+                    cursorCol: 0,
+                    matrixGrid: [],
+                    lockedCoords: [],
+                    lockedDisplays: [],
+                    bitGroupMode: 'raw',
+                    timeLeft: 34.0,
+                    failCount: 0,
+                    alarmActive: false,
+                    alarmMessage: '',
+                    isSuccessPulse: false,
+                    successMessage: '',
+                    isActionBlocked: false,
+                    isAfkPaused: false,
+                    flashCellKey: '',
+                    shakeOffsetPx: 0,
+                    sessionStartTime: 0,
+                    totalSessionElapsed: 0
+                };
+            },
+
+            computed: {
+                currentWaveData() {
+                    return this.activeWaves[this.currentWave - 1] || this.activeWaves[0];
+                },
+                isCursorOnActiveRail() {
+                    return this.isCellInActiveRail(this.cursorRow, this.cursorCol);
+                },
+                tracePoints() {
+                    const n = this.currentWaveData.size || 4;
+                    return this.lockedCoords.map((pt) => ({
+                        x: ((pt.col + 0.5) / n) * 100,
+                        y: ((pt.row + 0.5) / n) * 100
+                    }));
+                },
+                traceSegments() {
+                    const pts = this.tracePoints;
+                    const segs = [];
+                    for (let i = 1; i < pts.length; i += 1) {
+                        segs.push({
+                            x1: pts[i - 1].x,
+                            y1: pts[i - 1].y,
+                            x2: pts[i].x,
+                            y2: pts[i].y
+                        });
+                    }
+                    return segs;
+                }
+            },
+
+            mounted() {
+                this._boundKeydown = (e) => this.handleKeydown(e);
+                window.addEventListener('keydown', this._boundKeydown);
+            },
+
+            unmounted() {
+                if (this._boundKeydown) {
+                    window.removeEventListener('keydown', this._boundKeydown);
+                    this._boundKeydown = null;
+                }
+                this.clearAllTimers();
+            },
+
+            methods: {
+                clearAllTimers() {
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    if (resetTimeout) {
+                        clearTimeout(resetTimeout);
+                        resetTimeout = null;
+                    }
+                    if (pulseTimeout) {
+                        clearTimeout(pulseTimeout);
+                        pulseTimeout = null;
+                    }
+                    if (flashTimeout) {
+                        clearTimeout(flashTimeout);
+                        flashTimeout = null;
+                    }
+                    shakeTimeouts.forEach((t) => clearTimeout(t));
+                    shakeTimeouts = [];
+                },
+
+                baseLabel(base) {
+                    return BASE_LABELS[base] || String(base);
+                },
+
+                isCellInActiveRail(rIdx, cIdx) {
+                    return this.activeAxis === 'row'
+                        ? rIdx === this.activeRailIndex
+                        : cIdx === this.activeRailIndex;
+                },
+
+                isCursorAt(rIdx, cIdx) {
+                    return this.cursorRow === rIdx && this.cursorCol === cIdx;
+                },
+
+                slotLabelForCell(rIdx, cIdx) {
+                    if (this.activeAxis === 'row' && rIdx === this.activeRailIndex) {
+                        return '[' + (cIdx + 1) + ']';
+                    }
+                    if (this.activeAxis === 'col' && cIdx === this.activeRailIndex) {
+                        return '[' + (rIdx + 1) + ']';
+                    }
+                    return '·';
+                },
+
+                formatDisplaySource(step) {
+                    if (step.srcBase === 2) {
+                        return groupBinaryString(step.srcDisplay, this.bitGroupMode, step.isFraction);
+                    }
+                    return step.srcDisplay;
+                },
+
+                formatCellDisplay(cell) {
+                    if (cell.base === 2) {
+                        return groupBinaryString(cell.rawDisplay, this.bitGroupMode, cell.isFraction);
+                    }
+                    return cell.rawDisplay;
+                },
+
+                getCellStyle(rIdx, cIdx, cell) {
+                    const inRail = this.isCellInActiveRail(rIdx, cIdx);
+                    const isCursor = this.isCursorAt(rIdx, cIdx);
+                    const isFlashing = this.flashCellKey === (rIdx + '-' + cIdx);
+                    const railBg = this.activeAxis === 'row'
+                        ? 'rgba(13, 202, 240, 0.10)'
+                        : 'rgba(255, 193, 7, 0.10)';
+
+                    let background = '#06080b';
+                    let border = '1px solid #2b3035';
+                    let boxShadow = 'none';
+
+                    if (inRail) {
+                        background = railBg;
+                        border = this.activeAxis === 'row' ? '1px solid #0dcaf0' : '1px solid #ffc107';
+                    }
+                    if (cell.locked) {
+                        background = 'rgba(25, 135, 84, 0.28)';
+                        border = '2px solid #20c997';
+                    }
+                    if (isFlashing) {
+                        background = 'rgba(32, 201, 151, 0.48)';
+                        boxShadow = '0 0 18px rgba(32, 201, 151, 0.8)';
+                    }
+                    if (isCursor) {
+                        border = inRail ? '2px solid #00f0ff' : '2px solid #ff3b3b';
+                        boxShadow = inRail
+                            ? '0 0 14px rgba(0, 240, 255, 0.78)'
+                            : '0 0 14px rgba(255, 59, 59, 0.78)';
+                    }
+
+                    return {
+                        minHeight: this.currentWaveData.size >= 6 ? '64px' : '74px',
+                        pointerEvents: 'none',
+                        background,
+                        border,
+                        boxShadow,
+                        transition: 'background 150ms ease, border-color 150ms ease, box-shadow 150ms ease'
+                    };
+                },
+
+                triggerScreenShake() {
+                    shakeTimeouts.forEach((t) => clearTimeout(t));
+                    shakeTimeouts = [];
+                    const offsets = [-8, 8, -5, 4, 0];
+                    offsets.forEach((px, idx) => {
+                        shakeTimeouts.push(setTimeout(() => {
+                            this.shakeOffsetPx = px;
+                        }, idx * 55));
+                    });
+                },
+
+                startGame() {
+                    this.clearAllTimers();
+                    this.gameState = 'playing';
+                    this.sessionStartTime = Date.now();
+                    this.totalSessionElapsed = 0;
+                    this.failCount = 0;
+                    this.alarmActive = false;
+                    this.alarmMessage = '';
+                    this.isSuccessPulse = false;
+                    this.isActionBlocked = false;
+                    this.isAfkPaused = false;
+                    this.bitGroupMode = 'raw';
+                    this.activeWaves = generateWaves();
+
+                    telemetry.reset({ allowRecomplete: true });
+                    telemetry.start();
+                    telemetry.setWave(1, TOTAL_WAVES);
+                    telemetry.progress({
+                        wave: 1,
+                        total_waves: TOTAL_WAVES,
+                        stage: 1,
+                        total_stages: TOTAL_WAVES
+                    });
+                    this.loadWave(1);
+                },
+
+                restartGame() {
+                    this.clearAllTimers();
+                    this.alarmActive = false;
+                    this.isSuccessPulse = false;
+                    this.isActionBlocked = false;
+                    this.isAfkPaused = false;
+                    this.shakeOffsetPx = 0;
+                    telemetry.reset({ allowRecomplete: true });
+                    this.gameState = 'intro';
+                },
+
+                loadWave(waveNum) {
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    this.currentWave = waveNum;
+                    const waveData = this.currentWaveData;
+                    this.matrixGrid = cloneMatrixGrid(waveData.grid);
+                    this.currentStepIdx = 0;
+                    this.activeAxis = 'row';
+                    this.activeRailIndex = 0;
+                    this.cursorRow = 0;
+                    this.cursorCol = 0;
+                    this.lockedCoords = [];
+                    this.lockedDisplays = [];
+                    this.alarmActive = false;
+                    this.isActionBlocked = false;
+                    this.flashCellKey = '';
+                    this.timeLeft = waveData.maxTime;
+
+                    telemetry.setWave(waveNum, TOTAL_WAVES);
+
+                    timerInterval = setInterval(() => {
+                        if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused) return;
+                        this.timeLeft = Math.max(0, +(this.timeLeft - 0.1).toFixed(1));
+                        if (this.timeLeft <= 0) {
+                            this.triggerHardcoreReset(`Время волны ${waveNum} истекло! Сбой синхронизации шины.`, true);
+                        }
+                    }, 100);
+                },
+
+                moveCursor(dRow, dCol) {
+                    if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused || this.alarmActive) return;
+                    const n = this.currentWaveData.size;
+                    this.cursorRow = (this.cursorRow + dRow + n) % n;
+                    this.cursorCol = (this.cursorCol + dCol + n) % n;
+                    telemetry.markActivity();
+                    playStepSound();
+                },
+
+                jumpToRailSlot(slotIdx) {
+                    if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused || this.alarmActive) return;
+                    const n = this.currentWaveData.size;
+                    if (slotIdx < 0 || slotIdx >= n) return;
+                    if (this.activeAxis === 'row') {
+                        this.cursorRow = this.activeRailIndex;
+                        this.cursorCol = slotIdx;
+                    } else {
+                        this.cursorRow = slotIdx;
+                        this.cursorCol = this.activeRailIndex;
+                    }
+                    telemetry.markActivity();
+                    playStepSound();
+                },
+
+                cycleBitGroupMode() {
+                    if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused || this.alarmActive) return;
+                    const order = ['raw', 'triad', 'tetrad'];
+                    const nextIdx = (order.indexOf(this.bitGroupMode) + 1) % order.length;
+                    this.bitGroupMode = order[nextIdx];
+                    telemetry.markActivity();
+                    playShiftModeSound();
+                },
+
+                lockCurrentCell() {
+                    if (this.gameState !== 'playing' || this.isActionBlocked || this.isAfkPaused || this.alarmActive) return;
+                    telemetry.markActivity();
+
+                    const r = this.cursorRow;
+                    const c = this.cursorCol;
+                    const cell = this.matrixGrid[r] && this.matrixGrid[r][c];
+                    const step = this.currentWaveData.steps[this.currentStepIdx];
+                    if (!cell || !step) return;
+
+                    if (!this.isCellInActiveRail(r, c)) {
+                        const expectedRail = this.activeAxis === 'row'
+                            ? `строке R${this.activeRailIndex + 1}`
+                            : `столбце C${this.activeRailIndex + 1}`;
+                        this.triggerHardcoreReset(
+                            `Ячейка R${r + 1}:C${c + 1} находится вне активной шины (требуется узел в ${expectedRail})!`,
+                            false
+                        );
+                        return;
+                    }
+
+                    if (cell.locked) {
+                        this.triggerHardcoreReset(`Ячейка R${r + 1}:C${c + 1} уже использована в текущем буфере!`, false);
+                        return;
+                    }
+
+                    if (cell.key !== step.answerKey) {
+                        this.triggerHardcoreReset(
+                            `Неверное значение ${cell.rawDisplay} (${this.baseLabel(cell.base)}) вместо ${step.rawDisplay} (${this.baseLabel(step.targetBase)})!`,
+                            false
+                        );
+                        return;
+                    }
+
+                    if (cell.base !== step.targetBase) {
+                        this.triggerHardcoreReset(
+                            `Значение совпадает, но выбрана неверная система счисления: ${this.baseLabel(cell.base)} вместо ${this.baseLabel(step.targetBase)}!`,
+                            false
+                        );
+                        return;
+                    }
+
+                    // Успешный захват ячейки шага
+                    cell.locked = true;
+                    cell.lockedStep = this.currentStepIdx + 1;
+                    this.lockedCoords.push({ row: r, col: c });
+                    this.lockedDisplays.push(cell.rawDisplay);
+
+                    this.flashCellKey = r + '-' + c;
+                    if (flashTimeout) clearTimeout(flashTimeout);
+                    flashTimeout = setTimeout(() => {
+                        this.flashCellKey = '';
+                    }, 220);
+
+                    playLockSound(this.currentStepIdx);
+
+                    if (this.currentStepIdx + 1 < this.currentWaveData.steps.length) {
+                        this.currentStepIdx += 1;
+                        if (this.activeAxis === 'row') {
+                            this.activeAxis = 'col';
+                            this.activeRailIndex = c;
+                        } else {
+                            this.activeAxis = 'row';
+                            this.activeRailIndex = r;
+                        }
+                        return;
+                    }
+
+                    // Все шаги волны захвачены
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    this.isActionBlocked = true;
+
+                    if (this.currentWave >= TOTAL_WAVES) {
+                        playVictoryFanfare();
+                        this.totalSessionElapsed = Math.max(1, Math.round((Date.now() - this.sessionStartTime) / 1000));
+                        this.gameState = 'victory';
+                        telemetry.complete({
+                            wave: TOTAL_WAVES,
+                            total_waves: TOTAL_WAVES,
+                            stage: TOTAL_WAVES,
+                            total_stages: TOTAL_WAVES,
+                            time_spent_sec: this.totalSessionElapsed
+                        });
+                    } else {
+                        playWaveClearSound();
+                        const nextWave = this.currentWave + 1;
+                        this.successMessage = `Волна ${this.currentWave} взломана! Переключение на волну ${nextWave}...`;
+                        this.isSuccessPulse = true;
+                        telemetry.advanceWave(nextWave);
+                        pulseTimeout = setTimeout(() => {
+                            this.isSuccessPulse = false;
+                            if (this.gameState === 'playing' && !this.isAfkPaused) {
+                                this.loadWave(nextWave);
+                            }
+                        }, 240);
+                    }
+                },
+
+                triggerHardcoreReset(reason, isTimeout) {
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    this.isActionBlocked = true;
+                    this.isSuccessPulse = false;
+                    this.failCount += 1;
+
+                    const shouldReset = telemetry.fail({
+                        wave: this.currentWave,
+                        total_waves: TOTAL_WAVES,
+                        stage: this.currentWave,
+                        total_stages: TOTAL_WAVES,
+                        isTimeout: Boolean(isTimeout)
+                    });
+
+                    if (shouldReset === false) {
+                        return;
+                    }
+
+                    playAlarmSiren();
+                    this.triggerScreenShake();
+                    this.alarmMessage = reason;
+                    this.alarmActive = true;
+
+                    if (resetTimeout) clearTimeout(resetTimeout);
+                    resetTimeout = setTimeout(() => {
+                        if (this.gameState !== 'playing' || this.isAfkPaused) return;
+                        this.alarmActive = false;
+                        this.activeWaves = generateWaves();
+                        this.loadWave(1);
+                    }, 1650);
+                },
+
+                handleAfkStop() {
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    this.isAfkPaused = true;
+                    this.isActionBlocked = true;
+                    this.alarmActive = false;
+                },
+
+                handleAfkRetry() {
+                    this.isAfkPaused = false;
+                    this.isActionBlocked = false;
+                    this.alarmActive = false;
+                    if (this.gameState === 'playing') {
+                        this.activeWaves = generateWaves();
+                        this.loadWave(1);
+                    }
+                },
+
+                handleKeydown(e) {
+                    if (e.repeat) return;
+
+                    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+                        e.preventDefault();
+                    }
+
+                    const telState = telemetry.getState();
+                    if (this.isAfkPaused || telState.isAfkPaused) {
+                        if (e.code === 'Space') {
+                            telemetry.resumeFromAfk();
+                        }
+                        return;
+                    }
+
+                    if (this.gameState === 'intro') {
+                        if (e.code === 'Space') {
+                            this.startGame();
+                        }
+                        return;
+                    }
+
+                    if (this.gameState === 'victory') {
+                        if (e.code === 'Space') {
+                            this.restartGame();
+                        }
+                        return;
+                    }
+
+                    if (this.gameState !== 'playing' || this.alarmActive || this.isActionBlocked) {
+                        return;
+                    }
+
+                    switch (e.code) {
+                        case 'KeyW':
+                        case 'ArrowUp':
+                            this.moveCursor(-1, 0);
+                            return;
+                        case 'KeyS':
+                        case 'ArrowDown':
+                            this.moveCursor(1, 0);
+                            return;
+                        case 'KeyA':
+                        case 'ArrowLeft':
+                            this.moveCursor(0, -1);
+                            return;
+                        case 'KeyD':
+                        case 'ArrowRight':
+                            this.moveCursor(0, 1);
+                            return;
+                        case 'ShiftLeft':
+                        case 'ShiftRight':
+                            this.cycleBitGroupMode();
+                            return;
+                        case 'Space':
+                            this.lockCurrentCell();
+                            return;
+                        default:
+                            break;
+                    }
+
+                    const digitMatch = e.code && (e.code.match(/^Digit([1-6])$/) || e.code.match(/^Numpad([1-6])$/));
+                    if (digitMatch) {
+                        const slotIdx = Number(digitMatch[1]) - 1;
+                        if (slotIdx < this.currentWaveData.size) {
+                            this.jumpToRailSlot(slotIdx);
+                        }
+                    }
+                },
+
+                formatTime(sec) {
+                    const m = Math.floor(sec / 60);
+                    const s = sec % 60;
+                    return `${m}м ${String(s).padStart(2, '0')}с`;
+                }
+            }
+        });
+
+        appInstance = app.mount('#arcade-app');
+
+        // Отладочный и регрессионный хук E2E (персоны не используют, проходят через Black-Box DOM + клавиши)
+        window.__DEV_LEVEL3_STATE__ = {
+            get waves() {
+                return appInstance ? appInstance.activeWaves : [];
+            },
+            get currentWaveIndex() {
+                return appInstance ? appInstance.currentWave - 1 : 0;
+            },
+            get currentWave() {
+                return appInstance ? appInstance.currentWaveData : null;
+            },
+            solveCurrentWave() {
+                if (!appInstance || appInstance.gameState !== 'playing' || appInstance.isActionBlocked || appInstance.alarmActive) return false;
+                const steps = appInstance.currentWaveData.steps;
+                while (appInstance.gameState === 'playing' && !appInstance.isActionBlocked && appInstance.currentStepIdx < steps.length) {
+                    const step = steps[appInstance.currentStepIdx];
+                    appInstance.cursorRow = step.row;
+                    appInstance.cursorCol = step.col;
+                    appInstance.lockCurrentCell();
+                }
+                return true;
+            },
+            submitAction(action, payload) {
+                if (!appInstance) return false;
+                if (action === 'wrong') {
+                    const r = appInstance.activeAxis === 'row' ? appInstance.activeRailIndex : 0;
+                    const c = appInstance.activeAxis === 'col' ? appInstance.activeRailIndex : 0;
+                    const step = appInstance.currentWaveData.steps[appInstance.currentStepIdx];
+                    const n = appInstance.currentWaveData.size;
+                    for (let k = 0; k < n; k += 1) {
+                        const rr = appInstance.activeAxis === 'row' ? r : k;
+                        const cc = appInstance.activeAxis === 'col' ? c : k;
+                        if (rr !== step.row || cc !== step.col) {
+                            appInstance.cursorRow = rr;
+                            appInstance.cursorCol = cc;
+                            appInstance.lockCurrentCell();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                if (action === 'timeout') {
+                    appInstance.triggerHardcoreReset('Тайм-аут волны (тест)', true);
+                    return true;
+                }
+                if (action === 'lock' && payload && typeof payload.row === 'number' && typeof payload.col === 'number') {
+                    appInstance.cursorRow = payload.row;
+                    appInstance.cursorCol = payload.col;
+                    appInstance.lockCurrentCell();
+                    return true;
+                }
+                if (action === 'solve') {
+                    return this.solveCurrentWave();
+                }
+                return false;
+            }
+        };
+    });
+    </script>
+</TaskLayout>
