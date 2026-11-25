@@ -137,7 +137,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await page.locator('#hk-btn-start-mission').click();
     await enterEditorRun(
       page,
-      'нц 4 раз\nвправо\nкц\nвниз; вправо; укрыться; вправо; вправо; вниз; вниз; подключиться'
+      'нц 4 раз\nвправо\nкц\nвниз; вправо; укрыться; бросить вправо; вправо; вниз; вниз; вправо; подключиться'
     );
     await runLinuxInModal(page, [
       'find /home -name "*.dmp"',
@@ -147,10 +147,13 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
       'cat /opt/vault/coords.txt',
       'vault_unlock MEOA-902',
     ]);
-    await enterEditorRun(page, 'нц 3 раз\nвниз\nкц\nзакрасить\nнц 5 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nвправо');
+    await enterEditorRun(
+      page,
+      'нц 3 раз\nвниз\nкц\nзакрасить\nнц 3 раз\nвверх\nкц\nвправо; вверх\nесли сверху опасно то\n  ждать\nвсе\nвверх; бросить вправо\nнц 5 раз\n  если справа враг то\n    оглушить\n    добить\n  все\n  вправо\nкц\nвниз; вниз'
+    );
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
-    // Level 4
+    // Level 4 (2 relays)
     await page.locator('#hk-btn-next-level').click();
     await page.locator('#hk-btn-start-mission').click();
     await enterEditorRun(page, 'нц 5 раз\nвниз\nкц\nнц 7 раз\nвправо\nкц\nподключиться');
@@ -163,11 +166,11 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     ]);
     await enterEditorRun(
       page,
-      'нц 6 раз\nвправо\nкц\nзакрасить\nнц 5 раз\nвлево\nкц\nнц 5 раз\nвверх\nкц\nнц 5 раз\nвправо\nкц\nвниз; вправо; вправо; вниз; вниз'
+      'нц 6 раз\nвправо\nкц\nзакрасить\nнц 5 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вниз\nесли не снизу опасно то\n  ждать\nвсе\nвниз; отключить влево; вправо; вправо; вниз'
     );
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
-    // Level 5
+    // Level 5 (2 relays)
     await page.locator('#hk-btn-next-level').click();
     await page.locator('#hk-btn-start-mission').click();
     await enterEditorRun(
@@ -183,7 +186,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await expect(page.locator('#hk-gbr-tracker')).toBeVisible();
     await enterEditorRun(
       page,
-      'нц 2 раз\nвправо\nкц\nнц 3 раз\nвниз\nкц\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nнц 4 раз\nвверх\nкц\nвправо'
+      'вправо; вправо; вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nвверх; вверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх\nнц 4 раз\nвправо\nкц\nвверх; закрасить\nвверх; влево; вверх; вверх; вправо'
     );
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
@@ -276,5 +279,54 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     const finalState = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState());
     expect(finalState.lastResult.styleBadge).toBe('COMBAT');
     expect(finalState.lastResult.outcomeBranch).toBe('combat_gbr');
+  });
+
+  test('6. FX Idle-Zero <= 420ms without fastAnim and render all 5 level themes & masks cleanly', async ({ page }) => {
+    await setupStudentSession(page);
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto('/games/hotline-kumir?level=3&mask=rasmus&seed=42&mute=1&skipBriefing=1');
+
+    // Run tactical throw + dash to trigger FX in normal (non-fastAnim) mode
+    await enterEditorRun(page, 'бросить вправо; рывок вправо');
+    // Wait 550ms (> 420ms max FX window): rAF loop must auto-stop back to Idle-Zero
+    await page.waitForTimeout(550);
+    const s1 = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getRenderStats());
+    expect(s1.isLoopRunning).toBe(false);
+    await page.waitForTimeout(250);
+    const s2 = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getRenderStats());
+    expect(s2.rafFrames).toBe(s1.rafFrames);
+
+    // Optional visual screenshot capture when HK_SCREENSHOT_DIR is set
+    const shotDir = process.env.HK_SCREENSHOT_DIR;
+    const cases = [
+      { level: 1, mask: 'richard', name: 'level1-kpp-richard.png' },
+      { level: 2, mask: 'sprint', name: 'level2-lobby-sprint.png' },
+      { level: 3, mask: 'rasmus', name: 'level3-office-rasmus.png' },
+      { level: 4, mask: 'tony', name: 'level4-server-tony.png' },
+      { level: 5, mask: 'richard', name: 'level5-vault-gbr.png' },
+    ];
+    for (const c of cases) {
+      await page.evaluate(({ level, mask }) => {
+        window.__HOTLINE_KUMIR_TEST__.selectLevel(level, mask);
+      }, c);
+      if (c.level === 5) {
+        await page.evaluate(() => {
+          window.__HOTLINE_KUMIR_TEST__.execLinux('chmod 600 /home/root_backup/.ssh/id_rsa');
+          window.__HOTLINE_KUMIR_TEST__.execLinux(
+            'scp -P 2222 -i /home/root_backup/.ssh/id_rsa master@127.0.0.1:/vault/dump.sql /mnt/usb/'
+          );
+          window.__HOTLINE_KUMIR_TEST__.execLinux('rm /var/log/access.log');
+          while (!window.__HOTLINE_KUMIR_TEST__.getState().gbrSpawned) {
+            window.__HOTLINE_KUMIR_TEST__.forceTimeout();
+          }
+          window.__HOTLINE_KUMIR_TEST__.flushAnimations();
+        });
+      }
+      const theme = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().theme);
+      expect(theme).toBeTruthy();
+      if (shotDir) {
+        await page.locator('#hk-arena-canvas').screenshot({ path: path.join(shotDir, c.name) });
+      }
+    }
   });
 });

@@ -271,7 +271,7 @@ export class HotlineGameEngine {
   }
 
   private getEnemyVisionCells(enemy: EnemyState): Array<{ x: number; y: number }> {
-    if (enemy.status !== 'active') return [];
+    if (enemy.status !== 'active' || enemy.distractedTurns > 0) return [];
     if (enemy.isGbr) {
       // GBR units threaten melee + facing adjacent cell
       const d = DIR_DELTAS[enemy.facing];
@@ -281,16 +281,29 @@ export class HotlineGameEngine {
       ];
       return cells.filter((c) => this.inBounds(c.x, c.y));
     }
-    // Regular patrols look 2 tiles ahead unless blocked by wall/closed door
+    // Patrol vision: rat=2, raven=3; walls/doors block, COVER blocks vision past itself
+    const range = enemy.kind === 'patrol_raven' ? 3 : 2;
     const d = DIR_DELTAS[enemy.facing];
     const seen: Array<{ x: number; y: number }> = [];
-    for (let step = 1; step <= 2; step++) {
+    for (let step = 1; step <= range; step++) {
       const cx = enemy.x + d.dx * step;
       const cy = enemy.y + d.dy * step;
       if (!this.isPassable(cx, cy)) break;
       seen.push({ x: cx, y: cy });
+      if (this.tiles[cy][cx] === 'COVER') break;
     }
     return seen;
+  }
+
+  private isNearCover(x: number, y: number): boolean {
+    if (!this.inBounds(x, y)) return false;
+    if (this.tiles[y][x] === 'COVER') return true;
+    return ALL_DIRS.some((dir) => {
+      const d = DIR_DELTAS[dir];
+      const nx = x + d.dx;
+      const ny = y + d.dy;
+      return this.inBounds(nx, ny) && this.tiles[ny][nx] === 'COVER';
+    });
   }
 
   private isTileDangerous(x: number, y: number): boolean {
@@ -318,7 +331,7 @@ export class HotlineGameEngine {
     return this.enemies.find((e) => e.x === x && e.y === y && e.status !== 'offline');
   }
 
-  private resolveTargetDir(explicit: Direction | undefined, mode: 'move' | 'door' | 'enemy' | 'device'): Direction {
+  private resolveTargetDir(explicit: Direction | undefined, mode: 'move' | 'door' | 'enemy' | 'device' | 'throw'): Direction {
     if (explicit) return explicit;
     if (mode === 'move') return this.player.facing;
 
@@ -332,6 +345,16 @@ export class HotlineGameEngine {
       }
       if (mode === 'enemy' && this.enemies.some((e) => e.x === nx && e.y === ny && e.status !== 'offline')) {
         return dir;
+      }
+      if (mode === 'throw') {
+        for (let dist = 1; dist <= 3; dist++) {
+          const tx = this.player.x + dx * dist;
+          const ty = this.player.y + dy * dist;
+          if (!this.isPassable(tx, ty)) break;
+          if (this.enemies.some((e) => e.x === tx && e.y === ty && e.status !== 'offline')) {
+            return dir;
+          }
+        }
       }
       if (
         mode === 'device' &&
@@ -562,7 +585,7 @@ export class HotlineGameEngine {
 
   private refreshTelegraphs(): void {
     for (const e of this.enemies) {
-      if (e.status !== 'active') {
+      if (e.status !== 'active' || e.distractedTurns > 0) {
         e.telegraphNext = null;
         e.telegraphAttackCells = [];
         continue;
@@ -634,9 +657,11 @@ export class HotlineGameEngine {
           e.kind === 'gbr_boar' &&
           plan.attackCells.some((c) => c.x === this.player.x && c.y === this.player.y);
 
+        const prevX = e.x;
+        const prevY = e.y;
         e.x = plan.x;
         e.y = plan.y;
-        events.push({ type: 'ENEMY_MOVED', x: e.x, y: e.y, label: e.id, moodAfter: this.getAudioMood() });
+        events.push({ type: 'ENEMY_MOVED', fromX: prevX, fromY: prevY, x: e.x, y: e.y, label: e.id, moodAfter: this.getAudioMood() });
 
         if (collidedBoar || manhattan(e.x, e.y, this.player.x, this.player.y) === 0) {
           this.player.hp--;
@@ -678,9 +703,11 @@ export class HotlineGameEngine {
         else if (nextPt.x < e.x) e.facing = 'LEFT';
         else if (nextPt.y > e.y) e.facing = 'DOWN';
         else if (nextPt.y < e.y) e.facing = 'UP';
+        const prevX = e.x;
+        const prevY = e.y;
         e.x = nextPt.x;
         e.y = nextPt.y;
-        events.push({ type: 'ENEMY_MOVED', x: e.x, y: e.y, label: e.id, moodAfter: this.getAudioMood() });
+        events.push({ type: 'ENEMY_MOVED', fromX: prevX, fromY: prevY, x: e.x, y: e.y, label: e.id, moodAfter: this.getAudioMood() });
       }
     }
 
@@ -709,7 +736,7 @@ export class HotlineGameEngine {
       }
     }
 
-    if (this.player.crouched) {
+    if (this.player.crouched && this.isNearCover(this.player.x, this.player.y)) {
       return;
     }
 
@@ -1101,16 +1128,19 @@ export class HotlineGameEngine {
       case 'WAIT':
         break;
 
-      case 'CROUCH':
+      case 'CROUCH': {
         this.player.crouched = true;
+        const covered = this.isNearCover(this.player.x, this.player.y);
         events.push({
           type: 'ROBOT_CROUCHED',
           line: req.line,
           x: this.player.x,
           y: this.player.y,
+          label: covered ? 'Укрылся за стойкой C' : 'Присел на открытом месте (рядом нет C)',
           moodAfter: this.getAudioMood(),
         });
         break;
+      }
 
       case 'HACK': {
         if (manhattan(this.player.x, this.player.y, this.terminalPos.x, this.terminalPos.y) > 1) {
@@ -1140,7 +1170,7 @@ export class HotlineGameEngine {
         for (const cam of this.cameras) {
           if (cam.x === tx && cam.y === ty && cam.enabled) {
             cam.enabled = false;
-            cam.disabledTurns = 3;
+            cam.disabledTurns = 4;
             hit = true;
             events.push({ type: 'CAMERA_DISABLED', x: tx, y: ty, moodAfter: this.getAudioMood() });
           }
@@ -1148,7 +1178,7 @@ export class HotlineGameEngine {
         for (const l of this.lasers) {
           if (l.enabled && l.cells.some((c) => c.x === tx && c.y === ty)) {
             l.enabled = false;
-            l.disabledTurns = 3;
+            l.disabledTurns = 4;
             hit = true;
             events.push({ type: 'LASER_DISABLED', x: tx, y: ty, moodAfter: this.getAudioMood() });
           }
@@ -1184,37 +1214,82 @@ export class HotlineGameEngine {
       }
 
       case 'THROW': {
-        const dir = this.resolveTargetDir(req.dir, 'enemy');
+        const dir = this.resolveTargetDir(req.dir, 'throw');
         this.player.facing = dir;
         const d = DIR_DELTAS[dir];
+        let landX = this.player.x;
+        let landY = this.player.y;
         let hitEnemy: EnemyState | undefined;
         for (let dist = 1; dist <= 3; dist++) {
           const cx = this.player.x + d.dx * dist;
           const cy = this.player.y + d.dy * dist;
           if (!this.isPassable(cx, cy)) break;
+          landX = cx;
+          landY = cy;
           const found = this.findEnemyAt(cx, cy);
           if (found) {
             hitEnemy = found;
             break;
           }
         }
-        if (hitEnemy) {
-          if (hitEnemy.shielded) {
-            hitEnemy.shielded = false;
-            hitEnemy.distractedTurns = 1;
+
+        events.push({
+          type: 'DECOY_THROWN',
+          line: req.line,
+          fromX: this.player.x,
+          fromY: this.player.y,
+          x: landX,
+          y: landY,
+          dir,
+          label: 'ЭМИ-маячок брошен',
+          moodAfter: this.getAudioMood(),
+        });
+
+        if (hitEnemy && hitEnemy.shielded) {
+          hitEnemy.shielded = false;
+          hitEnemy.distractedTurns = 2;
+          events.push({
+            type: 'ENEMY_SHIELD_BROKEN',
+            line: req.line,
+            x: hitEnemy.x,
+            y: hitEnemy.y,
+            label: 'Щит Медведя сбит ЭМИ-маячком',
+            moodAfter: this.getAudioMood(),
+          });
+        }
+
+        // Area decoy distraction: all active enemies within Chebyshev radius 2 turn toward decoy & pause
+        for (const e of this.enemies) {
+          if (e.status !== 'active') continue;
+          const cheb = Math.max(Math.abs(e.x - landX), Math.abs(e.y - landY));
+          if (cheb > 2) continue;
+          if (e === hitEnemy && e.distractedTurns >= 2) continue;
+
+          if (e.shielded && manhattan(e.x, e.y, landX, landY) <= 1) {
+            e.shielded = false;
+            e.distractedTurns = Math.max(e.distractedTurns, 2);
             events.push({
               type: 'ENEMY_SHIELD_BROKEN',
-              x: hitEnemy.x,
-              y: hitEnemy.y,
+              line: req.line,
+              x: e.x,
+              y: e.y,
               label: 'Щит Медведя сбит ЭМИ-маячком',
               moodAfter: this.getAudioMood(),
             });
           } else {
-            hitEnemy.distractedTurns = 2;
+            e.distractedTurns = Math.max(e.distractedTurns, 2);
+            const dx = landX - e.x;
+            const dy = landY - e.y;
+            if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) {
+              e.facing = dx > 0 ? 'RIGHT' : 'LEFT';
+            } else if (dy !== 0) {
+              e.facing = dy > 0 ? 'DOWN' : 'UP';
+            }
             events.push({
               type: 'ENEMY_STUNNED',
-              x: hitEnemy.x,
-              y: hitEnemy.y,
+              line: req.line,
+              x: e.x,
+              y: e.y,
               label: 'Противник отвлечён ЭМИ-маячком',
               moodAfter: this.getAudioMood(),
             });
@@ -1363,6 +1438,7 @@ export class HotlineGameEngine {
     return {
       levelId: this.levelDef.id,
       levelTitle: this.levelDef.title,
+      theme: this.levelDef.theme,
       mask: this.mask,
       phase: this.phase,
       audioMood: this.getAudioMood(),

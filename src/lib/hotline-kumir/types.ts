@@ -104,6 +104,12 @@ export interface KumirSensorReader {
 }
 
 export type MaskId = 'richard' | 'rasmus' | 'tony' | 'sprint';
+export type LevelThemeId =
+  | 'kpp_street'
+  | 'lobby_hall'
+  | 'analytics_office'
+  | 'server_hall'
+  | 'master_vault';
 
 export type GamePhase =
   | 'BRIEFING'
@@ -193,6 +199,7 @@ export type WorldEventType =
   | 'ENEMY_STUNNED'
   | 'ENEMY_SHIELD_BROKEN'
   | 'ENEMY_OFFLINE'
+  | 'DECOY_THROWN'
   | 'ENEMY_MOVED'
   | 'ENEMY_ATTACK'
   | 'WALL_CRASH'
@@ -302,6 +309,7 @@ export interface LevelResult {
 export interface LevelDefinition {
   id: number;
   slug: string;
+  theme: LevelThemeId;
   title: string;
   subtitle: string;
   curriculumRef: string;
@@ -334,6 +342,7 @@ export interface LevelDefinition {
 export interface WorldSnapshot {
   levelId: number;
   levelTitle: string;
+  theme: LevelThemeId;
   mask: MaskId;
   phase: GamePhase;
   audioMood: AudioMood;
