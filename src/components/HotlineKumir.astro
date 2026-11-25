@@ -1,0 +1,295 @@
+---
+import { HOTLINE_KUMIR_LEVELS } from '../data/hotline-kumir-levels';
+---
+
+<div
+  id="hotline-kumir-root"
+  class="h-screen w-full overflow-hidden flex flex-col bg-[#0B0618] text-slate-100 font-mono select-none"
+>
+  <!-- Top HUD Bar -->
+  <header class="shrink-0 bg-black border-b-2 border-pink-600 px-3 py-1.5 flex items-center justify-between gap-2 flex-wrap">
+    <div class="flex items-center gap-2 min-w-0">
+      <a
+        href="/courses"
+        class="px-2 py-0.5 text-xs font-bold bg-slate-900 border border-slate-600 text-slate-300 hover:border-cyan-400 hover:text-cyan-300 rounded-0"
+      >
+        ← КУРСЫ
+      </a>
+      <span class="text-sm sm:text-base font-black tracking-wider text-pink-500">HOTLINE KUMIR</span>
+      <select
+        id="hk-level-select"
+        aria-label="Выбор уровня"
+        class="bg-slate-950 border border-cyan-500 text-cyan-300 text-xs px-2 py-1 rounded-0 cursor-pointer"
+      >
+        {HOTLINE_KUMIR_LEVELS.map((lvl) => (
+          <option value={lvl.id}>Ур.{lvl.id}: {lvl.title}</option>
+        ))}
+      </select>
+      <span
+        id="hk-mask-badge"
+        class="hidden md:inline-block px-2 py-0.5 text-xs bg-pink-950/70 border border-pink-500 text-pink-200 rounded-0"
+      >
+        Петух «Ричард»
+      </span>
+    </div>
+
+    <div class="flex items-center gap-2 shrink-0">
+      <span id="hk-phase-badge" class="px-2 py-0.5 text-xs font-bold bg-cyan-950 text-cyan-300 border border-cyan-500 rounded-0">
+        СТЕЛС
+      </span>
+      <span id="hk-hp-badge" class="px-2 py-0.5 text-xs bg-slate-900 border border-emerald-500 text-emerald-300 rounded-0">
+        ЗДОРОВЬЕ: 3
+      </span>
+      <span id="hk-ids-badge" class="px-2 py-0.5 text-xs bg-slate-900 border border-amber-500 text-amber-300 rounded-0">
+        IDS: 0/3
+      </span>
+      <span id="hk-student-badge" class="hidden lg:inline-block px-2 py-0.5 text-xs bg-slate-900 border border-slate-700 text-slate-300 rounded-0">
+        АГЕНТ
+      </span>
+      <button
+        id="hk-btn-mute"
+        type="button"
+        class="px-2 py-0.5 text-xs bg-slate-900 border border-slate-600 text-slate-200 hover:border-cyan-400 rounded-0 cursor-pointer"
+      >
+        🔊 ЗВУК: ВКЛ
+      </button>
+    </div>
+  </header>
+
+  <!-- GBR Alert Dispatch Tracker -->
+  <div
+    id="hk-gbr-tracker"
+    class="hidden shrink-0 bg-red-950/80 border-b-2 border-red-500 px-3 py-1 flex items-center justify-between gap-3"
+  >
+    <div class="flex items-center gap-2">
+      <span class="px-1.5 py-0.5 text-[11px] font-black bg-red-600 text-white rounded-0">РАЦИЯ ГБР</span>
+      <span id="hk-gbr-eta-text" class="text-xs font-bold text-red-200">ГБР ПРИБУДЕТ ЧЕРЕЗ: 5 ХОД.</span>
+    </div>
+    <div class="flex items-center gap-1">
+      <span data-gbr-seg="0" class="px-1.5 py-0.5 text-[10px] bg-red-600 text-white border border-red-300 rounded-0">БАЗА</span>
+      <span data-gbr-seg="1" class="px-1.5 py-0.5 text-[10px] bg-slate-900 text-slate-400 border border-slate-700 rounded-0">УЛИЦА</span>
+      <span data-gbr-seg="2" class="px-1.5 py-0.5 text-[10px] bg-slate-900 text-slate-400 border border-slate-700 rounded-0">ДВОР</span>
+      <span data-gbr-seg="3" class="px-1.5 py-0.5 text-[10px] bg-slate-900 text-slate-400 border border-slate-700 rounded-0">ВХОД G</span>
+    </div>
+  </div>
+
+  <!-- Main Split-Screen (calibrated for 1366x768) -->
+  <main class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2 p-2 overflow-hidden">
+    <!-- Left Column: KuMir Speed-Coding Editor -->
+    <section class="lg:col-span-5 flex flex-col min-h-0 bg-[#110824] border-2 border-pink-600/80 rounded-0 overflow-hidden">
+      <div class="shrink-0 px-3 py-2 bg-black/80 border-b border-pink-700/60 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-cyan-300">РЕДАКТОР КУМИР</span>
+          <span id="hk-active-line-label" class="text-[11px] text-slate-400">Готов</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] text-pink-300">ТАЙМЕР ХОДА:</span>
+          <span id="hk-turn-timer" class="px-3 py-1 font-mono text-xl font-black bg-slate-950 border-2 border-cyan-400 text-cyan-300 rounded-0">
+            35с
+          </span>
+        </div>
+      </div>
+
+      <!-- Editor Area -->
+      <div class="flex-1 min-h-0 flex bg-[#090414] overflow-hidden">
+        <pre
+          id="hk-line-gutter"
+          class="w-10 shrink-0 py-2 px-1 text-right text-xs leading-5 text-pink-400/70 bg-black/50 border-r border-pink-900/60 overflow-hidden select-none"
+        >  1</pre>
+        <textarea
+          id="hk-code-editor"
+          aria-label="Редактор программы КуМир"
+          spellcheck="false"
+          class="flex-1 min-w-0 p-2 bg-transparent text-sm leading-5 text-cyan-100 focus:outline-none resize-none overflow-auto select-text"
+        ></textarea>
+      </div>
+
+      <!-- Error Bar -->
+      <div
+        id="hk-error-box"
+        class="hidden shrink-0 px-3 py-1.5 bg-red-950 border-t border-red-500 text-xs font-bold text-red-200 rounded-0"
+      ></div>
+
+      <!-- Quick Snippets -->
+      <div id="hk-snippets" class="shrink-0 px-2 py-1.5 bg-black/70 border-t border-pink-900/60 flex flex-wrap gap-1"></div>
+
+      <!-- Action Buttons -->
+      <div class="shrink-0 px-2 py-2 bg-black border-t border-pink-600/80 flex items-center justify-between gap-2 flex-wrap">
+        <div class="flex items-center gap-1.5">
+          <button
+            id="hk-btn-run"
+            type="button"
+            class="px-3 py-1.5 text-xs font-black bg-pink-600 hover:bg-pink-500 text-white border border-pink-300 rounded-0 cursor-pointer"
+          >
+            ▶ ЗАПУСК (Ctrl+Enter)
+          </button>
+          <button
+            id="hk-btn-step"
+            type="button"
+            class="px-2.5 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500 rounded-0 cursor-pointer"
+          >
+            ШАГ (F8)
+          </button>
+          <button
+            id="hk-btn-reset"
+            type="button"
+            class="px-2.5 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-600 rounded-0 cursor-pointer"
+          >
+            ↺ [R]
+          </button>
+        </div>
+        <button
+          id="hk-btn-open-term"
+          type="button"
+          class="px-2.5 py-1.5 text-xs font-bold bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-500 rounded-0 cursor-pointer"
+        >
+          &gt;_ LINUX ПК
+        </button>
+      </div>
+    </section>
+
+    <!-- Right Column: Night Canvas 2D Arena -->
+    <section class="lg:col-span-7 flex flex-col min-h-0 bg-black border-2 border-cyan-500/80 rounded-0 overflow-hidden">
+      <div class="shrink-0 px-3 py-1.5 bg-slate-950 border-b border-cyan-700/60 flex items-center justify-between gap-2">
+        <span id="hk-obj-status" class="text-xs font-bold text-cyan-300">ПК: ЗАКРЫТ | РЕЛЕ *: 0/1 | ВЫХОД: ЗАБЛОКИРОВАН</span>
+        <span class="text-[11px] text-slate-400">Робот: ОГЭ 15.1 + Тактика</span>
+      </div>
+
+      <div class="flex-1 min-h-0 flex items-center justify-center p-2 bg-[#070312] overflow-hidden">
+        <canvas
+          id="hk-arena-canvas"
+          class="max-w-full max-h-full border border-pink-500/50 rounded-0 bg-[#070312]"
+        ></canvas>
+      </div>
+    </section>
+  </main>
+
+  <!-- Briefing & Mask Overlay -->
+  <div
+    id="hk-briefing-overlay"
+    class="hidden fixed inset-0 z-30 bg-black/90 items-center justify-center p-4"
+  >
+    <div class="w-full max-w-2xl bg-[#110824] border-2 border-pink-500 p-5 rounded-0 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-pink-600 pb-2">
+        <div>
+          <div id="hk-briefing-time" class="text-xs font-bold text-cyan-400">АВТООТВЕТЧИК // 00:14</div>
+          <h2 id="hk-briefing-title" class="text-xl font-black text-pink-400">УРОВЕНЬ 1: НОЧНОЙ КПП</h2>
+        </div>
+        <span id="hk-briefing-curriculum" class="px-2 py-1 text-[11px] bg-slate-900 border border-slate-700 text-slate-300 rounded-0">
+          8 класс
+        </span>
+      </div>
+
+      <p id="hk-briefing-text" class="text-sm leading-relaxed text-slate-200"></p>
+
+      <div>
+        <div class="text-xs font-bold text-cyan-300 mb-2">ВЫБОР ЗВЕРИНОЙ МАСКИ:</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button type="button" data-mask-choice="richard" class="p-2 text-left border-2 border-cyan-400 bg-cyan-950/70 text-white rounded-0 cursor-pointer">
+            <div class="text-xs font-bold text-cyan-300">🐓 Петух «Ричард»</div>
+            <div class="text-[11px] text-slate-300">Эталонный баланс и чёткий маршрут</div>
+          </button>
+          <button type="button" data-mask-choice="rasmus" class="p-2 text-left border border-slate-700 bg-slate-900 text-slate-300 rounded-0 cursor-pointer">
+            <div class="text-xs font-bold text-cyan-300">🦉 Сова «Расмус»</div>
+            <div class="text-[11px] text-slate-300">Прогноз камер и шагов на +1 такт</div>
+          </button>
+          <button type="button" data-mask-choice="tony" class="p-2 text-left border border-slate-700 bg-slate-900 text-slate-300 rounded-0 cursor-pointer">
+            <div class="text-xs font-bold text-pink-300">🐺 Волк «Тони»</div>
+            <div class="text-[11px] text-slate-300">+1 такт оглушения и быстрый рывок</div>
+          </button>
+          <button type="button" data-mask-choice="sprint" class="p-2 text-left border border-slate-700 bg-slate-900 text-slate-300 rounded-0 cursor-pointer">
+            <div class="text-xs font-bold text-amber-300">🦊 Лис «Спринт»</div>
+            <div class="text-[11px] text-slate-300">+1 ход / +15 с к ETA ГБР и лимит IDS 4</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button
+          id="hk-btn-start-mission"
+          type="button"
+          class="px-5 py-2 text-sm font-black bg-pink-600 hover:bg-pink-500 text-white border-2 border-pink-300 rounded-0 cursor-pointer"
+        >
+          НАЧАТЬ ОПЕРАЦИЮ ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Linux Terminal Popup Overlay -->
+  <div
+    id="hk-terminal-overlay"
+    class="hidden fixed inset-0 z-40 bg-black/85 items-center justify-center p-4"
+  >
+    <div class="w-full max-w-3xl h-[500px] bg-black border-2 border-emerald-500 rounded-0 flex flex-col overflow-hidden">
+      <div class="shrink-0 px-3 py-2 bg-slate-950 border-b border-emerald-600 flex items-center justify-between gap-2 flex-wrap">
+        <span class="text-xs font-black text-emerald-400">LINUX CTF ТЕРМИНАЛ</span>
+        <span id="hk-term-perimeter" class="text-[11px] font-bold text-amber-300">КАМЕРЫ: 1 | IDS ШУМ: 0/3</span>
+        <div class="flex items-center gap-2">
+          <button
+            id="hk-term-hint"
+            type="button"
+            class="px-2 py-0.5 text-xs bg-amber-950 border border-amber-500 text-amber-300 rounded-0 cursor-pointer"
+          >
+            ПОДСКАЗКА
+          </button>
+          <button
+            id="hk-term-close"
+            type="button"
+            class="px-2 py-0.5 text-xs bg-red-950 border border-red-500 text-red-200 rounded-0 cursor-pointer"
+          >
+            ЗАКРЫТЬ [ESC]
+          </button>
+        </div>
+      </div>
+
+      <pre
+        id="hk-term-output"
+        class="flex-1 min-h-0 p-3 text-xs leading-5 overflow-auto bg-black text-emerald-300 select-text"
+      ></pre>
+
+      <div class="shrink-0 px-3 py-2 bg-slate-950 border-t border-emerald-700 flex items-center gap-2">
+        <span id="hk-term-prompt" class="text-xs font-bold text-pink-400 shrink-0">agent@kpp-gate:~&gt;</span>
+        <input
+          id="hk-term-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Введи команду (например: ls -la, help)..."
+          class="flex-1 bg-transparent text-xs text-white focus:outline-none select-text"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission Result Overlay -->
+  <div
+    id="hk-result-overlay"
+    class="hidden fixed inset-0 z-50 bg-black/90 items-center justify-center p-4"
+  >
+    <div class="w-full max-w-lg bg-[#110824] border-2 border-cyan-400 p-5 rounded-0 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-cyan-600 pb-2">
+        <h2 id="hk-result-title" class="text-lg font-black text-cyan-300">МИССИЯ ВЫПОЛНЕНА</h2>
+        <span id="hk-result-grade" class="px-3 py-1 text-2xl font-black bg-pink-600 text-white border border-pink-300 rounded-0">S</span>
+      </div>
+      <div id="hk-result-style" class="text-sm font-bold text-pink-400">ПРИЗРАК (GHOST)</div>
+      <div id="hk-result-stats" class="text-xs leading-6 text-slate-200"></div>
+      <div class="flex items-center justify-end gap-2">
+        <button
+          id="hk-btn-retry-level"
+          type="button"
+          class="px-4 py-2 text-xs font-bold bg-slate-900 border border-slate-500 text-slate-200 hover:border-cyan-400 rounded-0 cursor-pointer"
+        >
+          ПОВТОРИТЬ [R]
+        </button>
+        <button
+          id="hk-btn-next-level"
+          type="button"
+          class="px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-300 rounded-0 cursor-pointer"
+        >
+          СЛЕДУЮЩИЙ УРОВЕНЬ ▶
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
