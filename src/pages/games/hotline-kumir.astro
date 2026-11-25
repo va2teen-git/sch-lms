@@ -1,0 +1,84 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import HotlineKumir from '../../components/HotlineKumir.astro';
+---
+
+<Layout title="Hotline KuMir — Ночной стелс и скоростное программирование">
+  <HotlineKumir />
+</Layout>
+
+<script is:inline src="/static/lms-telemetry.js"></script>
+<script>
+  import { initHotlineKumirController } from '../../lib/hotline-kumir/controller.ts';
+
+  const root = document.getElementById('hotline-kumir-root');
+  const studentBadge = document.getElementById('hk-student-badge');
+
+  const firstName = (localStorage.getItem('student_firstName') || 'Агент').trim();
+  const lastName = (localStorage.getItem('student_lastName') || 'Ночной').trim();
+  const studentClass = (localStorage.getItem('student_class') || '8-класс').trim();
+
+  if (studentBadge) {
+    studentBadge.textContent = `${lastName} ${firstName} (${studentClass})`;
+  }
+
+  if (root) {
+    const tracker = window.LMSTelemetry?.create?.({
+      missionName: 'Hotline KuMir',
+      totalStages: 5,
+    });
+
+    initHotlineKumirController(root, {
+      onMissionStart: () => {
+        tracker?.start?.();
+        tracker?.markActivity?.();
+      },
+      onMissionComplete: async (result, snap) => {
+        const meta = {
+          level: result.levelId,
+          mask: result.mask,
+          outcome_branch: result.outcomeBranch,
+          grade: result.grade,
+          score: result.score,
+          lines_of_code: result.locCount,
+          used_loops: result.usedLoops,
+          used_conditions: result.usedConditions,
+          used_subprograms: result.usedSubprograms,
+          linux_commands_count: result.linuxCommandsCount,
+          time_spent_sec: result.timeSpentSec,
+        };
+
+        const payload = {
+          student_firstName: firstName,
+          student_lastName: lastName,
+          student_class: studentClass,
+          course_slug: 'games',
+          lesson_id: 'hotline-kumir',
+          level_number: 0,
+          mission_name: `Сцена ${result.levelId}: ${snap.levelTitle} [${result.styleBadge}]`,
+          action_type: 'hotline_kumir_complete',
+          start_time: new Date().toISOString(),
+          time_spent_sec: result.timeSpentSec,
+          attempts_count: Math.max(1, result.turnsUsed),
+          success: true,
+          status: 'completed',
+          action_log: [meta],
+        };
+
+        try {
+          if (window.parent && window.parent !== window && tracker?.send) {
+            tracker.send('hotline_kumir_complete', payload);
+          } else {
+            await fetch('/api/telemetry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+          }
+        } catch (err) {
+          console.warn('Telemetry send error:', err);
+        }
+      },
+    });
+  }
+</script>
