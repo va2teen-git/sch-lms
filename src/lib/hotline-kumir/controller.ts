@@ -277,7 +277,7 @@ export function initHotlineKumirController(
   const playEventsAudio = (events: WorldEvent[]) => {
     for (const ev of events) {
       if (ev.type === 'ROBOT_MOVED') audio.playSfx('step');
-      else if (ev.type === 'ROBOT_DASHED') audio.playSfx('dash');
+      else if (ev.type === 'ROBOT_DASHED' || ev.type === 'DECOY_THROWN') audio.playSfx('dash');
       else if (ev.type === 'TILE_PAINTED') audio.playSfx('paint');
       else if (ev.type === 'DOOR_BROKEN') audio.playSfx('door_breach');
       else if (ev.type === 'ENEMY_STUNNED' || ev.type === 'ENEMY_OFFLINE' || ev.type === 'ENEMY_SHIELD_BROKEN')

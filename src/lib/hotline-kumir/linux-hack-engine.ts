@@ -817,12 +817,12 @@ export class LinuxHackEngine {
         }
         this.flags.add('SCP_DUMP_DONE');
         return {
-          output: 'dump.sql                                      100%   16KB   4.2MB/s   00:00\n[CORE-SHIELD]: лазерный контур (5..8,3) и шлюз D2 разблокированы.',
+          output: 'dump.sql                                      100%   16KB   4.2MB/s   00:00\n[CORE-SHIELD]: лазерный контур L5-core (5..8,3) и шлюз D(17,2) разблокированы.',
           exitCode: 0,
           noiseDelta: 0,
           effects: [
-            { type: 'DISABLE_LASER' },
-            { type: 'UNLOCK_DOOR' },
+            { type: 'DISABLE_LASER', laserId: 'L5-core' },
+            { type: 'UNLOCK_DOOR', doorId: 'door-core' },
           ],
         };
       }
