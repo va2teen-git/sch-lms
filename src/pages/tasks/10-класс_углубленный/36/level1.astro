@@ -1,0 +1,945 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={1}>
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Шапка тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 text-success mb-0">Тренажер: Системы счисления 2, 8, 16 и связь между ними (Уровень 1)</h2>
+            <span class="badge border border-success text-success bg-dark rounded-0 px-3 py-2">Манипуляция мышью // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-success rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок фазы и телеметрия -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-success text-dark rounded-0 fs-6 me-2">Шаг 1 из 3</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">12-битный регистр: Триады chmod / Тетрады Hex</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span>[СИСТЕМНЫЙ СБОЙ] <span id="feedback-text">Неверная конфигурация!</span> Перегенерация варианта...</span>
+                        <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 1: 12-БИТНЫЙ РЕГИСТР (DIRECT TAPE TOGGLE) ==================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-2">
+                        Установите 12-битный регистр в двоичное состояние, соответствующее значению:
+                        <strong id="p1-target-display" class="text-success fs-4 ms-1"></strong>.
+                    </p>
+                    <div id="p1-hint-text" class="text-warning small mb-3">
+                        Кликайте по битам регистра (0 ↔ 1), используя весовую разметку групп.
+                    </div>
+
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                            <span id="p1-reg-label" class="text-secondary small text-uppercase">12-битный аппаратный регистр:</span>
+                            <button id="p1-clear-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-width: 48px; min-height: 48px;">Обнулить регистр</button>
+                        </div>
+
+                        <div id="p1-groups-container" class="d-flex flex-wrap justify-content-center gap-3 my-2">
+                            <!-- Группы битов генерируются JS -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span class="text-secondary small">
+                            Код регистра: <strong id="p1-binary-preview" class="text-light">0000 0000 0000</strong>
+                        </span>
+                        <button id="p1-submit-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4 py-2" style="min-width: 48px; min-height: 48px;">
+                            Зафиксировать регистр &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 2: МАРШРУТИЗАТОР БАЙТОВ (DRAG-TO-BUCKET) ==================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Распределите 6 поступающих байт-пакетов по целевым шлюзам на основе равенства их числовых значений.
+                        <strong>Перетащите карточку в шлюз мышью</strong> (либо кликните по пакету, затем по нужному шлюзу).
+                    </p>
+                    <div class="text-warning small mb-3">
+                        Два пакета-ловушки отличаются от эталонов ровно на один бит — отправьте их в «Карантин (Помехи)». Клик по размещенному пакету возвращает его в буфер.
+                    </div>
+
+                    <!-- Буфер нераспределенных пакетов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 border-bottom border-secondary pb-2">
+                            <span class="text-secondary small text-uppercase">Входящий буфер пакетов:</span>
+                            <button id="p2-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-width: 48px; min-height: 48px;">Вернуть все пакеты</button>
+                        </div>
+                        <div id="p2-packet-pool" class="d-flex flex-wrap gap-2 align-items-center pt-1" style="min-height: 60px;">
+                            <!-- Карточки пакетов генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- 3 шлюза (col-12 col-sm-4 для сплит-экрана) -->
+                    <div id="p2-buckets-row" class="row g-2 mb-3">
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border-success rounded-0 h-100 p-2 p-sm-3 p2-bucket-zone" data-bucket="A" style="min-height: 150px; cursor: pointer;">
+                                <div class="text-success small text-uppercase fw-bold border-bottom border-success pb-1 mb-2">
+                                    Шлюз A: <span id="p2-label-A" class="text-light fs-6"></span>
+                                </div>
+                                <div id="p2-bucket-A" class="d-flex flex-wrap gap-2 align-content-start flex-grow-1" style="min-height: 80px;"></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border-info rounded-0 h-100 p-2 p-sm-3 p2-bucket-zone" data-bucket="B" style="min-height: 150px; cursor: pointer;">
+                                <div class="text-info small text-uppercase fw-bold border-bottom border-info pb-1 mb-2">
+                                    Шлюз B: <span id="p2-label-B" class="text-light fs-6"></span>
+                                </div>
+                                <div id="p2-bucket-B" class="d-flex flex-wrap gap-2 align-content-start flex-grow-1" style="min-height: 80px;"></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <div class="card bg-black border-danger rounded-0 h-100 p-2 p-sm-3 p2-bucket-zone" data-bucket="quarantine" style="min-height: 150px; cursor: pointer;">
+                                <div class="text-danger small text-uppercase fw-bold border-bottom border-danger pb-1 mb-2">
+                                    Карантин (Помехи)
+                                </div>
+                                <div id="p2-bucket-quarantine" class="d-flex flex-wrap gap-2 align-content-start flex-grow-1" style="min-height: 80px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span id="p2-counter" class="text-secondary small">Распределено пакетов: 0 / 6</span>
+                        <button id="p2-submit-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4 py-2" style="min-width: 48px; min-height: 48px;" disabled>
+                            Проверить маршрутизацию &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 3: КОНСТРУКТОР «ДВОИЧНОГО МОСТА» 8 ↔ 16 (SLOT & SNAP) ==================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Выполните прямой перевод смешанного числа через «двоичный мост»:
+                        <strong id="p3-source-display" class="text-success fs-4 ms-1"></strong>
+                        <span class="text-light mx-1">&rarr;</span>
+                        <strong id="p3-target-base-label" class="text-info"></strong>.
+                    </p>
+                    <div class="text-warning small mb-3">
+                        Перетащите разрядные токены в 5 слотов слева направо (или кликните по токену, затем по слоту). Учитывайте направление дополнения нулями от запятой! В палитре есть ложные цифры-ловушки.
+                    </div>
+
+                    <!-- Палитра токенов -->
+                    <div class="card bg-black border-secondary rounded-0 p-3 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 border-bottom border-secondary pb-2">
+                            <span class="text-secondary small text-uppercase">Палитра разрядных цифр (с дистракторами):</span>
+                            <button id="p3-reset-btn" type="button" class="btn btn-outline-secondary btn-sm rounded-0 px-3" style="min-width: 48px; min-height: 48px;">Очистить слоты</button>
+                        </div>
+                        <div id="p3-token-pool" class="d-flex flex-wrap gap-2 align-items-center pt-1" style="min-height: 58px;">
+                            <!-- Токены генерируются JS -->
+                        </div>
+                    </div>
+
+                    <!-- 5 целевых слотов с запятой -->
+                    <div class="card bg-black border-success rounded-0 p-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-3 border-bottom border-secondary pb-1">
+                            Выходной регистр результата (целая и дробная части разделены запятой):
+                        </div>
+                        <div id="p3-slots-row" class="d-flex flex-wrap justify-content-center align-items-end gap-2 my-2">
+                            <!-- 3 слота целой части + запятая + 2 слота дробной части -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span id="p3-counter" class="text-secondary small">Заполнено слотов: 0 / 5</span>
+                        <button id="p3-submit-btn" type="button" class="btn btn-success rounded-0 fw-bold px-4 py-2" style="min-width: 48px; min-height: 48px;" disabled>
+                            Зафиксировать перевод &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== ЭКРАН ПОБЕДЫ ==================== -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-success bg-black p-4 mb-3">
+                        <h3 class="text-success mb-2">[ УРОВЕНЬ 1 ПРОЙДЕН ]</h3>
+                        <p class="text-light mb-3">Все 3 фазы манипулятивного преобразования между системами счисления 2, 8 и 16 успешно выполнены.</p>
+                        <div class="d-flex justify-content-center gap-4 text-secondary small">
+                            <span>Ошибок: <strong id="final-attempts" class="text-warning">0</strong></span>
+                            <span>Время: <strong id="final-time" class="text-info">00:00</strong></span>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-0">Переключайтесь на вкладку «Уровень 2» для аналитических расчетов с ручным вводом.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+    (function() {
+        const HEX_DIGITS = '0123456789ABCDEF';
+        const FORBIDDEN_VALS = new Set([0x3A, 0x4A, 0x7F, 0x89, 0xB6, 0xF0, 0xFF]);
+        const FORBIDDEN_OCT_STR = new Set(['1777', '0750', '1750', '604', '723', '4652', '3745', '112']);
+        const FORBIDDEN_HEX_STR = new Set(['3E8', '5BA', '2C0', '9AA', '7E5', '3A']);
+
+        let currentPhase = 1;
+        let isProcessingError = false;
+        let timerInterval = null;
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 36 :: Двоичная, восьмеричная и шестнадцатеричная системы счисления, связь между ними (Уровень 1)',
+            level: 1,
+            totalStages: 3
+        });
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const phaseBadge = document.getElementById('phase-badge');
+        const phaseTitle = document.getElementById('phase-title');
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function shuffle(arr) {
+            const copy = arr.slice();
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = copy[i];
+                copy[i] = copy[j];
+                copy[j] = tmp;
+            }
+            return copy;
+        }
+
+        function toBinPadded(num, width) {
+            return num.toString(2).padStart(width, '0');
+        }
+
+        function formatTime(sec) {
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateTimerDisplay() {
+            if (timerDisplay) {
+                timerDisplay.textContent = formatTime(telemetry.getTimeSpentSec());
+            }
+        }
+
+        function createEl(tag, className, text) {
+            const el = document.createElement(tag);
+            if (className) el.className = className;
+            if (text !== undefined) el.textContent = text;
+            return el;
+        }
+
+        function formatWithBase(text, base) {
+            const span = document.createElement('span');
+            span.appendChild(document.createTextNode(text));
+            const sub = document.createElement('sub');
+            sub.textContent = String(base);
+            span.appendChild(sub);
+            return span;
+        }
+
+        function triggerFailure(message, resetCallback) {
+            if (isProcessingError) return;
+            isProcessingError = true;
+            telemetry.fail({ stage: currentPhase, total_stages: 3 });
+            if (attemptsDisplay) {
+                attemptsDisplay.textContent = String(telemetry.getState().attemptsCount);
+            }
+            if (feedbackText) feedbackText.textContent = message;
+            if (feedbackBox) feedbackBox.classList.remove('d-none');
+
+            setTimeout(() => {
+                if (feedbackBox) feedbackBox.classList.add('d-none');
+                isProcessingError = false;
+                resetCallback();
+            }, 1250);
+        }
+
+        function switchToPhase(nextPhase) {
+            document.getElementById(`phase${currentPhase}`).classList.add('d-none');
+            currentPhase = nextPhase;
+            if (nextPhase <= 3) {
+                telemetry.advanceStage(nextPhase);
+                document.getElementById(`phase${nextPhase}`).classList.remove('d-none');
+                phaseBadge.textContent = `Шаг ${nextPhase} из 3`;
+                if (nextPhase === 2) {
+                    phaseTitle.textContent = 'Маршрутизатор байт-пакетов 2 / 8 / 16 (Drag-to-Bucket)';
+                    generatePhase2();
+                } else if (nextPhase === 3) {
+                    phaseTitle.textContent = 'Конструктор «двоичного моста» 8 ↔ 16 (Slot & Snap)';
+                    generatePhase3();
+                }
+            }
+        }
+
+        function showVictory() {
+            document.getElementById('phase3').classList.add('d-none');
+            if (timerInterval) clearInterval(timerInterval);
+            telemetry.complete({ stage: 3, total_stages: 3 });
+            document.getElementById('final-attempts').textContent = String(telemetry.getState().attemptsCount);
+            document.getElementById('final-time').textContent = formatTime(telemetry.getTimeSpentSec());
+            document.getElementById('victory-screen').classList.remove('d-none');
+            phaseBadge.textContent = 'Завершено';
+            phaseTitle.textContent = 'Все 3 фазы выполнены';
+        }
+
+        /* =========================================================================
+           ФАЗА 1: 12-БИТНЫЙ РЕГИСТР (ТРИАДЫ CHMOD / ТЕТРАДЫ HEX)
+           ========================================================================= */
+        const p1State = {
+            mode: 'oct',       // 'oct' (4x3 бит) | 'hex' (3x4 бит)
+            targetValue: 0,
+            bits: new Array(12).fill(0),
+            prevKey: ''
+        };
+
+        const p1TargetDisplay = document.getElementById('p1-target-display');
+        const p1HintText = document.getElementById('p1-hint-text');
+        const p1RegLabel = document.getElementById('p1-reg-label');
+        const p1GroupsContainer = document.getElementById('p1-groups-container');
+        const p1BinaryPreview = document.getElementById('p1-binary-preview');
+        const p1ClearBtn = document.getElementById('p1-clear-btn');
+        const p1SubmitBtn = document.getElementById('p1-submit-btn');
+
+        function generatePhase1() {
+            p1State.bits.fill(0);
+            let mode = Math.random() < 0.5 ? 'oct' : 'hex';
+            let codeStr = '';
+            let value = 0;
+
+            for (let guard = 0; guard < 30; guard++) {
+                mode = Math.random() < 0.5 ? 'oct' : 'hex';
+                if (mode === 'oct') {
+                    const d3 = pickRandom([0, 1, 2, 4]);
+                    const d2 = pickRandom([5, 6, 7]);
+                    const d1 = pickRandom([0, 4, 5, 6, 7]);
+                    const d0 = pickRandom([0, 1, 4, 5]);
+                    codeStr = `${d3}${d2}${d1}${d0}`;
+                    value = (d3 << 9) | (d2 << 6) | (d1 << 3) | d0;
+                    if (!FORBIDDEN_OCT_STR.has(codeStr) && value > 0 && `oct:${codeStr}` !== p1State.prevKey) break;
+                } else {
+                    const h2 = randInt(1, 15);
+                    const h1 = randInt(0, 15);
+                    const h0 = randInt(0, 15);
+                    const hasLetter = h2 >= 10 || h1 >= 10 || h0 >= 10;
+                    codeStr = `${HEX_DIGITS[h2]}${HEX_DIGITS[h1]}${HEX_DIGITS[h0]}`;
+                    value = (h2 << 8) | (h1 << 4) | h0;
+                    if (hasLetter && !FORBIDDEN_HEX_STR.has(codeStr) && `hex:${codeStr}` !== p1State.prevKey) break;
+                }
+            }
+
+            p1State.mode = mode;
+            p1State.targetValue = value;
+            p1State.prevKey = `${mode}:${codeStr}`;
+
+            p1TargetDisplay.innerHTML = '';
+            if (mode === 'oct') {
+                p1TargetDisplay.appendChild(formatWithBase(`chmod ${codeStr} (`, 8));
+                p1TargetDisplay.appendChild(document.createTextNode(')'));
+                p1HintText.textContent = 'Каждая восьмеричная цифра прав доступа (Спецбиты, Владелец, Группа, Остальные) кодируется триадой с весами 4–2–1.';
+                p1RegLabel.textContent = '12-битный регистр прав доступа (4 триады):';
+            } else {
+                p1TargetDisplay.appendChild(formatWithBase(codeStr, 16));
+                p1HintText.textContent = 'Каждая шестнадцатеричная цифра кодируется тетрадой из 4 бит с весами 8–4–2–1.';
+                p1RegLabel.textContent = '12-битный регистр слова (3 тетрады):';
+            }
+
+            renderPhase1();
+        }
+
+        function renderPhase1() {
+            p1GroupsContainer.innerHTML = '';
+            const isOct = p1State.mode === 'oct';
+            const groupSize = isOct ? 3 : 4;
+            const groupLabels = isOct
+                ? ['Спецбиты', 'Владелец', 'Группа', 'Остальные']
+                : ['Старшая тетрада', 'Средняя тетрада', 'Младшая тетрада'];
+            const weights = isOct ? [4, 2, 1] : [8, 4, 2, 1];
+
+            for (let g = 0; g < groupLabels.length; g++) {
+                const groupBox = createEl('div', 'border border-secondary bg-dark p-2 text-center rounded-0');
+                const title = createEl('div', 'text-secondary small mb-2', groupLabels[g]);
+                const btnsRow = createEl('div', 'd-flex gap-1 justify-content-center');
+
+                for (let b = 0; b < groupSize; b++) {
+                    const bitIdx = g * groupSize + b;
+                    const bitVal = p1State.bits[bitIdx];
+                    const btn = createEl(
+                        'button',
+                        bitVal === 1
+                            ? 'btn btn-success text-dark fw-bold rounded-0 d-flex flex-column align-items-center justify-content-center p-1 p1-bit-btn'
+                            : 'btn btn-outline-secondary text-light rounded-0 d-flex flex-column align-items-center justify-content-center p-1 p1-bit-btn'
+                    );
+                    btn.type = 'button';
+                    btn.dataset.bitIdx = String(bitIdx);
+                    btn.style.minWidth = '48px';
+                    btn.style.minHeight = '54px';
+
+                    const valSpan = createEl('span', 'fs-5 lh-1', String(bitVal));
+                    const weightSpan = createEl('span', bitVal === 1 ? 'small text-dark opacity-75' : 'small text-secondary', String(weights[b]));
+                    weightSpan.style.fontSize = '0.68rem';
+                    btn.appendChild(valSpan);
+                    btn.appendChild(weightSpan);
+                    btnsRow.appendChild(btn);
+                }
+
+                groupBox.appendChild(title);
+                groupBox.appendChild(btnsRow);
+                p1GroupsContainer.appendChild(groupBox);
+            }
+
+            updatePhase1Preview();
+        }
+
+        function updatePhase1Preview() {
+            const raw = p1State.bits.join('');
+            const chunk = p1State.mode === 'oct' ? 3 : 4;
+            const parts = [];
+            for (let i = 0; i < 12; i += chunk) {
+                parts.push(raw.slice(i, i + chunk));
+            }
+            p1BinaryPreview.textContent = parts.join(' ');
+        }
+
+        /* =========================================================================
+           ФАЗА 2: МАРШРУТИЗАТОР БАЙТ-ПАКЕТОВ (DRAG-TO-BUCKET)
+           ========================================================================= */
+        const p2State = {
+            packets: [],         // { id, displayText, displayBase, bucketTarget }
+            placements: {},      // packetId -> 'pool' | 'A' | 'B' | 'quarantine'
+            selectedPacketId: null,
+            dragPacketId: null,
+            prevKey: ''
+        };
+
+        const p2PacketPool = document.getElementById('p2-packet-pool');
+        const p2BucketsRow = document.getElementById('p2-buckets-row');
+        const p2LabelA = document.getElementById('p2-label-A');
+        const p2LabelB = document.getElementById('p2-label-B');
+        const p2Counter = document.getElementById('p2-counter');
+        const p2ResetBtn = document.getElementById('p2-reset-btn');
+        const p2SubmitBtn = document.getElementById('p2-submit-btn');
+
+        function formatPacketByBase(val, base) {
+            if (base === 2) {
+                const b = toBinPadded(val, 8);
+                return `${b.slice(0, 4)} ${b.slice(4)}`;
+            }
+            if (base === 8) return val.toString(8);
+            return val.toString(16).toUpperCase();
+        }
+
+        function popCount(n) {
+            let c = 0;
+            while (n > 0) {
+                c += n & 1;
+                n >>= 1;
+            }
+            return c;
+        }
+
+        function generatePhase2() {
+            p2State.placements = {};
+            p2State.selectedPacketId = null;
+            p2State.dragPacketId = null;
+
+            let valA = 0;
+            let valB = 0;
+            for (let guard = 0; guard < 40; guard++) {
+                valA = randInt(0x25, 0x7E);
+                valB = randInt(0x85, 0xF6);
+                if (FORBIDDEN_VALS.has(valA) || FORBIDDEN_VALS.has(valB)) continue;
+                if (popCount(valA ^ valB) < 3) continue;
+                if (`${valA}:${valB}` !== p2State.prevKey) break;
+            }
+            p2State.prevKey = `${valA}:${valB}`;
+
+            const baseA = Math.random() < 0.5 ? 16 : 8;
+            const baseB = baseA === 16 ? 8 : 16;
+
+            p2LabelA.innerHTML = '';
+            p2LabelA.appendChild(formatWithBase(formatPacketByBase(valA, baseA), baseA));
+            p2LabelB.innerHTML = '';
+            p2LabelB.appendChild(formatWithBase(formatPacketByBase(valB, baseB), baseB));
+
+            const otherBasesA = [2, 8, 16].filter(b => b !== baseA);
+            const otherBasesB = [2, 8, 16].filter(b => b !== baseB);
+
+            let trapA = valA ^ (1 << randInt(0, 5));
+            while (trapA === valA || trapA === valB || FORBIDDEN_VALS.has(trapA)) {
+                trapA = valA ^ (1 << randInt(0, 6));
+            }
+            let trapB = valB ^ (1 << randInt(0, 5));
+            while (trapB === valA || trapB === valB || trapB === trapA || FORBIDDEN_VALS.has(trapB)) {
+                trapB = valB ^ (1 << randInt(0, 6));
+            }
+
+            const rawPackets = [
+                { val: valA, base: otherBasesA[0], target: 'A' },
+                { val: valA, base: otherBasesA[1], target: 'A' },
+                { val: valB, base: otherBasesB[0], target: 'B' },
+                { val: valB, base: otherBasesB[1], target: 'B' },
+                { val: trapA, base: pickRandom([2, 8, 16]), target: 'quarantine' },
+                { val: trapB, base: pickRandom([2, 8, 16]), target: 'quarantine' }
+            ];
+
+            p2State.packets = shuffle(rawPackets).map((item, idx) => {
+                const id = `p2-pkt-${idx}`;
+                p2State.placements[id] = 'pool';
+                return {
+                    id,
+                    text: formatPacketByBase(item.val, item.base),
+                    base: item.base,
+                    target: item.target
+                };
+            });
+
+            renderPhase2();
+        }
+
+        function createPacketButton(pkt, inBucket) {
+            const isSelected = p2State.selectedPacketId === pkt.id;
+            const btn = createEl(
+                'button',
+                isSelected
+                    ? 'btn btn-warning text-dark fw-bold rounded-0 px-3 py-2 p2-packet-btn'
+                    : (inBucket
+                        ? 'btn btn-outline-light bg-dark fw-bold rounded-0 px-2 py-2 p2-packet-btn'
+                        : 'btn btn-outline-success bg-dark fw-bold rounded-0 px-3 py-2 p2-packet-btn')
+            );
+            btn.type = 'button';
+            btn.draggable = true;
+            btn.dataset.packetId = pkt.id;
+            btn.style.minWidth = '64px';
+            btn.style.minHeight = '48px';
+            btn.style.cursor = 'grab';
+            btn.appendChild(formatWithBase(pkt.text, pkt.base));
+            return btn;
+        }
+
+        function renderPhase2() {
+            const containers = {
+                pool: p2PacketPool,
+                A: document.getElementById('p2-bucket-A'),
+                B: document.getElementById('p2-bucket-B'),
+                quarantine: document.getElementById('p2-bucket-quarantine')
+            };
+
+            Object.values(containers).forEach(el => { el.innerHTML = ''; });
+
+            let placedCount = 0;
+            for (const pkt of p2State.packets) {
+                const place = p2State.placements[pkt.id] || 'pool';
+                if (place !== 'pool') placedCount++;
+                containers[place].appendChild(createPacketButton(pkt, place !== 'pool'));
+            }
+
+            if (containers.pool.children.length === 0) {
+                containers.pool.appendChild(createEl('span', 'text-secondary small', 'Все 6 пакетов распределены по шлюзам.'));
+            }
+
+            p2Counter.textContent = `Распределено пакетов: ${placedCount} / 6`;
+            p2SubmitBtn.disabled = placedCount < 6;
+        }
+
+        /* =========================================================================
+           ФАЗА 3: КОНСТРУКТОР «ДВОИЧНОГО МОСТА» 8 ↔ 16 (SLOT & SNAP)
+           ========================================================================= */
+        const p3State = {
+            srcBase: 8,
+            dstBase: 16,
+            answerChars: [],     // 5 символов: [int0, int1, int2, frac0, frac1]
+            tokens: [],          // { id, ch }
+            assignments: {},     // slotIdx -> tokenId
+            selectedTokenId: null,
+            dragTokenId: null,
+            prevKey: ''
+        };
+
+        const p3SourceDisplay = document.getElementById('p3-source-display');
+        const p3TargetBaseLabel = document.getElementById('p3-target-base-label');
+        const p3TokenPool = document.getElementById('p3-token-pool');
+        const p3SlotsRow = document.getElementById('p3-slots-row');
+        const p3Counter = document.getElementById('p3-counter');
+        const p3ResetBtn = document.getElementById('p3-reset-btn');
+        const p3SubmitBtn = document.getElementById('p3-submit-btn');
+
+        function generatePhase3() {
+            p3State.assignments = {};
+            p3State.selectedTokenId = null;
+            p3State.dragTokenId = null;
+
+            const octToHex = Math.random() < 0.5;
+            let srcStr = '';
+            let dstDigits = [];
+            let trapPool = [];
+
+            if (octToHex) {
+                p3State.srcBase = 8;
+                p3State.dstBase = 16;
+
+                let d2 = 4, d1 = 0, d0 = 0, intVal = 256, intHex = '100';
+                for (let guard = 0; guard < 30; guard++) {
+                    d2 = randInt(4, 7);
+                    d1 = randInt(0, 7);
+                    d0 = randInt(0, 7);
+                    intVal = (d2 << 6) | (d1 << 3) | d0;
+                    intHex = intVal.toString(16).toUpperCase();
+                    const hasLetter = /[A-F]/.test(intHex);
+                    const octPart = `${d2}${d1}${d0}`;
+                    if (hasLetter && !FORBIDDEN_OCT_STR.has(octPart) && !FORBIDDEN_HEX_STR.has(intHex) && octPart !== p3State.prevKey) {
+                        break;
+                    }
+                }
+                const f1 = randInt(1, 7);
+                const f2 = pickRandom([1, 2, 3, 5, 6, 7]);
+                const v6 = (f1 << 3) | f2;
+                const x1 = HEX_DIGITS[v6 >> 2];
+                const x2 = HEX_DIGITS[(v6 & 3) << 2];
+
+                srcStr = `${d2}${d1}${d0},${f1}${f2}`;
+                p3State.prevKey = `${d2}${d1}${d0}`;
+                dstDigits = [intHex[0], intHex[1], intHex[2], x1, x2];
+
+                const wrongFracA = HEX_DIGITS[v6 >> 4];
+                const wrongFracB = HEX_DIGITS[v6 & 0xF];
+                const candidates = [wrongFracA, wrongFracB, '1', '2', '3', 'A', 'B', 'C', 'D', 'E', 'F'];
+                for (const ch of candidates) {
+                    if (trapPool.length >= 4) break;
+                    if (!trapPool.includes(ch)) trapPool.push(ch);
+                }
+            } else {
+                p3State.srcBase = 16;
+                p3State.dstBase = 8;
+
+                let h1 = 4, h0 = 0, intVal = 64, intHex = '40', intOct = '100';
+                for (let guard = 0; guard < 30; guard++) {
+                    h1 = randInt(4, 15);
+                    h0 = randInt(0, 15);
+                    intVal = (h1 << 4) | h0;
+                    intHex = `${HEX_DIGITS[h1]}${HEX_DIGITS[h0]}`;
+                    intOct = intVal.toString(8);
+                    if ((h1 >= 10 || h0 >= 10) && !FORBIDDEN_HEX_STR.has(intHex) && !FORBIDDEN_OCT_STR.has(intOct) && intHex !== p3State.prevKey) {
+                        break;
+                    }
+                }
+                const hf = pickRandom([1, 3, 5, 7, 9, 11, 13, 15]);
+                const o1 = String(hf >> 1);
+                const o2 = '4'; // младший бит 1 с двумя дописанными нулями справа -> 100₂ = 4
+
+                srcStr = `${intHex},${HEX_DIGITS[hf]}`;
+                p3State.prevKey = intHex;
+                dstDigits = [intOct[0], intOct[1], intOct[2], o1, o2];
+
+                const candidates = ['1', String(hf & 7), String(hf >> 3), '0', '2', '3', '5', '6', '7'];
+                for (const ch of candidates) {
+                    if (trapPool.length >= 4) break;
+                    if (!trapPool.includes(ch)) trapPool.push(ch);
+                }
+            }
+
+            p3State.answerChars = dstDigits;
+            const allChars = shuffle(dstDigits.concat(trapPool));
+            p3State.tokens = allChars.map((ch, idx) => ({ id: `p3-tok-${idx}`, ch }));
+
+            p3SourceDisplay.innerHTML = '';
+            p3SourceDisplay.appendChild(formatWithBase(srcStr, p3State.srcBase));
+            p3TargetBaseLabel.textContent = p3State.dstBase === 16 ? 'шестнадцатеричная система (q = 16)' : 'восьмеричная система (q = 8)';
+
+            renderPhase3();
+        }
+
+        function getUsedTokenIdsP3() {
+            return new Set(Object.values(p3State.assignments));
+        }
+
+        function renderPhase3() {
+            const usedIds = getUsedTokenIdsP3();
+            p3TokenPool.innerHTML = '';
+
+            let availCount = 0;
+            for (const tok of p3State.tokens) {
+                if (usedIds.has(tok.id)) continue;
+                availCount++;
+                const isSelected = p3State.selectedTokenId === tok.id;
+                const btn = createEl(
+                    'button',
+                    isSelected
+                        ? 'btn btn-warning text-dark fw-bold rounded-0 fs-5 p3-token-btn'
+                        : 'btn btn-outline-success bg-dark fw-bold rounded-0 fs-5 p3-token-btn',
+                    tok.ch
+                );
+                btn.type = 'button';
+                btn.draggable = true;
+                btn.dataset.tokenId = tok.id;
+                btn.style.minWidth = '52px';
+                btn.style.minHeight = '52px';
+                btn.style.cursor = 'grab';
+                p3TokenPool.appendChild(btn);
+            }
+            if (availCount === 0) {
+                p3TokenPool.appendChild(createEl('span', 'text-secondary small', 'Все доступные токены использованы.'));
+            }
+
+            p3SlotsRow.innerHTML = '';
+            const baseStr = String(p3State.dstBase);
+            const slotLabels = [`${baseStr}²`, `${baseStr}¹`, `${baseStr}⁰`, `${baseStr}⁻¹`, `${baseStr}⁻²`];
+
+            for (let idx = 0; idx < 5; idx++) {
+                if (idx === 3) {
+                    const comma = createEl('div', 'text-success fw-bold fs-2 px-1 pb-2', ',');
+                    p3SlotsRow.appendChild(comma);
+                }
+
+                const wrap = createEl('div', 'd-flex flex-column align-items-center');
+                const weightLbl = createEl('span', 'text-secondary small mb-1', slotLabels[idx]);
+                const tokId = p3State.assignments[idx];
+                const tok = tokId ? p3State.tokens.find(t => t.id === tokId) : null;
+
+                const slotBtn = createEl(
+                    'button',
+                    tok
+                        ? 'btn btn-success text-dark fw-bold rounded-0 fs-4 p3-slot-btn'
+                        : 'btn btn-outline-secondary text-secondary rounded-0 fs-5 p3-slot-btn',
+                    tok ? tok.ch : '?'
+                );
+                slotBtn.type = 'button';
+                slotBtn.dataset.slotIdx = String(idx);
+                slotBtn.style.minWidth = '56px';
+                slotBtn.style.minHeight = '56px';
+                wrap.appendChild(weightLbl);
+                wrap.appendChild(slotBtn);
+                p3SlotsRow.appendChild(wrap);
+            }
+
+            const baseBadge = createEl('sub', 'text-info fs-5 pb-2', String(p3State.dstBase));
+            p3SlotsRow.appendChild(baseBadge);
+
+            const filledCount = Object.keys(p3State.assignments).length;
+            p3Counter.textContent = `Заполнено слотов: ${filledCount} / 5`;
+            p3SubmitBtn.disabled = filledCount < 5;
+        }
+
+        /* =========================================================================
+           ОДНОКРАТНАЯ ПОДПИСКА СЛУШАТЕЛЕЙ СОБЫТИЙ (EVENT DELEGATION)
+           ========================================================================= */
+        function bindEventsOnce() {
+            // --- Фаза 1 ---
+            p1GroupsContainer.addEventListener('click', (e) => {
+                if (isProcessingError || currentPhase !== 1) return;
+                const btn = e.target.closest('.p1-bit-btn');
+                if (!btn) return;
+                const idx = Number(btn.dataset.bitIdx);
+                p1State.bits[idx] = p1State.bits[idx] === 1 ? 0 : 1;
+                renderPhase1();
+            });
+
+            p1ClearBtn.addEventListener('click', () => {
+                if (isProcessingError || currentPhase !== 1) return;
+                p1State.bits.fill(0);
+                renderPhase1();
+            });
+
+            p1SubmitBtn.addEventListener('click', () => {
+                if (isProcessingError || currentPhase !== 1) return;
+                const regVal = parseInt(p1State.bits.join(''), 2);
+                if (regVal === p1State.targetValue) {
+                    switchToPhase(2);
+                } else {
+                    const msg = p1State.mode === 'oct'
+                        ? 'Неверная комбинация бит прав доступа! Проверьте веса триад 4–2–1.'
+                        : 'Неверные биты в 12-битном слове! Проверьте веса тетрад 8–4–2–1.';
+                    triggerFailure(msg, generatePhase1);
+                }
+            });
+
+            // --- Фаза 2 (Click & HTML5 Drag-and-Drop через делегирование) ---
+            p2PacketPool.addEventListener('click', (e) => {
+                if (isProcessingError || currentPhase !== 2) return;
+                const btn = e.target.closest('.p2-packet-btn');
+                if (!btn) return;
+                const pktId = btn.dataset.packetId;
+                p2State.selectedPacketId = p2State.selectedPacketId === pktId ? null : pktId;
+                renderPhase2();
+            });
+
+            p2BucketsRow.addEventListener('click', (e) => {
+                if (isProcessingError || currentPhase !== 2) return;
+                const pktBtn = e.target.closest('.p2-packet-btn');
+                if (pktBtn) {
+                    const pktId = pktBtn.dataset.packetId;
+                    p2State.placements[pktId] = 'pool';
+                    if (p2State.selectedPacketId === pktId) p2State.selectedPacketId = null;
+                    renderPhase2();
+                    return;
+                }
+                const zone = e.target.closest('.p2-bucket-zone');
+                if (zone && p2State.selectedPacketId) {
+                    p2State.placements[p2State.selectedPacketId] = zone.dataset.bucket;
+                    p2State.selectedPacketId = null;
+                    renderPhase2();
+                }
+            });
+
+            const phase2El = document.getElementById('phase2');
+            phase2El.addEventListener('dragstart', (e) => {
+                const btn = e.target.closest('.p2-packet-btn');
+                if (!btn || isProcessingError || currentPhase !== 2) return;
+                p2State.dragPacketId = btn.dataset.packetId;
+                if (e.dataTransfer) {
+                    e.dataTransfer.setData('text/plain', btn.dataset.packetId);
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+            });
+
+            phase2El.addEventListener('dragover', (e) => {
+                if (currentPhase !== 2) return;
+                if (e.target.closest('.p2-bucket-zone') || e.target.closest('#p2-packet-pool')) {
+                    e.preventDefault();
+                }
+            });
+
+            phase2El.addEventListener('drop', (e) => {
+                if (isProcessingError || currentPhase !== 2) return;
+                const pktId = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || p2State.dragPacketId;
+                p2State.dragPacketId = null;
+                if (!pktId) return;
+
+                const zone = e.target.closest('.p2-bucket-zone');
+                if (zone) {
+                    e.preventDefault();
+                    p2State.placements[pktId] = zone.dataset.bucket;
+                    p2State.selectedPacketId = null;
+                    renderPhase2();
+                } else if (e.target.closest('#p2-packet-pool')) {
+                    e.preventDefault();
+                    p2State.placements[pktId] = 'pool';
+                    p2State.selectedPacketId = null;
+                    renderPhase2();
+                }
+            });
+
+            p2ResetBtn.addEventListener('click', () => {
+                if (isProcessingError || currentPhase !== 2) return;
+                for (const pkt of p2State.packets) {
+                    p2State.placements[pkt.id] = 'pool';
+                }
+                p2State.selectedPacketId = null;
+                renderPhase2();
+            });
+
+            p2SubmitBtn.addEventListener('click', () => {
+                if (isProcessingError || currentPhase !== 2) return;
+                const allCorrect = p2State.packets.every(pkt => p2State.placements[pkt.id] === pkt.target);
+                if (allCorrect) {
+                    switchToPhase(3);
+                } else {
+                    triggerFailure('Ошибка маршрутизации байт-пакетов! Сверьте старшую и младшую тетрады/триады.', generatePhase2);
+                }
+            });
+
+            // --- Фаза 3 (Click & HTML5 Drag-and-Drop через делегирование) ---
+            p3TokenPool.addEventListener('click', (e) => {
+                if (isProcessingError || currentPhase !== 3) return;
+                const btn = e.target.closest('.p3-token-btn');
+                if (!btn) return;
+                const tokId = btn.dataset.tokenId;
+                p3State.selectedTokenId = p3State.selectedTokenId === tokId ? null : tokId;
+                renderPhase3();
+            });
+
+            p3SlotsRow.addEventListener('click', (e) => {
+                if (isProcessingError || currentPhase !== 3) return;
+                const slotBtn = e.target.closest('.p3-slot-btn');
+                if (!slotBtn) return;
+                const idx = Number(slotBtn.dataset.slotIdx);
+                if (p3State.selectedTokenId) {
+                    p3State.assignments[idx] = p3State.selectedTokenId;
+                    p3State.selectedTokenId = null;
+                    renderPhase3();
+                } else if (p3State.assignments[idx]) {
+                    delete p3State.assignments[idx];
+                    renderPhase3();
+                }
+            });
+
+            const phase3El = document.getElementById('phase3');
+            phase3El.addEventListener('dragstart', (e) => {
+                const btn = e.target.closest('.p3-token-btn');
+                if (!btn || isProcessingError || currentPhase !== 3) return;
+                p3State.dragTokenId = btn.dataset.tokenId;
+                if (e.dataTransfer) {
+                    e.dataTransfer.setData('text/plain', btn.dataset.tokenId);
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+            });
+
+            phase3El.addEventListener('dragover', (e) => {
+                if (currentPhase !== 3) return;
+                if (e.target.closest('.p3-slot-btn')) {
+                    e.preventDefault();
+                }
+            });
+
+            phase3El.addEventListener('drop', (e) => {
+                if (isProcessingError || currentPhase !== 3) return;
+                const slotBtn = e.target.closest('.p3-slot-btn');
+                if (!slotBtn) return;
+                e.preventDefault();
+                const tokId = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || p3State.dragTokenId;
+                p3State.dragTokenId = null;
+                if (!tokId) return;
+                const idx = Number(slotBtn.dataset.slotIdx);
+                p3State.assignments[idx] = tokId;
+                p3State.selectedTokenId = null;
+                renderPhase3();
+            });
+
+            p3ResetBtn.addEventListener('click', () => {
+                if (isProcessingError || currentPhase !== 3) return;
+                p3State.assignments = {};
+                p3State.selectedTokenId = null;
+                renderPhase3();
+            });
+
+            p3SubmitBtn.addEventListener('click', () => {
+                if (isProcessingError || currentPhase !== 3) return;
+                let ok = true;
+                for (let i = 0; i < 5; i++) {
+                    const tokId = p3State.assignments[i];
+                    const tok = p3State.tokens.find(t => t.id === tokId);
+                    if (!tok || tok.ch !== p3State.answerChars[i]) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok) {
+                    showVictory();
+                } else {
+                    triggerFailure('Ошибка «двоичного моста»! Целая часть группируется влево от запятой, дробная — вправо с дописыванием нулей справа.', generatePhase3);
+                }
+            });
+        }
+
+        // Инициализация тренажера
+        bindEventsOnce();
+        timerInterval = setInterval(updateTimerDisplay, 1000);
+        generatePhase1();
+    })();
+    </script>
+</TaskLayout>
