@@ -1,0 +1,1610 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={3}>
+    <div id="arcade-app" class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Шапка аркады -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 text-danger mb-0">Аркада: LOGIC PULSE RUNNER // Логические элементы (Уровень 3)</h2>
+            <span class="badge border border-danger text-danger bg-black rounded-0 px-3 py-2">
+                Keyboard-Only // 16 клавиш // Hardcore
+            </span>
+        </div>
+
+        <div
+            id="game-card"
+            :class="['card bg-black rounded-0', screenShake ? 'border-warning' : 'border-danger']"
+            :style="{ transform: shakeOffset ? 'translateX(' + shakeOffset + 'px)' : 'none' }">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- ==================== ЭКРАН INTRO (ОБЯЗАТЕЛЬНЫЙ БРИФИНГ) ==================== -->
+                <div v-if="gameState === 'intro'" id="intro-screen" class="py-2">
+                    <div class="border border-danger bg-dark p-3 p-md-4 mb-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <span class="badge bg-danger text-black rounded-0 fs-6">ХАРДКОР-РЕЖИМ // 10 ВОЛН</span>
+                            <span class="text-warning small">Волна 1: 34.0 с → Волна 10: 15.0 с</span>
+                        </div>
+                        <h3 class="h5 text-light mb-2">Протокол калибровки логических вентилей (ГОСТ) под потоком 2 тактов</h3>
+                        <p class="text-light small mb-3">
+                            На входную шину платы поступают двухразрядные последовательности сигналов (такт 1 и такт 2:
+                            <span class="badge bg-success text-black rounded-0">1</span> и
+                            <span class="badge bg-info text-dark rounded-0">0</span>).
+                            Ваша задача — настроить функцию каждого логического вентиля (<code>&amp;</code> И, <code>1</code> ИЛИ) и
+                            выходную инверсию <code>○</code> (И-НЕ, ИЛИ-НЕ, НЕ) с клавиатуры, чтобы выходные сигналы на всех датчиках справа совпали с целью до прихода фронта импульса.
+                            Любое короткое замыкание или тайм-аут сбрасывает прогресс на Волну 1.
+                        </p>
+
+                        <div class="border border-secondary bg-black p-3 mb-3">
+                            <div class="text-danger small text-uppercase fw-bold mb-2">Клавиатурное управление (16 клавиш, мышь в игре отключена):</div>
+                            <div class="row g-2 small text-light">
+                                <div class="col-12 col-sm-6">
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">A</kbd> /
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">D</kbd> или
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">&larr;</kbd> /
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">&rarr;</kbd>
+                                    — переместить курсор на соседний вентиль
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">W</kbd> /
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">S</kbd> или
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">&uarr;</kbd> /
+                                    <kbd class="bg-dark border border-secondary text-warning rounded-0 px-2">&darr;</kbd>
+                                    — переключить ядро (<code>&amp;</code> И ↔ <code>1</code> ИЛИ)
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <kbd class="bg-dark border border-secondary text-info rounded-0 px-2">1</kbd>–<kbd class="bg-dark border border-secondary text-info rounded-0 px-2">6</kbd>
+                                    — быстрый выбор вентиля по номеру [1..6]
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <kbd class="bg-dark border border-secondary text-danger rounded-0 px-2">Shift</kbd> — инверсия выхода <code>○</code>,
+                                    <kbd class="bg-dark border border-secondary text-success rounded-0 px-2">Space</kbd> — подать импульс
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <button id="start-btn" type="button" @click="startGame" class="btn btn-danger text-black fw-bold rounded-0 px-4 py-2 fs-5" style="min-width: 220px; min-height: 48px;">
+                                Начать [Space]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ИГРОВОЙ ЭКРАН (KEYBOARD-ONLY) ==================== -->
+                <div v-else-if="gameState === 'playing'" id="playing-screen">
+                    <!-- Верхний HUD -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 border-bottom border-danger pb-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span id="wave-badge" class="badge bg-danger text-black rounded-0 fs-6" v-text="'Волна ' + currentWave + ' / 10'"></span>
+                            <span class="text-light fw-bold small" v-text="currentWaveData.title"></span>
+                            <span
+                                v-if="currentWaveData.modeTag"
+                                class="badge bg-warning text-dark rounded-0 small"
+                                v-text="currentWaveData.modeTag">
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3 small">
+                            <span class="text-secondary">Сбросы: <strong id="alarm-count" class="text-danger" v-text="alarmCount"></strong></span>
+                            <span class="text-secondary">Время: <strong class="text-info" v-text="formatTime(totalElapsedSec)"></strong></span>
+                            <span id="wave-timer" :class="['badge rounded-0 fs-6', waveTimeLeft <= 5 ? 'bg-danger text-black' : 'bg-dark border border-warning text-warning']" v-text="waveTimeLeft.toFixed(1) + ' с'"></span>
+                        </div>
+                    </div>
+
+                    <!-- Прогресс-бар движения логического фронта импульса -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>ФРОНТ ИМПУЛЬСА → ВЫХОДНЫЕ ДАТЧИКИ</span>
+                            <span v-text="pulsePercent + '%'"></span>
+                        </div>
+                        <div class="progress rounded-0 bg-dark border border-secondary" style="height: 12px;">
+                            <div
+                                class="progress-bar rounded-0"
+                                :class="waveTimeLeft <= 5 ? 'bg-danger' : 'bg-warning'"
+                                role="progressbar"
+                                :style="{ width: pulsePercent + '%' }">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Аварийный баннер хардкор-сброса (#alarm-box) -->
+                    <div id="alarm-box" v-show="alarmActive" class="alert alert-danger bg-black text-danger border border-danger rounded-0 mb-2 py-2" role="alert">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <span>
+                                <strong v-text="'[HARDCORE RESET #' + alarmCount + ']'"></strong>
+                                <span class="ms-1" v-text="alarmMessage + ' Возврат на Волну 1...'"></span>
+                            </span>
+                            <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+                        </div>
+                    </div>
+
+                    <!-- Игровое поле: СТРОГО pointer-events: none (ЗАПРЕТ МЫШИ В ИГРЕ) -->
+                    <div id="arcade-field" style="pointer-events: none; user-select: none;">
+                        <!-- Интерактивная принципиальная схема платы (Data Source + Direct Surface + Event FX) -->
+                        <div class="border border-secondary bg-black mb-2 p-1">
+                            <svg id="circuit-svg" viewBox="0 0 840 300" class="w-100 d-block bg-black" role="img" aria-label="Принципиальная логическая схема">
+                                <!-- Фоновая монтажная сетка платы (статическая) -->
+                                <g stroke="#1e293b" stroke-width="1">
+                                    <line x1="120" y1="0" x2="120" y2="300"></line>
+                                    <line x1="220" y1="0" x2="220" y2="300"></line>
+                                    <line x1="360" y1="0" x2="360" y2="300"></line>
+                                    <line x1="540" y1="0" x2="540" y2="300"></line>
+                                    <line x1="710" y1="0" x2="710" y2="300"></line>
+                                </g>
+
+                                <!-- Заголовки зон платы -->
+                                <text x="58" y="14" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">ВХОДЫ (2 ТАКТА)</text>
+                                <text x="277" y="14" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">КАСКАД 1</text>
+                                <text x="457" y="14" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">КАСКАД 2</text>
+                                <text x="627" y="14" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">ВЫХ. КАСКАД</text>
+                                <text x="778" y="14" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">ЦЕЛЬ ДАТЧИКОВ</text>
+
+                                <!-- Линия приближения тактового фронта (синхронизирована с pulsePercent) -->
+                                <line
+                                    :x1="wavefrontSvgX"
+                                    y1="20"
+                                    :x2="wavefrontSvgX"
+                                    y2="294"
+                                    :stroke="waveTimeLeft <= 5 ? '#ef4444' : '#f59e0b'"
+                                    stroke-width="2"
+                                    stroke-dasharray="5,4"
+                                    opacity="0.75">
+                                </line>
+
+                                <!-- Проводники схемы (реактивная подсветка только во время pulseFxActive) -->
+                                <g fill="none" stroke-linecap="square" stroke-linejoin="miter">
+                                    <path
+                                        v-for="(w, wIdx) in currentWaveData.wires"
+                                        :key="'w-' + wIdx"
+                                        :d="w.d"
+                                        :stroke="getWireStroke(w)"
+                                        :stroke-width="pulseFxActive ? 3.5 : 2.2">
+                                    </path>
+                                </g>
+
+                                <!-- Точки разветвления ГОСТ (●) -->
+                                <g>
+                                    <circle
+                                        v-for="(dot, dIdx) in currentWaveData.dots"
+                                        :key="'dot-' + dIdx"
+                                        :cx="dot.x"
+                                        :cy="dot.y"
+                                        r="4.5"
+                                        fill="#e2e8f0"
+                                        stroke="#0f172a"
+                                        stroke-width="1">
+                                    </circle>
+                                </g>
+
+                                <!-- Входные генераторы 2-тактного сигнала (слева) -->
+                                <g
+                                    v-for="inp in currentWaveData.inputs"
+                                    :key="'in-' + inp.id"
+                                    :data-input-pin="inp.id"
+                                    :data-ticks="inp.ticks.join(',')">
+                                    <rect :x="12" :y="inp.y - 16" width="90" height="32" fill="#0f172a" stroke="#475569" stroke-width="1.5"></rect>
+                                    <text :x="25" :y="inp.y + 5" fill="#f8fafc" font-size="15" font-weight="bold" text-anchor="middle" font-family="monospace" v-text="inp.id"></text>
+                                    <rect :x="40" :y="inp.y - 11" width="24" height="22" :fill="inp.ticks[0] ? '#22c55e' : '#38bdf8'"></rect>
+                                    <text :x="52" :y="inp.y + 5" fill="#000000" font-size="14" font-weight="bold" text-anchor="middle" font-family="monospace" v-text="inp.ticks[0]"></text>
+                                    <rect :x="69" :y="inp.y - 11" width="24" height="22" :fill="inp.ticks[1] ? '#22c55e' : '#38bdf8'"></rect>
+                                    <text :x="81" :y="inp.y + 5" fill="#000000" font-size="14" font-weight="bold" text-anchor="middle" font-family="monospace" v-text="inp.ticks[1]"></text>
+                                </g>
+
+                                <!-- Аппаратные фиксированные инверторы (FIX 1○) -->
+                                <g
+                                    v-for="(fx, fIdx) in currentWaveData.fixedInverters"
+                                    :key="'fx-' + fIdx"
+                                    data-fix-inverter="true"
+                                    :data-source="fx.source"
+                                    :data-ticks="fx.ticks.join(',')">
+                                    <rect :x="fx.x" :y="fx.y - 18" width="40" height="36" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"></rect>
+                                    <text :x="fx.x + 20" :y="fx.y - 3" fill="#94a3b8" font-size="9" text-anchor="middle" font-family="monospace">FIX</text>
+                                    <text :x="fx.x + 20" :y="fx.y + 12" fill="#f8fafc" font-size="15" font-weight="bold" text-anchor="middle" font-family="monospace">1</text>
+                                    <circle :cx="fx.x + 45" :cy="fx.y" r="5" fill="#000000" stroke="#f59e0b" stroke-width="2"></circle>
+                                </g>
+
+                                <!-- Программируемые логические вентили ГОСТ [1..K] (Direct Surface, Keyboard-Only) -->
+                                <g
+                                    v-for="g in currentWaveData.gates"
+                                    :key="'gate-' + g.id"
+                                    :data-gate-id="g.id"
+                                    :data-arity="g.arity"
+                                    :data-base="gateStates[g.id] ? gateStates[g.id].base : 'AND'"
+                                    :data-inv="gateStates[g.id] && gateStates[g.id].inv ? '1' : '0'"
+                                    :data-op="getGateOp(g.id)"
+                                    :data-inputs="g.inputs.join(',')"
+                                    :data-cursor="cursorGateId === g.id ? 'true' : 'false'">
+                                    <!-- Неоновая рамка курсора -->
+                                    <rect
+                                        v-if="cursorGateId === g.id"
+                                        :x="g.x - 5"
+                                        :y="g.y - 29"
+                                        width="74"
+                                        height="58"
+                                        fill="none"
+                                        stroke="#ffc107"
+                                        stroke-width="2"
+                                        stroke-dasharray="4,3">
+                                    </rect>
+                                    <!-- Корпус вентиля ГОСТ -->
+                                    <rect
+                                        :x="g.x"
+                                        :y="g.y - 24"
+                                        width="64"
+                                        height="48"
+                                        :fill="getGateFill(g.id)"
+                                        :stroke="getGateStroke(g.id)"
+                                        :stroke-width="cursorGateId === g.id ? 3 : 2">
+                                    </rect>
+                                    <!-- Номер вентиля [1..6] -->
+                                    <text
+                                        :x="g.x + 13"
+                                        :y="g.y - 10"
+                                        :fill="cursorGateId === g.id ? '#ffc107' : '#38bdf8'"
+                                        font-size="11"
+                                        font-weight="bold"
+                                        text-anchor="middle"
+                                        font-family="monospace"
+                                        v-text="'[' + g.id + ']'">
+                                    </text>
+                                    <!-- Маркировка ГОСТ (& или 1) -->
+                                    <text
+                                        :x="g.x + 36"
+                                        :y="g.y + 5"
+                                        fill="#ffffff"
+                                        font-size="22"
+                                        font-weight="bold"
+                                        text-anchor="middle"
+                                        font-family="monospace"
+                                        v-text="getGateGostSymbol(g.id)">
+                                    </text>
+                                    <!-- Подпись операции (И / ИЛИ / И-НЕ / ИЛИ-НЕ / ПРЯМ / НЕ) -->
+                                    <text
+                                        :x="g.x + 32"
+                                        :y="g.y + 19"
+                                        :fill="gateStates[g.id] && gateStates[g.id].inv ? '#fbbf24' : '#cbd5e1'"
+                                        font-size="10"
+                                        font-weight="bold"
+                                        text-anchor="middle"
+                                        font-family="monospace"
+                                        v-text="getGateRuLabel(g.id)">
+                                    </text>
+                                    <!-- Инверсный кружок ГОСТ на выходе (○) -->
+                                    <circle
+                                        v-if="gateStates[g.id] && gateStates[g.id].inv"
+                                        :cx="g.x + 70"
+                                        :cy="g.y"
+                                        r="6"
+                                        fill="#000000"
+                                        stroke="#f59e0b"
+                                        stroke-width="2.5">
+                                    </circle>
+                                </g>
+
+                                <!-- Целевые выходные датчики (справа) -->
+                                <g
+                                    v-for="s in currentWaveData.sensors"
+                                    :key="'sens-' + s.id"
+                                    :data-sensor-id="s.id"
+                                    :data-source-gate="s.sourceGate"
+                                    :data-target="s.target.join(',')">
+                                    <rect
+                                        :x="732"
+                                        :y="s.y - 16"
+                                        width="96"
+                                        height="32"
+                                        fill="#0f172a"
+                                        :stroke="getSensorStroke(s)"
+                                        :stroke-width="pulseFxActive ? 3 : 1.5">
+                                    </rect>
+                                    <text :x="749" :y="s.y + 5" fill="#f8fafc" font-size="13" font-weight="bold" text-anchor="middle" font-family="monospace" v-text="s.id"></text>
+                                    <rect :x="768" :y="s.y - 11" width="24" height="22" :fill="s.target[0] ? '#22c55e' : '#38bdf8'"></rect>
+                                    <text :x="780" :y="s.y + 5" fill="#000000" font-size="14" font-weight="bold" text-anchor="middle" font-family="monospace" v-text="s.target[0]"></text>
+                                    <rect :x="797" :y="s.y - 11" width="24" height="22" :fill="s.target[1] ? '#22c55e' : '#38bdf8'"></rect>
+                                    <text :x="809" :y="s.y + 5" fill="#000000" font-size="14" font-weight="bold" text-anchor="middle" font-family="monospace" v-text="s.target[1]"></text>
+                                </g>
+                            </svg>
+                        </div>
+
+                        <!-- Панель состояния активного курсора (строго без дублирования условий схемы) -->
+                        <div class="border border-secondary bg-dark px-3 py-2 mb-2 d-flex flex-wrap justify-content-between align-items-center gap-2 small">
+                            <span class="text-light">
+                                Курсор: <strong class="text-warning" v-text="'Вентиль [' + cursorGateId + ']'"></strong>
+                                <span class="text-secondary ms-2" v-text="'(' + activeCursorMetaText + ')'"></span>
+                            </span>
+                            <span class="text-info" v-text="'Режим вентиля: ' + getGateRuLabel(cursorGateId) + ' [' + getGateGostSymbol(cursorGateId) + (gateStates[cursorGateId] && gateStates[cursorGateId].inv ? '○' : '') + ']'"></span>
+                        </div>
+
+                        <!-- Компактный Keycap HUD -->
+                        <div class="border border-secondary bg-dark p-2 text-center small text-light">
+                            <kbd class="bg-black border border-secondary text-warning rounded-0 px-1">A/D</kbd>
+                            <kbd class="bg-black border border-secondary text-warning rounded-0 px-1">&larr;/&rarr;</kbd> курсор &middot;
+                            <kbd class="bg-black border border-secondary text-warning rounded-0 px-1">W/S</kbd>
+                            <kbd class="bg-black border border-secondary text-warning rounded-0 px-1">&uarr;/&darr;</kbd> И / ИЛИ &middot;
+                            <kbd class="bg-black border border-secondary text-danger rounded-0 px-1">Shift</kbd> инверсия ○ &middot;
+                            <kbd class="bg-black border border-secondary text-info rounded-0 px-1">1..6</kbd> узел &middot;
+                            <kbd class="bg-black border border-secondary text-success rounded-0 px-1">Space</kbd> ПОДАТЬ ИМПУЛЬС
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ЭКРАН ПОБЕДЫ ==================== -->
+                <div v-else-if="gameState === 'victory'" id="victory-screen" class="text-center py-4">
+                    <div class="border border-success bg-dark p-4 mb-3">
+                        <h3 class="text-success mb-2">[ УРОВЕНЬ 3 ПРОЙДЕН // ЛОГИЧЕСКАЯ ПЛАТА СТАБИЛИЗИРОВАНА ]</h3>
+                        <p class="text-light mb-3">
+                            Все 10 волн калибровки логических элементов И, ИЛИ, НЕ, И-НЕ и ИЛИ-НЕ пройдены с клавиатуры без единого замыкания.
+                        </p>
+                        <div class="d-flex justify-content-center gap-4 text-secondary small mb-3">
+                            <span>Хардкор-сбросов: <strong class="text-danger" v-text="alarmCount"></strong></span>
+                            <span>Время: <strong class="text-info" v-text="formatTime(totalElapsedSec)"></strong></span>
+                        </div>
+                        <button id="restart-btn" type="button" @click="restartGame" class="btn btn-outline-success rounded-0 fw-bold px-4 py-2" style="min-height: 48px;">
+                            Пройти снова [Space]
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline src="/static/vue.global.js"></script>
+    <script is:inline>
+    (function() {
+        const ALL_TICKS = [
+            [0, 0],
+            [0, 1],
+            [1, 0],
+            [1, 1]
+        ];
+        const BINARY_OPS = ['AND', 'OR', 'NAND', 'NOR'];
+
+        let audioCtx = null;
+        let resetTimeoutId = null;
+        let pulseTimeoutId = null;
+        let shakeTimerIds = [];
+        let appInstance = null;
+
+        function getAudioContext() {
+            if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                try { audioCtx = new Ctx(); } catch (e) {}
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(function() {});
+            }
+            return audioCtx;
+        }
+
+        function playTone(freq, type, duration, vol) {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type || 'square';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                gain.gain.setValueAtTime(vol || 0.05, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (duration || 0.08));
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + (duration || 0.08));
+            } catch (e) {}
+        }
+
+        function playCursorSound() { playTone(340, 'triangle', 0.04, 0.04); }
+        function playGateSwitchSound() { playTone(520, 'square', 0.06, 0.045); }
+        function playInvertSound(isInv) { playTone(isInv ? 660 : 390, 'sawtooth', 0.07, 0.045); }
+        function playWaveClearSound() {
+            playTone(523, 'triangle', 0.08, 0.06);
+            setTimeout(function() { playTone(784, 'triangle', 0.14, 0.06); }, 85);
+        }
+        function playAlarmSiren() {
+            playTone(210, 'sawtooth', 0.18, 0.09);
+            setTimeout(function() { playTone(150, 'sawtooth', 0.24, 0.09); }, 180);
+        }
+        function playVictoryFanfare() {
+            [523, 659, 784, 1046].forEach(function(freq, idx) {
+                setTimeout(function() { playTone(freq, 'triangle', 0.16, 0.06); }, idx * 95);
+            });
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[randInt(0, arr.length - 1)];
+        }
+
+        function shuffle(arr) {
+            const copy = arr.slice();
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = copy[i];
+                copy[i] = copy[j];
+                copy[j] = tmp;
+            }
+            return copy;
+        }
+
+        function cloneTicks(t) {
+            return [t[0], t[1]];
+        }
+
+        function invTicks(t) {
+            return [1 - t[0], 1 - t[1]];
+        }
+
+        function hamming(a, b) {
+            return (a[0] ^ b[0]) + (a[1] ^ b[1]);
+        }
+
+        function sameTicks(a, b) {
+            return a[0] === b[0] && a[1] === b[1];
+        }
+
+        function neighborsOf(t) {
+            return [
+                [1 - t[0], t[1]],
+                [t[0], 1 - t[1]]
+            ];
+        }
+
+        function evalGateTicks(arity, op, in1, in2) {
+            if (arity === 1) {
+                return op === 'NOT' ? [1 - in1[0], 1 - in1[1]] : [in1[0], in1[1]];
+            }
+            const a0 = in1[0], a1 = in1[1];
+            const b0 = in2[0], b1 = in2[1];
+            if (op === 'AND') return [a0 & b0, a1 & b1];
+            if (op === 'OR') return [a0 | b0, a1 | b1];
+            if (op === 'NAND') return [1 - (a0 & b0), 1 - (a1 & b1)];
+            return [1 - (a0 | b0), 1 - (a1 | b1)];
+        }
+
+        function opToState(arity, op) {
+            if (arity === 1) {
+                return { base: 'BUF', inv: op === 'NOT' };
+            }
+            return {
+                base: (op === 'AND' || op === 'NAND') ? 'AND' : 'OR',
+                inv: (op === 'NAND' || op === 'NOR')
+            };
+        }
+
+        function stateToOp(arity, st) {
+            if (arity === 1) {
+                return st.inv ? 'NOT' : 'BUF';
+            }
+            if (st.base === 'AND') {
+                return st.inv ? 'NAND' : 'AND';
+            }
+            return st.inv ? 'NOR' : 'OR';
+        }
+
+        function pickDifferentOp(op, pool) {
+            const candidates = pool.filter(function(c) { return c !== op; });
+            return pickRandom(candidates);
+        }
+
+        function buildInitialGateStates(gates, solutionOps, mismatchedIds, forceNonInv) {
+            const mismatchSet = {};
+            mismatchedIds.forEach(function(id) { mismatchSet[id] = true; });
+            const init = {};
+            gates.forEach(function(g) {
+                const targetOp = solutionOps[g.id];
+                if (!mismatchSet[g.id]) {
+                    init[g.id] = opToState(g.arity, targetOp);
+                    return;
+                }
+                if (g.arity === 1) {
+                    init[g.id] = opToState(1, targetOp === 'NOT' ? 'BUF' : 'NOT');
+                    return;
+                }
+                if (forceNonInv) {
+                    const nonInvPool = ['AND', 'OR'];
+                    const chosen = pickDifferentOp(targetOp, nonInvPool);
+                    init[g.id] = opToState(2, chosen);
+                } else {
+                    const st = opToState(2, targetOp);
+                    if (st.inv) {
+                        // Неинверсная база (без ○), чтобы ученик явно включил инверсию через Shift
+                        init[g.id] = { base: Math.random() < 0.5 ? 'AND' : 'OR', inv: false };
+                    } else {
+                        init[g.id] = { base: st.base === 'AND' ? 'OR' : 'AND', inv: false };
+                    }
+                }
+            });
+            return init;
+        }
+
+        function evaluateCircuit(wave, gateStates) {
+            const values = {};
+            wave.inputs.forEach(function(inp) {
+                values[inp.id] = cloneTicks(inp.ticks);
+            });
+            (wave.fixedInverters || []).forEach(function(fx) {
+                values[fx.id] = invTicks(values[fx.source]);
+            });
+            wave.gates.forEach(function(g) {
+                const op = stateToOp(g.arity, gateStates[g.id]);
+                const in1 = values[g.inputs[0]];
+                const in2 = g.arity === 2 ? values[g.inputs[1]] : null;
+                values['G' + g.id] = evalGateTicks(g.arity, op, in1, in2);
+            });
+            return values;
+        }
+
+        function buildWave1() {
+            const A = pickRandom(ALL_TICKS);
+            const B = pickRandom(neighborsOf(A));
+            const C = pickRandom(ALL_TICKS);
+            const D = pickRandom(neighborsOf(C));
+            const op1 = pickRandom(['AND', 'OR']);
+            const op2 = op1 === 'AND' ? 'OR' : 'AND';
+            const F1 = evalGateTicks(2, op1, A, B);
+            const F2 = evalGateTicks(2, op2, C, D);
+
+            return {
+                wave: 1,
+                timeLimit: 34.0,
+                title: 'Параллельная шина: базовые И / ИЛИ',
+                modeTag: '',
+                inputs: [
+                    { id: 'A', y: 62, ticks: A },
+                    { id: 'B', y: 112, ticks: B },
+                    { id: 'C', y: 188, ticks: C },
+                    { id: 'D', y: 238, ticks: D }
+                ],
+                fixedInverters: [],
+                gates: [
+                    { id: 1, arity: 2, x: 310, y: 87, inputs: ['A', 'B'] },
+                    { id: 2, arity: 2, x: 310, y: 213, inputs: ['C', 'D'] }
+                ],
+                sensors: [
+                    { id: 'F₁', y: 87, sourceGate: 1, target: F1 },
+                    { id: 'F₂', y: 213, sourceGate: 2, target: F2 }
+                ],
+                dots: [],
+                wires: [
+                    { src: 'A', d: 'M102,62 L270,62 L270,76 L310,76' },
+                    { src: 'B', d: 'M102,112 L270,112 L270,98 L310,98' },
+                    { src: 'C', d: 'M102,188 L270,188 L270,202 L310,202' },
+                    { src: 'D', d: 'M102,238 L270,238 L270,224 L310,224' },
+                    { src: 'G1', d: 'M374,87 L732,87' },
+                    { src: 'G2', d: 'M374,213 L732,213' }
+                ],
+                solutionOps: { 1: op1, 2: op2 },
+                initialGateStates: buildInitialGateStates(
+                    [{ id: 1, arity: 2 }, { id: 2, arity: 2 }],
+                    { 1: op1, 2: op2 },
+                    [1, 2],
+                    true
+                )
+            };
+        }
+
+        function buildWave2() {
+            const A = pickRandom(ALL_TICKS);
+            const B = pickRandom(neighborsOf(A));
+            const C = pickRandom(ALL_TICKS);
+            const op1 = pickRandom(['NAND', 'NOR']);
+            const op2 = 'NOT';
+            const F1 = evalGateTicks(2, op1, A, B);
+            const F2 = evalGateTicks(1, op2, C, null);
+
+            return {
+                wave: 2,
+                timeLimit: 30.0,
+                title: 'Введение инверсии [Shift]: И-НЕ / ИЛИ-НЕ и НЕ',
+                modeTag: '',
+                inputs: [
+                    { id: 'A', y: 65, ticks: A },
+                    { id: 'B', y: 115, ticks: B },
+                    { id: 'C', y: 213, ticks: C }
+                ],
+                fixedInverters: [],
+                gates: [
+                    { id: 1, arity: 2, x: 310, y: 90, inputs: ['A', 'B'] },
+                    { id: 2, arity: 1, x: 310, y: 213, inputs: ['C'] }
+                ],
+                sensors: [
+                    { id: 'F₁', y: 90, sourceGate: 1, target: F1 },
+                    { id: 'F₂', y: 213, sourceGate: 2, target: F2 }
+                ],
+                dots: [],
+                wires: [
+                    { src: 'A', d: 'M102,65 L270,65 L270,79 L310,79' },
+                    { src: 'B', d: 'M102,115 L270,115 L270,101 L310,101' },
+                    { src: 'C', d: 'M102,213 L310,213' },
+                    { src: 'G1', d: 'M374,90 L732,90' },
+                    { src: 'G2', d: 'M374,213 L732,213' }
+                ],
+                solutionOps: { 1: op1, 2: op2 },
+                initialGateStates: buildInitialGateStates(
+                    [{ id: 1, arity: 2 }, { id: 2, arity: 1 }],
+                    { 1: op1, 2: op2 },
+                    [1, 2],
+                    false
+                )
+            };
+        }
+
+        function buildWave3or4(waveNum, timeLimit, withFix) {
+            const A = pickRandom(ALL_TICKS);
+            const B = pickRandom(neighborsOf(A));
+            const B_nbr = pickRandom(neighborsOf(B));
+            const C = withFix ? invTicks(B_nbr) : B_nbr;
+            const cEff = withFix ? invTicks(C) : C;
+
+            const op1 = pickRandom(withFix ? ['AND', 'OR', 'NAND', 'NOR'] : ['AND', 'OR', 'NAND']);
+            const F1 = evalGateTicks(2, op1, A, B);
+
+            const op2Candidates = shuffle(BINARY_OPS).filter(function(op) {
+                const out2 = evalGateTicks(2, op, B, cEff);
+                return hamming(F1, out2) === 1;
+            });
+            const op2 = op2Candidates[0];
+            const F2 = evalGateTicks(2, op2, B, cEff);
+
+            const op3 = withFix ? pickRandom(['NAND', 'NOR']) : pickRandom(['AND', 'OR']);
+            const F3 = evalGateTicks(2, op3, F1, F2);
+
+            const gatesMeta = [
+                { id: 1, arity: 2, x: 245, y: 82, inputs: ['A', 'B'] },
+                { id: 2, arity: 2, x: 245, y: 214, inputs: ['B', withFix ? 'FIX_C' : 'C'] },
+                { id: 3, arity: 2, x: 440, y: 148, inputs: ['G1', 'G2'] }
+            ];
+            const mismatched = withFix ? [1, 2, 3] : shuffle([1, 2, 3]).slice(0, 2);
+
+            const wires = [
+                { src: 'A', d: 'M102,60 L215,60 L215,71 L245,71' },
+                { src: 'B', d: 'M102,148 L195,148 L195,93 L245,93' },
+                { src: 'B', d: 'M195,148 L195,203 L245,203' },
+                { src: 'G1', d: 'M309,82 L355,82 L355,44 L732,44' },
+                { src: 'G1', d: 'M355,82 L390,82 L390,137 L440,137' },
+                { src: 'G2', d: 'M309,214 L355,214 L355,254 L732,254' },
+                { src: 'G2', d: 'M355,214 L390,214 L390,159 L440,159' },
+                { src: 'G3', d: 'M504,148 L732,148' }
+            ];
+            if (withFix) {
+                wires.push({ src: 'C', d: 'M102,238 L140,238' });
+                wires.push({ src: 'FIX_C', d: 'M190,238 L215,238 L215,225 L245,225' });
+            } else {
+                wires.push({ src: 'C', d: 'M102,238 L215,238 L215,225 L245,225' });
+            }
+
+            return {
+                wave: waveNum,
+                timeLimit: timeLimit,
+                title: withFix
+                    ? 'Двухкаскадный узел + аппаратный инвертор FIX 1○'
+                    : 'Двухкаскадная схема с разветвлением шины B',
+                modeTag: '',
+                inputs: [
+                    { id: 'A', y: 60, ticks: A },
+                    { id: 'B', y: 148, ticks: B },
+                    { id: 'C', y: 238, ticks: C }
+                ],
+                fixedInverters: withFix ? [{ id: 'FIX_C', source: 'C', x: 140, y: 238, ticks: cEff }] : [],
+                gates: gatesMeta,
+                sensors: [
+                    { id: 'F₁', y: 44, sourceGate: 1, target: F1 },
+                    { id: 'F₂', y: 254, sourceGate: 2, target: F2 },
+                    { id: 'F₃', y: 148, sourceGate: 3, target: F3 }
+                ],
+                dots: [
+                    { x: 195, y: 148 },
+                    { x: 355, y: 82 },
+                    { x: 355, y: 214 }
+                ],
+                wires: wires,
+                solutionOps: { 1: op1, 2: op2, 3: op3 },
+                initialGateStates: buildInitialGateStates(gatesMeta, { 1: op1, 2: op2, 3: op3 }, mismatched, false)
+            };
+        }
+
+        function buildWave5or6(waveNum, timeLimit, withFix) {
+            const A = pickRandom(ALL_TICKS);
+            const B = pickRandom(neighborsOf(A));
+            const bForG2 = withFix ? invTicks(B) : B;
+            const C = pickRandom(neighborsOf(bForG2));
+            const D = pickRandom(neighborsOf(C));
+
+            let op1, op2, op3, op4, F1, F2, F3, F4;
+            if (!withFix) {
+                op1 = pickRandom(BINARY_OPS);
+                F1 = evalGateTicks(2, op1, A, B);
+                const op2Pool = shuffle(BINARY_OPS).filter(function(op) {
+                    return hamming(F1, evalGateTicks(2, op, B, C)) === 1;
+                });
+                op2 = op2Pool[0];
+                F2 = evalGateTicks(2, op2, B, C);
+                op3 = pickRandom(BINARY_OPS);
+                F3 = evalGateTicks(2, op3, C, D);
+                op4 = pickRandom(BINARY_OPS);
+                F4 = evalGateTicks(2, op4, F1, F2);
+            } else {
+                op1 = pickRandom(BINARY_OPS);
+                F1 = evalGateTicks(2, op1, A, B);
+                op2 = pickRandom(BINARY_OPS);
+                F2 = evalGateTicks(2, op2, bForG2, C);
+                const op3Pool = shuffle(BINARY_OPS).filter(function(op) {
+                    return hamming(F2, evalGateTicks(2, op, C, D)) === 1;
+                });
+                op3 = op3Pool[0];
+                F3 = evalGateTicks(2, op3, C, D);
+                op4 = pickRandom(BINARY_OPS);
+                F4 = evalGateTicks(2, op4, F2, F3);
+            }
+
+            const gatesMeta = [
+                { id: 1, arity: 2, x: 245, y: 58, inputs: ['A', 'B'] },
+                { id: 2, arity: 2, x: 245, y: 150, inputs: [withFix ? 'FIX_B' : 'B', 'C'] },
+                { id: 3, arity: 2, x: 245, y: 242, inputs: ['C', 'D'] },
+                { id: 4, arity: 2, x: 455, y: withFix ? 196 : 104, inputs: withFix ? ['G2', 'G3'] : ['G1', 'G2'] }
+            ];
+            const mismatched = shuffle([1, 2, 3, 4]).slice(0, 3);
+
+            const wires = [
+                { src: 'A', d: 'M102,42 L205,42 L205,47 L245,47' },
+                { src: 'B', d: 'M102,114 L132,114 L132,69 L245,69' },
+                { src: 'C', d: 'M102,186 L205,186 L205,161 L245,161' },
+                { src: 'C', d: 'M205,186 L205,231 L245,231' },
+                { src: 'D', d: 'M102,258 L205,258 L205,253 L245,253' },
+                { src: 'G1', d: 'M309,58 L355,58 L355,34 L732,34' },
+                { src: 'G3', d: 'M309,242 L355,242 L355,268 L732,268' }
+            ];
+
+            if (!withFix) {
+                wires.push({ src: 'B', d: 'M132,114 L132,139 L245,139' });
+                wires.push({ src: 'G1', d: 'M355,58 L395,58 L395,93 L455,93' });
+                wires.push({ src: 'G2', d: 'M309,150 L365,150 L365,115 L455,115' });
+                wires.push({ src: 'G2', d: 'M365,150 L365,176 L732,176' });
+                wires.push({ src: 'G4', d: 'M519,104 L732,104' });
+            } else {
+                wires.push({ src: 'B', d: 'M132,114 L132,139 L142,139' });
+                wires.push({ src: 'FIX_B', d: 'M192,139 L245,139' });
+                wires.push({ src: 'G2', d: 'M309,150 L365,150 L365,112 L732,112' });
+                wires.push({ src: 'G2', d: 'M365,150 L365,185 L455,185' });
+                wires.push({ src: 'G3', d: 'M355,242 L395,242 L395,207 L455,207' });
+                wires.push({ src: 'G4', d: 'M519,196 L732,196' });
+            }
+
+            const sensors = !withFix
+                ? [
+                    { id: 'F₁', y: 34, sourceGate: 1, target: F1 },
+                    { id: 'F₄', y: 104, sourceGate: 4, target: F4 },
+                    { id: 'F₂', y: 176, sourceGate: 2, target: F2 },
+                    { id: 'F₃', y: 268, sourceGate: 3, target: F3 }
+                ]
+                : [
+                    { id: 'F₁', y: 34, sourceGate: 1, target: F1 },
+                    { id: 'F₂', y: 112, sourceGate: 2, target: F2 },
+                    { id: 'F₄', y: 196, sourceGate: 4, target: F4 },
+                    { id: 'F₃', y: 268, sourceGate: 3, target: F3 }
+                ];
+
+            const dots = [
+                { x: 132, y: 114 },
+                { x: 205, y: 186 },
+                { x: 365, y: 150 },
+                { x: withFix ? 355 : 355, y: withFix ? 242 : 58 }
+            ];
+
+            return {
+                wave: waveNum,
+                timeLimit: timeLimit,
+                title: withFix
+                    ? '4-вентильный ромб + аппаратный сдвиг фазы FIX 1○'
+                    : '4-вентильный ромб на 4 входных шинах',
+                modeTag: '',
+                inputs: [
+                    { id: 'A', y: 42, ticks: A },
+                    { id: 'B', y: 114, ticks: B },
+                    { id: 'C', y: 186, ticks: C },
+                    { id: 'D', y: 258, ticks: D }
+                ],
+                fixedInverters: withFix ? [{ id: 'FIX_B', source: 'B', x: 142, y: 139, ticks: bForG2 }] : [],
+                gates: gatesMeta,
+                sensors: sensors,
+                dots: dots,
+                wires: wires,
+                solutionOps: { 1: op1, 2: op2, 3: op3, 4: op4 },
+                initialGateStates: buildInitialGateStates(gatesMeta, { 1: op1, 2: op2, 3: op3, 4: op4 }, mismatched, false)
+            };
+        }
+
+        function buildWave7() {
+            const A = pickRandom(ALL_TICKS);
+            const B = pickRandom(neighborsOf(A));
+            const C = pickRandom(neighborsOf(B));
+
+            const op1 = pickRandom(BINARY_OPS);
+            const F1 = evalGateTicks(2, op1, A, B);
+            const op2Pool = shuffle(BINARY_OPS).filter(function(op) {
+                return op !== op1 && hamming(F1, evalGateTicks(2, op, A, B)) === 1;
+            });
+            const op2 = op2Pool[0];
+            const F2 = evalGateTicks(2, op2, A, B);
+
+            const op3 = pickRandom(['AND', 'OR', 'NAND', 'NOR']);
+            const F3 = evalGateTicks(2, op3, F1, F2);
+
+            const op4 = pickRandom(BINARY_OPS);
+            const F4 = evalGateTicks(2, op4, B, C);
+
+            const gatesMeta = [
+                { id: 1, arity: 2, x: 245, y: 68, inputs: ['A', 'B'] },
+                { id: 2, arity: 2, x: 245, y: 162, inputs: ['A', 'B'] },
+                { id: 3, arity: 2, x: 455, y: 115, inputs: ['G1', 'G2'] },
+                { id: 4, arity: 2, x: 245, y: 244, inputs: ['B', 'C'] }
+            ];
+            const mismatched = shuffle([1, 2, 3, 4]).slice(0, 3);
+
+            return {
+                wave: 7,
+                timeLimit: 18.0,
+                title: 'Узел полусумматора (разветвление пары шин A, B)',
+                modeTag: '',
+                inputs: [
+                    { id: 'A', y: 68, ticks: A },
+                    { id: 'B', y: 162, ticks: B },
+                    { id: 'C', y: 244, ticks: C }
+                ],
+                fixedInverters: [],
+                gates: gatesMeta,
+                sensors: [
+                    { id: 'F₁', y: 34, sourceGate: 1, target: F1 },
+                    { id: 'F₃', y: 115, sourceGate: 3, target: F3 },
+                    { id: 'F₂', y: 192, sourceGate: 2, target: F2 },
+                    { id: 'F₄', y: 244, sourceGate: 4, target: F4 }
+                ],
+                dots: [
+                    { x: 155, y: 68 },
+                    { x: 185, y: 162 },
+                    { x: 355, y: 68 },
+                    { x: 355, y: 162 }
+                ],
+                wires: [
+                    { src: 'A', d: 'M102,68 L155,68 L155,57 L245,57' },
+                    { src: 'A', d: 'M155,68 L155,151 L245,151' },
+                    { src: 'B', d: 'M102,162 L185,162 L185,79 L245,79' },
+                    { src: 'B', d: 'M185,162 L185,173 L245,173' },
+                    { src: 'B', d: 'M185,162 L185,233 L245,233' },
+                    { src: 'C', d: 'M102,244 L205,244 L205,255 L245,255' },
+                    { src: 'G1', d: 'M309,68 L355,68 L355,34 L732,34' },
+                    { src: 'G1', d: 'M355,68 L395,68 L395,104 L455,104' },
+                    { src: 'G2', d: 'M309,162 L355,162 L355,192 L732,192' },
+                    { src: 'G2', d: 'M355,162 L395,162 L395,126 L455,126' },
+                    { src: 'G3', d: 'M519,115 L732,115' },
+                    { src: 'G4', d: 'M309,244 L732,244' }
+                ],
+                solutionOps: { 1: op1, 2: op2, 3: op3, 4: op4 },
+                initialGateStates: buildInitialGateStates(gatesMeta, { 1: op1, 2: op2, 3: op3, 4: op4 }, mismatched, false)
+            };
+        }
+
+        function buildWave8() {
+            // Тактическая передышка (+3.0 с относительно Волны 7), смена паттерна: ВСЕ цели строго в инверсном базисе {NAND, NOR}
+            const B = pickRandom(ALL_TICKS);
+            const notA = pickRandom(neighborsOf(B));
+            const A = invTicks(notA);
+            const op1 = pickRandom(['NAND', 'NOR']);
+            const F1 = evalGateTicks(2, op1, notA, B);
+
+            let C = null, op2 = null, F2 = null;
+            const cCandidates = shuffle(neighborsOf(B));
+            for (let i = 0; i < cCandidates.length && !op2; i++) {
+                const candC = cCandidates[i];
+                const invOps = shuffle(['NAND', 'NOR']);
+                for (let j = 0; j < invOps.length; j++) {
+                    const out2 = evalGateTicks(2, invOps[j], B, candC);
+                    if (hamming(F1, out2) === 1) {
+                        C = candC;
+                        op2 = invOps[j];
+                        F2 = out2;
+                        break;
+                    }
+                }
+            }
+
+            const op3 = pickRandom(['NAND', 'NOR']);
+            const F3 = evalGateTicks(2, op3, F1, F2);
+
+            const gatesMeta = [
+                { id: 1, arity: 2, x: 245, y: 82, inputs: ['FIX_A', 'B'] },
+                { id: 2, arity: 2, x: 245, y: 214, inputs: ['B', 'C'] },
+                { id: 3, arity: 2, x: 440, y: 148, inputs: ['G1', 'G2'] }
+            ];
+
+            return {
+                wave: 8,
+                timeLimit: 21.0,
+                title: 'Тактическая инверсия: универсальный базис Пирса/Шеффера',
+                modeTag: 'РЕЖИМ: ИНВЕРСНЫЙ БАЗИС ○',
+                inputs: [
+                    { id: 'A', y: 60, ticks: A },
+                    { id: 'B', y: 148, ticks: B },
+                    { id: 'C', y: 238, ticks: C }
+                ],
+                fixedInverters: [{ id: 'FIX_A', source: 'A', x: 140, y: 60, ticks: notA }],
+                gates: gatesMeta,
+                sensors: [
+                    { id: 'F₁', y: 44, sourceGate: 1, target: F1 },
+                    { id: 'F₃', y: 148, sourceGate: 3, target: F3 },
+                    { id: 'F₂', y: 254, sourceGate: 2, target: F2 }
+                ],
+                dots: [
+                    { x: 195, y: 148 },
+                    { x: 355, y: 82 },
+                    { x: 355, y: 214 }
+                ],
+                wires: [
+                    { src: 'A', d: 'M102,60 L140,60' },
+                    { src: 'FIX_A', d: 'M190,60 L215,60 L215,71 L245,71' },
+                    { src: 'B', d: 'M102,148 L195,148 L195,93 L245,93' },
+                    { src: 'B', d: 'M195,148 L195,203 L245,203' },
+                    { src: 'C', d: 'M102,238 L215,238 L215,225 L245,225' },
+                    { src: 'G1', d: 'M309,82 L355,82 L355,44 L732,44' },
+                    { src: 'G1', d: 'M355,82 L390,82 L390,137 L440,137' },
+                    { src: 'G2', d: 'M309,214 L355,214 L355,254 L732,254' },
+                    { src: 'G2', d: 'M355,214 L390,214 L390,159 L440,159' },
+                    { src: 'G3', d: 'M504,148 L732,148' }
+                ],
+                solutionOps: { 1: op1, 2: op2, 3: op3 },
+                initialGateStates: buildInitialGateStates(gatesMeta, { 1: op1, 2: op2, 3: op3 }, [1, 2, 3], true)
+            };
+        }
+
+        function buildWave9or10(waveNum, timeLimit, withCascade3) {
+            const A = pickRandom(ALL_TICKS);
+            const B = pickRandom(neighborsOf(A));
+            const C = pickRandom(neighborsOf(B));
+            const D = pickRandom(neighborsOf(C));
+
+            const op1 = pickRandom(BINARY_OPS);
+            const F1 = evalGateTicks(2, op1, A, B);
+
+            const op2Pool = shuffle(BINARY_OPS).filter(function(op) {
+                return hamming(F1, evalGateTicks(2, op, B, C)) === 1;
+            });
+            const op2 = op2Pool[0];
+            const F2 = evalGateTicks(2, op2, B, C);
+
+            const op3Pool = shuffle(BINARY_OPS).filter(function(op) {
+                return hamming(F2, evalGateTicks(2, op, C, D)) === 1;
+            });
+            const op3 = op3Pool[0];
+            const F3 = evalGateTicks(2, op3, C, D);
+
+            const op4 = pickRandom(BINARY_OPS);
+            const F4 = evalGateTicks(2, op4, F1, F2);
+
+            let op5;
+            if (withCascade3) {
+                const op5Pool = shuffle(BINARY_OPS).filter(function(op) {
+                    return hamming(F4, evalGateTicks(2, op, F2, F3)) === 1;
+                });
+                op5 = op5Pool[0];
+            } else {
+                op5 = pickRandom(BINARY_OPS);
+            }
+            const F5 = evalGateTicks(2, op5, F2, F3);
+
+            const gatesMeta = [
+                { id: 1, arity: 2, x: 245, y: 56, inputs: ['A', 'B'] },
+                { id: 2, arity: 2, x: 245, y: 150, inputs: ['B', 'C'] },
+                { id: 3, arity: 2, x: 245, y: 244, inputs: ['C', 'D'] },
+                { id: 4, arity: 2, x: 425, y: 103, inputs: ['G1', 'G2'] },
+                { id: 5, arity: 2, x: 425, y: 197, inputs: ['G2', 'G3'] }
+            ];
+            const solutionOps = { 1: op1, 2: op2, 3: op3, 4: op4, 5: op5 };
+
+            const wires = [
+                { src: 'A', d: 'M102,42 L200,42 L200,45 L245,45' },
+                { src: 'B', d: 'M102,114 L155,114 L155,67 L245,67' },
+                { src: 'B', d: 'M155,114 L155,139 L245,139' },
+                { src: 'C', d: 'M102,186 L185,186 L185,161 L245,161' },
+                { src: 'C', d: 'M185,186 L185,233 L245,233' },
+                { src: 'D', d: 'M102,258 L200,258 L200,255 L245,255' },
+                { src: 'G1', d: 'M309,56 L345,56 L345,28 L732,28' },
+                { src: 'G1', d: 'M345,56 L385,56 L385,92 L425,92' },
+                { src: 'G2', d: 'M309,150 L360,150 L360,54 L732,54' },
+                { src: 'G2', d: 'M360,150 L385,150 L385,114 L425,114' },
+                { src: 'G2', d: 'M360,150 L385,150 L385,186 L425,186' },
+                { src: 'G3', d: 'M309,244 L345,244 L345,274 L732,274' },
+                { src: 'G3', d: 'M345,244 L385,244 L385,208 L425,208' }
+            ];
+
+            const dots = [
+                { x: 155, y: 114 },
+                { x: 185, y: 186 },
+                { x: 345, y: 56 },
+                { x: 360, y: 150 },
+                { x: 345, y: 244 }
+            ];
+
+            const sensors = [
+                { id: 'F₁', y: 28, sourceGate: 1, target: F1 },
+                { id: 'F₂', y: 54, sourceGate: 2, target: F2 },
+                { id: 'F₄', y: 98, sourceGate: 4, target: F4 },
+                { id: 'F₅', y: 204, sourceGate: 5, target: F5 },
+                { id: 'F₃', y: 274, sourceGate: 3, target: F3 }
+            ];
+
+            if (!withCascade3) {
+                wires.push({ src: 'G4', d: 'M489,103 L520,103 L520,98 L732,98' });
+                wires.push({ src: 'G5', d: 'M489,197 L520,197 L520,204 L732,204' });
+                const mismatched5 = shuffle([1, 2, 3, 4, 5]).slice(0, 4);
+                return {
+                    wave: waveNum,
+                    timeLimit: timeLimit,
+                    title: '5-вентильная многокаскадная матрица',
+                    modeTag: '',
+                    inputs: [
+                        { id: 'A', y: 42, ticks: A },
+                        { id: 'B', y: 114, ticks: B },
+                        { id: 'C', y: 186, ticks: C },
+                        { id: 'D', y: 258, ticks: D }
+                    ],
+                    fixedInverters: [],
+                    gates: gatesMeta,
+                    sensors: sensors,
+                    dots: dots,
+                    wires: wires,
+                    solutionOps: solutionOps,
+                    initialGateStates: buildInitialGateStates(gatesMeta, solutionOps, mismatched5, false)
+                };
+            }
+
+            const op6 = pickRandom(BINARY_OPS);
+            const F6 = evalGateTicks(2, op6, F4, F5);
+            gatesMeta.push({ id: 6, arity: 2, x: 595, y: 150, inputs: ['G4', 'G5'] });
+            solutionOps[6] = op6;
+
+            wires.push({ src: 'G4', d: 'M489,103 L528,103 L528,98 L732,98' });
+            wires.push({ src: 'G4', d: 'M528,103 L558,103 L558,139 L595,139' });
+            wires.push({ src: 'G5', d: 'M489,197 L528,197 L528,204 L732,204' });
+            wires.push({ src: 'G5', d: 'M528,197 L558,197 L558,161 L595,161' });
+            wires.push({ src: 'G6', d: 'M659,150 L732,150' });
+            dots.push({ x: 528, y: 103 });
+            dots.push({ x: 528, y: 197 });
+
+            sensors.splice(3, 0, { id: 'F₆', y: 150, sourceGate: 6, target: F6 });
+            // Переупорядочим Y для 6 датчиков без наложения
+            sensors[0].y = 24;
+            sensors[1].y = 58;
+            sensors[2].y = 98;
+            sensors[3].y = 150;
+            sensors[4].y = 204;
+            sensors[5].y = 274;
+            // Обновим конечные Y на проводах F1, F2
+            wires[6].d = 'M309,56 L345,56 L345,24 L732,24';
+            wires[8].d = 'M309,150 L360,150 L360,58 L732,58';
+
+            const mismatched6 = shuffle([1, 2, 3, 4, 5, 6]).slice(0, 4);
+
+            return {
+                wave: waveNum,
+                timeLimit: timeLimit,
+                title: 'ФИНАЛЬНЫЙ ШТУРМ // 3-каскадная шина (6 вентилей)',
+                modeTag: 'ФИНАЛ',
+                inputs: [
+                    { id: 'A', y: 42, ticks: A },
+                    { id: 'B', y: 114, ticks: B },
+                    { id: 'C', y: 186, ticks: C },
+                    { id: 'D', y: 258, ticks: D }
+                ],
+                fixedInverters: [],
+                gates: gatesMeta,
+                sensors: sensors,
+                dots: dots,
+                wires: wires,
+                solutionOps: solutionOps,
+                initialGateStates: buildInitialGateStates(gatesMeta, solutionOps, mismatched6, false)
+            };
+        }
+
+        function generateWaves() {
+            return [
+                buildWave1(),
+                buildWave2(),
+                buildWave3or4(3, 26.0, false),
+                buildWave3or4(4, 24.0, true),
+                buildWave5or6(5, 22.0, false),
+                buildWave5or6(6, 19.5, true),
+                buildWave7(),
+                buildWave8(),
+                buildWave9or10(9, 16.5, false),
+                buildWave9or10(10, 15.0, true)
+            ];
+        }
+
+        function cloneGateStates(map) {
+            const copy = {};
+            Object.keys(map).forEach(function(k) {
+                copy[k] = { base: map[k].base, inv: Boolean(map[k].inv) };
+            });
+            return copy;
+        }
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 11 :: Логические элементы (Уровень 3)',
+            level: 3,
+            totalWaves: 10,
+            showAfkOverlay: true,
+            onAfkStop: function() {
+                if (appInstance) {
+                    appInstance.handleAfkPaused();
+                }
+            },
+            onAfkRetry: function() {
+                if (appInstance) {
+                    appInstance.handleAfkResumed();
+                }
+            }
+        });
+
+        const { createApp } = Vue;
+        const app = createApp({
+            data: function() {
+                const initialWaves = generateWaves();
+                return {
+                    gameState: 'intro', // 'intro' | 'playing' | 'victory'
+                    activeWaves: initialWaves,
+                    currentWave: 1,
+                    gateStates: cloneGateStates(initialWaves[0].initialGateStates),
+                    cursorGateId: 1,
+                    waveTimeLeft: 34.0,
+                    totalElapsedSec: 0,
+                    alarmActive: false,
+                    alarmMessage: '',
+                    alarmCount: 0,
+                    isActionBlocked: false,
+                    afkPaused: false,
+                    screenShake: false,
+                    shakeOffset: 0,
+                    lastMutatedGateId: -1,
+                    pulseFxActive: false,
+                    pulseFxOutcome: 'none', // 'none' | 'ok' | 'err'
+                    lastEvalValues: {},
+                    lastFailedSensors: {},
+                    waveTimerHandle: null
+                };
+            },
+
+            computed: {
+                currentWaveData: function() {
+                    return this.activeWaves[this.currentWave - 1] || this.activeWaves[0];
+                },
+
+                pulsePercent: function() {
+                    const lim = this.currentWaveData.timeLimit || 34;
+                    const pct = Math.round(((lim - this.waveTimeLeft) / lim) * 100);
+                    return Math.max(0, Math.min(100, pct));
+                },
+
+                wavefrontSvgX: function() {
+                    return Math.round(108 + (this.pulsePercent / 100) * 620);
+                },
+
+                activeCursorMetaText: function() {
+                    const gates = this.currentWaveData.gates || [];
+                    const found = gates.find(function(g) { return g.id === this.cursorGateId; }, this);
+                    if (!found) return '';
+                    return found.arity === 1 ? 'одноместный вход' : 'двухместный вход';
+                }
+            },
+
+            mounted: function() {
+                window.addEventListener('keydown', this.handleKeyDown);
+            },
+
+            unmounted: function() {
+                window.removeEventListener('keydown', this.handleKeyDown);
+                this.stopTimers();
+            },
+
+            methods: {
+                stopTimers: function() {
+                    if (this.waveTimerHandle) {
+                        clearInterval(this.waveTimerHandle);
+                        this.waveTimerHandle = null;
+                    }
+                    if (resetTimeoutId) {
+                        clearTimeout(resetTimeoutId);
+                        resetTimeoutId = null;
+                    }
+                    if (pulseTimeoutId) {
+                        clearTimeout(pulseTimeoutId);
+                        pulseTimeoutId = null;
+                    }
+                    shakeTimerIds.forEach(function(id) { clearTimeout(id); });
+                    shakeTimerIds = [];
+                },
+
+                triggerShake: function() {
+                    const self = this;
+                    shakeTimerIds.forEach(function(id) { clearTimeout(id); });
+                    shakeTimerIds = [];
+                    self.screenShake = true;
+                    const steps = [-6, 6, -4, 4, 0];
+                    steps.forEach(function(offset, idx) {
+                        const tid = setTimeout(function() {
+                            self.shakeOffset = offset;
+                            if (offset === 0) self.screenShake = false;
+                        }, idx * 55);
+                        shakeTimerIds.push(tid);
+                    });
+                },
+
+                getGateOp: function(gateId) {
+                    const g = (this.currentWaveData.gates || []).find(function(item) { return item.id === gateId; });
+                    const st = this.gateStates[gateId];
+                    if (!g || !st) return 'AND';
+                    return stateToOp(g.arity, st);
+                },
+
+                getGateGostSymbol: function(gateId) {
+                    const op = this.getGateOp(gateId);
+                    if (op === 'AND' || op === 'NAND') return '&';
+                    return '1';
+                },
+
+                getGateRuLabel: function(gateId) {
+                    const op = this.getGateOp(gateId);
+                    if (op === 'AND') return 'И';
+                    if (op === 'OR') return 'ИЛИ';
+                    if (op === 'NAND') return 'И-НЕ';
+                    if (op === 'NOR') return 'ИЛИ-НЕ';
+                    if (op === 'NOT') return 'НЕ';
+                    return 'ПРЯМ';
+                },
+
+                getGateFill: function(gateId) {
+                    if (this.pulseFxActive && this.pulseFxOutcome === 'err') return '#3b0a0a';
+                    if (this.pulseFxActive && this.pulseFxOutcome === 'ok') return '#052e16';
+                    if (this.lastMutatedGateId === gateId) return '#1e293b';
+                    return this.cursorGateId === gateId ? '#172554' : '#0f172a';
+                },
+
+                getGateStroke: function(gateId) {
+                    if (this.pulseFxActive && this.pulseFxOutcome === 'ok') return '#22c55e';
+                    if (this.pulseFxActive && this.pulseFxOutcome === 'err') return '#ef4444';
+                    return this.cursorGateId === gateId ? '#ffc107' : '#94a3b8';
+                },
+
+                getWireStroke: function(wire) {
+                    if (!this.pulseFxActive) return '#64748b';
+                    if (this.pulseFxOutcome === 'err') return '#ef4444';
+                    const vals = this.lastEvalValues[wire.src];
+                    if (!vals) return '#22c55e';
+                    return vals[0] === 1 || vals[1] === 1 ? '#22c55e' : '#38bdf8';
+                },
+
+                getSensorStroke: function(sensor) {
+                    if (!this.pulseFxActive) return '#64748b';
+                    return this.lastFailedSensors[sensor.id] ? '#ef4444' : '#22c55e';
+                },
+
+                loadWave: function(waveNum) {
+                    this.currentWave = waveNum;
+                    const w = this.currentWaveData;
+                    this.gateStates = cloneGateStates(w.initialGateStates);
+                    this.cursorGateId = w.gates[0].id;
+                    this.waveTimeLeft = w.timeLimit;
+                    this.alarmActive = false;
+                    this.isActionBlocked = false;
+                    this.pulseFxActive = false;
+                    this.pulseFxOutcome = 'none';
+                    this.lastFailedSensors = {};
+                    this.lastEvalValues = {};
+                },
+
+                startWaveInterval: function() {
+                    const self = this;
+                    if (this.waveTimerHandle) clearInterval(this.waveTimerHandle);
+                    this.waveTimerHandle = setInterval(function() {
+                        if (self.gameState !== 'playing' || self.alarmActive || self.isActionBlocked || self.afkPaused) {
+                            return;
+                        }
+                        self.totalElapsedSec = telemetry.getTimeSpentSec();
+                        self.waveTimeLeft = Math.max(0, Number((self.waveTimeLeft - 0.1).toFixed(1)));
+                        if (self.waveTimeLeft <= 0) {
+                            self.triggerHardcoreReset('Тайм-аут фронта импульса! Калибровка схемы не завершена вовремя.', true);
+                        }
+                    }, 100);
+                },
+
+                startGame: function() {
+                    getAudioContext();
+                    this.stopTimers();
+                    this.activeWaves = generateWaves();
+                    this.alarmCount = 0;
+                    this.afkPaused = false;
+                    this.gameState = 'playing';
+                    telemetry.start();
+                    this.totalElapsedSec = telemetry.getTimeSpentSec();
+                    this.loadWave(1);
+                    this.startWaveInterval();
+                },
+
+                restartGame: function() {
+                    this.stopTimers();
+                    telemetry.reset({ allowRecomplete: true });
+                    this.startGame();
+                },
+
+                handleAfkPaused: function() {
+                    this.afkPaused = true;
+                    this.stopTimers();
+                },
+
+                handleAfkResumed: function() {
+                    this.afkPaused = false;
+                    this.alarmActive = false;
+                    this.isActionBlocked = false;
+                    this.activeWaves = generateWaves();
+                    this.loadWave(1);
+                    this.startWaveInterval();
+                },
+
+                moveCursor: function(delta) {
+                    const gates = this.currentWaveData.gates || [];
+                    if (!gates.length) return;
+                    const curIdx = gates.findIndex(function(g) { return g.id === this.cursorGateId; }, this);
+                    const baseIdx = curIdx >= 0 ? curIdx : 0;
+                    const nextIdx = (baseIdx + delta + gates.length) % gates.length;
+                    this.cursorGateId = gates[nextIdx].id;
+                    playCursorSound();
+                },
+
+                selectGateByNumber: function(num) {
+                    const gates = this.currentWaveData.gates || [];
+                    const found = gates.find(function(g) { return g.id === num; });
+                    if (!found) return;
+                    this.cursorGateId = found.id;
+                    playCursorSound();
+                },
+
+                flashGateMutation: function(gateId) {
+                    const self = this;
+                    this.lastMutatedGateId = gateId;
+                    setTimeout(function() {
+                        if (self.lastMutatedGateId === gateId) {
+                            self.lastMutatedGateId = -1;
+                        }
+                    }, 180);
+                },
+
+                toggleCoreBase: function() {
+                    const g = (this.currentWaveData.gates || []).find(function(item) { return item.id === this.cursorGateId; }, this);
+                    const st = this.gateStates[this.cursorGateId];
+                    if (!g || !st) return;
+                    if (g.arity === 1) {
+                        st.inv = !st.inv;
+                    } else {
+                        st.base = st.base === 'AND' ? 'OR' : 'AND';
+                    }
+                    playGateSwitchSound();
+                    this.flashGateMutation(this.cursorGateId);
+                },
+
+                toggleInversionBubble: function() {
+                    const st = this.gateStates[this.cursorGateId];
+                    if (!st) return;
+                    st.inv = !st.inv;
+                    playInvertSound(st.inv);
+                    this.flashGateMutation(this.cursorGateId);
+                },
+
+                triggerHardcoreReset: function(message, isTimeout) {
+                    const self = this;
+                    if (this.alarmActive || this.afkPaused) return;
+                    if (pulseTimeoutId) {
+                        clearTimeout(pulseTimeoutId);
+                        pulseTimeoutId = null;
+                    }
+                    this.isActionBlocked = true;
+                    this.stopTimers();
+                    playAlarmSiren();
+                    this.triggerShake();
+
+                    const res = telemetry.fail({ wave: this.currentWave, isTimeout: Boolean(isTimeout) });
+                    this.alarmCount = telemetry.getState().attemptsCount;
+
+                    if (res === false || telemetry.getState().isAfkPaused) {
+                        this.afkPaused = true;
+                        return;
+                    }
+
+                    this.alarmMessage = message;
+                    this.alarmActive = true;
+
+                    resetTimeoutId = setTimeout(function() {
+                        resetTimeoutId = null;
+                        if (self.afkPaused || self.gameState !== 'playing') return;
+                        self.activeWaves = generateWaves();
+                        self.loadWave(1);
+                        self.startWaveInterval();
+                    }, 1500);
+                },
+
+                launchPulse: function() {
+                    const self = this;
+                    if (this.alarmActive || this.isActionBlocked || this.afkPaused) return;
+
+                    const w = this.currentWaveData;
+                    const vals = evaluateCircuit(w, this.gateStates);
+                    this.lastEvalValues = vals;
+
+                    const failed = [];
+                    const failedMap = {};
+                    w.sensors.forEach(function(s) {
+                        const actual = vals['G' + s.sourceGate];
+                        if (!actual || !sameTicks(actual, s.target)) {
+                            failed.push(s.id);
+                            failedMap[s.id] = true;
+                        }
+                    });
+                    this.lastFailedSensors = failedMap;
+
+                    if (failed.length > 0) {
+                        this.pulseFxActive = true;
+                        this.pulseFxOutcome = 'err';
+                        this.triggerHardcoreReset('Короткое замыкание! Сигнал на датчике ' + failed.join(', ') + ' не совпал с целью.', false);
+                        return;
+                    }
+
+                    this.isActionBlocked = true;
+                    this.pulseFxActive = true;
+                    this.pulseFxOutcome = 'ok';
+
+                    if (this.currentWave >= 10) {
+                        this.stopTimers();
+                        this.totalElapsedSec = telemetry.getTimeSpentSec();
+                        playVictoryFanfare();
+                        telemetry.complete({ wave: 10, total_waves: 10 });
+                        pulseTimeoutId = setTimeout(function() {
+                            pulseTimeoutId = null;
+                            self.pulseFxActive = false;
+                            self.pulseFxOutcome = 'none';
+                            self.gameState = 'victory';
+                            self.isActionBlocked = false;
+                        }, 220);
+                        return;
+                    }
+
+                    playWaveClearSound();
+                    const nextWave = this.currentWave + 1;
+                    telemetry.advanceWave(nextWave);
+                    pulseTimeoutId = setTimeout(function() {
+                        pulseTimeoutId = null;
+                        if (self.afkPaused || self.gameState !== 'playing') return;
+                        self.loadWave(nextWave);
+                    }, 220);
+                },
+
+                handleKeyDown: function(e) {
+                    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+                        e.preventDefault();
+                    }
+
+                    if (this.afkPaused || telemetry.getState().isAfkPaused) {
+                        if (e.code === 'Space') {
+                            telemetry.resumeFromAfk();
+                        }
+                        return;
+                    }
+
+                    if (this.gameState === 'intro') {
+                        if (e.code === 'Space') {
+                            this.startGame();
+                        }
+                        return;
+                    }
+
+                    if (this.gameState === 'victory') {
+                        if (e.code === 'Space') {
+                            this.restartGame();
+                        }
+                        return;
+                    }
+
+                    if (this.gameState !== 'playing' || this.alarmActive || this.isActionBlocked) {
+                        return;
+                    }
+
+                    switch (e.code) {
+                        case 'KeyA':
+                        case 'ArrowLeft':
+                            this.moveCursor(-1);
+                            return;
+                        case 'KeyD':
+                        case 'ArrowRight':
+                            this.moveCursor(1);
+                            return;
+                        case 'KeyW':
+                        case 'ArrowUp':
+                        case 'KeyS':
+                        case 'ArrowDown':
+                            this.toggleCoreBase();
+                            return;
+                        case 'ShiftLeft':
+                        case 'ShiftRight':
+                            this.toggleInversionBubble();
+                            return;
+                        case 'Space':
+                            this.launchPulse();
+                            return;
+                        default:
+                            break;
+                    }
+
+                    const digitMatch = e.code && (e.code.match(/^Digit([1-6])$/) || e.code.match(/^Numpad([1-6])$/));
+                    if (digitMatch) {
+                        this.selectGateByNumber(Number(digitMatch[1]));
+                    }
+                },
+
+                formatTime: function(sec) {
+                    const m = Math.floor(sec / 60);
+                    const s = sec % 60;
+                    return m + 'м ' + String(s).padStart(2, '0') + 'с';
+                }
+            }
+        });
+
+        appInstance = app.mount('#arcade-app');
+
+        // Отладочный и регрессионный хук E2E (не используется в тестах персон Black-Box)
+        window.__DEV_LEVEL3_STATE__ = {
+            get waves() {
+                return appInstance ? appInstance.activeWaves : [];
+            },
+            get currentWaveIndex() {
+                return appInstance ? appInstance.currentWave - 1 : 0;
+            },
+            get currentWave() {
+                return appInstance ? appInstance.currentWaveData : null;
+            },
+            solveCurrentWave: function() {
+                if (!appInstance || appInstance.gameState !== 'playing' || appInstance.alarmActive || appInstance.isActionBlocked || appInstance.afkPaused) {
+                    return false;
+                }
+                const w = appInstance.currentWaveData;
+                w.gates.forEach(function(g) {
+                    appInstance.gateStates[g.id] = opToState(g.arity, w.solutionOps[g.id]);
+                });
+                appInstance.launchPulse();
+                return true;
+            },
+            submitAction: function(action) {
+                if (!appInstance) return false;
+                if (action === 'solve') {
+                    return this.solveCurrentWave();
+                }
+                if (action === 'wrong') {
+                    if (appInstance.gameState !== 'playing' || appInstance.alarmActive || appInstance.isActionBlocked) return false;
+                    const w = appInstance.currentWaveData;
+                    const g1 = w.gates[0];
+                    const sol = w.solutionOps[g1.id];
+                    const wrongOp = g1.arity === 1 ? (sol === 'NOT' ? 'BUF' : 'NOT') : pickDifferentOp(sol, BINARY_OPS);
+                    appInstance.gateStates[g1.id] = opToState(g1.arity, wrongOp);
+                    appInstance.launchPulse();
+                    return true;
+                }
+                if (action === 'timeout') {
+                    appInstance.triggerHardcoreReset('Тайм-аут фронта импульса (тест)', true);
+                    return true;
+                }
+                return false;
+            }
+        };
+    })();
+    </script>
+</TaskLayout>
