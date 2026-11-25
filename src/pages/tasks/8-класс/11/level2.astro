@@ -1,0 +1,897 @@
+---
+import TaskLayout from '../../../../layouts/TaskLayout.astro';
+---
+
+<TaskLayout level={2} title="Урок 11 :: Логические элементы (Уровень 2)">
+    <div class="container-fluid px-2 px-md-3 my-3 font-monospace">
+        <!-- Шапка тренажера -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h4 text-warning mb-0">Тренажер: Логические элементы (Уровень 2)</h2>
+            <span class="badge border border-warning text-warning bg-dark rounded-0 px-3 py-2">Ручной ввод // Zero Multiple Choice</span>
+        </div>
+
+        <div id="game-container" class="card bg-dark border-warning rounded-0">
+            <div class="card-body p-3 p-md-4">
+
+                <!-- Заголовок фазы и телеметрия -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom border-secondary pb-2">
+                    <div>
+                        <span id="phase-badge" class="badge bg-warning text-dark rounded-0 fs-6 me-2">Шаг 1 из 5</span>
+                        <span id="phase-title" class="text-light fw-bold fs-6">Вектор выходов 2-входовой логической схемы</span>
+                    </div>
+                    <div class="text-secondary small">
+                        Ошибки: <span id="attempts-display" class="text-warning">0</span> | Время: <span id="timer-display" class="text-info">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Системный баннер ошибки -->
+                <div id="feedback-box" class="alert alert-danger bg-black text-danger border border-danger rounded-0 d-none mb-3 py-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span>[ОШИБКА РАСЧЕТА] <span id="feedback-text">Неверный ответ!</span> Генерируется новый вариант...</span>
+                        <span class="spinner-border spinner-border-sm text-danger flex-shrink-0" role="status"></span>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 1: ПРЯМОЙ РАСЧЕТ (CCS = 4) ==================== -->
+                <div id="phase1" class="phase-container">
+                    <p class="text-light mb-2">
+                        Проанализируйте схему ГОСТ 2.743-91 и вычислите значение выхода <strong>F</strong> для всех четырёх входных наборов <strong>(A, B)</strong> в порядке:
+                        <code class="text-warning">00</code>, <code class="text-warning">01</code>, <code class="text-warning">10</code>, <code class="text-warning">11</code>.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-2 p-sm-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-1">Принципиальная схема (2 входа):</div>
+                        <div id="p1-svg-wrap" class="w-100 d-flex justify-content-center"></div>
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p1-input" class="form-label text-warning small text-uppercase">
+                            Введите 4-битный вектор выходов (строку из 4 цифр без пробелов, от 00 до 11):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p1-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 0110" autocomplete="off" style="min-height: 48px;">
+                            <button id="p1-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 2: МНОГОШАГОВЫЙ РАСЧЕТ И % (CCS = 6) ==================== -->
+                <div id="phase2" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Определите, на какой доле (в <strong>процентах</strong>) из всех <strong>8</strong> возможных входных наборов <strong>(A, B, C)</strong> данная схема выдаёт на выходе сигнал <strong class="text-success">F = 1</strong>.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-2 p-sm-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-1">Принципиальная схема (3 входа):</div>
+                        <div id="p2-svg-wrap" class="w-100 d-flex justify-content-center"></div>
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p2-input" class="form-label text-warning small text-uppercase">
+                            Введите долю в % (можно с запятой, например: 37,5 или 37,5%):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p2-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 37,5%" autocomplete="off" style="min-height: 48px;">
+                            <button id="p2-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 3: ПИК ИНВЕРСИИ / ОБРАТНАЯ ЗАДАЧА (CCS = 7) ==================== -->
+                <div id="phase3" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        <strong>Обратная задача:</strong> известно, что на выходе схемы зафиксирован сигнал
+                        <strong id="p3-target-badge" class="badge bg-warning text-dark rounded-0 fs-6 mx-1">F = 1</strong>.
+                        Восстановите <strong>единственный</strong> 3-битный входной набор <strong>ABC</strong>, который к нему привёл.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-2 p-sm-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-1">Схема для обратного анализа (двигайтесь справа налево):</div>
+                        <div id="p3-svg-wrap" class="w-100 d-flex justify-content-center"></div>
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p3-input" class="form-label text-warning small text-uppercase">
+                            Введите 3 бита входного набора в порядке ABC (например: 101):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p3-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 101" autocomplete="off" style="min-height: 48px;">
+                            <button id="p3-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ (CCS = 5) ==================== -->
+                <div id="phase4" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        <strong>Концептуальный инвариант:</strong> выполните инженерный расчёт характеристик цифровой схемы и памяти.
+                    </p>
+                    <div id="p4-condition" class="card bg-black border-secondary rounded-0 p-3 mb-3 text-light">
+                        <!-- Генерируется JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label id="p4-label" for="p4-input" class="form-label text-warning small text-uppercase">
+                            Введите вычисленное целое число:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p4-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 32" autocomplete="off" style="min-height: 48px;">
+                            <button id="p4-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Проверить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ФАЗА 5: КУЛЬМИНАЦИЯ (CCS = 8) ==================== -->
+                <div id="phase5" class="phase-container d-none">
+                    <p class="text-light mb-2">
+                        Протрассируйте 4 входных пакета через комбинированную схему с разветвлением <strong>●</strong> и инверторами <strong>○</strong> на выходах вентилей.
+                        Из полученных бит <strong>b<sub>3</sub>b<sub>2</sub>b<sub>1</sub>b<sub>0</sub></strong> сформируйте 4-битное двоичное число и переведите его в <strong>десятичную систему</strong>.
+                    </p>
+                    <div class="card bg-black border-secondary rounded-0 p-2 p-sm-3 mb-3">
+                        <div class="text-secondary small text-uppercase mb-1">Комбинированная схема с разветвлением шины B (●):</div>
+                        <div id="p5-svg-wrap" class="w-100 d-flex justify-content-center"></div>
+                    </div>
+                    <div id="p5-packets-wrap" class="row g-2 mb-3">
+                        <!-- 4 пакета генерируются JS -->
+                    </div>
+                    <div class="mb-3 w-100" style="max-width: 580px;">
+                        <label for="p5-input" class="form-label text-warning small text-uppercase">
+                            Введите итоговое десятичное число (от 0 до 15):
+                        </label>
+                        <div class="input-group">
+                            <input type="text" inputmode="decimal" id="p5-input" class="form-control rounded-0 bg-black text-warning border-secondary font-monospace" placeholder="Например: 11" autocomplete="off" style="min-height: 48px;">
+                            <button id="p5-submit-btn" type="button" class="btn btn-warning rounded-0 fw-bold px-4" style="min-height: 48px;">Завершить уровень</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ЭКРАН ПОБЕДЫ ==================== -->
+                <div id="victory-screen" class="d-none text-center py-4">
+                    <div class="border border-warning bg-black p-4 mb-3">
+                        <h3 class="text-warning mb-2">[ УРОВЕНЬ 2 ПРОЙДЕН ]</h3>
+                        <p class="text-light mb-3">Все 5 фаз аналитического расчёта и обратного анализа логических схем успешно выполнены.</p>
+                        <div class="d-flex justify-content-center gap-4 text-secondary small">
+                            <span>Ошибок: <strong id="final-attempts" class="text-warning">0</strong></span>
+                            <span>Время: <strong id="final-time" class="text-info">00:00</strong></span>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-0">Переключайтесь на вкладку «Уровень 3» для скоростного аркадного испытания.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script is:inline>
+    (function() {
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+
+        let currentPhase = 1;
+        let isProcessingError = false;
+        let timerInterval = null;
+
+        const telemetry = window.LMSTelemetry.create({
+            missionName: 'Урок 11 :: Логические элементы (Уровень 2)',
+            level: 2,
+            totalStages: 5
+        });
+
+        const attemptsDisplay = document.getElementById('attempts-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const phaseBadge = document.getElementById('phase-badge');
+        const phaseTitle = document.getElementById('phase-title');
+        const feedbackBox = document.getElementById('feedback-box');
+        const feedbackText = document.getElementById('feedback-text');
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function shuffle(arr) {
+            const copy = arr.slice();
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = copy[i];
+                copy[i] = copy[j];
+                copy[j] = tmp;
+            }
+            return copy;
+        }
+
+        function formatTime(sec) {
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateTimerDisplay() {
+            if (timerDisplay) {
+                timerDisplay.textContent = formatTime(telemetry.getTimeSpentSec());
+            }
+        }
+
+        function normalizeNumericText(raw) {
+            return String(raw || '').replace(/%/g, '').replace(/,/g, '.').trim();
+        }
+
+        function normalizeBitString(raw) {
+            return normalizeNumericText(raw).replace(/[\s._-]+/g, '');
+        }
+
+        function parseDecimalNumber(raw) {
+            const cleaned = normalizeNumericText(raw).replace(/\s+/g, '');
+            if (!/^[+-]?\d+(?:\.\d+)?$/.test(cleaned)) return NaN;
+            return Number(cleaned);
+        }
+
+        function evalGate(type, a, b) {
+            if (type === 'NOT') return a ? 0 : 1;
+            if (type === 'AND') return (a && b) ? 1 : 0;
+            if (type === 'OR') return (a || b) ? 1 : 0;
+            if (type === 'NAND') return (a && b) ? 0 : 1;
+            if (type === 'NOR') return (a || b) ? 0 : 1;
+            return 0;
+        }
+
+        function svgEl(tag, attrs) {
+            const el = document.createElementNS(SVG_NS, tag);
+            if (attrs) {
+                for (const [k, v] of Object.entries(attrs)) {
+                    el.setAttribute(k, String(v));
+                }
+            }
+            return el;
+        }
+
+        function createEl(tag, className, text) {
+            const el = document.createElement(tag);
+            if (className) el.className = className;
+            if (text !== undefined) el.textContent = text;
+            return el;
+        }
+
+        const GATE_INFO = {
+            NOT: { symbol: '1', inverted: true },
+            AND: { symbol: '&', inverted: false },
+            OR: { symbol: '1', inverted: false },
+            NAND: { symbol: '&', inverted: true },
+            NOR: { symbol: '1', inverted: true }
+        };
+
+        function drawGostGate(svg, x, y, w, h, gateType, fontSize) {
+            const info = GATE_INFO[gateType];
+            const stroke = info.inverted ? '#ffc107' : '#fd7e14';
+            svg.appendChild(svgEl('rect', {
+                x, y, width: w, height: h,
+                fill: '#101418', stroke, 'stroke-width': 2
+            }));
+            const txt = svgEl('text', {
+                x: x + w / 2, y: y + h / 2 + Math.round((fontSize || 18) * 0.35),
+                fill: '#f8f9fa', 'font-size': fontSize || 18, 'font-weight': 'bold',
+                'text-anchor': 'middle', 'font-family': 'monospace'
+            });
+            txt.textContent = info.symbol;
+            svg.appendChild(txt);
+            if (info.inverted) {
+                svg.appendChild(svgEl('circle', {
+                    cx: x + w + 5.5, cy: y + h / 2, r: 5,
+                    fill: '#101418', stroke, 'stroke-width': 2
+                }));
+            }
+        }
+
+        function triggerFailure(message, resetCallback, inputId) {
+            if (isProcessingError) return;
+            isProcessingError = true;
+            telemetry.fail({ stage: currentPhase, total_stages: 5 });
+            if (attemptsDisplay) {
+                attemptsDisplay.textContent = String(telemetry.getState().attemptsCount);
+            }
+            if (feedbackText) feedbackText.textContent = message;
+            if (feedbackBox) feedbackBox.classList.remove('d-none');
+
+            setTimeout(() => {
+                if (feedbackBox) feedbackBox.classList.add('d-none');
+                isProcessingError = false;
+                if (inputId) {
+                    const inp = document.getElementById(inputId);
+                    if (inp) {
+                        inp.value = '';
+                        inp.focus();
+                    }
+                }
+                resetCallback();
+            }, 1250);
+        }
+
+        const PHASE_META = {
+            1: { title: 'Вектор выходов 2-входовой логической схемы', gen: () => generatePhase1(), inputId: 'p1-input' },
+            2: { title: 'Доля истинных наборов 3-входовой схемы (%)', gen: () => generatePhase2(), inputId: 'p2-input' },
+            3: { title: 'Пик инверсии: восстановление входного набора ABC', gen: () => generatePhase3(), inputId: 'p3-input' },
+            4: { title: 'Долина консолидации: архитектурные инварианты', gen: () => generatePhase4(), inputId: 'p4-input' },
+            5: { title: 'Кульминация: схема с разветвлением и 4-битный регистр', gen: () => generatePhase5(), inputId: 'p5-input' }
+        };
+
+        function switchToPhase(nextPhase) {
+            document.getElementById(`phase${currentPhase}`).classList.add('d-none');
+            currentPhase = nextPhase;
+            if (nextPhase <= 5) {
+                telemetry.advanceStage(nextPhase);
+                document.getElementById(`phase${nextPhase}`).classList.remove('d-none');
+                phaseBadge.textContent = `Шаг ${nextPhase} из 5`;
+                phaseTitle.textContent = PHASE_META[nextPhase].title;
+                PHASE_META[nextPhase].gen();
+                const inp = document.getElementById(PHASE_META[nextPhase].inputId);
+                if (inp) {
+                    inp.value = '';
+                    inp.focus();
+                }
+            }
+        }
+
+        function showVictory() {
+            document.getElementById('phase5').classList.add('d-none');
+            if (timerInterval) clearInterval(timerInterval);
+            telemetry.complete({ stage: 5, total_stages: 5 });
+            document.getElementById('final-attempts').textContent = String(telemetry.getState().attemptsCount);
+            document.getElementById('final-time').textContent = formatTime(telemetry.getTimeSpentSec());
+            document.getElementById('victory-screen').classList.remove('d-none');
+            phaseBadge.textContent = 'Завершено';
+            phaseTitle.textContent = 'Все 5 фаз выполнены';
+        }
+
+        /* =========================================================================
+           ФАЗА 1: 4-БИТНЫЙ ВЕКТОР ВЫХОДОВ 2-ВХОДОВОЙ СХЕМЫ (CCS = 4)
+           ========================================================================= */
+        const p1State = { expected: '', prevKey: '' };
+        const p1SvgWrap = document.getElementById('p1-svg-wrap');
+        const p1Input = document.getElementById('p1-input');
+        const p1SubmitBtn = document.getElementById('p1-submit-btn');
+
+        function renderPhase1Svg(cfg) {
+            p1SvgWrap.innerHTML = '';
+            const svg = svgEl('svg', { viewBox: '0 0 560 190', class: 'w-100' });
+            svg.style.maxHeight = '200px';
+
+            const wire = '#adb5bd';
+            const lblAttrs = { fill: '#0dcaf0', 'font-size': '16', 'font-weight': 'bold', 'font-family': 'monospace' };
+
+            const lblA = svgEl('text', { ...lblAttrs, x: 24, y: 60 }); lblA.textContent = 'A'; svg.appendChild(lblA);
+            const lblB = svgEl('text', { ...lblAttrs, x: 24, y: 140 }); lblB.textContent = 'B'; svg.appendChild(lblB);
+
+            // Вход A -> опциональный инвертор -> G_main(240, 62, 66, 66) вход верх (y=80)
+            if (cfg.invA) {
+                svg.appendChild(svgEl('line', { x1: 44, y1: 55, x2: 100, y2: 55, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 100, 35, 40, 40, 'NOT', 15);
+                svg.appendChild(svgEl('polyline', { points: '151,55 196,55 196,80 240,80', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '44,55 196,55 196,80 240,80', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            // Вход B -> опциональный инвертор -> G_main вход низ (y=110)
+            if (cfg.invB) {
+                svg.appendChild(svgEl('line', { x1: 44, y1: 135, x2: 100, y2: 135, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 100, 115, 40, 40, 'NOT', 15);
+                svg.appendChild(svgEl('polyline', { points: '151,135 196,135 196,110 240,110', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '44,135 196,135 196,110 240,110', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            // Главный вентиль
+            drawGostGate(svg, 240, 62, 66, 66, cfg.op, 20);
+
+            if (cfg.invOut) {
+                svg.appendChild(svgEl('line', { x1: 306, y1: 95, x2: 368, y2: 95, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 368, 75, 40, 40, 'NOT', 15);
+                svg.appendChild(svgEl('line', { x1: 419, y1: 95, x2: 495, y2: 95, stroke: '#ffc107', 'stroke-width': 2.5 }));
+            } else {
+                svg.appendChild(svgEl('line', { x1: 306, y1: 95, x2: 495, y2: 95, stroke: '#ffc107', 'stroke-width': 2.5 }));
+            }
+
+            const lblF = svgEl('text', { x: 506, y: 101, fill: '#ffc107', 'font-size': '18', 'font-weight': 'bold', 'font-family': 'monospace' });
+            lblF.textContent = 'F';
+            svg.appendChild(lblF);
+
+            p1SvgWrap.appendChild(svg);
+        }
+
+        function generatePhase1() {
+            let cfg;
+            let key;
+            do {
+                const invA = Math.random() < 0.5 ? 1 : 0;
+                const invB = Math.random() < 0.5 ? 1 : 0;
+                const invOut = Math.random() < 0.5 ? 1 : 0;
+                const op = Math.random() < 0.5 ? 'AND' : 'OR';
+                const invSum = invA + invB + invOut;
+                if (invSum < 1 || invSum > 2) continue;
+                if (invA === 0 && invB === 0 && invOut === 1 && op === 'AND') continue; // ¬(A ∧ B) из theory.md
+                cfg = { invA, invB, invOut, op };
+                key = `${invA}${invB}${invOut}${op}`;
+            } while (!cfg || key === p1State.prevKey);
+
+            p1State.prevKey = key;
+            let bits = '';
+            for (let a = 0; a <= 1; a++) {
+                for (let b = 0; b <= 1; b++) {
+                    const va = cfg.invA ? evalGate('NOT', a, 0) : a;
+                    const vb = cfg.invB ? evalGate('NOT', b, 0) : b;
+                    let res = evalGate(cfg.op, va, vb);
+                    if (cfg.invOut) res = evalGate('NOT', res, 0);
+                    bits += String(res);
+                }
+            }
+            p1State.expected = bits;
+            p1Input.value = '';
+            renderPhase1Svg(cfg);
+        }
+
+        function checkPhase1() {
+            const val = normalizeBitString(p1Input.value);
+            if (!/^[01]{4}$/.test(val)) {
+                triggerFailure('Введите ровно 4 бита (0 и 1) для наборов 00, 01, 10, 11!', generatePhase1, 'p1-input');
+                return;
+            }
+            if (val === p1State.expected) {
+                switchToPhase(2);
+            } else {
+                triggerFailure('Неверный вектор выходов! Проверьте инверторы на входах/выходе.', generatePhase1, 'p1-input');
+            }
+        }
+
+        /* =========================================================================
+           ФАЗА 2: ДОЛЯ ИСТИННЫХ НАБОРОВ 3-ВХОДОВОЙ СХЕМЫ В % (CCS = 6)
+           ========================================================================= */
+        const p2State = { expectedPct: 0, prevKey: '' };
+        const p2SvgWrap = document.getElementById('p2-svg-wrap');
+        const p2Input = document.getElementById('p2-input');
+        const p2SubmitBtn = document.getElementById('p2-submit-btn');
+
+        function renderPhase2Svg(cfg) {
+            p2SvgWrap.innerHTML = '';
+            const svg = svgEl('svg', { viewBox: '0 0 560 210', class: 'w-100' });
+            svg.style.maxHeight = '210px';
+            const wire = '#adb5bd';
+            const lblAttrs = { fill: '#0dcaf0', 'font-size': '16', 'font-weight': 'bold', 'font-family': 'monospace' };
+
+            const lblA = svgEl('text', { ...lblAttrs, x: 20, y: 42 }); lblA.textContent = 'A'; svg.appendChild(lblA);
+            const lblB = svgEl('text', { ...lblAttrs, x: 20, y: 98 }); lblB.textContent = 'B'; svg.appendChild(lblB);
+            const lblC = svgEl('text', { ...lblAttrs, x: 20, y: 168 }); lblC.textContent = 'C'; svg.appendChild(lblC);
+
+            if (cfg.invA) {
+                svg.appendChild(svgEl('line', { x1: 40, y1: 37, x2: 88, y2: 37, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 88, 19, 36, 36, 'NOT', 14);
+                svg.appendChild(svgEl('polyline', { points: '135,37 166,37 166,48 195,48', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '40,37 166,37 166,48 195,48', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            if (cfg.invB) {
+                svg.appendChild(svgEl('line', { x1: 40, y1: 93, x2: 88, y2: 93, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 88, 75, 36, 36, 'NOT', 14);
+                svg.appendChild(svgEl('polyline', { points: '135,93 166,93 166,82 195,82', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '40,93 166,93 166,82 195,82', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            // G1
+            drawGostGate(svg, 195, 32, 64, 66, cfg.g1, 20);
+            svg.appendChild(svgEl('polyline', { points: '259,65 305,65 305,94 345,94', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+
+            // C -> optional invC -> G2 bot (y=128)
+            if (cfg.invC) {
+                svg.appendChild(svgEl('line', { x1: 40, y1: 163, x2: 145, y2: 163, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 145, 143, 40, 40, 'NOT', 15);
+                svg.appendChild(svgEl('polyline', { points: '196,163 305,163 305,128 345,128', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '40,163 305,163 305,128 345,128', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            // G2
+            drawGostGate(svg, 345, 78, 64, 66, cfg.g2, 20);
+            svg.appendChild(svgEl('line', { x1: 409, y1: 111, x2: 495, y2: 111, stroke: '#ffc107', 'stroke-width': 2.5 }));
+            const lblF = svgEl('text', { x: 506, y: 117, fill: '#ffc107', 'font-size': '18', 'font-weight': 'bold', 'font-family': 'monospace' });
+            lblF.textContent = 'F';
+            svg.appendChild(lblF);
+
+            p2SvgWrap.appendChild(svg);
+        }
+
+        function generatePhase2() {
+            let cfg;
+            let key;
+            let trueCount = 0;
+            do {
+                const invA = Math.random() < 0.45 ? 1 : 0;
+                const invB = Math.random() < 0.45 ? 1 : 0;
+                const invC = Math.random() < 0.5 ? 1 : 0;
+                const g1 = Math.random() < 0.5 ? 'AND' : 'OR';
+                const g2 = Math.random() < 0.5 ? 'AND' : 'OR';
+
+                if (invA + invB + invC === 0) continue;
+                // Исключаем (A ∨ B) ∧ ¬C и (A ∧ ¬B) ∨ C из theory.md
+                if (!invA && !invB && invC && g1 === 'OR' && g2 === 'AND') continue;
+                if (!invA && invB && !invC && g1 === 'AND' && g2 === 'OR') continue;
+
+                let k = 0;
+                for (let a = 0; a <= 1; a++) {
+                    for (let b = 0; b <= 1; b++) {
+                        for (let c = 0; c <= 1; c++) {
+                            const va = invA ? evalGate('NOT', a, 0) : a;
+                            const vb = invB ? evalGate('NOT', b, 0) : b;
+                            const vc = invC ? evalGate('NOT', c, 0) : c;
+                            const f1 = evalGate(g1, va, vb);
+                            const f2 = evalGate(g2, f1, vc);
+                            if (f2 === 1) k++;
+                        }
+                    }
+                }
+                if (![1, 2, 3, 5, 6, 7].includes(k)) continue;
+                cfg = { invA, invB, invC, g1, g2 };
+                trueCount = k;
+                key = `${invA}${invB}${invC}:${g1}:${g2}`;
+            } while (!cfg || key === p2State.prevKey);
+
+            p2State.prevKey = key;
+            p2State.expectedPct = (trueCount / 8) * 100;
+            p2Input.value = '';
+            renderPhase2Svg(cfg);
+        }
+
+        function checkPhase2() {
+            const val = parseDecimalNumber(p2Input.value);
+            if (!Number.isFinite(val)) {
+                triggerFailure('Введите числовое значение процента (например: 37,5 или 37,5%)!', generatePhase2, 'p2-input');
+                return;
+            }
+            if (Math.abs(val - p2State.expectedPct) < 1e-6) {
+                switchToPhase(3);
+            } else {
+                triggerFailure('Неверная доля истинных наборов! Посчитайте число единиц из 8 и переведите в %.', generatePhase2, 'p2-input');
+            }
+        }
+
+        /* =========================================================================
+           ФАЗА 3: ПИК ИНВЕРСИИ — ВОССТАНОВЛЕНИЕ ЕДИНСТВЕННОГО ВХОДА ABC (CCS = 7)
+           ========================================================================= */
+        const p3State = { expectedAbc: '', targetF: 1, prevKey: '' };
+        const p3TargetBadge = document.getElementById('p3-target-badge');
+        const p3SvgWrap = document.getElementById('p3-svg-wrap');
+        const p3Input = document.getElementById('p3-input');
+        const p3SubmitBtn = document.getElementById('p3-submit-btn');
+
+        function renderPhase3Svg(cfg) {
+            p3SvgWrap.innerHTML = '';
+            const svg = svgEl('svg', { viewBox: '0 0 560 210', class: 'w-100' });
+            svg.style.maxHeight = '210px';
+            const wire = '#adb5bd';
+            const lblAttrs = { fill: '#0dcaf0', 'font-size': '16', 'font-weight': 'bold', 'font-family': 'monospace' };
+
+            const lblA = svgEl('text', { ...lblAttrs, x: 18, y: 42 }); lblA.textContent = 'A'; svg.appendChild(lblA);
+            const lblB = svgEl('text', { ...lblAttrs, x: 18, y: 98 }); lblB.textContent = 'B'; svg.appendChild(lblB);
+            const lblC = svgEl('text', { ...lblAttrs, x: 18, y: 168 }); lblC.textContent = 'C'; svg.appendChild(lblC);
+
+            if (cfg.invA) {
+                svg.appendChild(svgEl('line', { x1: 38, y1: 37, x2: 84, y2: 37, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 84, 19, 36, 36, 'NOT', 14);
+                svg.appendChild(svgEl('polyline', { points: '131,37 160,37 160,48 188,48', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '38,37 160,37 160,48 188,48', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            if (cfg.invB) {
+                svg.appendChild(svgEl('line', { x1: 38, y1: 93, x2: 84, y2: 93, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 84, 75, 36, 36, 'NOT', 14);
+                svg.appendChild(svgEl('polyline', { points: '131,93 160,93 160,82 188,82', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '38,93 160,93 160,82 188,82', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            // G1 (op)
+            drawGostGate(svg, 188, 32, 60, 66, cfg.op, 20);
+            svg.appendChild(svgEl('polyline', { points: '248,65 288,65 288,94 322,94', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+
+            if (cfg.invC) {
+                svg.appendChild(svgEl('line', { x1: 38, y1: 163, x2: 140, y2: 163, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 140, 145, 36, 36, 'NOT', 14);
+                svg.appendChild(svgEl('polyline', { points: '187,163 288,163 288,128 322,128', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            } else {
+                svg.appendChild(svgEl('polyline', { points: '38,163 288,163 288,128 322,128', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            }
+
+            // G2 (op)
+            drawGostGate(svg, 322, 78, 60, 66, cfg.op, 20);
+
+            if (cfg.invOut) {
+                svg.appendChild(svgEl('line', { x1: 382, y1: 111, x2: 426, y2: 111, stroke: wire, 'stroke-width': 2 }));
+                drawGostGate(svg, 426, 91, 38, 40, 'NOT', 14);
+                svg.appendChild(svgEl('line', { x1: 475, y1: 111, x2: 506, y2: 111, stroke: '#ffc107', 'stroke-width': 2.5 }));
+            } else {
+                svg.appendChild(svgEl('line', { x1: 382, y1: 111, x2: 506, y2: 111, stroke: '#ffc107', 'stroke-width': 2.5 }));
+            }
+
+            const lblF = svgEl('text', { x: 514, y: 117, fill: '#ffc107', 'font-size': '16', 'font-weight': 'bold', 'font-family': 'monospace' });
+            lblF.textContent = `F=${cfg.targetF}`;
+            svg.appendChild(lblF);
+
+            p3SvgWrap.appendChild(svg);
+        }
+
+        function generatePhase3() {
+            let cfg;
+            let key;
+            let uniqueVec = '';
+            do {
+                const op = Math.random() < 0.5 ? 'AND' : 'OR';
+                const invA = Math.random() < 0.5 ? 1 : 0;
+                const invB = Math.random() < 0.5 ? 1 : 0;
+                const invC = Math.random() < 0.5 ? 1 : 0;
+                const invOut = Math.random() < 0.5 ? 1 : 0;
+                const invInCount = invA + invB + invC;
+                if (invInCount < 1 || invInCount > 2) continue;
+
+                const targetF = op === 'AND' ? (invOut ? 0 : 1) : (invOut ? 1 : 0);
+                const matches = [];
+                for (let a = 0; a <= 1; a++) {
+                    for (let b = 0; b <= 1; b++) {
+                        for (let c = 0; c <= 1; c++) {
+                            const va = invA ? evalGate('NOT', a, 0) : a;
+                            const vb = invB ? evalGate('NOT', b, 0) : b;
+                            const vc = invC ? evalGate('NOT', c, 0) : c;
+                            let res = evalGate(op, evalGate(op, va, vb), vc);
+                            if (invOut) res = evalGate('NOT', res, 0);
+                            if (res === targetF) matches.push(`${a}${b}${c}`);
+                        }
+                    }
+                }
+                if (matches.length !== 1) continue;
+                uniqueVec = matches[0];
+                cfg = { op, invA, invB, invC, invOut, targetF };
+                key = `${op}:${invA}${invB}${invC}:${invOut}`;
+            } while (!cfg || key === p3State.prevKey);
+
+            p3State.prevKey = key;
+            p3State.expectedAbc = uniqueVec;
+            p3State.targetF = cfg.targetF;
+            p3TargetBadge.textContent = `F = ${cfg.targetF}`;
+            p3Input.value = '';
+            renderPhase3Svg(cfg);
+        }
+
+        function checkPhase3() {
+            const val = normalizeBitString(p3Input.value);
+            if (!/^[01]{3}$/.test(val)) {
+                triggerFailure('Введите ровно 3 бита для входов A, B и C (например: 101)!', generatePhase3, 'p3-input');
+                return;
+            }
+            if (val === p3State.expectedAbc) {
+                switchToPhase(4);
+            } else {
+                triggerFailure('Неверный входной набор ABC! Раскручивайте сигнал справа налево от выхода F.', generatePhase3, 'p3-input');
+            }
+        }
+
+        /* =========================================================================
+           ФАЗА 4: ДОЛИНА КОНСОЛИДАЦИИ — АРХИТЕКТУРНЫЕ ИНВАРИАНТЫ (CCS = 5)
+           ========================================================================= */
+        const p4State = { expected: 0, prevKey: '' };
+        const p4Condition = document.getElementById('p4-condition');
+        const p4Input = document.getElementById('p4-input');
+        const p4SubmitBtn = document.getElementById('p4-submit-btn');
+
+        function generatePhase4() {
+            const kindPool = ['triggers', 'truth_rows', 'cmos_transistors'];
+            let chosen;
+            let key;
+            let html = '';
+            let expected = 0;
+
+            do {
+                chosen = pickRandom(kindPool);
+                if (chosen === 'triggers') {
+                    const bytes = pickRandom([1, 2, 3, 4, 6, 8]);
+                    expected = bytes * 8;
+                    key = `tr:${bytes}`;
+                    html = `
+                        <p class="mb-2">Каждый <strong class="text-warning">триггер</strong> в регистре процессора хранит ровно <strong>1 бит</strong> информации.</p>
+                        <p class="mb-0">Сколько отдельных триггеров необходимо для построения регистра ёмкостью <strong class="text-info">${bytes} байт</strong>?</p>
+                    `;
+                } else if (chosen === 'truth_rows') {
+                    const n = randInt(3, 7);
+                    expected = Math.pow(2, n);
+                    key = `rows:${n}`;
+                    html = `
+                        <p class="mb-2">Инженер тестирует новую комбинационную логическую схему, у которой ровно <strong class="text-info">${n}</strong> независимых двоичных входов.</p>
+                        <p class="mb-0">Сколько различных входных наборов (строк) содержится в её полной таблице истинности (<strong>2<sup>n</sup></strong>)?</p>
+                    `;
+                } else {
+                    const nandCount = randInt(2, 7);
+                    const notCount = randInt(1, 6);
+                    expected = nandCount * 4 + notCount * 2;
+                    key = `cmos:${nandCount}:${notCount}`;
+                    html = `
+                        <p class="mb-2">По технологии КМОП один логический вентиль <strong>И-НЕ</strong> содержит <strong class="text-info">4</strong> транзистора, а один инвертор <strong>НЕ</strong> — <strong class="text-info">2</strong> транзистора.</p>
+                        <p class="mb-0">Сколько всего транзисторов в цифровом узле, собранном из <strong class="text-warning">${nandCount}</strong> элементов <strong>И-НЕ</strong> и <strong class="text-warning">${notCount}</strong> инверторов <strong>НЕ</strong>?</p>
+                    `;
+                }
+            } while (key === p4State.prevKey);
+
+            p4State.prevKey = key;
+            p4State.expected = expected;
+            p4Condition.innerHTML = html;
+            p4Input.value = '';
+        }
+
+        function checkPhase4() {
+            const val = parseDecimalNumber(p4Input.value);
+            if (!Number.isFinite(val)) {
+                triggerFailure('Введите целое число!', generatePhase4, 'p4-input');
+                return;
+            }
+            if (Math.abs(val - p4State.expected) < 1e-6) {
+                switchToPhase(5);
+            } else {
+                triggerFailure('Ошибка расчёта! Проверьте разрядность байта, 2^n или число транзисторов.', generatePhase4, 'p4-input');
+            }
+        }
+
+        /* =========================================================================
+           ФАЗА 5: КУЛЬМИНАЦИЯ — РАЗВЕТВЛЕНИЕ ● + КОМБИНИРОВАННЫЕ ВЕНТИЛИ (CCS = 8)
+           ========================================================================= */
+        const p5State = { expectedDec: 0, prevKey: '' };
+        const p5SvgWrap = document.getElementById('p5-svg-wrap');
+        const p5PacketsWrap = document.getElementById('p5-packets-wrap');
+        const p5Input = document.getElementById('p5-input');
+        const p5SubmitBtn = document.getElementById('p5-submit-btn');
+
+        function evalPhase5Schema(cfg, a, b, c) {
+            const f1 = evalGate(cfg.g1, a, b);
+            const f2 = evalGate(cfg.g2, b, c);
+            return evalGate(cfg.g3, f1, f2);
+        }
+
+        function renderPhase5Svg(cfg) {
+            p5SvgWrap.innerHTML = '';
+            const svg = svgEl('svg', { viewBox: '0 0 560 210', class: 'w-100' });
+            svg.style.maxHeight = '210px';
+            const wire = '#adb5bd';
+            const lblAttrs = { fill: '#0dcaf0', 'font-size': '16', 'font-weight': 'bold', 'font-family': 'monospace' };
+
+            const lblA = svgEl('text', { ...lblAttrs, x: 18, y: 47 }); lblA.textContent = 'A'; svg.appendChild(lblA);
+            const lblB = svgEl('text', { ...lblAttrs, x: 18, y: 110 }); lblB.textContent = 'B'; svg.appendChild(lblB);
+            const lblC = svgEl('text', { ...lblAttrs, x: 18, y: 173 }); lblC.textContent = 'C'; svg.appendChild(lblC);
+
+            // Разветвление B в точке (92, 105)
+            svg.appendChild(svgEl('line', { x1: 38, y1: 42, x2: 145, y2: 42, stroke: wire, 'stroke-width': 2 }));
+            svg.appendChild(svgEl('line', { x1: 38, y1: 105, x2: 92, y2: 105, stroke: wire, 'stroke-width': 2 }));
+            svg.appendChild(svgEl('circle', { cx: 92, cy: 105, r: 4.5, fill: '#0dcaf0' }));
+            svg.appendChild(svgEl('polyline', { points: '92,105 92,76 145,76', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            svg.appendChild(svgEl('polyline', { points: '92,105 92,134 145,134', fill: 'none', stroke: wire, 'stroke-width': 2 }));
+            svg.appendChild(svgEl('line', { x1: 38, y1: 168, x2: 145, y2: 168, stroke: wire, 'stroke-width': 2 }));
+
+            drawGostGate(svg, 145, 26, 66, 66, cfg.g1, 20);
+            drawGostGate(svg, 145, 118, 66, 66, cfg.g2, 20);
+
+            const g1OutX = GATE_INFO[cfg.g1].inverted ? 222 : 211;
+            const g2OutX = GATE_INFO[cfg.g2].inverted ? 222 : 211;
+
+            svg.appendChild(svgEl('polyline', {
+                points: `${g1OutX},59 296,59 296,88 342,88`,
+                fill: 'none', stroke: wire, 'stroke-width': 2
+            }));
+            svg.appendChild(svgEl('polyline', {
+                points: `${g2OutX},151 296,151 296,122 342,122`,
+                fill: 'none', stroke: wire, 'stroke-width': 2
+            }));
+
+            drawGostGate(svg, 342, 72, 66, 66, cfg.g3, 20);
+            const g3OutX = GATE_INFO[cfg.g3].inverted ? 419 : 408;
+
+            svg.appendChild(svgEl('line', { x1: g3OutX, y1: 105, x2: 498, y2: 105, stroke: '#ffc107', 'stroke-width': 2.5 }));
+            const lblF = svgEl('text', { x: 508, y: 111, fill: '#ffc107', 'font-size': '18', 'font-weight': 'bold', 'font-family': 'monospace' });
+            lblF.textContent = 'F';
+            svg.appendChild(lblF);
+
+            p5SvgWrap.appendChild(svg);
+        }
+
+        function generatePhase5() {
+            const gateChoices = ['AND', 'OR', 'NAND', 'NOR'];
+            let cfg;
+            let packets;
+            let decVal = 0;
+            let key = '';
+
+            do {
+                const g1 = pickRandom(gateChoices);
+                const g2 = pickRandom(gateChoices);
+                const g3 = pickRandom(gateChoices);
+                if (g1 === g2) continue;
+                const hasCombined = [g1, g2, g3].some((g) => g === 'NAND' || g === 'NOR');
+                if (!hasCombined) continue;
+
+                const allVecs = [];
+                for (let a = 0; a <= 1; a++) {
+                    for (let b = 0; b <= 1; b++) {
+                        for (let c = 0; c <= 1; c++) {
+                            const bit = evalPhase5Schema({ g1, g2, g3 }, a, b, c);
+                            allVecs.push({ a, b, c, bit });
+                        }
+                    }
+                }
+                const ones = allVecs.filter((v) => v.bit === 1);
+                const zeros = allVecs.filter((v) => v.bit === 0);
+                if (ones.length < 2 || zeros.length < 2) continue;
+
+                const picked = shuffle(allVecs).slice(0, 4);
+                decVal = (picked[0].bit << 3) | (picked[1].bit << 2) | (picked[2].bit << 1) | picked[3].bit;
+                if (decVal < 3 || decVal > 14) continue;
+
+                cfg = { g1, g2, g3 };
+                packets = picked;
+                key = `${g1}:${g2}:${g3}:${decVal}`;
+            } while (!cfg || key === p5State.prevKey);
+
+            p5State.prevKey = key;
+            p5State.expectedDec = decVal;
+
+            renderPhase5Svg(cfg);
+
+            p5PacketsWrap.innerHTML = '';
+            packets.forEach((pkt, idx) => {
+                const bitWeight = 3 - idx;
+                const col = createEl('div', 'col-6 col-sm-3');
+                const box = createEl('div', 'border border-secondary bg-black p-2 text-center h-100');
+                box.appendChild(createEl('div', 'text-warning small fw-bold mb-1', `Пакет ${idx + 1} (бит b${bitWeight})`));
+                box.appendChild(createEl('div', 'text-info fw-bold', `A=${pkt.a}, B=${pkt.b}, C=${pkt.c}`));
+                col.appendChild(box);
+                p5PacketsWrap.appendChild(col);
+            });
+
+            p5Input.value = '';
+        }
+
+        function checkPhase5() {
+            const val = parseDecimalNumber(p5Input.value);
+            if (!Number.isFinite(val)) {
+                triggerFailure('Введите целое десятичное число (от 0 до 15)!', generatePhase5, 'p5-input');
+                return;
+            }
+            if (Math.abs(val - p5State.expectedDec) < 1e-6) {
+                showVictory();
+            } else {
+                triggerFailure('Неверное итоговое число! Проверьте разветвление B (●) и инверсию ○ на выходе.', generatePhase5, 'p5-input');
+            }
+        }
+
+        /* =========================================================================
+           ОДНОКРАТНАЯ ПРИВЯЗКА СОБЫТИЙ
+           ========================================================================= */
+        function bindEventsOnce() {
+            const pairs = [
+                { btn: p1SubmitBtn, inp: p1Input, fn: checkPhase1, phase: 1 },
+                { btn: p2SubmitBtn, inp: p2Input, fn: checkPhase2, phase: 2 },
+                { btn: p3SubmitBtn, inp: p3Input, fn: checkPhase3, phase: 3 },
+                { btn: p4SubmitBtn, inp: p4Input, fn: checkPhase4, phase: 4 },
+                { btn: p5SubmitBtn, inp: p5Input, fn: checkPhase5, phase: 5 }
+            ];
+
+            pairs.forEach((p) => {
+                p.btn.addEventListener('click', () => {
+                    if (isProcessingError || currentPhase !== p.phase) return;
+                    p.fn();
+                });
+                p.inp.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (isProcessingError || currentPhase !== p.phase) return;
+                        p.fn();
+                    }
+                });
+            });
+        }
+
+        // Инициализация
+        bindEventsOnce();
+        generatePhase1();
+        timerInterval = setInterval(updateTimerDisplay, 500);
+    })();
+    </script>
+</TaskLayout>
