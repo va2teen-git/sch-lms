@@ -3,10 +3,16 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { ensurePrinceProgressSchema, getLessonProgressSnapshot } from '../../lib/prince-progress';
 import { getNextCampaignStage, getTotalCampaignStages } from '../../lib/prince-campaign';
+import { ensureHotlineKumirProgressSchema } from '../../lib/hotline-kumir-progress';
 
 // Initialize DB
 const dbPath = path.join(process.cwd(), 'telemetry.db');
 const db = new Database(dbPath);
+try {
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('busy_timeout = 5000');
+} catch(e) {}
 
 // Create table if not exists
 db.exec(`
@@ -85,6 +91,7 @@ try {
 }
 
 ensurePrinceProgressSchema(db);
+ensureHotlineKumirProgressSchema(db);
 
 export const POST: APIRoute = async ({ request }) => {
   if (request.headers.get('Content-Type') === 'application/json') {

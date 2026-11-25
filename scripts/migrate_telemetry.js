@@ -62,8 +62,30 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_prince_progress_student ON prince_progress(first_name, last_name, student_class);
   CREATE INDEX IF NOT EXISTS idx_prince_progress_lesson ON prince_progress(course_slug, lesson_id);
+
+  CREATE TABLE IF NOT EXISTS hotline_kumir_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    student_class TEXT NOT NULL,
+    level_id INTEGER NOT NULL,
+    best_rank TEXT NOT NULL,
+    best_score INTEGER NOT NULL DEFAULT 0,
+    best_style TEXT NOT NULL,
+    mask_id TEXT NOT NULL,
+    kumir_loc INTEGER DEFAULT 0,
+    used_loops BOOLEAN DEFAULT 0,
+    used_conditions BOOLEAN DEFAULT 0,
+    used_subprograms BOOLEAN DEFAULT 0,
+    linux_commands_count INTEGER DEFAULT 0,
+    best_time_sec INTEGER DEFAULT 0,
+    attempts INTEGER DEFAULT 1,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(first_name, last_name, student_class, level_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_hk_progress_student ON hotline_kumir_progress(first_name, last_name, student_class);
 `);
-console.log('Indexes and prince_progress table created/verified.');
+console.log('Indexes, prince_progress and hotline_kumir_progress tables created/verified.');
 
 // Step 2: Build primary student_class mapping
 console.log('Analyzing student cohorts...');
@@ -102,7 +124,7 @@ function toPosInt(val) {
 
 function parseLevel(missionName, actionType, rawLog) {
   const m = String(missionName || '');
-  if (actionType === 'sprint_complete' || actionType === 'prince_complete' || m.includes('Prince of Persia')) {
+  if (actionType === 'sprint_complete' || actionType === 'prince_complete' || actionType === 'hotline_kumir_complete' || m.includes('Prince of Persia')) {
     return 0;
   }
   if (/Уровень\s*1/i.test(m) || /Ур\s*1/i.test(m) || /\(Базовый\)/i.test(m)) return 1;

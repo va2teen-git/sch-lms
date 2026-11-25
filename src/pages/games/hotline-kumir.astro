@@ -69,11 +69,33 @@ import HotlineKumir from '../../components/HotlineKumir.astro';
           if (window.parent && window.parent !== window && tracker?.send) {
             tracker.send('hotline_kumir_complete', payload);
           } else {
-            await fetch('/api/telemetry', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
+            await Promise.all([
+              fetch('/api/telemetry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              }),
+              fetch('/api/hotline-kumir/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  firstName,
+                  lastName,
+                  className: studentClass,
+                  levelId: result.levelId,
+                  grade: result.grade,
+                  score: result.score,
+                  styleBadge: result.styleBadge,
+                  maskId: result.mask,
+                  locCount: result.locCount,
+                  usedLoops: result.usedLoops,
+                  usedConditions: result.usedConditions,
+                  usedSubprograms: result.usedSubprograms,
+                  linuxCommandsCount: result.linuxCommandsCount,
+                  timeSpentSec: result.timeSpentSec,
+                }),
+              }),
+            ]);
           }
         } catch (err) {
           console.warn('Telemetry send error:', err);
