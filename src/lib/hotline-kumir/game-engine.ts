@@ -110,6 +110,8 @@ export class HotlineGameEngine {
         const ch = line[x] || '#';
         if (ch === '#') {
           row.push('WALL');
+        } else if (ch === 'W') {
+          row.push('WINDOW');
         } else if (ch === 'C') {
           row.push('COVER');
         } else if (ch === 'E') {
@@ -259,7 +261,8 @@ export class HotlineGameEngine {
 
   private isPassable(x: number, y: number): boolean {
     if (!this.inBounds(x, y)) return false;
-    if (this.tiles[y][x] === 'WALL') return false;
+    const t = this.tiles[y][x];
+    if (t === 'WALL' || t === 'WINDOW') return false;
     const closedDoor = this.doors.find((d) => d.x === x && d.y === y && !d.open);
     if (closedDoor) return false;
     return true;
@@ -1422,6 +1425,7 @@ export class HotlineGameEngine {
       return { events, snapshot: this.getSnapshot() };
     }
     this.turnIndex++;
+    this.totalStepsSession++;
     events.push({
       type: 'TURN_TIMEOUT',
       x: this.player.x,
@@ -1482,6 +1486,7 @@ export class HotlineGameEngine {
       terminalPos: { ...this.terminalPos },
       exitPos: { ...this.exitPos },
       gbrSpawnPos: { ...this.gbrSpawnPos },
+      scene: this.levelDef.scene,
       lastError: this.lastError ? { ...this.lastError } : null,
       lastResult: this.lastResult ? { ...this.lastResult } : null,
     };

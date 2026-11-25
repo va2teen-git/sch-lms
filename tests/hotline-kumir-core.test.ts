@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compileKumir, executeKumirProgram } from '../src/lib/hotline-kumir/kumir-interpreter.ts';
+import { ATLAS_SPRITES } from '../src/lib/hotline-kumir/atlas-manifest.ts';
 import { HotlineGameEngine, HOTLINE_KUMIR_LEVELS } from '../src/lib/hotline-kumir/game-engine.ts';
 import type { KumirSensorReader } from '../src/lib/hotline-kumir/types.ts';
 
@@ -88,10 +89,18 @@ test('KuMir interpreter: stops empty infinite loop and recursive overflow safely
   }
 });
 
-test('Calibration invariants: themes, rotating cameras, 2 relays on L4-5, no starterCode auto-solutions', () => {
+test('Calibration invariants: themes, rotating cameras, 2 relays on L4-5, rich architectural scenes & valid props', () => {
   const expectedThemes = ['kpp_street', 'lobby_hall', 'analytics_office', 'server_hall', 'master_vault'];
   HOTLINE_KUMIR_LEVELS.forEach((lvl, idx) => {
     assert.equal(lvl.theme, expectedThemes[idx]);
+    assert.ok(lvl.asciiMap[0].length >= 20, `Level ${lvl.id} width must be >= 20`);
+    assert.ok(lvl.asciiMap.length >= 12, `Level ${lvl.id} height must be >= 12`);
+    assert.ok(lvl.asciiMap.some((row) => row.includes('W')), `Level ${lvl.id} must have glass WINDOW tiles`);
+    assert.ok(lvl.scene.props.length >= 25, `Level ${lvl.id} must have >= 25 rich props`);
+    for (const pr of lvl.scene.props) {
+      assert.ok(ATLAS_SPRITES[pr.sprite], `Missing atlas sprite ${pr.sprite} in Level ${lvl.id}`);
+    }
+
     const g = new HotlineGameEngine(lvl.id, 'richard', 42);
     g.startMission();
     const res = g.runProgramImmediate(lvl.starterCode);
@@ -115,14 +124,14 @@ test('Honest COVER, patrol_raven 3-tile vision, and tactical area decoy THROW', 
   // Honest COVER: crouching in open corridor without adjacent C does NOT hide from Level 1 camera
   const gOpen = new HotlineGameEngine(1, 'richard', 42);
   gOpen.startMission();
-  const openCrouch = gOpen.runProgramImmediate('вниз; вниз\nнц 5 раз\nвправо\nкц\nукрыться');
+  const openCrouch = gOpen.runProgramImmediate('нц 6 раз\nвправо\nкц\nвниз; вниз\nнц 5 раз\nвправо\nкц\nукрыться');
   assert.equal(openCrouch.snapshot.alarmTriggered, true);
 
   // Raven 3-tile vision + area decoy THROW on Level 3
   const g3 = new HotlineGameEngine(3, 'richard', 42);
   g3.startMission();
-  // Walk to C(6,2) and crouch: covered by C(6,2)
-  g3.runProgramImmediate('нц 4 раз\nвправо\nкц\nвниз; вправо; укрыться');
+  // Walk to C(10,3) and crouch: covered by C(10,3)
+  g3.runProgramImmediate('нц 4 раз\nвправо\nкц\nвверх\nнц 5 раз\nвправо\nкц\nвниз; укрыться');
   assert.equal(g3.getSnapshot().alarmTriggered, false);
   // Throw EMP decoy toward guard-office -> emits DECOY_THROWN and distracts Raven so vision cone clears
   const throwRes = g3.runProgramImmediate('бросить вправо');
@@ -204,61 +213,67 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
   // Level 1 GHOST
   const g1 = new HotlineGameEngine(1, 'richard', 42);
   g1.startMission();
-  g1.runProgramImmediate('нц 3 раз\nвправо\nкц\nподключиться');
+  g1.runProgramImmediate('вверх; вверх\nнц 4 раз\nвправо\nкц\nподключиться');
   g1.execLinuxCommand('unlock 4821');
   g1.exitTerminal();
-  const r1 = g1.runProgramImmediate('нц 4 раз\nвправо\nкц\nзакрасить\nвправо\nвниз\nвниз\nвправо');
+  const r1 = g1.runProgramImmediate('нц 10 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вправо\nнц 4 раз\nвниз\nкц');
   assert.equal(r1.snapshot.phase, 'EXTRACTION');
   assert.equal(r1.snapshot.lastResult?.styleBadge, 'GHOST');
 
   // Level 2 GHOST
   const g2 = new HotlineGameEngine(2, 'richard', 42);
   g2.startMission();
-  g2.runProgramImmediate('нц 3 раз\nвправо\nкц\nвниз; вниз; вправо; подключиться');
+  g2.runProgramImmediate('нц 5 раз\nвправо\nкц\nвниз; подключиться');
   g2.execLinuxCommand('camctl off cam-01 NEON-774');
   g2.execLinuxCommand('laserctl off L1 NEON-774');
   g2.exitTerminal();
-  const r2 = g2.runProgramImmediate('вправо; вниз; вниз; вправо; закрасить\nнц 4 раз\nвверх\nкц\nнц 5 раз\nвправо\nкц');
+  const r2 = g2.runProgramImmediate('вверх\nнц 5 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nзакрасить\nнц 5 раз\nвверх\nкц\nнц 9 раз\nвправо\nкц\nвниз');
   assert.equal(r2.snapshot.phase, 'EXTRACTION');
   assert.equal(r2.snapshot.lastResult?.styleBadge, 'GHOST');
 
-  // Level 3 GHOST (COVER at C(6,2) + decoy throw past Raven -> T(8,4) -> *(8,7) -> silent takedown -> D1)
+  // Level 3 GHOST (COVER at C(10,3) + decoy throw past Raven -> T(12,5) -> *(18,8) -> silent takedown -> D1)
   const g3 = new HotlineGameEngine(3, 'richard', 42);
   g3.startMission();
   g3.runProgramImmediate(
-    'нц 4 раз\nвправо\nкц\nвниз; вправо; укрыться; бросить вправо; вправо; вниз; вниз; вправо; подключиться'
+    'нц 4 раз\nвправо\nкц\nвверх\nнц 5 раз\nвправо\nкц\nвниз; укрыться; бросить вправо; вниз; вправо; вправо; вниз; подключиться'
   );
   g3.execLinuxCommand('vault_unlock MEOA-902');
   g3.exitTerminal();
+  g3.runProgramImmediate(
+    'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nзакрасить\nнц 6 раз\nвлево\nкц\nнц 4 раз\nвверх\nкц'
+  );
   const r3 = g3.runProgramImmediate(
-    'нц 3 раз\nвниз\nкц\nзакрасить\nнц 3 раз\nвверх\nкц\nвправо; вверх\nесли сверху опасно то\n  ждать\nвсе\nвверх; бросить вправо\nнц 5 раз\n  если справа враг то\n    оглушить\n    добить\n  все\n  вправо\nкц\nвниз; вниз'
+    'ждать; вверх; рывок вправо; бросить вправо; вправо\nесли справа враг то\n  оглушить\n  добить\nвсе\nнц 5 раз\n  вправо\nкц\nвниз; вниз; вправо'
   );
   assert.equal(r3.snapshot.phase, 'EXTRACTION');
   assert.equal(r3.snapshot.lastResult?.styleBadge, 'GHOST');
 
-  // Level 4 GHOST (2 relays: *1(14,6) and *2(12,1), decoy past guard-srv, timing cam-srv-2)
+  // Level 4 GHOST (2 relays: *1(21,7) and *2(16,2), decoy past guard-srv, timing cam-srv-2)
   const g4 = new HotlineGameEngine(4, 'richard', 42);
   g4.startMission();
-  g4.runProgramImmediate('нц 5 раз\nвниз\nкц\nнц 7 раз\nвправо\nкц\nподключиться');
+  g4.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nнц 8 раз\nвправо\nкц\nподключиться');
   g4.execLinuxCommand('gridctl reset --no-alarm');
   g4.execLinuxCommand('tar -czf /mnt/usb/audit.tar.gz /srv/secret');
   g4.exitTerminal();
+  g4.runProgramImmediate(
+    'вверх\nнц 8 раз\nвправо\nкц\nзакрасить\nнц 8 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nзакрасить'
+  );
   const r4 = g4.runProgramImmediate(
-    'нц 6 раз\nвправо\nкц\nзакрасить\nнц 5 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вниз\nесли не снизу опасно то\n  ждать\nвсе\nвниз; отключить влево; вправо; вправо; вниз'
+    'вправо; вправо; вправо; вниз\nнц пока не снизу опасно\n  ждать\nкц\nвниз; отключить влево; вправо; вправо; вправо; вниз'
   );
   assert.equal(r4.snapshot.phase, 'EXTRACTION');
   assert.equal(r4.snapshot.lastResult?.styleBadge, 'GHOST');
 
-  // Level 5 GHOST (2 relays: *1(1,8) and *2(18,4), silent truncate -s 0)
+  // Level 5 GHOST (2 relays: *1(6,9) and *2(26,5), silent truncate -s 0)
   const g5 = new HotlineGameEngine(5, 'richard', 42);
   g5.startMission();
-  g5.runProgramImmediate('нц пока снизу свободно\nвниз\nкц\nзакрасить\nнц 7 раз\nвправо\nкц\nвверх; вверх; вверх; влево; влево; подключиться');
+  g5.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; закрасить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться');
   g5.execLinuxCommand('chmod 600 /home/root_backup/.ssh/id_rsa');
   g5.execLinuxCommand('scp -P 2222 -i /home/root_backup/.ssh/id_rsa master@127.0.0.1:/vault/dump.sql /mnt/usb/');
   g5.execLinuxCommand('truncate -s 0 /var/log/access.log');
   g5.exitTerminal();
   const r5 = g5.runProgramImmediate(
-    'вправо; вправо; вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nвверх; вверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх\nнц 4 раз\nвправо\nкц\nвверх; закрасить\nвверх; влево; вверх; вверх; вправо'
+    'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; закрасить; вверх; влево; вверх; вверх; вправо'
   );
   assert.equal(r5.snapshot.phase, 'EXTRACTION');
   assert.equal(r5.snapshot.lastResult?.styleBadge, 'GHOST');
@@ -266,37 +281,39 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
 });
 
 test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Bear shield COMBAT', () => {
-  // Level 3 assault shortcut D2(11,5) + southern route -> ESCAPE
+  // Level 3 assault shortcut D2(16,6) + southern route -> ESCAPE
   const g3Esc = new HotlineGameEngine(3, 'sprint', 55);
   g3Esc.startMission();
-  g3Esc.runProgramImmediate('нц 4 раз\nвправо\nкц\nвниз; вправо; укрыться; бросить вправо; вправо; вниз; вниз; вправо; подключиться');
+  g3Esc.runProgramImmediate(
+    'нц 4 раз\nвправо\nкц\nвверх\nнц 5 раз\nвправо\nкц\nвниз; укрыться; бросить вправо; вправо; вниз; вправо; вниз; подключиться'
+  );
   g3Esc.execLinuxCommand('vault_unlock MEOA-902');
   g3Esc.exitTerminal();
   const r3Esc = g3Esc.runProgramImmediate(
-    'нц 3 раз\nвниз\nкц\nзакрасить\nнц 3 раз\nвправо\nкц\nвверх; выбить дверь вверх; вверх; вверх\nнц 3 раз\nвправо\nкц'
+    'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nзакрасить; влево; влево; вверх; выбить дверь вверх; вверх; вверх\nнц 5 раз\nвправо\nкц'
   );
   assert.equal(r3Esc.snapshot.phase, 'EXTRACTION');
   assert.equal(r3Esc.snapshot.lastResult?.styleBadge, 'ESCAPE');
 
-  // Level 4 EMP flank: distract guard-srv with decoy, disable western laser L4-west via "отключить", cross cleanly
+  // Level 4 EMP flank: disable western laser L4-west, distract guard-srv with decoy, dash across cleanly
   const g4Emp = new HotlineGameEngine(4, 'rasmus', 88);
   g4Emp.startMission();
-  const empRes = g4Emp.runProgramImmediate('вниз; вниз; вправо; вправо; бросить вправо; отключить вправо; вправо; вправо');
+  const empRes = g4Emp.runProgramImmediate('нц 4 раз\nвправо\nкц\nвверх; вправо; вправо; вниз; вниз; отключить вправо; бросить вправо; рывок вправо');
   assert.equal(empRes.snapshot.alarmTriggered, false);
-  assert.equal(empRes.snapshot.player.x, 5);
-  assert.equal(empRes.snapshot.player.y, 3);
+  assert.equal(empRes.snapshot.player.x, 9);
+  assert.equal(empRes.snapshot.player.y, 4);
 
-  // Level 5 ESCAPE via rm tamper + assault shortcut D2(15,1)
+  // Level 5 ESCAPE via rm tamper
   const g5Esc = new HotlineGameEngine(5, 'richard', 42);
   g5Esc.startMission();
-  g5Esc.runProgramImmediate('нц пока снизу свободно\nвниз\nкц\nзакрасить\nнц 7 раз\nвправо\nкц\nвверх; вверх; вверх; влево; влево; подключиться');
+  g5Esc.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; закрасить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться');
   g5Esc.execLinuxCommand('chmod 600 /home/root_backup/.ssh/id_rsa');
   g5Esc.execLinuxCommand('scp -P 2222 -i /home/root_backup/.ssh/id_rsa master@127.0.0.1:/vault/dump.sql /mnt/usb/');
   g5Esc.execLinuxCommand('rm /var/log/access.log');
   g5Esc.exitTerminal();
   assert.equal(g5Esc.getSnapshot().phase, 'ESCAPE_RACE');
   const r5Esc = g5Esc.runProgramImmediate(
-    'вправо; вправо; вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nвверх; вверх\nесли сверху опасно то\n  ждать\nвсе\nвверх\nнц 4 раз\nвправо\nкц\nвверх; закрасить\nвверх; влево; вверх; вверх; вправо'
+    'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; закрасить; вверх; влево; вверх; вверх; вправо'
   );
   assert.equal(r5Esc.snapshot.phase, 'EXTRACTION');
   assert.equal(r5Esc.snapshot.lastResult?.styleBadge, 'ESCAPE');
@@ -304,7 +321,7 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   // Level 1 COMBAT Fail-Forward
   const g1 = new HotlineGameEngine(1, 'tony', 77);
   g1.startMission();
-  const camTrip = g1.runProgramImmediate('вниз; вниз\nнц 5 раз\nвправо\nкц');
+  const camTrip = g1.runProgramImmediate('нц 6 раз\nвправо\nкц\nвниз; вниз\nнц 5 раз\nвправо\nкц');
   assert.equal(camTrip.snapshot.alarmTriggered, true);
   assert.equal(camTrip.snapshot.phase, 'ESCAPE_RACE');
 
@@ -317,34 +334,35 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   const gbrEnemy = combatSnap.enemies.find((e) => e.isGbr);
   assert.ok(gbrEnemy && gbrEnemy.telegraphNext !== null);
 
-  g1.runProgramImmediate('влево; влево; влево; влево; влево; вверх; вверх; вправо; вправо; вправо; подключиться');
+  g1.runProgramImmediate('нц 5 раз\nвлево\nкц\nвверх; вверх; влево; вверх; вверх; подключиться');
   g1.execLinuxCommand('unlock 4821');
   g1.exitTerminal();
 
   const killIfNear = 'если рядом враг то\n  оглушить\n  добить\nвсе';
-  g1.runProgramImmediate(`${killIfNear}\nнц 4 раз\n  ${killIfNear}\n  вправо\nкц\nзакрасить\nвправо\n${killIfNear}\nвниз; вниз\n${killIfNear}\nвправо`);
+  g1.runProgramImmediate(`${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nзакрасить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц`);
   const endSnap = g1.getSnapshot();
   assert.equal(endSnap.phase, 'EXTRACTION');
   assert.equal(endSnap.lastResult?.styleBadge, 'COMBAT');
   assert.equal(endSnap.lastResult?.outcomeBranch, 'combat_gbr');
 
-  // Level 4 Bear shield test: strike without throw fails, throw breaks shield then strike succeeds
+  // Level 4 Bear shield test: throw breaks shield
   const g4Bear = new HotlineGameEngine(4, 'tony', 99);
   g4Bear.startMission();
-  g4Bear.runProgramImmediate('нц 5 раз\nвниз\nкц\nнц 7 раз\nвправо\nкц\nподключиться');
+  g4Bear.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nнц 8 раз\nвправо\nкц\nподключиться');
   g4Bear.execLinuxCommand('gridctl reset --no-alarm');
   g4Bear.execLinuxCommand('tar -czf /mnt/usb/audit.tar.gz /srv/secret');
   g4Bear.exitTerminal();
-  g4Bear.runProgramImmediate('нц 6 раз\nвправо\nкц\nзакрасить');
-  // Trigger alarm by breaching D2(16,5) and wait for GBR (gbr_boar + gbr_bear)
-  g4Bear.runProgramImmediate('вправо; вправо; выбить дверь вверх');
+  g4Bear.runProgramImmediate('вверх\nнц 8 раз\nвправо\nкц\nзакрасить');
+  // Trigger alarm by breaching D2(22,6) and wait for GBR (gbr_boar + gbr_bear)
+  g4Bear.runProgramImmediate('вправо; выбить дверь вверх');
   while (!g4Bear.getSnapshot().gbrSpawned) {
     g4Bear.handleTurnTimeout();
   }
   const bear = g4Bear.getSnapshot().enemies.find((e) => e.kind === 'gbr_bear');
   assert.ok(bear && bear.shielded === true);
-  // Move Bear within throw range and verify shield break via "бросить"
+  let bearGuard = 0;
   while (
+    bearGuard++ < 40 &&
     Math.abs(
       (g4Bear.getSnapshot().enemies.find((e) => e.kind === 'gbr_bear')?.x ?? 0) -
         g4Bear.getSnapshot().player.x
