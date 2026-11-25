@@ -1,9 +1,14 @@
+import { ATLAS_SPRITES, ATLAS_URL } from './atlas-manifest.ts';
+import { Camera2D, TILE_PX, type CameraMode } from './camera.ts';
+import { buildClosedDoorSet, computeConePolygon, renderAdditiveGlows, renderLightmap } from './lighting.ts';
 import type {
-  AudioMood,
   Direction,
   EnemyState,
+  FloorKind,
   LevelThemeId,
   MaskId,
+  SceneProp,
+  TileKind,
   WorldEvent,
   WorldSnapshot,
 } from './types.ts';
@@ -67,83 +72,80 @@ interface Shockwave {
 
 interface ThemePalette {
   label: string;
-  floorA: string;
-  floorB: string;
-  gridLine: string;
   wallBase: string;
   wallTop: string;
   wallBevel: string;
   wallEdge: string;
-  coverFill: string;
-  coverStroke: string;
+  accent: string;
 }
 
-const TILE_PX = 36;
-const PAD_PX = 36;
 const MAX_FX_MS = 420;
+const CHAR_DRAW_PX = 54;
 
 const THEME_PALETTES: Record<LevelThemeId, ThemePalette> = {
   kpp_street: {
     label: 'КПП // ПЕРИМЕТР',
-    floorA: '#100A20',
-    floorB: '#140E27',
-    gridLine: 'rgba(0, 240, 255, 0.10)',
-    wallBase: '#1B0C30',
-    wallTop: '#261142',
-    wallBevel: 'rgba(255, 255, 255, 0.14)',
+    wallBase: '#180B2C',
+    wallTop: '#2E184F',
+    wallBevel: 'rgba(255, 255, 255, 0.16)',
     wallEdge: '#FF007F',
-    coverFill: '#334155',
-    coverStroke: '#FACC15',
+    accent: '#00F0FF',
   },
   lobby_hall: {
     label: 'ХОЛЛ // РЕСЕПШЕН',
-    floorA: '#160B2A',
-    floorB: '#1E1038',
-    gridLine: 'rgba(255, 0, 127, 0.12)',
-    wallBase: '#230D36',
-    wallTop: '#31124B',
-    wallBevel: 'rgba(255, 210, 240, 0.16)',
+    wallBase: '#220B33',
+    wallTop: '#3C1659',
+    wallBevel: 'rgba(255, 210, 240, 0.18)',
     wallEdge: '#F43F5E',
-    coverFill: '#4C1D95',
-    coverStroke: '#00F0FF',
+    accent: '#00F0FF',
   },
   analytics_office: {
     label: 'ОФИС // АНАЛИТИКА',
-    floorA: '#0E1328',
-    floorB: '#121933',
-    gridLine: 'rgba(56, 189, 248, 0.12)',
-    wallBase: '#171C3A',
-    wallTop: '#222A54',
-    wallBevel: 'rgba(186, 230, 253, 0.16)',
+    wallBase: '#151A38',
+    wallTop: '#253063',
+    wallBevel: 'rgba(186, 230, 253, 0.18)',
     wallEdge: '#38BDF8',
-    coverFill: '#1E3A5F',
-    coverStroke: '#38BDF8',
+    accent: '#F472B6',
   },
   server_hall: {
     label: 'СЕРВЕРНАЯ // ХОЛОД',
-    floorA: '#071426',
-    floorB: '#0B1D34',
-    gridLine: 'rgba(0, 240, 255, 0.16)',
-    wallBase: '#0C203D',
-    wallTop: '#133159',
-    wallBevel: 'rgba(165, 243, 252, 0.2)',
+    wallBase: '#0A1C36',
+    wallTop: '#143866',
+    wallBevel: 'rgba(165, 243, 252, 0.22)',
     wallEdge: '#00F0FF',
-    coverFill: '#0F294A',
-    coverStroke: '#22D3EE',
+    accent: '#22D3EE',
   },
   master_vault: {
     label: 'ЯДРО // КРАСНАЯ ЛИНИЯ',
-    floorA: '#140814',
-    floorB: '#1B0A1B',
-    gridLine: 'rgba(255, 30, 66, 0.16)',
-    wallBase: '#26081A',
-    wallTop: '#380C26',
-    wallBevel: 'rgba(254, 205, 211, 0.16)',
+    wallBase: '#260718',
+    wallTop: '#450E2A',
+    wallBevel: 'rgba(254, 205, 211, 0.18)',
     wallEdge: '#FF1E42',
-    coverFill: '#3F1D2B',
-    coverStroke: '#FB7185',
+    accent: '#FB7185',
   },
 };
+
+const FLOOR_SPRITE_VARIANTS: Record<FloorKind, [string, string]> = {
+  asphalt: ['asphalt_0', 'asphalt_1'],
+  sidewalk: ['sidewalk_0', 'sidewalk_1'],
+  grass: ['grass_0', 'grass_1'],
+  gravel: ['gravel_0', 'gravel_0'],
+  kpp_concrete: ['floor_kpp_0', 'floor_kpp_1'],
+  lobby_marble: ['floor_lobby_marble_0', 'floor_lobby_marble_1'],
+  lobby_rug: ['floor_lobby_rug', 'floor_lobby_rug'],
+  office_carpet: ['floor_office_carpet_0', 'floor_office_carpet_1'],
+  wood_parquet: ['floor_wood_0', 'floor_wood_1'],
+  server_grate: ['floor_server_grate_0', 'floor_server_grate_1'],
+  vault_obsidian: ['floor_vault_0', 'floor_vault_1'],
+  vault_crimson: ['floor_vault_crimson', 'floor_vault_crimson'],
+  bathroom_tile: ['floor_bathroom', 'floor_bathroom'],
+};
+
+function hash2d(x: number, y: number): number {
+  let n = (x * 374761393 + y * 668265263) | 0;
+  n = ((n ^ (n >> 13)) * 1274126177) | 0;
+  return (n ^ (n >> 16)) & 0xff;
+}
 
 function dirToAngle(dir: Direction): number {
   switch (dir) {
@@ -160,8 +162,8 @@ function dirToAngle(dir: Direction): number {
 
 function tileCenter(x: number, y: number): { cx: number; cy: number } {
   return {
-    cx: PAD_PX + x * TILE_PX + TILE_PX / 2,
-    cy: PAD_PX + y * TILE_PX + TILE_PX / 2,
+    cx: x * TILE_PX + TILE_PX / 2,
+    cy: y * TILE_PX + TILE_PX / 2,
   };
 }
 
@@ -190,44 +192,119 @@ function drawRoundedRect(
 export class HotlineCanvasRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
+  private readonly fastAnim: boolean;
+  readonly camera = new Camera2D();
+
+  private atlasImg: HTMLImageElement | null = null;
+  private atlasReady = false;
+  private atlasWaiters: Array<() => void> = [];
+  private onAtlasReadyCb: (() => void) | null = null;
+
   private backdropCanvas: HTMLCanvasElement | null = null;
   private backdropKey = '';
+  private lightCanvas: HTMLCanvasElement | null = null;
 
   private snapshot: WorldSnapshot | null = null;
   private rafId: number | null = null;
-  private lastTimestamp = 0;
-
-  private fastAnim = false;
-  private fxTimerMs = 0;
-  private fxKind: 'NONE' | 'SHAKE' | 'GLITCH' | 'ALARM_PULSE' = 'NONE';
-  private shakeIntensity = 0;
-  private sirenPhase = 0;
+  private lastTickTs = 0;
+  private rafFrames = 0;
+  private lastFrameMs = 0;
 
   private moveAnims = new Map<string, MoveAnim>();
   private dashTrails: DashTrail[] = [];
   private throwArcs: ThrowArc[] = [];
   private particles: Particle[] = [];
   private shockwaves: Shockwave[] = [];
+  private fxTimerMs = 0;
+  private fxKind: 'NONE' | 'SHAKE' | 'GLITCH' | 'ALARM_PULSE' = 'NONE';
+  private shakeIntensity = 0;
+  private sirenPhase = 0;
+  private dpr = 1;
 
-  private rafFrames = 0;
-  private lastFrameMs = 0;
+  private readonly onVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.hidden) {
+      this.stopLoop();
+    }
+  };
 
   constructor(canvas: HTMLCanvasElement, fastAnim = false) {
     this.canvas = canvas;
     const context = canvas.getContext('2d');
     if (!context) {
-      throw new Error('Canvas 2D context is not available');
+      throw new Error('Canvas 2D context unavailable');
     }
     this.ctx = context;
     this.fastAnim = fastAnim;
 
     if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          this.stopLoop();
-        }
-      });
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+      this.lightCanvas = document.createElement('canvas');
     }
+
+    if (typeof Image !== 'undefined') {
+      const img = new Image();
+      img.onload = () => {
+        this.atlasReady = true;
+        this.backdropKey = '';
+        if (this.snapshot) {
+          this.ensureBackdropCache(this.snapshot);
+          this.drawFrame();
+        }
+        this.onAtlasReadyCb?.();
+        const waiters = this.atlasWaiters.splice(0);
+        for (const w of waiters) w();
+      };
+      img.onerror = () => {
+        const waiters = this.atlasWaiters.splice(0);
+        for (const w of waiters) w();
+      };
+      img.src = ATLAS_URL;
+      this.atlasImg = img;
+    }
+  }
+
+  onAtlasLoad(cb: () => void): void {
+    this.onAtlasReadyCb = cb;
+    if (this.atlasReady) cb();
+  }
+
+  waitForAtlasReady(): Promise<void> {
+    if (this.atlasReady || !this.atlasImg) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.atlasWaiters.push(resolve);
+      setTimeout(resolve, 2500);
+    });
+  }
+
+  drawPortraitToCanvas(targetCanvas: HTMLCanvasElement, kind: MaskId | 'gbr'): void {
+    const g = targetCanvas.getContext('2d');
+    if (!g) return;
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+
+    const key = `portrait_${kind}`;
+    const rect = ATLAS_SPRITES[key];
+    if (this.atlasReady && this.atlasImg && rect) {
+      g.drawImage(
+        this.atlasImg,
+        rect.x,
+        rect.y,
+        rect.w,
+        rect.h,
+        0,
+        0,
+        targetCanvas.width,
+        targetCanvas.height
+      );
+      return;
+    }
+
+    // Crisp fallback before atlas onload completes
+    g.fillStyle = '#110824';
+    g.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    g.strokeStyle = '#FF007F';
+    g.lineWidth = 2;
+    g.strokeRect(1, 1, targetCanvas.width - 2, targetCanvas.height - 2);
   }
 
   getRenderStats(): RenderStats {
@@ -238,13 +315,77 @@ export class HotlineCanvasRenderer {
     };
   }
 
+  getCameraState(): { mode: CameraMode; zoom: number; x: number; y: number } {
+    return {
+      mode: this.camera.mode,
+      zoom: Number(this.camera.zoom.toFixed(2)),
+      x: Math.round(this.camera.x),
+      y: Math.round(this.camera.y),
+    };
+  }
+
+  resize(): void {
+    if (!this.snapshot) return;
+    this.ensureCanvasDimensions();
+    this.drawFrame();
+  }
+
+  setCameraMode(mode: CameraMode): void {
+    if (!this.snapshot) return;
+    const p = tileCenter(this.snapshot.player.x, this.snapshot.player.y);
+    this.camera.setMode(mode, p.cx, p.cy);
+    this.drawFrame();
+  }
+
+  zoomBy(factor: number, sx?: number, sy?: number): void {
+    if (!this.snapshot) return;
+    this.camera.zoomAt(factor, sx, sy);
+    this.drawFrame();
+  }
+
+  panBy(dxScreen: number, dyScreen: number): void {
+    if (!this.snapshot) return;
+    this.camera.panBy(dxScreen, dyScreen);
+    this.drawFrame();
+  }
+
+  getHoveredTile(clientX: number, clientY: number): { x: number; y: number } | null {
+    if (!this.snapshot) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    return this.camera.screenToTile(sx, sy, TILE_PX);
+  }
+
   renderSnapshot(snapshot: WorldSnapshot, events: WorldEvent[] = []): void {
+    const levelChanged = this.snapshot?.levelId !== snapshot.levelId;
     this.snapshot = snapshot;
-    this.ensureCanvasDimensions(snapshot);
+    this.ensureCanvasDimensions();
+
+    const marginPx = snapshot.scene.exteriorMargin * TILE_PX;
+    this.camera.setWorldBounds(
+      -marginPx,
+      -marginPx,
+      snapshot.width * TILE_PX + marginPx,
+      snapshot.height * TILE_PX + marginPx
+    );
+
+    if (levelChanged) {
+      this.camera.mode = 'FOLLOW';
+      this.camera.zoom = 1.0;
+      const p = tileCenter(snapshot.player.x, snapshot.player.y);
+      this.camera.followTarget(p.cx, p.cy, 16, true);
+    }
+
     this.ensureBackdropCache(snapshot);
 
     if (!this.fastAnim && events.length > 0) {
       this.ingestEvents(snapshot, events);
+    } else if (this.fastAnim) {
+      this.flushAnimationsInternal();
+      const p = tileCenter(snapshot.player.x, snapshot.player.y);
+      this.camera.followTarget(p.cx, p.cy, 16, true);
     }
 
     this.drawFrame();
@@ -257,38 +398,68 @@ export class HotlineCanvasRenderer {
   }
 
   flushAnimations(): void {
-    this.fxTimerMs = 0;
-    this.fxKind = 'NONE';
-    this.shakeIntensity = 0;
+    this.flushAnimationsInternal();
+    if (this.snapshot) {
+      const p = tileCenter(this.snapshot.player.x, this.snapshot.player.y);
+      this.camera.followTarget(p.cx, p.cy, 16, true);
+      this.drawFrame();
+    }
+  }
+
+  private flushAnimationsInternal(): void {
     this.moveAnims.clear();
     this.dashTrails = [];
     this.throwArcs = [];
     this.particles = [];
     this.shockwaves = [];
+    this.fxTimerMs = 0;
+    this.fxKind = 'NONE';
+    this.shakeIntensity = 0;
     this.stopLoop();
-    if (this.snapshot) {
-      this.drawFrame();
-    }
   }
 
   dispose(): void {
     this.stopLoop();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    }
   }
 
   private hasActiveAnimations(): boolean {
     return (
-      this.fxTimerMs > 0 ||
       this.moveAnims.size > 0 ||
       this.dashTrails.length > 0 ||
       this.throwArcs.length > 0 ||
       this.particles.length > 0 ||
-      this.shockwaves.length > 0
+      this.shockwaves.length > 0 ||
+      this.fxTimerMs > 0
     );
   }
 
   private ingestEvents(snap: WorldSnapshot, events: WorldEvent[]): void {
     for (const ev of events) {
-      if (ev.type === 'ROBOT_MOVED' && ev.fromX !== undefined && ev.fromY !== undefined && ev.x !== undefined && ev.y !== undefined) {
+      if (
+        ev.type === 'ROBOT_MOVED' &&
+        ev.fromX !== undefined &&
+        ev.fromY !== undefined &&
+        ev.x !== undefined &&
+        ev.y !== undefined
+      ) {
+        this.moveAnims.set('player', {
+          fromX: ev.fromX,
+          fromY: ev.fromY,
+          toX: ev.x,
+          toY: ev.y,
+          elapsed: 0,
+          duration: 120,
+        });
+      } else if (
+        ev.type === 'ROBOT_DASHED' &&
+        ev.fromX !== undefined &&
+        ev.fromY !== undefined &&
+        ev.x !== undefined &&
+        ev.y !== undefined
+      ) {
         this.moveAnims.set('player', {
           fromX: ev.fromX,
           fromY: ev.fromY,
@@ -296,15 +467,6 @@ export class HotlineCanvasRenderer {
           toY: ev.y,
           elapsed: 0,
           duration: 145,
-        });
-      } else if (ev.type === 'ROBOT_DASHED' && ev.fromX !== undefined && ev.fromY !== undefined && ev.x !== undefined && ev.y !== undefined) {
-        this.moveAnims.set('player', {
-          fromX: ev.fromX,
-          fromY: ev.fromY,
-          toX: ev.x,
-          toY: ev.y,
-          elapsed: 0,
-          duration: 165,
         });
         this.dashTrails.push({
           fromX: ev.fromX,
@@ -313,84 +475,95 @@ export class HotlineCanvasRenderer {
           toY: ev.y,
           mask: snap.mask,
           facing: ev.dir || snap.player.facing,
-          life: 280,
-          maxLife: 280,
+          life: 260,
+          maxLife: 260,
         });
-        this.triggerFx('SHAKE', 180, 2.5);
-      } else if (ev.type === 'ENEMY_MOVED' && ev.label && ev.fromX !== undefined && ev.fromY !== undefined && ev.x !== undefined && ev.y !== undefined) {
+        this.spawnBurst(ev.x, ev.y, ['#00F0FF', '#F8FAFC'], 10, 260);
+      } else if (
+        ev.type === 'ENEMY_MOVED' &&
+        ev.label &&
+        ev.fromX !== undefined &&
+        ev.fromY !== undefined &&
+        ev.x !== undefined &&
+        ev.y !== undefined
+      ) {
         this.moveAnims.set(ev.label, {
           fromX: ev.fromX,
           fromY: ev.fromY,
           toX: ev.x,
           toY: ev.y,
           elapsed: 0,
-          duration: 145,
+          duration: 130,
         });
-      } else if (ev.type === 'DECOY_THROWN' && ev.fromX !== undefined && ev.fromY !== undefined && ev.x !== undefined && ev.y !== undefined) {
+      } else if (
+        ev.type === 'DECOY_THROWN' &&
+        ev.fromX !== undefined &&
+        ev.fromY !== undefined &&
+        ev.x !== undefined &&
+        ev.y !== undefined
+      ) {
         this.throwArcs.push({
           fromX: ev.fromX,
           fromY: ev.fromY,
           toX: ev.x,
           toY: ev.y,
-          life: 360,
-          maxLife: 360,
+          life: 240,
+          maxLife: 240,
         });
-        const { cx, cy } = tileCenter(ev.x, ev.y);
-        this.shockwaves.push({ x: cx, y: cy, maxR: TILE_PX * 1.8, color: '#00F0FF', life: 360, maxLife: 360 });
-      } else if (ev.type === 'DOOR_BROKEN' && ev.x !== undefined && ev.y !== undefined) {
-        this.triggerFx('SHAKE', 280, 5);
-        this.spawnBurst(ev.x, ev.y, ['#F59E0B', '#FDE047', '#FF007F'], 10, 360);
-        const { cx, cy } = tileCenter(ev.x, ev.y);
-        this.shockwaves.push({ x: cx, y: cy, maxR: TILE_PX * 1.2, color: '#F59E0B', life: 280, maxLife: 280 });
-      } else if (ev.type === 'ENEMY_SHIELD_BROKEN' && ev.x !== undefined && ev.y !== undefined) {
-        this.triggerFx('SHAKE', 260, 4.5);
-        this.spawnBurst(ev.x, ev.y, ['#00A8FF', '#38BDF8', '#FFFFFF'], 10, 380);
-        const { cx, cy } = tileCenter(ev.x, ev.y);
-        this.shockwaves.push({ x: cx, y: cy, maxR: TILE_PX * 1.4, color: '#38BDF8', life: 320, maxLife: 320 });
-      } else if ((ev.type === 'ENEMY_STUNNED' || ev.type === 'ENEMY_OFFLINE') && ev.x !== undefined && ev.y !== undefined) {
-        this.triggerFx('SHAKE', 220, 4);
-        const col = ev.type === 'ENEMY_OFFLINE' ? '#10B981' : '#FACC15';
-        this.spawnBurst(ev.x, ev.y, [col, '#00F0FF'], 6, 300);
-        const { cx, cy } = tileCenter(ev.x, ev.y);
-        this.shockwaves.push({ x: cx, y: cy, maxR: TILE_PX * 1.1, color: col, life: 290, maxLife: 290 });
+        this.shockwaves.push({
+          x: ev.x,
+          y: ev.y,
+          maxR: TILE_PX * 1.45,
+          color: '#00F0FF',
+          life: 320,
+          maxLife: 320,
+        });
       } else if (ev.type === 'TILE_PAINTED' && ev.x !== undefined && ev.y !== undefined) {
-        this.triggerFx('SHAKE', 150, 2);
-        const { cx, cy } = tileCenter(ev.x, ev.y);
-        this.shockwaves.push({ x: cx, y: cy, maxR: TILE_PX * 1.15, color: '#00F0FF', life: 300, maxLife: 300 });
-      } else if (ev.type === 'WALL_CRASH' || ev.type === 'PLAYER_KO') {
-        this.triggerFx('GLITCH', 320, 6);
+        this.shockwaves.push({
+          x: ev.x,
+          y: ev.y,
+          maxR: TILE_PX * 1.0,
+          color: '#00F0FF',
+          life: 260,
+          maxLife: 260,
+        });
+        this.spawnBurst(ev.x, ev.y, ['#00F0FF', '#FF007F'], 10, 260);
+      } else if (ev.type === 'DOOR_BROKEN' && ev.x !== undefined && ev.y !== undefined) {
+        this.triggerFx('SHAKE', 240, 4.5);
+        this.spawnBurst(ev.x, ev.y, ['#F59E0B', '#F8FAFC', '#FF007F'], 16, 300);
+      } else if (ev.type === 'ENEMY_STUNNED' || ev.type === 'ENEMY_OFFLINE' || ev.type === 'ENEMY_SHIELD_BROKEN') {
+        this.triggerFx('SHAKE', 180, 3.2);
         if (ev.x !== undefined && ev.y !== undefined) {
-          this.spawnBurst(ev.x, ev.y, ['#FF1E42', '#FF007F'], 7, 320);
+          this.spawnBurst(ev.x, ev.y, ['#FACC15', '#FF007F', '#00F0FF'], 12, 260);
         }
-      } else if (ev.type === 'ALERT_TRIGGERED' || ev.type === 'GBR_ARRIVED' || ev.type === 'ENEMY_ATTACK') {
-        this.triggerFx('ALARM_PULSE', 400, 5.5);
-      } else if (ev.type === 'EXTRACTION') {
-        this.triggerFx('SHAKE', 200, 2);
+      } else if (ev.type === 'WALL_CRASH' || ev.type === 'ENEMY_ATTACK' || ev.type === 'PLAYER_KO') {
+        this.triggerFx('GLITCH', 280, 4.5);
         if (ev.x !== undefined && ev.y !== undefined) {
-          const { cx, cy } = tileCenter(ev.x, ev.y);
-          this.shockwaves.push({ x: cx, y: cy, maxR: TILE_PX * 1.6, color: '#10B981', life: 380, maxLife: 380 });
+          this.spawnBurst(ev.x, ev.y, ['#FF1E42', '#F8FAFC'], 14, 280);
         }
+      } else if (ev.type === 'ALERT_TRIGGERED' || ev.type === 'GBR_ARRIVED') {
+        this.triggerFx('ALARM_PULSE', MAX_FX_MS, 5.5);
       }
     }
   }
 
   private spawnBurst(tx: number, ty: number, colors: string[], count: number, maxLife: number): void {
     const { cx, cy } = tileCenter(tx, ty);
-    const clampedLife = Math.min(MAX_FX_MS, maxLife);
     for (let i = 0; i < count; i++) {
-      const ang = (Math.PI * 2 * i) / count + (i % 2) * 0.25;
-      const spd = 0.045 + (i % 3) * 0.03;
+      if (this.particles.length >= 120) break;
+      const angle = (Math.PI * 2 * i) / count + ((i % 3) - 1) * 0.2;
+      const speed = 0.045 + (i % 4) * 0.025;
       this.particles.push({
         x: cx,
         y: cy,
-        vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd,
-        size: 2.5 + (i % 3),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 3 + (i % 3),
         color: colors[i % colors.length],
-        rot: ang,
-        vrot: (i % 2 === 0 ? 1 : -1) * 0.015,
-        life: clampedLife,
-        maxLife: clampedLife,
+        rot: angle,
+        vrot: 0.02,
+        life: maxLife,
+        maxLife,
       });
     }
   }
@@ -399,23 +572,18 @@ export class HotlineCanvasRenderer {
     this.fxKind = kind;
     this.fxTimerMs = Math.min(MAX_FX_MS, Math.max(this.fxTimerMs, durationMs));
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
-    this.sirenPhase = (this.sirenPhase + 1) % 2;
   }
 
   private startLoop(): void {
     if (this.rafId !== null || typeof requestAnimationFrame === 'undefined') return;
     if (typeof document !== 'undefined' && document.hidden) return;
-    this.lastTimestamp = performance.now();
+    this.lastTickTs = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const tick = (now: number) => {
       this.rafId = null;
       if (!this.snapshot) return;
-      const rawDt = now - this.lastTimestamp;
-      this.lastTimestamp = now;
-      const dt = Math.min(Math.max(rawDt, 0), 50);
-      this.rafFrames++;
-
-      this.fxTimerMs = Math.max(0, this.fxTimerMs - dt);
-      this.sirenPhase = (this.sirenPhase + dt * 0.012) % 2;
+      const rawDt = now - this.lastTickTs;
+      this.lastTickTs = now;
+      const dt = Math.max(1, Math.min(rawDt, 50));
 
       for (const [key, anim] of this.moveAnims.entries()) {
         anim.elapsed += dt;
@@ -423,6 +591,11 @@ export class HotlineCanvasRenderer {
           this.moveAnims.delete(key);
         }
       }
+
+      const pPos = this.getInterpolatedPos('player', this.snapshot.player.x, this.snapshot.player.y);
+      const target = tileCenter(pPos.x, pPos.y);
+      this.camera.followTarget(target.cx, target.cy, dt, false);
+
       this.dashTrails = this.dashTrails.filter((t) => {
         t.life -= dt;
         return t.life > 0;
@@ -431,6 +604,10 @@ export class HotlineCanvasRenderer {
         a.life -= dt;
         return a.life > 0;
       });
+      this.shockwaves = this.shockwaves.filter((s) => {
+        s.life -= dt;
+        return s.life > 0;
+      });
       this.particles = this.particles.filter((p) => {
         p.life -= dt;
         p.x += p.vx * dt;
@@ -438,18 +615,21 @@ export class HotlineCanvasRenderer {
         p.rot += p.vrot * dt;
         return p.life > 0;
       });
-      this.shockwaves = this.shockwaves.filter((s) => {
-        s.life -= dt;
-        return s.life > 0;
-      });
-
+      if (this.fxTimerMs > 0) {
+        this.fxTimerMs = Math.max(0, this.fxTimerMs - dt);
+        if (this.fxTimerMs === 0) {
+          this.fxKind = 'NONE';
+          this.shakeIntensity = 0;
+        }
+      }
+      this.sirenPhase += dt * 0.012;
+      this.rafFrames++;
       this.drawFrame();
 
       if (this.hasActiveAnimations() && !(typeof document !== 'undefined' && document.hidden)) {
         this.rafId = requestAnimationFrame(tick);
       } else {
-        this.fxKind = 'NONE';
-        this.shakeIntensity = 0;
+        this.stopLoop();
       }
     };
     this.rafId = requestAnimationFrame(tick);
@@ -458,287 +638,343 @@ export class HotlineCanvasRenderer {
   private stopLoop(): void {
     if (this.rafId !== null && typeof cancelAnimationFrame !== 'undefined') {
       cancelAnimationFrame(this.rafId);
-      this.rafId = null;
     }
+    this.rafId = null;
   }
 
-  private ensureCanvasDimensions(snap: WorldSnapshot): void {
-    const logicalW = snap.width * TILE_PX + PAD_PX * 2;
-    const logicalH = snap.height * TILE_PX + PAD_PX * 2;
-    const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
+  private ensureCanvasDimensions(): void {
+    const parent = this.canvas.parentElement;
+    const cssW = parent && parent.clientWidth > 120 ? parent.clientWidth : 760;
+    const cssH = parent && parent.clientHeight > 120 ? parent.clientHeight : 540;
+    this.dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
 
-    const targetW = Math.round(logicalW * dpr);
-    const targetH = Math.round(logicalH * dpr);
+    const targetW = Math.round(cssW * this.dpr);
+    const targetH = Math.round(cssH * this.dpr);
     if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
       this.canvas.width = targetW;
       this.canvas.height = targetH;
-      this.canvas.style.aspectRatio = `${logicalW} / ${logicalH}`;
     }
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.ctx.imageSmoothingEnabled = false;
+    this.camera.setViewport(cssW, cssH);
+  }
+
+  private drawSprite(
+    g: CanvasRenderingContext2D,
+    name: string,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number
+  ): boolean {
+    if (!this.atlasReady || !this.atlasImg) return false;
+    const rect = ATLAS_SPRITES[name];
+    if (!rect) return false;
+    g.drawImage(this.atlasImg, rect.x, rect.y, rect.w, rect.h, dx, dy, dw, dh);
+    return true;
+  }
+
+  private drawPropRotated(g: CanvasRenderingContext2D, prop: SceneProp): void {
+    const rect = ATLAS_SPRITES[prop.sprite];
+    if (!rect || !this.atlasReady || !this.atlasImg) return;
+    const sw = prop.w ? prop.w * TILE_PX : rect.w * 2;
+    const sh = prop.h ? prop.h * TILE_PX : rect.h * 2;
+    const rot = prop.rot || 0;
+    const rotated = rot === 90 || rot === 270;
+    const fw = rotated ? sh : sw;
+    const fh = rotated ? sw : sh;
+    const cx = prop.x * TILE_PX + fw / 2;
+    const cy = prop.y * TILE_PX + fh / 2;
+
+    g.save();
+    g.translate(cx, cy);
+    if (rot !== 0) g.rotate((rot * Math.PI) / 180);
+    if (prop.flipX) g.scale(-1, 1);
+    g.drawImage(this.atlasImg, rect.x, rect.y, rect.w, rect.h, -sw / 2, -sh / 2, sw, sh);
+    g.restore();
   }
 
   private ensureBackdropCache(snap: WorldSnapshot): void {
     const theme = snap.theme || 'kpp_street';
-    const key = `${snap.levelId}:${theme}:${snap.width}x${snap.height}`;
+    const margin = snap.scene.exteriorMargin;
+    const key = `${snap.levelId}:${theme}:${snap.width}x${snap.height}:${this.atlasReady ? 1 : 0}`;
     if (this.backdropCanvas && this.backdropKey === key) return;
     if (typeof document === 'undefined') return;
 
-    const logicalW = snap.width * TILE_PX + PAD_PX * 2;
-    const logicalH = snap.height * TILE_PX + PAD_PX * 2;
+    const totalW = (snap.width + margin * 2) * TILE_PX;
+    const totalH = (snap.height + margin * 2) * TILE_PX;
     const off = document.createElement('canvas');
-    off.width = logicalW;
-    off.height = logicalH;
+    off.width = totalW;
+    off.height = totalH;
     const g = off.getContext('2d');
     if (!g) return;
+    g.imageSmoothingEnabled = false;
 
     const pal = THEME_PALETTES[theme];
+    const ox = margin * TILE_PX;
+    const oy = margin * TILE_PX;
+    g.save();
+    g.translate(ox, oy);
 
-    // L0: Night street wet asphalt outside building
-    g.fillStyle = '#070312';
-    g.fillRect(0, 0, logicalW, logicalH);
+    // 1. Fill full exterior night asphalt
+    for (let y = -margin; y < snap.height + margin; y++) {
+      for (let x = -margin; x < snap.width + margin; x++) {
+        const px = x * TILE_PX;
+        const py = y * TILE_PX;
+        const h = hash2d(x, y);
+        const keyTile = h > 236 ? 'asphalt_crack' : h % 2 === 0 ? 'asphalt_0' : 'asphalt_1';
+        if (!this.drawSprite(g, keyTile, px, py, TILE_PX, TILE_PX)) {
+          g.fillStyle = h % 2 === 0 ? '#121024' : '#17142C';
+          g.fillRect(px, py, TILE_PX, TILE_PX);
+        }
+      }
+    }
 
-    // Street asphalt texture & dashed lane markings along outer perimeter
-    g.strokeStyle = 'rgba(255, 0, 127, 0.10)';
+    // Road curb frame around playable compound [0..width, 0..height]
+    g.fillStyle = '#334155';
+    g.fillRect(-4, -4, snap.width * TILE_PX + 8, 4);
+    g.fillRect(-4, snap.height * TILE_PX, snap.width * TILE_PX + 8, 4);
+    g.fillRect(-4, 0, 4, snap.height * TILE_PX);
+    g.fillRect(snap.width * TILE_PX, 0, 4, snap.height * TILE_PX);
+
+    // 2. Scene Zones (sidewalks, grass, gravel, interior marble/carpet/parquet/grate)
+    for (const zone of snap.scene.zones) {
+      const variants = FLOOR_SPRITE_VARIANTS[zone.floor];
+      for (let y = zone.y; y < zone.y + zone.h; y++) {
+        for (let x = zone.x; x < zone.x + zone.w; x++) {
+          const px = x * TILE_PX;
+          const py = y * TILE_PX;
+          const spr = (x + y) % 2 === 0 ? variants[0] : variants[1];
+          if (!this.drawSprite(g, spr, px, py, TILE_PX, TILE_PX)) {
+            g.fillStyle = zone.indoor ? '#1B1035' : '#252338';
+            g.fillRect(px, py, TILE_PX, TILE_PX);
+          }
+        }
+      }
+      if (zone.label) {
+        g.fillStyle = zone.indoor ? 'rgba(226, 232, 240, 0.22)' : 'rgba(148, 163, 184, 0.28)';
+        g.font = 'bold 9px monospace';
+        g.textAlign = 'left';
+        g.fillText(zone.label, zone.x * TILE_PX + 8, zone.y * TILE_PX + 14);
+      }
+    }
+
+    // 3. Subtle KuMir Tactical Grid inside playable arena
+    g.strokeStyle = 'rgba(255, 255, 255, 0.065)';
     g.lineWidth = 1;
-    for (let x = 0; x < logicalW; x += 24) {
-      g.beginPath();
-      g.moveTo(x, 0);
-      g.lineTo(x, logicalH);
-      g.stroke();
-    }
-    g.strokeStyle = 'rgba(250, 204, 21, 0.25)';
-    g.setLineDash([12, 10]);
-    g.beginPath();
-    g.moveTo(PAD_PX, logicalH - 12);
-    g.lineTo(logicalW - PAD_PX, logicalH - 12);
-    g.stroke();
-    g.setLineDash([]);
-
-    // Wet neon puddles on the night street
-    const puddles = [
-      { x: 18, y: logicalH * 0.52, rx: 12, ry: 22, color: 'rgba(0, 240, 255, 0.14)' },
-      { x: logicalW - 18, y: logicalH * 0.35, rx: 11, ry: 20, color: 'rgba(255, 0, 127, 0.14)' },
-    ];
-    for (const pd of puddles) {
-      g.fillStyle = pd.color;
-      g.beginPath();
-      g.ellipse(pd.x, pd.y, pd.rx, pd.ry, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-
-    // Street lamp pools at corners
-    const lamps = [
-      { x: 16, y: 16, color: 'rgba(0, 240, 255, 0.24)' },
-      { x: logicalW - 16, y: 16, color: 'rgba(255, 0, 127, 0.24)' },
-      { x: logicalW - 16, y: logicalH - 16, color: 'rgba(0, 168, 255, 0.22)' },
-    ];
-    for (const lamp of lamps) {
-      const grad = g.createRadialGradient(lamp.x, lamp.y, 2, lamp.x, lamp.y, 48);
-      grad.addColorStop(0, lamp.color);
-      grad.addColorStop(1, 'rgba(7, 3, 18, 0)');
-      g.fillStyle = grad;
-      g.fillRect(lamp.x - 48, lamp.y - 48, 96, 96);
-    }
-
-    // Hacker's Sport Coupe parked on the west/bottom-left street outside KPP/building
-    this.drawHackerCoupe(g, 18, Math.min(logicalH - 54, PAD_PX + TILE_PX * 1.4));
-
-    // Building interior floor tiles by theme
     for (let y = 0; y < snap.height; y++) {
       for (let x = 0; x < snap.width; x++) {
-        const px = PAD_PX + x * TILE_PX;
-        const py = PAD_PX + y * TILE_PX;
         const tile = snap.tiles[y][x];
-        if (tile === 'WALL') continue;
-
-        g.fillStyle = (x + y) % 2 === 0 ? pal.floorA : pal.floorB;
-        g.fillRect(px, py, TILE_PX, TILE_PX);
-        g.strokeStyle = pal.gridLine;
-        g.lineWidth = 1;
-        g.strokeRect(px, py, TILE_PX, TILE_PX);
-
-        // Theme-specific subtle floor surface accents
-        if (theme === 'lobby_hall' && (y === 1 || y === 3) && x > 1 && x < snap.width - 2) {
-          g.fillStyle = 'rgba(244, 63, 94, 0.12)';
-          g.fillRect(px + 2, py + 7, TILE_PX - 4, TILE_PX - 14);
-        } else if (theme === 'analytics_office' && (x + y) % 3 === 0) {
-          g.strokeStyle = 'rgba(56, 189, 248, 0.14)';
-          g.strokeRect(px + 6, py + 6, TILE_PX - 12, TILE_PX - 12);
-        } else if (theme === 'server_hall') {
-          g.fillStyle = 'rgba(0, 240, 255, 0.16)';
-          g.fillRect(px + 8, py + 8, 2, 2);
-          g.fillRect(px + TILE_PX - 10, py + 8, 2, 2);
-          g.fillRect(px + 8, py + TILE_PX - 10, 2, 2);
-          g.fillRect(px + TILE_PX - 10, py + TILE_PX - 10, 2, 2);
-          if (y === 6) {
-            g.fillStyle = 'rgba(0, 240, 255, 0.09)';
-            g.fillRect(px, py + TILE_PX / 2 - 2, TILE_PX, 4);
-          }
-        } else if (theme === 'master_vault') {
-          if (x >= 5 && x <= 8 && y >= 4 && y <= 6) {
-            g.fillStyle = 'rgba(255, 30, 66, 0.09)';
-            g.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
-          }
-        }
-
-        if (tile === 'COVER') {
-          this.drawThemeCover(g, px, py, theme, pal);
-        } else if (tile === 'GBR_SPAWN') {
-          g.fillStyle = 'rgba(255, 30, 66, 0.18)';
-          g.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
-          g.strokeStyle = '#FF1E42';
-          g.lineWidth = 1.5;
-          g.strokeRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
-          g.fillStyle = '#FCA5A5';
-          g.font = 'bold 10px monospace';
-          g.textAlign = 'center';
-          g.fillText('ГБР', px + TILE_PX / 2, py + TILE_PX / 2 + 4);
-        }
+        if (tile === 'WALL' || tile === 'WINDOW') continue;
+        const px = x * TILE_PX;
+        const py = y * TILE_PX;
+        g.strokeRect(px + 0.5, py + 0.5, TILE_PX - 1, TILE_PX - 1);
       }
     }
 
-    // Pass 1 for 3D Walls: directional drop shadows onto adjacent non-wall tiles
-    g.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    // 4. Floor decal props (puddles, manholes, rugs, cable trays, clutter)
+    for (const prop of snap.scene.props) {
+      if (prop.layer === 'floor') {
+        this.drawPropRotated(g, prop);
+      }
+    }
+
+    // 5. Parked Hacker Sports Coupe on exterior avenue
+    const coupe = snap.scene.coupePos;
+    const coupeRect = ATLAS_SPRITES['car_hacker_coupe'];
+    if (coupeRect && this.atlasReady && this.atlasImg) {
+      g.save();
+      g.translate(coupe.x * TILE_PX, coupe.y * TILE_PX);
+      g.rotate((coupe.rot * Math.PI) / 180);
+      const cw = coupeRect.w * 2;
+      const ch = coupeRect.h * 2;
+      g.drawImage(this.atlasImg, coupeRect.x, coupeRect.y, coupeRect.w, coupeRect.h, -cw / 2, -ch / 2, cw, ch);
+      g.restore();
+    }
+
+    // 6. Ambient Occlusion & Directional Drop Shadows from Building Walls/Windows
+    const isBorderTile = (gx: number, gy: number): boolean =>
+      gx === 0 || gy === 0 || gx === snap.width - 1 || gy === snap.height - 1;
+    const isStruct = (gx: number, gy: number): boolean => {
+      if (gx < 0 || gy < 0 || gx >= snap.width || gy >= snap.height) return false;
+      const t = snap.tiles[gy][gx];
+      return t === 'WALL' || t === 'WINDOW' || snap.doors.some((d) => d.x === gx && d.y === gy);
+    };
+    const isBuildingStruct = (gx: number, gy: number): boolean => !isBorderTile(gx, gy) && isStruct(gx, gy);
+
     for (let y = 0; y < snap.height; y++) {
       for (let x = 0; x < snap.width; x++) {
-        if (snap.tiles[y][x] !== 'WALL') continue;
-        const px = PAD_PX + x * TILE_PX;
-        const py = PAD_PX + y * TILE_PX;
-        if (x + 1 < snap.width && snap.tiles[y][x + 1] !== 'WALL') {
-          g.fillRect(px + TILE_PX, py + 5, 6, TILE_PX);
+        if (isStruct(x, y)) continue;
+        const px = x * TILE_PX;
+        const py = y * TILE_PX;
+        if (isBuildingStruct(x - 1, y)) {
+          g.fillStyle = 'rgba(6, 3, 14, 0.36)';
+          g.fillRect(px, py, 8, TILE_PX);
         }
-        if (y + 1 < snap.height && snap.tiles[y + 1][x] !== 'WALL') {
-          g.fillRect(px + 5, py + TILE_PX, TILE_PX, 6);
+        if (isBuildingStruct(x, y - 1)) {
+          g.fillStyle = 'rgba(6, 3, 14, 0.42)';
+          g.fillRect(px, py, TILE_PX, 9);
+        }
+        if (isBuildingStruct(x + 1, y)) {
+          g.fillStyle = 'rgba(6, 3, 14, 0.16)';
+          g.fillRect(px + TILE_PX - 5, py, 5, TILE_PX);
+        }
+        if (isBuildingStruct(x, y + 1)) {
+          g.fillStyle = 'rgba(6, 3, 14, 0.16)';
+          g.fillRect(px, py + TILE_PX - 5, TILE_PX, 5);
         }
       }
     }
 
-    // Pass 2 for 3D Walls: extruded blocks + bevels + connected neon perimeter contour
+    // 7. Auto-tiled Thin Top-Down Building Walls (14 px) + Sleek Compound Perimeter Fence (6 px) + Glass Windows
+    const wallThick = 14;
+    const wallOff = (TILE_PX - wallThick) / 2; // 17 px
+    const fenceThick = 6;
+    const fenceOff = (TILE_PX - fenceThick) / 2; // 21 px
+
     for (let y = 0; y < snap.height; y++) {
       for (let x = 0; x < snap.width; x++) {
-        if (snap.tiles[y][x] !== 'WALL') continue;
-        const px = PAD_PX + x * TILE_PX;
-        const py = PAD_PX + y * TILE_PX;
+        const tile = snap.tiles[y][x];
+        const px = x * TILE_PX;
+        const py = y * TILE_PX;
 
-        g.fillStyle = pal.wallBase;
-        g.fillRect(px, py, TILE_PX, TILE_PX);
-        g.fillStyle = pal.wallTop;
-        g.fillRect(px + 2, py + 2, TILE_PX - 6, TILE_PX - 6);
-        g.fillStyle = pal.wallBevel;
-        g.fillRect(px + 2, py + 2, TILE_PX - 6, 2);
-        g.fillRect(px + 2, py + 2, 2, TILE_PX - 6);
+        if (tile === 'WALL' && isBorderTile(x, y)) {
+          const fn = isBorderTile(x, y - 1) && isStruct(x, y - 1);
+          const fs = isBorderTile(x, y + 1) && isStruct(x, y + 1);
+          const fw = isBorderTile(x - 1, y) && isStruct(x - 1, y);
+          const fe = isBorderTile(x + 1, y) && isStruct(x + 1, y);
 
-        // Connected neon contour only on exposed faces
-        g.strokeStyle = pal.wallEdge;
-        g.lineWidth = 1.6;
-        g.beginPath();
-        if (y === 0 || snap.tiles[y - 1][x] !== 'WALL') {
-          g.moveTo(px, py + 1);
-          g.lineTo(px + TILE_PX, py + 1);
-        }
-        if (y === snap.height - 1 || snap.tiles[y + 1][x] !== 'WALL') {
-          g.moveTo(px, py + TILE_PX - 1);
-          g.lineTo(px + TILE_PX, py + TILE_PX - 1);
-        }
-        if (x === 0 || snap.tiles[y][x - 1] !== 'WALL') {
-          g.moveTo(px + 1, py);
-          g.lineTo(px + 1, py + TILE_PX);
-        }
-        if (x === snap.width - 1 || snap.tiles[y][x + 1] !== 'WALL') {
-          g.moveTo(px + TILE_PX - 1, py);
-          g.lineTo(px + TILE_PX - 1, py + TILE_PX);
-        }
-        g.stroke();
+          g.fillStyle = '#0A0614';
+          g.fillRect(px + fenceOff - 1, py + fenceOff - 1, fenceThick + 2, fenceThick + 2);
+          if (fn) g.fillRect(px + fenceOff - 1, py, fenceThick + 2, fenceOff + 1);
+          if (fs) g.fillRect(px + fenceOff - 1, py + fenceOff, fenceThick + 2, TILE_PX - fenceOff);
+          if (fw) g.fillRect(px, py + fenceOff - 1, fenceOff + 1, fenceThick + 2);
+          if (fe) g.fillRect(px + fenceOff, py + fenceOff - 1, TILE_PX - fenceOff, fenceThick + 2);
 
-        // Server hall LED dots on interior wall blocks
-        if (theme === 'server_hall' && y > 0 && y < snap.height - 1 && (x + y) % 2 === 0) {
-          g.fillStyle = '#00F0FF';
-          g.fillRect(px + 8, py + 12, 3, 2);
-          g.fillStyle = '#10B981';
-          g.fillRect(px + 14, py + 12, 3, 2);
+          g.fillStyle = '#475569';
+          g.fillRect(px + fenceOff, py + fenceOff, fenceThick, fenceThick);
+          if (fn) g.fillRect(px + fenceOff, py, fenceThick, fenceOff);
+          if (fs) g.fillRect(px + fenceOff, py + fenceOff, fenceThick, TILE_PX - fenceOff);
+          if (fw) g.fillRect(px, py + fenceOff, fenceOff, fenceThick);
+          if (fe) g.fillRect(px + fenceOff, py + fenceOff, TILE_PX - fenceOff, fenceThick);
+
+          // Fence post cap
+          g.fillStyle = '#94A3B8';
+          g.fillRect(px + fenceOff + 1, py + fenceOff + 1, fenceThick - 2, fenceThick - 2);
+        } else if (tile === 'WALL') {
+          const n = isBuildingStruct(x, y - 1);
+          const s = isBuildingStruct(x, y + 1);
+          const w = isBuildingStruct(x - 1, y);
+          const e = isBuildingStruct(x + 1, y);
+
+          // Cast crisp pixel shadow SE
+          g.fillStyle = 'rgba(6, 3, 14, 0.48)';
+          g.fillRect(px + wallOff + 4, py + wallOff + 4, wallThick, wallThick);
+          if (e) g.fillRect(px + wallOff + 4, py + wallOff + 4, TILE_PX - wallOff, wallThick);
+          if (s) g.fillRect(px + wallOff + 4, py + wallOff + 4, wallThick, TILE_PX - wallOff);
+
+          // Dark #0A0614 outer wall casing
+          g.fillStyle = '#0A0614';
+          g.fillRect(px + wallOff - 2, py + wallOff - 2, wallThick + 4, wallThick + 4);
+          if (n) g.fillRect(px + wallOff - 2, py, wallThick + 4, wallOff + 2);
+          if (s) g.fillRect(px + wallOff - 2, py + wallOff, wallThick + 4, TILE_PX - wallOff);
+          if (w) g.fillRect(px, py + wallOff - 2, wallOff + 2, wallThick + 4);
+          if (e) g.fillRect(px + wallOff, py + wallOff - 2, TILE_PX - wallOff, wallThick + 4);
+
+          // Wall masonry cap fill
+          g.fillStyle = pal.wallTop;
+          g.fillRect(px + wallOff, py + wallOff, wallThick, wallThick);
+          if (n) g.fillRect(px + wallOff, py, wallThick, wallOff);
+          if (s) g.fillRect(px + wallOff, py + wallOff, wallThick, TILE_PX - wallOff);
+          if (w) g.fillRect(px, py + wallOff, wallOff, wallThick);
+          if (e) g.fillRect(px + wallOff, py + wallOff, TILE_PX - wallOff, wallThick);
+
+          // Inner top-left bevel + neon perimeter highlight on outer building edge
+          g.fillStyle = pal.wallBevel;
+          g.fillRect(px + wallOff, py + wallOff, wallThick, 2);
+          g.fillRect(px + wallOff, py + wallOff, 2, wallThick);
+
+          const isOuterWall =
+            x === snap.scene.buildingBounds.x ||
+            x === snap.scene.buildingBounds.x + snap.scene.buildingBounds.w - 1 ||
+            y === snap.scene.buildingBounds.y ||
+            y === snap.scene.buildingBounds.y + snap.scene.buildingBounds.h - 1;
+          if (isOuterWall) {
+            g.fillStyle = pal.wallEdge;
+            if (e || w) g.fillRect(px + (w ? 0 : wallOff), py + wallOff + wallThick - 2, (w ? wallOff : 0) + wallThick + (e ? TILE_PX - wallOff - wallThick : 0), 2);
+            if (n || s) g.fillRect(px + wallOff + wallThick - 2, py + (n ? 0 : wallOff), 2, (n ? wallOff : 0) + wallThick + (s ? TILE_PX - wallOff - wallThick : 0));
+          }
+
+          // Brick joint pixel ticks
+          g.fillStyle = pal.wallBase;
+          g.fillRect(px + wallOff + 4, py + wallOff + 4, 2, 2);
+          if (e) g.fillRect(px + TILE_PX - 8, py + wallOff + 5, 2, 3);
+          if (s) g.fillRect(px + wallOff + 5, py + TILE_PX - 8, 3, 2);
+        } else if (tile === 'WINDOW') {
+          const horiz = isStruct(x - 1, y) || isStruct(x + 1, y);
+          if (horiz) {
+            // Window sill & frame
+            g.fillStyle = '#0A0614';
+            g.fillRect(px, py + wallOff - 1, TILE_PX, wallThick + 2);
+            g.fillStyle = pal.wallTop;
+            g.fillRect(px, py + wallOff, 6, wallThick);
+            g.fillRect(px + TILE_PX - 6, py + wallOff, 6, wallThick);
+            // Cyan glass pane
+            g.fillStyle = '#0E4A6E';
+            g.fillRect(px + 6, py + wallOff + 2, TILE_PX - 12, wallThick - 4);
+            g.fillStyle = '#38BDF8';
+            g.fillRect(px + 6, py + wallOff + 4, TILE_PX - 12, 3);
+            g.fillStyle = '#E0F2FE';
+            g.fillRect(px + 12, py + wallOff + 3, 8, 2);
+            g.fillRect(px + 28, py + wallOff + 6, 8, 2);
+            // Center mullion
+            g.fillStyle = '#1E293B';
+            g.fillRect(px + TILE_PX / 2 - 1, py + wallOff, 2, wallThick);
+          } else {
+            g.fillStyle = '#0A0614';
+            g.fillRect(px + wallOff - 1, py, wallThick + 2, TILE_PX);
+            g.fillStyle = pal.wallTop;
+            g.fillRect(px + wallOff, py, wallThick, 6);
+            g.fillRect(px + wallOff, py + TILE_PX - 6, wallThick, 6);
+            g.fillStyle = '#0E4A6E';
+            g.fillRect(px + wallOff + 2, py + 6, wallThick - 4, TILE_PX - 12);
+            g.fillStyle = '#38BDF8';
+            g.fillRect(px + wallOff + 4, py + 6, 3, TILE_PX - 12);
+            g.fillStyle = '#E0F2FE';
+            g.fillRect(px + wallOff + 3, py + 12, 2, 8);
+            g.fillRect(px + wallOff + 6, py + 28, 2, 8);
+            g.fillStyle = '#1E293B';
+            g.fillRect(px + wallOff, py + TILE_PX / 2 - 1, wallThick, 2);
+          }
         }
       }
     }
 
-    // Neon street sign banner
-    g.fillStyle = '#0B0618';
-    g.fillRect(PAD_PX, 7, 210, 20);
-    g.strokeStyle = pal.wallEdge;
-    g.lineWidth = 1.2;
-    g.strokeRect(PAD_PX, 7, 210, 20);
-    g.fillStyle = '#00F0FF';
-    g.font = 'bold 10px monospace';
-    g.textAlign = 'left';
-    g.fillText(`0${snap.levelId} // ${pal.label}`, PAD_PX + 8, 20);
+    // 8. Interior Furniture & Yard Props (layer === 'prop' or undefined)
+    for (const prop of snap.scene.props) {
+      if (!prop.layer || prop.layer === 'prop') {
+        this.drawPropRotated(g, prop);
+      }
+    }
 
+    // 9. Neon Building Facade Marquee Sign (placed cleanly above facade line)
+    if (snap.scene.neonSignPos) {
+      const sign = snap.scene.neonSignPos;
+      const sx = sign.x * TILE_PX;
+      const sy = sign.y * TILE_PX - 28;
+      g.font = 'bold 11px monospace';
+      const tw = Math.max(114, g.measureText(sign.text).width + 20);
+      g.fillStyle = '#090414';
+      g.fillRect(sx, sy, tw, 20);
+      g.strokeStyle = sign.color;
+      g.lineWidth = 2;
+      g.strokeRect(sx, sy, tw, 20);
+      g.fillStyle = sign.color;
+      g.textAlign = 'left';
+      g.fillText(sign.text, sx + 10, sy + 14);
+    }
+
+    g.restore();
     this.backdropCanvas = off;
     this.backdropKey = key;
-  }
-
-  private drawHackerCoupe(g: CanvasRenderingContext2D, cx: number, cy: number): void {
-    g.save();
-    g.translate(cx, cy);
-    // Soft cyan/magenta underglow
-    g.fillStyle = 'rgba(0, 240, 255, 0.16)';
-    drawRoundedRect(g, -11, -24, 22, 48, 6);
-    g.fill();
-    // Car chassis
-    g.fillStyle = '#0F172A';
-    drawRoundedRect(g, -9, -21, 18, 42, 4);
-    g.fill();
-    g.strokeStyle = '#FF007F';
-    g.lineWidth = 1.2;
-    g.stroke();
-    // Hood stripe & dark cockpit windshield
-    g.fillStyle = '#00F0FF';
-    g.fillRect(-2, -19, 4, 10);
-    g.fillStyle = '#020617';
-    drawRoundedRect(g, -6, -7, 12, 16, 2);
-    g.fill();
-    // Headlights & taillights
-    g.fillStyle = '#FEF08A';
-    g.fillRect(-7, -21, 4, 2);
-    g.fillRect(3, -21, 4, 2);
-    g.fillStyle = '#FF1E42';
-    g.fillRect(-7, 19, 4, 2);
-    g.fillRect(3, 19, 4, 2);
-    g.restore();
-  }
-
-  private drawThemeCover(
-    g: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    theme: LevelThemeId,
-    pal: ThemePalette
-  ): void {
-    g.fillStyle = 'rgba(0,0,0,0.4)';
-    g.fillRect(px + 7, py + 9, TILE_PX - 10, TILE_PX - 14);
-
-    g.fillStyle = pal.coverFill;
-    drawRoundedRect(g, px + 5, py + 7, TILE_PX - 10, TILE_PX - 14, 3);
-    g.fill();
-    g.strokeStyle = pal.coverStroke;
-    g.lineWidth = 1.3;
-    g.stroke();
-
-    if (theme === 'kpp_street') {
-      g.fillStyle = '#FACC15';
-      g.fillRect(px + 8, py + 9, 5, 4);
-      g.fillRect(px + 18, py + 9, 5, 4);
-    } else if (theme === 'analytics_office') {
-      g.fillStyle = '#00F0FF';
-      g.fillRect(px + 11, py + 11, 14, 6);
-    } else if (theme === 'server_hall') {
-      g.fillStyle = '#00F0FF';
-      g.fillRect(px + 9, py + 12, 4, 3);
-      g.fillStyle = '#10B981';
-      g.fillRect(px + 15, py + 12, 4, 3);
-    } else {
-      g.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      g.fillRect(px + 9, py + 10, TILE_PX - 18, 2);
-    }
   }
 
   private drawFrame(): void {
@@ -747,12 +983,19 @@ export class HotlineCanvasRenderer {
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 
     const ctx = this.ctx;
-    const logicalW = snap.width * TILE_PX + PAD_PX * 2;
-    const logicalH = snap.height * TILE_PX + PAD_PX * 2;
+    const viewW = this.camera.viewW;
+    const viewH = this.camera.viewH;
 
     ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#070312';
+    ctx.fillRect(0, 0, viewW, viewH);
 
-    // L4 Reactive Screen Shake
+    // Camera World Transform + L4 Reactive Shake
+    this.camera.applyTransform(ctx, this.dpr);
+    ctx.imageSmoothingEnabled = false;
+
     if (this.fxTimerMs > 0 && this.shakeIntensity > 0) {
       const ratio = this.fxTimerMs / MAX_FX_MS;
       const dx = Math.sin(this.fxTimerMs * 0.45) * this.shakeIntensity * ratio;
@@ -760,21 +1003,19 @@ export class HotlineCanvasRenderer {
       ctx.translate(dx, dy);
     }
 
-    // L0: Static backdrop
+    // L0: Static World Backdrop (Exterior + Floors + Thin Walls/Windows + Furniture)
     if (this.backdropCanvas) {
-      ctx.drawImage(this.backdropCanvas, 0, 0);
-    } else {
-      ctx.fillStyle = '#0B0618';
-      ctx.fillRect(0, 0, logicalW, logicalH);
+      const mPx = snap.scene.exteriorMargin * TILE_PX;
+      ctx.drawImage(this.backdropCanvas, -mPx, -mPx);
     }
 
-    // L1: Relays, painted decals, Terminal T, Exit E, Doors D
+    // L1: Relays, Painted Tiles, Terminal, Exit, Orientation-Aware Doors
     this.drawWorldObjects(ctx, snap);
 
-    // L3 (under characters): Camera rays, 3-layer Lasers, Guard sight & Rasmus owl forecast
+    // L2: 2D Raycast Vision Cones, Camera Rays, Lasers, Rasmus Forecast
     this.drawLightingAndCones(ctx, snap);
 
-    // L2: GBR van lights, dash afterimages, characters in animal masks
+    // L3: GBR Van, Dash Trails, Animated Multi-Layer Characters
     this.drawGbrStreetPresence(ctx, snap);
     this.drawDashTrails(ctx);
 
@@ -783,9 +1024,24 @@ export class HotlineCanvasRenderer {
     }
     this.drawPlayer(ctx, snap);
 
-    // L4: Decoy arcs, shockwaves, particles, alarm vignette, Glitch slices & Scanlines
+    // L4: Overhead Trees & Streetlamps (translucent if player passes underneath)
+    this.drawOverheadProps(ctx, snap);
+
+    // L5a: Additive Neon Glows & Particles in world space
+    renderAdditiveGlows(ctx, snap, this.sirenPhase, TILE_PX);
     this.drawEffectsOverlay(ctx);
-    this.drawPostFx(ctx, snap, logicalW, logicalH);
+
+    // L5b: Half-res Offscreen Night Lightmap in screen space
+    if (this.lightCanvas) {
+      renderLightmap(this.lightCanvas, this.camera, snap, this.sirenPhase, TILE_PX);
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.drawImage(this.lightCanvas, 0, 0, viewW, viewH);
+    }
+
+    // L5c: Post-FX (Alarm vignette, Glitch slices, Scanlines) + L6 Tactical Minimap
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.drawPostFx(ctx, snap, viewW, viewH);
+    this.drawMinimap(ctx, snap, viewW);
 
     ctx.restore();
     if (typeof performance !== 'undefined') {
@@ -799,150 +1055,171 @@ export class HotlineCanvasRenderer {
     for (let y = 0; y < snap.height; y++) {
       for (let x = 0; x < snap.width; x++) {
         const tile = snap.tiles[y][x];
-        const px = PAD_PX + x * TILE_PX;
-        const py = PAD_PX + y * TILE_PX;
+        const px = x * TILE_PX;
+        const py = y * TILE_PX;
         const isPainted = paintedKeys.has(`${x},${y}`);
 
         if (isPainted) {
           ctx.fillStyle = 'rgba(0, 240, 255, 0.22)';
-          ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
+          ctx.fillRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
           ctx.strokeStyle = '#00F0FF';
-          ctx.lineWidth = 1.4;
-          ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 5, py + 5, TILE_PX - 10, TILE_PX - 10);
         }
 
         if (tile === 'RELAY') {
-          // Industrial EMP hatch + coil ring
-          ctx.fillStyle = isPainted ? '#082F49' : '#2E0927';
-          drawRoundedRect(ctx, px + 5, py + 5, TILE_PX - 10, TILE_PX - 10, 3);
-          ctx.fill();
-          ctx.strokeStyle = isPainted ? '#00F0FF' : '#FF007F';
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.arc(px + TILE_PX / 2, py + TILE_PX / 2, 7, 0, Math.PI * 2);
-          ctx.stroke();
-
+          if (!this.drawSprite(ctx, isPainted ? 'relay_on' : 'relay_off', px + 3, py + 3, TILE_PX - 6, TILE_PX - 6)) {
+            ctx.fillStyle = isPainted ? '#082F49' : '#2E0927';
+            ctx.fillRect(px + 6, py + 6, TILE_PX - 12, TILE_PX - 12);
+          }
           ctx.fillStyle = isPainted ? '#67E8F9' : '#F472B6';
-          ctx.font = 'bold 11px monospace';
+          ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';
-          ctx.fillText(isPainted ? '✓' : '*', px + TILE_PX / 2, py + TILE_PX / 2 + 4);
+          ctx.fillText(isPainted ? '✓' : '*', px + TILE_PX / 2, py + TILE_PX - 6);
         } else if (tile === 'TERMINAL') {
-          // Detailed terminal desk with glowing dual monitor & code lines
-          ctx.fillStyle = '#0F172A';
-          drawRoundedRect(ctx, px + 4, py + 5, TILE_PX - 8, TILE_PX - 10, 3);
-          ctx.fill();
-          ctx.strokeStyle = snap.hackCompleted ? '#10B981' : '#00F0FF';
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
-
-          ctx.fillStyle = snap.hackCompleted ? '#064E3B' : '#082F49';
-          ctx.fillRect(px + 7, py + 8, TILE_PX - 14, 11);
+          if (!this.drawSprite(ctx, snap.hackCompleted ? 'terminal_hacked' : 'terminal_locked', px + 2, py + 2, TILE_PX - 4, TILE_PX - 4)) {
+            ctx.fillStyle = '#0F172A';
+            ctx.fillRect(px + 5, py + 5, TILE_PX - 10, TILE_PX - 10);
+          }
           ctx.fillStyle = snap.hackCompleted ? '#34D399' : '#38BDF8';
-          ctx.fillRect(px + 9, py + 10, 10, 2);
-          ctx.fillRect(px + 9, py + 14, 14, 2);
-
-          ctx.fillStyle = snap.hackCompleted ? '#10B981' : '#00F0FF';
-          ctx.font = 'bold 8px monospace';
+          ctx.font = 'bold 9px monospace';
           ctx.textAlign = 'center';
-          ctx.fillText('ПК', px + TILE_PX / 2, py + TILE_PX - 7);
+          ctx.fillText('ПК', px + TILE_PX / 2, py + TILE_PX - 4);
         } else if (tile === 'EXIT') {
           const open = snap.exitUnlocked;
-          ctx.fillStyle = open ? 'rgba(16, 185, 129, 0.28)' : 'rgba(255, 30, 66, 0.16)';
-          ctx.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
+          ctx.fillStyle = open ? 'rgba(16, 185, 129, 0.30)' : 'rgba(255, 30, 66, 0.18)';
+          ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
           ctx.strokeStyle = open ? '#10B981' : '#FF1E42';
           ctx.lineWidth = 2;
-          ctx.strokeRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
+          ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
 
-          // Chevrons >>>
           ctx.strokeStyle = open ? '#34D399' : '#FB7185';
-          ctx.lineWidth = 1.6;
+          ctx.lineWidth = 2;
           for (let c = -1; c <= 1; c++) {
-            const ox = px + TILE_PX / 2 + c * 6;
-            const oy = py + 12;
+            const ox = px + TILE_PX / 2 + c * 7;
+            const oy = py + 15;
             ctx.beginPath();
-            ctx.moveTo(ox - 2, oy - 4);
-            ctx.lineTo(ox + 2, oy);
-            ctx.lineTo(ox - 2, oy + 4);
+            ctx.moveTo(ox - 2.5, oy - 5);
+            ctx.lineTo(ox + 2.5, oy);
+            ctx.lineTo(ox - 2.5, oy + 5);
             ctx.stroke();
           }
 
           ctx.fillStyle = open ? '#6EE7B7' : '#FDA4AF';
-          ctx.font = 'bold 8px monospace';
+          ctx.font = 'bold 9px monospace';
           ctx.textAlign = 'center';
           ctx.fillText(open ? 'ВЫХ' : 'ЗАП', px + TILE_PX / 2, py + TILE_PX - 7);
+        } else if (tile === 'GBR_SPAWN') {
+          ctx.fillStyle = 'rgba(255, 30, 66, 0.16)';
+          ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
+          ctx.strokeStyle = '#FF1E42';
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#FCA5A5';
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('ГБР', px + TILE_PX / 2, py + TILE_PX / 2 + 3);
         }
       }
     }
 
-    // Doors with pockets & shattered leaf on breach
+    // Orientation-aware architectural doors
+    const isWall = (gx: number, gy: number) =>
+      gx >= 0 && gy >= 0 && gx < snap.width && gy < snap.height && (snap.tiles[gy][gx] === 'WALL' || snap.tiles[gy][gx] === 'WINDOW');
+
     for (const d of snap.doors) {
-      const px = PAD_PX + d.x * TILE_PX;
-      const py = PAD_PX + d.y * TILE_PX;
-      // Door pocket jambs
-      ctx.fillStyle = '#1E293B';
-      ctx.fillRect(px + 1, py + 12, 4, TILE_PX - 24);
-      ctx.fillRect(px + TILE_PX - 5, py + 12, 4, TILE_PX - 24);
+      const px = d.x * TILE_PX;
+      const py = d.y * TILE_PX;
+      const horiz = isWall(d.x - 1, d.y) || isWall(d.x + 1, d.y);
+
+      ctx.save();
+      ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2);
+      if (!horiz) ctx.rotate(Math.PI / 2);
+
+      // Door jambs matching 14px wall thickness
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(-TILE_PX / 2, -8, 6, 16);
+      ctx.fillRect(TILE_PX / 2 - 6, -8, 6, 16);
 
       if (!d.open) {
         ctx.fillStyle = '#3B0764';
-        drawRoundedRect(ctx, px + 3, py + 7, TILE_PX - 6, TILE_PX - 14, 2);
-        ctx.fill();
+        ctx.fillRect(-TILE_PX / 2 + 6, -5, TILE_PX - 12, 10);
         ctx.strokeStyle = '#FF007F';
         ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = '#FF007F';
-        ctx.fillRect(px + 7, py + TILE_PX / 2 - 1, TILE_PX - 14, 2);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('D', px + TILE_PX / 2, py + TILE_PX / 2 + 3);
+        ctx.strokeRect(-TILE_PX / 2 + 6, -5, TILE_PX - 12, 10);
+        ctx.fillStyle = '#FF1E42';
+        ctx.fillRect(-3, -2, 6, 4);
       } else if (d.broken) {
-        // Skewed broken door leaf + scorch marks
+        // Splintered blown-off door slab
         ctx.save();
-        ctx.translate(px + 5, py + 5);
-        ctx.rotate(-0.42);
+        ctx.translate(-TILE_PX / 2 + 6, -5);
+        ctx.rotate(-0.65);
         ctx.fillStyle = '#78350F';
-        ctx.fillRect(0, 0, TILE_PX - 10, 6);
+        ctx.fillRect(0, 0, TILE_PX - 14, 7);
         ctx.strokeStyle = '#F59E0B';
-        ctx.lineWidth = 1.4;
-        ctx.strokeRect(0, 0, TILE_PX - 10, 6);
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(0, 0, TILE_PX - 14, 7);
         ctx.restore();
       } else {
-        // Retracted into pocket with emerald LED
+        // Swung 90 deg open against jamb with green LED
         ctx.fillStyle = '#064E3B';
-        ctx.fillRect(px + 5, py + 3, TILE_PX - 10, 5);
+        ctx.fillRect(-TILE_PX / 2 + 6, -5, 8, TILE_PX - 14);
         ctx.strokeStyle = '#10B981';
-        ctx.lineWidth = 1.3;
-        ctx.strokeRect(px + 5, py + 3, TILE_PX - 10, 5);
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-TILE_PX / 2 + 6, -5, 8, TILE_PX - 14);
       }
+      ctx.restore();
     }
   }
 
   private drawLightingAndCones(ctx: CanvasRenderingContext2D, snap: WorldSnapshot): void {
-    // Active dome cameras + volumetric beams + Rasmus (+1 turn forecast)
-    for (const cam of snap.cameras) {
-      const cpx = PAD_PX + cam.x * TILE_PX;
-      const cpy = PAD_PX + cam.y * TILE_PX;
-      const cx = cpx + TILE_PX / 2;
-      const cy = cpy + TILE_PX / 2;
+    const closedDoors = buildClosedDoorSet(snap.doors);
 
+    for (const cam of snap.cameras) {
+      const cx = cam.x * TILE_PX + TILE_PX / 2;
+      const cy = cam.y * TILE_PX + TILE_PX / 2;
       const cells = cam.enabled && cam.phases.length > 0 ? cam.phases[cam.phaseIndex % cam.phases.length] : [];
 
+      let aimAngle = 0;
+      if (cells.length > 0) {
+        const avgX = cells.reduce((s, c) => s + c.x, 0) / cells.length;
+        const avgY = cells.reduce((s, c) => s + c.y, 0) / cells.length;
+        aimAngle = Math.atan2(avgY - cam.y, avgX - cam.x);
+      }
+
       if (cam.enabled && cells.length > 0) {
+        // Smooth wall-clipped 2D raycast cone
+        const poly = computeConePolygon(
+          cx,
+          cy,
+          aimAngle,
+          0.48,
+          TILE_PX * 3.1,
+          snap.tiles,
+          closedDoors,
+          snap.width,
+          snap.height,
+          TILE_PX,
+          24
+        );
+        const coneGrad = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE_PX * 3.1);
+        coneGrad.addColorStop(0, 'rgba(255, 0, 127, 0.34)');
+        coneGrad.addColorStop(1, 'rgba(255, 0, 127, 0.05)');
+        ctx.fillStyle = coneGrad;
+        ctx.beginPath();
+        poly.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+        ctx.closePath();
+        ctx.fill();
+
+        // Crisp tactical danger cell brackets for exact KuMir planning
         for (const cell of cells) {
-          const px = PAD_PX + cell.x * TILE_PX;
-          const py = PAD_PX + cell.y * TILE_PX;
-          const tcx = px + TILE_PX / 2;
-          const tcy = py + TILE_PX / 2;
-          const grad = ctx.createRadialGradient(cx, cy, 4, tcx, tcy, TILE_PX * 1.1);
-          grad.addColorStop(0, 'rgba(255, 0, 127, 0.34)');
-          grad.addColorStop(1, 'rgba(255, 0, 127, 0.14)');
-          ctx.fillStyle = grad;
+          const px = cell.x * TILE_PX;
+          const py = cell.y * TILE_PX;
+          ctx.fillStyle = 'rgba(255, 0, 127, 0.15)';
           ctx.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
           ctx.strokeStyle = 'rgba(255, 0, 127, 0.72)';
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1.2;
           ctx.strokeRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
         }
       }
@@ -950,39 +1227,33 @@ export class HotlineCanvasRenderer {
       if (cam.enabled && snap.mask === 'rasmus' && cam.phases.length > 1) {
         const nextCells = cam.phases[(cam.phaseIndex + 1) % cam.phases.length];
         for (const nc of nextCells) {
-          const px = PAD_PX + nc.x * TILE_PX;
-          const py = PAD_PX + nc.y * TILE_PX;
+          const px = nc.x * TILE_PX;
+          const py = nc.y * TILE_PX;
           ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
-          ctx.lineWidth = 1.4;
+          ctx.lineWidth = 1.5;
           ctx.setLineDash([4, 3]);
           ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
           ctx.setLineDash([]);
         }
       }
 
-      // Dome camera housing pointed toward active cone centroid
-      let aimAngle = 0;
-      if (cells.length > 0) {
-        const avgX = cells.reduce((s, c) => s + c.x, 0) / cells.length;
-        const avgY = cells.reduce((s, c) => s + c.y, 0) / cells.length;
-        aimAngle = Math.atan2(avgY - cam.y, avgX - cam.x);
-      }
+      // Dome camera housing
       ctx.save();
       ctx.translate(cx, cy);
       ctx.fillStyle = '#0F172A';
       ctx.beginPath();
-      ctx.arc(0, 0, 9, 0, Math.PI * 2);
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = cam.enabled ? '#F43F5E' : '#475569';
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.8;
       ctx.stroke();
 
       ctx.rotate(aimAngle);
       ctx.fillStyle = cam.enabled ? '#334155' : '#1E293B';
-      ctx.fillRect(0, -4, 10, 8);
+      ctx.fillRect(0, -4, 12, 8);
       ctx.fillStyle = cam.enabled ? '#FF1E42' : '#64748B';
       ctx.beginPath();
-      ctx.arc(8, 0, 2.5, 0, Math.PI * 2);
+      ctx.arc(10, 0, 2.8, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -993,70 +1264,95 @@ export class HotlineCanvasRenderer {
       const vertical = l.cells.length > 1 && l.cells[0].x === l.cells[1].x;
       const first = l.cells[0];
       const last = l.cells[l.cells.length - 1];
-      const sx = PAD_PX + first.x * TILE_PX + (vertical ? TILE_PX / 2 : 2);
-      const sy = PAD_PX + first.y * TILE_PX + (vertical ? 2 : TILE_PX / 2);
-      const ex = PAD_PX + last.x * TILE_PX + (vertical ? TILE_PX / 2 : TILE_PX - 2);
-      const ey = PAD_PX + last.y * TILE_PX + (vertical ? TILE_PX - 2 : TILE_PX / 2);
+      const sx = first.x * TILE_PX + (vertical ? TILE_PX / 2 : 3);
+      const sy = first.y * TILE_PX + (vertical ? 3 : TILE_PX / 2);
+      const ex = last.x * TILE_PX + (vertical ? TILE_PX / 2 : TILE_PX - 3);
+      const ey = last.y * TILE_PX + (vertical ? TILE_PX - 3 : TILE_PX / 2);
 
-      // Layer 1: Outer bloom
-      ctx.strokeStyle = 'rgba(255, 30, 66, 0.28)';
-      ctx.lineWidth = 10;
+      ctx.strokeStyle = 'rgba(255, 30, 66, 0.30)';
+      ctx.lineWidth = 12;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(ex, ey);
       ctx.stroke();
 
-      // Layer 2: Mid crimson beam
       ctx.strokeStyle = '#FF1E42';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 4.5;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(ex, ey);
       ctx.stroke();
 
-      // Layer 3: Hot white-pink core
       ctx.strokeStyle = '#FFE4E6';
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(ex, ey);
       ctx.stroke();
 
-      // Emitter nodes
       ctx.fillStyle = '#0F172A';
       ctx.strokeStyle = '#FF1E42';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.6;
       for (const pt of [
         { x: sx, y: sy },
         { x: ex, y: ey },
       ]) {
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
     }
 
-    // Enemy telegraphed sight & next-step vectors
+    // Patrol flashlight 2D raycast cones & telegraphed tiles
     for (const enemy of snap.enemies) {
       if (enemy.status !== 'active') continue;
+      if (!enemy.isGbr && enemy.distractedTurns <= 0) {
+        const ePos = this.getInterpolatedPos(enemy.id, enemy.x, enemy.y);
+        const ex = ePos.x * TILE_PX + TILE_PX / 2;
+        const ey = ePos.y * TILE_PX + TILE_PX / 2;
+        const range = enemy.kind === 'patrol_raven' ? 3.3 : 2.3;
+        const poly = computeConePolygon(
+          ex,
+          ey,
+          dirToAngle(enemy.facing),
+          0.38,
+          range * TILE_PX,
+          snap.tiles,
+          closedDoors,
+          snap.width,
+          snap.height,
+          TILE_PX,
+          20
+        );
+        const fGrad = ctx.createRadialGradient(ex, ey, 6, ex, ey, range * TILE_PX);
+        fGrad.addColorStop(0, 'rgba(250, 204, 21, 0.28)');
+        fGrad.addColorStop(1, 'rgba(250, 204, 21, 0.03)');
+        ctx.fillStyle = fGrad;
+        ctx.beginPath();
+        poly.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+        ctx.closePath();
+        ctx.fill();
+      }
+
       for (const cell of enemy.telegraphAttackCells) {
-        const px = PAD_PX + cell.x * TILE_PX;
-        const py = PAD_PX + cell.y * TILE_PX;
-        ctx.fillStyle = enemy.isGbr ? 'rgba(255, 30, 66, 0.26)' : 'rgba(250, 204, 21, 0.16)';
+        const px = cell.x * TILE_PX;
+        const py = cell.y * TILE_PX;
+        ctx.fillStyle = enemy.isGbr ? 'rgba(255, 30, 66, 0.24)' : 'rgba(250, 204, 21, 0.11)';
         ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
-        ctx.strokeStyle = enemy.isGbr ? '#FF1E42' : '#FACC15';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = enemy.isGbr ? '#FF1E42' : 'rgba(250, 204, 21, 0.72)';
+        ctx.lineWidth = 1.2;
         ctx.strokeRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
       }
+
       if (enemy.telegraphNext && (snap.mask === 'rasmus' || enemy.isGbr || enemy.patrolRoute.length > 1)) {
-        const nx = PAD_PX + enemy.telegraphNext.x * TILE_PX + TILE_PX / 2;
-        const ny = PAD_PX + enemy.telegraphNext.y * TILE_PX + TILE_PX / 2;
+        const nx = enemy.telegraphNext.x * TILE_PX + TILE_PX / 2;
+        const ny = enemy.telegraphNext.y * TILE_PX + TILE_PX / 2;
         const pos = this.getInterpolatedPos(enemy.id, enemy.x, enemy.y);
-        const ex = PAD_PX + pos.x * TILE_PX + TILE_PX / 2;
-        const ey = PAD_PX + pos.y * TILE_PX + TILE_PX / 2;
-        ctx.strokeStyle = enemy.isGbr ? 'rgba(255, 30, 66, 0.65)' : 'rgba(0, 240, 255, 0.45)';
-        ctx.setLineDash([3, 3]);
+        const ex = pos.x * TILE_PX + TILE_PX / 2;
+        const ey = pos.y * TILE_PX + TILE_PX / 2;
+        ctx.strokeStyle = enemy.isGbr ? 'rgba(255, 30, 66, 0.7)' : 'rgba(0, 240, 255, 0.5)';
+        ctx.setLineDash([4, 3]);
         ctx.beginPath();
         ctx.moveTo(ex, ey);
         ctx.lineTo(nx, ny);
@@ -1068,270 +1364,111 @@ export class HotlineCanvasRenderer {
 
   private drawGbrStreetPresence(ctx: CanvasRenderingContext2D, snap: WorldSnapshot): void {
     if (!snap.alarmTriggered && !snap.gbrSpawned) return;
-    const gx = PAD_PX + snap.gbrSpawnPos.x * TILE_PX + TILE_PX / 2;
-    const gy = PAD_PX + snap.gbrSpawnPos.y * TILE_PX + TILE_PX / 2;
+    const vanPos = snap.scene.gbrVanPos;
+    const vx = Math.max(vanPos.x, snap.width + 2.2) * TILE_PX;
+    const vy = vanPos.y * TILE_PX;
     const redFirst = Math.floor(this.sirenPhase) % 2 === 0;
-    const radius = snap.gbrSpawned ? 72 : Math.max(28, 66 - snap.gbrEtaTurns * 6);
 
-    const grad = ctx.createRadialGradient(gx, gy, 4, gx, gy, radius);
-    grad.addColorStop(0, redFirst ? 'rgba(255, 30, 66, 0.55)' : 'rgba(0, 168, 255, 0.55)');
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(gx - radius, gy - radius, radius * 2, radius * 2);
-
-    // Armored GBR Van parked on street margin below spawn
-    const vx = gx;
-    const vy = gy + 24;
-    ctx.save();
-    ctx.translate(vx, vy);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    drawRoundedRect(ctx, -20, -9, 40, 18, 3);
-    ctx.fill();
-
-    ctx.fillStyle = '#0F172A';
-    drawRoundedRect(ctx, -19, -10, 38, 17, 3);
-    ctx.fill();
-    ctx.strokeStyle = '#38BDF8';
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-
-    // Windshield & roof lightbar
-    ctx.fillStyle = '#1E293B';
-    ctx.fillRect(-16, -7, 7, 11);
-    ctx.fillStyle = redFirst ? '#FF1E42' : '#00A8FF';
-    ctx.fillRect(-5, -8, 5, 6);
-    ctx.fillStyle = redFirst ? '#00A8FF' : '#FF1E42';
-    ctx.fillRect(-5, 0, 5, 6);
-
-    ctx.fillStyle = '#E2E8F0';
-    ctx.font = 'bold 7px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('ГБР', 8, 2);
-    ctx.restore();
+    const vanRect = ATLAS_SPRITES['van_gbr_swat'];
+    if (vanRect && this.atlasReady && this.atlasImg) {
+      ctx.save();
+      ctx.translate(vx, vy);
+      ctx.rotate((vanPos.rot * Math.PI) / 180);
+      const vw = vanRect.w * 2;
+      const vh = vanRect.h * 2;
+      ctx.drawImage(this.atlasImg, vanRect.x, vanRect.y, vanRect.w, vanRect.h, -vw / 2, -vh / 2, vw, vh);
+      // Animated flashing lightbar overlay
+      ctx.fillStyle = redFirst ? '#FF1E42' : '#00A8FF';
+      ctx.fillRect(-16, -vh / 2 + 29, 14, 6);
+      ctx.fillStyle = redFirst ? '#00A8FF' : '#FF1E42';
+      ctx.fillRect(2, -vh / 2 + 29, 14, 6);
+      ctx.restore();
+    }
   }
 
-  private getInterpolatedPos(key: string, targetX: number, targetY: number): { x: number; y: number } {
+  private getInterpolatedPos(key: string, targetX: number, targetY: number): { x: number; y: number; strideFrame: number } {
     const anim = this.moveAnims.get(key);
-    if (!anim || anim.duration <= 0) return { x: targetX, y: targetY };
+    if (!anim || anim.duration <= 0) return { x: targetX, y: targetY, strideFrame: 0 };
     const t = Math.min(1, anim.elapsed / anim.duration);
     const eased = 1 - Math.pow(1 - t, 2);
+    const strideFrame = Math.floor(t * 4) % 4;
     return {
       x: anim.fromX + (anim.toX - anim.fromX) * eased,
       y: anim.fromY + (anim.toY - anim.fromY) * eased,
+      strideFrame,
     };
   }
 
   private drawDashTrails(ctx: CanvasRenderingContext2D): void {
     for (const trail of this.dashTrails) {
-      const alpha = Math.max(0, trail.life / trail.maxLife) * 0.45;
+      const alpha = Math.max(0, trail.life / trail.maxLife) * 0.48;
       for (let i = 1; i <= 3; i++) {
         const f = i / 4;
         const x = trail.fromX + (trail.toX - trail.fromX) * f;
         const y = trail.fromY + (trail.toY - trail.fromY) * f;
-        const cx = PAD_PX + x * TILE_PX + TILE_PX / 2;
-        const cy = PAD_PX + y * TILE_PX + TILE_PX / 2;
+        const cx = x * TILE_PX + TILE_PX / 2;
+        const cy = y * TILE_PX + TILE_PX / 2;
         ctx.save();
         ctx.globalAlpha = alpha * (i / 3);
         ctx.translate(cx, cy);
         ctx.rotate(dirToAngle(trail.facing));
-        ctx.fillStyle = '#00F0FF';
-        ctx.beginPath();
-        ctx.arc(0, 0, 9, 0, Math.PI * 2);
-        ctx.fill();
+        if (!this.drawSprite(ctx, `char_${trail.mask}_stand`, -CHAR_DRAW_PX / 2, -CHAR_DRAW_PX / 2, CHAR_DRAW_PX, CHAR_DRAW_PX)) {
+          ctx.fillStyle = '#00F0FF';
+          ctx.beginPath();
+          ctx.arc(0, 0, 12, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
       }
     }
   }
 
-  private drawTopDownAnatomy(
+  private drawCharacterSprite(
     ctx: CanvasRenderingContext2D,
     kind: MaskId | EnemyState['kind'],
-    opts: { crouched?: boolean; shielded?: boolean; alpha?: number }
+    opts: { crouched?: boolean; shielded?: boolean; downed?: boolean; strideFrame?: number; alpha?: number }
   ): void {
-    const { crouched = false, shielded = false, alpha = 1 } = opts;
+    const { crouched = false, shielded = false, downed = false, strideFrame = 0, alpha = 1 } = opts;
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    // Ground drop shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
-    ctx.beginPath();
-    ctx.ellipse(-1, 2, 12, 11, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Shoulders & torso palette
-    const jacketMap: Record<MaskId | EnemyState['kind'], { body: string; trim: string; gear: string; wide: number }> = {
-      richard: { body: '#0E7490', trim: '#F8FAFC', gear: '#00F0FF', wide: 10 },
-      rasmus: { body: '#312E81', trim: '#818CF8', gear: '#38BDF8', wide: 10 },
-      tony: { body: '#881337', trim: '#FB7185', gear: '#F43F5E', wide: 11 },
-      sprint: { body: '#701A75', trim: '#F0ABFC', gear: '#FACC15', wide: 9.5 },
-      patrol_rat: { body: '#1E293B', trim: '#64748B', gear: '#FACC15', wide: 10 },
-      patrol_raven: { body: '#0F172A', trim: '#94A3B8', gear: '#FDE047', wide: 10.5 },
-      gbr_dog: { body: '#0F172A', trim: '#38BDF8', gear: '#FF1E42', wide: 10.5 },
-      gbr_boar: { body: '#1E1B4B', trim: '#A855F7', gear: '#F97316', wide: 12 },
-      gbr_bear: { body: '#090D16', trim: '#1D4ED8', gear: '#38BDF8', wide: 13 },
-    };
-    const cfg = jacketMap[kind];
-
-    // Arms & gear reaching forward (+x)
-    ctx.fillStyle = cfg.body;
-    drawRoundedRect(ctx, 2, 5, 9, 4, 2);
-    ctx.fill();
-    drawRoundedRect(ctx, 2, -9, 8, 4, 2);
-    ctx.fill();
-
-    // Gear item (baton/EMP wand/flashlight)
-    ctx.fillStyle = cfg.gear;
-    ctx.fillRect(8, 5, 6, 2.5);
-
-    // Broad shoulders / jacket / vest
-    ctx.fillStyle = cfg.body;
-    drawRoundedRect(ctx, -8, -cfg.wide, 16, cfg.wide * 2, 5);
-    ctx.fill();
-    ctx.strokeStyle = cfg.trim;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // Tactical vest plate on GBR units
-    if (kind === 'gbr_dog' || kind === 'gbr_boar' || kind === 'gbr_bear') {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
-      drawRoundedRect(ctx, -5, -cfg.wide + 3, 10, cfg.wide * 2 - 6, 2);
-      ctx.fill();
+    const half = CHAR_DRAW_PX / 2;
+    if (downed) {
+      if (!this.drawSprite(ctx, `char_${kind}_down`, -half, -half, CHAR_DRAW_PX, CHAR_DRAW_PX)) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(-14, -9, 28, 18);
+      }
+      ctx.restore();
+      return;
     }
 
-    // Head / Animal Mask
-    if (kind === 'richard') {
-      ctx.fillStyle = '#F8FAFC';
-      ctx.beginPath();
-      ctx.ellipse(1, 0, 7.5, 6.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#FF1E42';
-      ctx.fillRect(-3, -7.5, 6, 3.5);
-      ctx.fillStyle = '#FACC15';
-      ctx.beginPath();
-      ctx.moveTo(7, -3);
-      ctx.lineTo(13, 0);
-      ctx.lineTo(7, 3);
-      ctx.closePath();
-      ctx.fill();
-    } else if (kind === 'rasmus') {
-      ctx.fillStyle = '#E2E8F0';
-      ctx.beginPath();
-      ctx.arc(1, 0, 7.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#64748B';
-      ctx.fillRect(-3, -7, 4, 2);
-      ctx.fillRect(-3, 5, 4, 2);
+    // Animated legs layer underneath torso
+    this.drawSprite(ctx, `legs_${strideFrame % 4}`, -half, -half, CHAR_DRAW_PX, CHAR_DRAW_PX);
+
+    // Detailed top-down character torso + arms + animal mask
+    if (!this.drawSprite(ctx, `char_${kind}_stand`, -half, -half, CHAR_DRAW_PX, CHAR_DRAW_PX)) {
       ctx.fillStyle = '#00F0FF';
-      ctx.fillRect(3, -5, 4.5, 3.5);
-      ctx.fillRect(3, 1.5, 4.5, 3.5);
-    } else if (kind === 'tony') {
-      ctx.fillStyle = '#FB7185';
       ctx.beginPath();
-      ctx.arc(1, 0, 7.5, 0, Math.PI * 2);
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#881337';
-      ctx.fillRect(-1, -8, 4, 3);
-      ctx.fillRect(-1, 5, 4, 3);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(6, -4, 4, 2);
-      ctx.fillRect(6, 2, 4, 2);
-    } else if (kind === 'sprint') {
-      ctx.fillStyle = '#FF007F';
-      ctx.beginPath();
-      ctx.arc(1, 0, 7.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#F0ABFC';
-      ctx.beginPath();
-      ctx.moveTo(-2, -7);
-      ctx.lineTo(2, -10);
-      ctx.lineTo(3, -5);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(-2, 7);
-      ctx.lineTo(2, 10);
-      ctx.lineTo(3, 5);
-      ctx.fill();
-      ctx.fillStyle = '#FEF08A';
-      ctx.fillRect(4, -4, 4, 2.2);
-      ctx.fillRect(4, 1.8, 4, 2.2);
-    } else if (kind === 'patrol_rat') {
-      ctx.fillStyle = '#94A3B8';
-      ctx.beginPath();
-      ctx.arc(1, 0, 6.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#CBD5E1';
-      ctx.beginPath();
-      ctx.arc(-2, -6, 3, 0, Math.PI * 2);
-      ctx.arc(-2, 6, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#F472B6';
-      ctx.beginPath();
-      ctx.moveTo(6, -2.5);
-      ctx.lineTo(12, 0);
-      ctx.lineTo(6, 2.5);
-      ctx.closePath();
-      ctx.fill();
-    } else if (kind === 'patrol_raven') {
-      ctx.fillStyle = '#334155';
-      ctx.beginPath();
-      ctx.arc(1, 0, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#FACC15';
-      ctx.beginPath();
-      ctx.moveTo(6, -3);
-      ctx.lineTo(14, 0);
-      ctx.lineTo(6, 3);
-      ctx.closePath();
-      ctx.fill();
-    } else if (kind === 'gbr_dog') {
-      ctx.fillStyle = '#475569';
-      ctx.beginPath();
-      ctx.arc(1, 0, 7.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#FF1E42';
-      ctx.fillRect(4, -4.5, 5, 9);
-    } else if (kind === 'gbr_boar') {
-      ctx.fillStyle = '#78350F';
-      ctx.beginPath();
-      ctx.arc(1, 0, 8.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#F8FAFC';
-      ctx.fillRect(7, -6, 5.5, 2.2);
-      ctx.fillRect(7, 3.8, 5.5, 2.2);
-    } else if (kind === 'gbr_bear') {
-      ctx.fillStyle = '#7C2D12';
-      ctx.beginPath();
-      ctx.arc(1, 0, 9.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#451A03';
-      ctx.beginPath();
-      ctx.arc(-3, -8, 3, 0, Math.PI * 2);
-      ctx.arc(-3, 8, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#38BDF8';
-      ctx.fillRect(5, -4, 3, 8);
     }
 
-    // Bear ballistic riot/energy shield
     if (shielded) {
-      ctx.strokeStyle = '#00A8FF';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.arc(3, 0, 14, -Math.PI * 0.38, Math.PI * 0.38);
-      ctx.stroke();
-      ctx.strokeStyle = '#E0F2FE';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(3, 0, 14, -Math.PI * 0.25, Math.PI * 0.25);
-      ctx.stroke();
+      if (!this.drawSprite(ctx, 'bear_shield_fx', -half, -half, CHAR_DRAW_PX, CHAR_DRAW_PX)) {
+        ctx.strokeStyle = '#00A8FF';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(4, 0, 18, -Math.PI * 0.38, Math.PI * 0.38);
+        ctx.stroke();
+      }
     }
 
     if (crouched) {
       ctx.strokeStyle = '#00F0FF';
-      ctx.lineWidth = 1.6;
-      ctx.setLineDash([3, 2]);
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([4, 2]);
       ctx.beginPath();
-      ctx.arc(0, 0, 13, 0, Math.PI * 2);
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -1341,97 +1478,108 @@ export class HotlineCanvasRenderer {
 
   private drawPlayer(ctx: CanvasRenderingContext2D, snap: WorldSnapshot): void {
     const pos = this.getInterpolatedPos('player', snap.player.x, snap.player.y);
-    const cx = PAD_PX + pos.x * TILE_PX + TILE_PX / 2;
-    const cy = PAD_PX + pos.y * TILE_PX + TILE_PX / 2;
+    const cx = pos.x * TILE_PX + TILE_PX / 2;
+    const cy = pos.y * TILE_PX + TILE_PX / 2;
 
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(dirToAngle(snap.player.facing));
     if (snap.player.crouched) {
-      ctx.scale(0.84, 0.84);
+      ctx.scale(0.86, 0.86);
     }
-    this.drawTopDownAnatomy(ctx, snap.mask, { crouched: snap.player.crouched });
+    this.drawCharacterSprite(ctx, snap.mask, {
+      crouched: snap.player.crouched,
+      strideFrame: pos.strideFrame,
+    });
     ctx.restore();
   }
 
   private drawEnemy(ctx: CanvasRenderingContext2D, enemy: EnemyState): void {
     const pos = this.getInterpolatedPos(enemy.id, enemy.x, enemy.y);
-    const cx = PAD_PX + pos.x * TILE_PX + TILE_PX / 2;
-    const cy = PAD_PX + pos.y * TILE_PX + TILE_PX / 2;
+    const cx = pos.x * TILE_PX + TILE_PX / 2;
+    const cy = pos.y * TILE_PX + TILE_PX / 2;
+    const isDown = enemy.status === 'stunned' || enemy.status === 'offline';
 
     ctx.save();
     ctx.translate(cx, cy);
     const baseAngle = dirToAngle(enemy.facing);
-    if (enemy.status === 'stunned') {
-      ctx.rotate(baseAngle + 0.55);
-    } else if (enemy.status === 'offline') {
-      ctx.rotate(baseAngle + 1.35);
-    } else {
-      ctx.rotate(baseAngle);
-    }
-    const alpha = enemy.status === 'offline' ? 0.42 : enemy.status === 'stunned' ? 0.65 : 1;
-    this.drawTopDownAnatomy(ctx, enemy.kind, {
+    ctx.rotate(isDown ? baseAngle + 0.75 : baseAngle);
+    const alpha = enemy.status === 'offline' ? 0.55 : enemy.status === 'stunned' ? 0.8 : 1;
+    this.drawCharacterSprite(ctx, enemy.kind, {
       shielded: enemy.shielded && enemy.status === 'active',
+      downed: isDown,
+      strideFrame: pos.strideFrame,
       alpha,
     });
     ctx.restore();
 
-    if (enemy.status === 'stunned' || enemy.status === 'offline') {
+    if (isDown) {
       ctx.fillStyle = enemy.status === 'offline' ? '#10B981' : '#FACC15';
-      ctx.font = 'bold 9px monospace';
+      ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(enemy.status === 'offline' ? 'OFF' : 'ZZZ', cx, cy - 12);
+      ctx.fillText(enemy.status === 'offline' ? 'OFF' : 'ZZZ', cx, cy - 18);
     } else if (enemy.distractedTurns > 0) {
       ctx.fillStyle = '#00F0FF';
-      ctx.font = 'bold 9px monospace';
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('?!', cx, cy - 12);
+      ctx.fillText('?!', cx, cy - 18);
+    }
+  }
+
+  private drawOverheadProps(ctx: CanvasRenderingContext2D, snap: WorldSnapshot): void {
+    const px = snap.player.x + 0.5;
+    const py = snap.player.y + 0.5;
+    for (const prop of snap.scene.props) {
+      if (prop.layer !== 'overhead') continue;
+      const rect = ATLAS_SPRITES[prop.sprite];
+      if (!rect) continue;
+      const wTiles = (rect.w * 2) / TILE_PX;
+      const hTiles = (rect.h * 2) / TILE_PX;
+      const dist = Math.hypot(px - (prop.x + wTiles / 2), py - (prop.y + hTiles / 2));
+      ctx.save();
+      if (dist < 1.6) ctx.globalAlpha = 0.45;
+      this.drawPropRotated(ctx, prop);
+      ctx.restore();
     }
   }
 
   private drawEffectsOverlay(ctx: CanvasRenderingContext2D): void {
-    // Decoy parabolic throw arcs
     for (const arc of this.throwArcs) {
       const progress = 1 - arc.life / arc.maxLife;
-      const start = tileCenter(arc.fromX, arc.fromY);
-      const end = tileCenter(arc.toX, arc.toY);
-      const midX = (start.cx + end.cx) / 2;
-      const midY = (start.cy + end.cy) / 2 - 20;
+      const x = arc.fromX + (arc.toX - arc.fromX) * progress;
+      const y = arc.fromY + (arc.toY - arc.fromY) * progress;
+      const cx = x * TILE_PX + TILE_PX / 2;
+      const cy = y * TILE_PX + TILE_PX / 2 - Math.sin(progress * Math.PI) * 20;
 
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.75)';
-      ctx.lineWidth = 1.8;
-      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.55)';
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(start.cx, start.cy);
-      ctx.quadraticCurveTo(midX, midY, end.cx, end.cy);
+      ctx.moveTo(arc.fromX * TILE_PX + TILE_PX / 2, arc.fromY * TILE_PX + TILE_PX / 2);
+      ctx.lineTo(arc.toX * TILE_PX + TILE_PX / 2, arc.toY * TILE_PX + TILE_PX / 2);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Flying beacon orb along quadratic bezier
-      const t = Math.min(1, progress * 1.4);
-      const inv = 1 - t;
-      const bx = inv * inv * start.cx + 2 * inv * t * midX + t * t * end.cx;
-      const by = inv * inv * start.cy + 2 * inv * t * midY + t * t * end.cy;
-      ctx.fillStyle = '#67E8F9';
+      ctx.fillStyle = '#00F0FF';
       ctx.beginPath();
-      ctx.arc(bx, by, 3.5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Expanding shockwaves
     for (const sw of this.shockwaves) {
-      const p = 1 - sw.life / sw.maxLife;
-      const r = 6 + (sw.maxR - 6) * p;
+      const progress = 1 - sw.life / sw.maxLife;
+      const cx = sw.x * TILE_PX + TILE_PX / 2;
+      const cy = sw.y * TILE_PX + TILE_PX / 2;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - progress);
       ctx.strokeStyle = sw.color;
-      ctx.globalAlpha = Math.max(0, 1 - p);
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2.6 * (1 - progress * 0.5);
       ctx.beginPath();
-      ctx.arc(sw.x, sw.y, r, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 6 + sw.maxR * progress, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
-    // Particles (splinters, shield shards, sparks)
     for (const pt of this.particles) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
@@ -1444,35 +1592,90 @@ export class HotlineCanvasRenderer {
   }
 
   private drawPostFx(ctx: CanvasRenderingContext2D, snap: WorldSnapshot, w: number, h: number): void {
-    // Subtle red neon alarm border during ESCAPE_RACE / GBR_BREACH_COMBAT
     if (snap.alarmTriggered && snap.phase !== 'EXTRACTION') {
-      ctx.strokeStyle = snap.phase === 'GBR_BREACH_COMBAT' ? 'rgba(255, 30, 66, 0.72)' : 'rgba(255, 0, 127, 0.48)';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(2, 2, w - 4, h - 4);
-    }
-
-    // Siren flash wash during active ALARM_PULSE FX
-    if (this.fxKind === 'ALARM_PULSE' && this.fxTimerMs > 0) {
-      const red = Math.floor(this.sirenPhase) % 2 === 0;
-      ctx.fillStyle = red ? 'rgba(255, 30, 66, 0.10)' : 'rgba(0, 168, 255, 0.10)';
+      const pulse = 0.08 + 0.06 * Math.abs(Math.sin(this.sirenPhase * 1.4));
+      const vig = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.65);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, `rgba(255, 0, 80, ${pulse.toFixed(3)})`);
+      ctx.fillStyle = vig;
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Event-driven VHS horizontal glitch bars
+    if (this.fxKind === 'ALARM_PULSE' && this.fxTimerMs > 0) {
+      const alpha = (this.fxTimerMs / MAX_FX_MS) * 0.22;
+      ctx.fillStyle = `rgba(255, 0, 80, ${alpha.toFixed(3)})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+
     if (this.fxKind === 'GLITCH' && this.fxTimerMs > 0) {
       for (let i = 0; i < 4; i++) {
-        const y = (this.fxTimerMs * (i + 3)) % Math.max(40, h - 20);
-        ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 0, 127, 0.25)' : 'rgba(0, 240, 255, 0.25)';
-        ctx.fillRect(0, y, w, 6);
+        const sy = Math.floor(((i * 79 + this.fxTimerMs * 3) % Math.max(40, h - 24)));
+        const sh = 10 + (i % 3) * 6;
+        const shift = (i % 2 === 0 ? 1 : -1) * 5;
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 0, 127, 0.22)' : 'rgba(0, 240, 255, 0.22)';
+        ctx.fillRect(Math.max(0, shift), sy, w, sh);
       }
     }
 
-    // Crisp lightweight scanlines
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.09)';
     for (let y = 0; y < h; y += 4) {
       ctx.fillRect(0, y, w, 1);
     }
   }
-}
 
-export type { AudioMood };
+  private drawMinimap(ctx: CanvasRenderingContext2D, snap: WorldSnapshot, viewW: number): void {
+    if (viewW < 360) return;
+    const cell = 4;
+    const mw = snap.width * cell;
+    const mh = snap.height * cell;
+    const mx = viewW - mw - 14;
+    const my = 10;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(7, 3, 18, 0.82)';
+    drawRoundedRect(ctx, mx - 4, my - 4, mw + 8, mh + 8, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FF007F';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(mx - 4, my - 4, mw + 8, mh + 8);
+
+    for (let y = 0; y < snap.height; y++) {
+      for (let x = 0; x < snap.width; x++) {
+        const t = snap.tiles[y][x];
+        if (t === 'WALL') ctx.fillStyle = '#475569';
+        else if (t === 'WINDOW') ctx.fillStyle = '#38BDF8';
+        else if (t === 'TERMINAL') ctx.fillStyle = snap.hackCompleted ? '#10B981' : '#00F0FF';
+        else if (t === 'RELAY') ctx.fillStyle = '#F472B6';
+        else if (t === 'EXIT') ctx.fillStyle = snap.exitUnlocked ? '#10B981' : '#FF1E42';
+        else continue;
+        ctx.fillRect(mx + x * cell, my + y * cell, cell, cell);
+      }
+    }
+
+    for (const e of snap.enemies) {
+      if (e.status === 'offline') continue;
+      ctx.fillStyle = e.isGbr ? '#FF1E42' : '#FACC15';
+      ctx.fillRect(mx + e.x * cell, my + e.y * cell, cell, cell);
+    }
+
+    // Player dot
+    ctx.fillStyle = '#00F0FF';
+    ctx.fillRect(mx + snap.player.x * cell - 1, my + snap.player.y * cell - 1, cell + 2, cell + 2);
+
+    // Camera viewport rectangle
+    const vr = this.camera.getViewportRectWorld();
+    const rx = mx + (vr.x / TILE_PX) * cell;
+    const ry = my + (vr.y / TILE_PX) * cell;
+    const rw = (vr.w / TILE_PX) * cell;
+    const rh = (vr.h / TILE_PX) * cell;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      Math.max(mx - 2, rx),
+      Math.max(my - 2, ry),
+      Math.min(mw + 4, rw),
+      Math.min(mh + 4, rh)
+    );
+    ctx.restore();
+  }
+}

@@ -99,7 +99,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     expect(errTxt).toContain('кц');
 
     // Empty infinite loop aborts safely via E_RT_INFINITE_LOOP
-    await enterEditorRun(page, 'нц пока сверху стена\nкц');
+    await enterEditorRun(page, 'нц пока сверху свободно\nкц');
     await expect(page.locator('#hk-error-box')).toBeVisible();
     const loopErr = await page.locator('#hk-error-box').textContent();
     expect(loopErr).toContain('зацикливание');
@@ -112,16 +112,16 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     // Level 1
     await page.goto('/games/hotline-kumir?level=1&seed=42&fastAnim=1&mute=1&skipBriefing=1');
     const tel1Promise = page.waitForResponse((r) => r.url().includes('/api/hotline-kumir/progress') && r.status() === 200);
-    await enterEditorRun(page, 'нц 3 раз\nвправо\nкц\nподключиться');
+    await enterEditorRun(page, 'вверх; вверх\nнц 4 раз\nвправо\nкц\nподключиться');
     await runLinuxInModal(page, ['ls -la', 'cat .gate.conf', 'unlock 4821']);
-    await enterEditorRun(page, 'нц 4 раз\nвправо\nкц\nзакрасить\nвправо\nвниз\nвниз\nвправо');
+    await enterEditorRun(page, 'нц 10 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вправо\nнц 4 раз\nвниз\nкц');
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
     await tel1Promise;
 
     // Level 2 via "Next Level" button
     await page.locator('#hk-btn-next-level').click();
     await page.locator('#hk-btn-start-mission').click();
-    await enterEditorRun(page, 'нц 3 раз\nвправо\nкц\nвниз; вниз; вправо; подключиться');
+    await enterEditorRun(page, 'нц 5 раз\nвправо\nкц\nвниз; подключиться');
     await runLinuxInModal(page, [
       'cat ~/.bash_history',
       'cd /srv/desk',
@@ -129,7 +129,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
       'camctl off cam-01 NEON-774',
       'laserctl off L1 NEON-774',
     ]);
-    await enterEditorRun(page, 'вправо; вниз; вниз; вправо; закрасить\nнц 4 раз\nвверх\nкц\nнц 5 раз\nвправо\nкц');
+    await enterEditorRun(page, 'вверх\nнц 5 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nзакрасить\nнц 5 раз\nвверх\nкц\nнц 9 раз\nвправо\nкц\nвниз');
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
     // Level 3
@@ -137,7 +137,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await page.locator('#hk-btn-start-mission').click();
     await enterEditorRun(
       page,
-      'нц 4 раз\nвправо\nкц\nвниз; вправо; укрыться; бросить вправо; вправо; вниз; вниз; вправо; подключиться'
+      'нц 4 раз\nвправо\nкц\nвверх\nнц 5 раз\nвправо\nкц\nвниз; укрыться; бросить вправо; вниз; вправо; вправо; вниз; подключиться'
     );
     await runLinuxInModal(page, [
       'find /home -name "*.dmp"',
@@ -149,14 +149,14 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     ]);
     await enterEditorRun(
       page,
-      'нц 3 раз\nвниз\nкц\nзакрасить\nнц 3 раз\nвверх\nкц\nвправо; вверх\nесли сверху опасно то\n  ждать\nвсе\nвверх; бросить вправо\nнц 5 раз\n  если справа враг то\n    оглушить\n    добить\n  все\n  вправо\nкц\nвниз; вниз'
+      'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nзакрасить\nвлево; влево; вверх; выбить дверь вверх; вверх; вверх\nнц 5 раз\nвправо\nкц'
     );
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
     // Level 4 (2 relays)
     await page.locator('#hk-btn-next-level').click();
     await page.locator('#hk-btn-start-mission').click();
-    await enterEditorRun(page, 'нц 5 раз\nвниз\nкц\nнц 7 раз\nвправо\nкц\nподключиться');
+    await enterEditorRun(page, 'нц 4 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nнц 8 раз\nвправо\nкц\nподключиться');
     await runLinuxInModal(page, [
       'ps aux',
       'ss -tulpn',
@@ -166,7 +166,11 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     ]);
     await enterEditorRun(
       page,
-      'нц 6 раз\nвправо\nкц\nзакрасить\nнц 5 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вниз\nесли не снизу опасно то\n  ждать\nвсе\nвниз; отключить влево; вправо; вправо; вниз'
+      'вверх\nнц 8 раз\nвправо\nкц\nзакрасить\nнц 8 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nзакрасить'
+    );
+    await enterEditorRun(
+      page,
+      'вправо; вправо; вправо; вниз\nнц пока не снизу опасно\n  ждать\nкц\nвниз; отключить влево; вправо; вправо; вправо; вниз'
     );
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
@@ -175,7 +179,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await page.locator('#hk-btn-start-mission').click();
     await enterEditorRun(
       page,
-      'нц пока снизу свободно\nвниз\nкц\nзакрасить\nнц 7 раз\nвправо\nкц\nвверх; вверх; вверх; влево; влево; подключиться'
+      'нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; закрасить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться'
     );
     await runLinuxInModal(page, [
       'find / -name "id_rsa" 2>/dev/null',
@@ -186,7 +190,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await expect(page.locator('#hk-gbr-tracker')).toBeVisible();
     await enterEditorRun(
       page,
-      'вправо; вправо; вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nвверх; вверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх\nнц 4 раз\nвправо\nкц\nвверх; закрасить\nвверх; влево; вверх; вверх; вправо'
+      'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; закрасить; вверх; влево; вверх; вверх; вправо'
     );
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
 
@@ -231,16 +235,16 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await setupStudentSession(page);
     await page.goto('/games/hotline-kumir?level=1&seed=77&fastAnim=1&mute=1&skipBriefing=1');
 
-    // Intentionally enter camera cone (6,3)
-    await enterEditorRun(page, 'вниз; вниз\nнц 5 раз\nвправо\nкц');
+    // Intentionally enter camera cone (12,7)
+    await enterEditorRun(page, 'нц 6 раз\nвправо\nкц\nвниз; вниз\nнц 5 раз\nвправо\nкц');
     await expect(page.locator('#hk-gbr-tracker')).toBeVisible();
     const stAlarm = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState());
     expect(stAlarm.phase).toBe('ESCAPE_RACE');
 
     // Move back, unlock door, extract before ETA hits 0
-    await enterEditorRun(page, 'влево; влево; влево; влево; влево; вверх; вверх; вправо; вправо; вправо; подключиться');
+    await enterEditorRun(page, 'нц 5 раз\nвлево\nкц\nвверх; вверх; влево; вверх; вверх; подключиться');
     await runLinuxInModal(page, ['unlock 4821']);
-    await enterEditorRun(page, 'нц 4 раз\nвправо\nкц\nзакрасить\nвправо\nвниз\nвниз\nвправо');
+    await enterEditorRun(page, 'нц 9 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вправо\nнц 4 раз\nвниз\nкц');
 
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
     const endState = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState());
@@ -252,7 +256,7 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     await setupStudentSession(page);
     await page.goto('/games/hotline-kumir?level=1&mask=tony&seed=77&fastAnim=1&mute=1&skipBriefing=1');
 
-    await enterEditorRun(page, 'вниз; вниз\nнц 5 раз\nвправо\nкц');
+    await enterEditorRun(page, 'нц 6 раз\nвправо\nкц\nвниз; вниз\nнц 5 раз\nвправо\nкц');
     await expect(page.locator('#hk-gbr-tracker')).toBeVisible();
 
     // Advance timeouts until GBR enters the building
@@ -266,13 +270,13 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     expect(combatState.phase).toBe('GBR_BREACH_COMBAT');
     await expect(page.locator('#hk-phase-badge')).toContainText('БОЙ С ГБР');
 
-    await enterEditorRun(page, 'влево; влево; влево; влево; влево; вверх; вверх; вправо; вправо; вправо; подключиться');
+    await enterEditorRun(page, 'нц 5 раз\nвлево\nкц\nвверх; вверх; влево; вверх; вверх; подключиться');
     await runLinuxInModal(page, ['unlock 4821']);
 
     const killIfNear = 'если рядом враг то\n  оглушить\n  добить\nвсе';
     await enterEditorRun(
       page,
-      `${killIfNear}\nнц 4 раз\n  ${killIfNear}\n  вправо\nкц\nзакрасить\nвправо\n${killIfNear}\nвниз; вниз\n${killIfNear}\nвправо`
+      `${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nзакрасить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц`
     );
 
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
@@ -281,10 +285,11 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     expect(finalState.lastResult.outcomeBranch).toBe('combat_gbr');
   });
 
-  test('6. FX Idle-Zero <= 420ms without fastAnim and render all 5 level themes & masks cleanly', async ({ page }) => {
+  test('6. FX Idle-Zero <= 420ms without fastAnim, Atlas + Camera modes & render all 5 level themes cleanly', async ({ page }) => {
     await setupStudentSession(page);
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto('/games/hotline-kumir?level=3&mask=rasmus&seed=42&mute=1&skipBriefing=1');
+    await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.waitForAtlasReady());
 
     // Run tactical throw + dash to trigger FX in normal (non-fastAnim) mode
     await enterEditorRun(page, 'бросить вправо; рывок вправо');
@@ -296,18 +301,27 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
     const s2 = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getRenderStats());
     expect(s2.rafFrames).toBe(s1.rafFrames);
 
+    // Verify camera OVERVIEW & FOLLOW toggles via HUD buttons
+    await page.locator('#hk-btn-cam-overview').click();
+    const camOver = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getCameraState());
+    expect(camOver.mode).toBe('OVERVIEW');
+    await page.locator('#hk-btn-cam-follow').click();
+    const camFol = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getCameraState());
+    expect(camFol.mode).toBe('FOLLOW');
+
     // Optional visual screenshot capture when HK_SCREENSHOT_DIR is set
     const shotDir = process.env.HK_SCREENSHOT_DIR;
     const cases = [
-      { level: 1, mask: 'richard', name: 'level1-kpp-richard.png' },
-      { level: 2, mask: 'sprint', name: 'level2-lobby-sprint.png' },
-      { level: 3, mask: 'rasmus', name: 'level3-office-rasmus.png' },
-      { level: 4, mask: 'tony', name: 'level4-server-tony.png' },
-      { level: 5, mask: 'richard', name: 'level5-vault-gbr.png' },
+      { level: 1, mask: 'richard', slug: 'level1-kpp-richard' },
+      { level: 2, mask: 'sprint', slug: 'level2-lobby-sprint' },
+      { level: 3, mask: 'rasmus', slug: 'level3-office-rasmus' },
+      { level: 4, mask: 'tony', slug: 'level4-server-tony' },
+      { level: 5, mask: 'richard', slug: 'level5-vault-gbr' },
     ];
     for (const c of cases) {
       await page.evaluate(({ level, mask }) => {
         window.__HOTLINE_KUMIR_TEST__.selectLevel(level, mask);
+        window.__HOTLINE_KUMIR_TEST__.setCameraMode('FOLLOW');
       }, c);
       if (c.level === 5) {
         await page.evaluate(() => {
@@ -325,8 +339,17 @@ test.describe('Hotline KuMir: E2E (5 Levels, KuMir VM, GBR Combat, Zero-Dep, 136
       const theme = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().theme);
       expect(theme).toBeTruthy();
       if (shotDir) {
-        await page.locator('#hk-arena-canvas').screenshot({ path: path.join(shotDir, c.name) });
+        await page.locator('#hk-arena-canvas').screenshot({ path: path.join(shotDir, `${c.slug}-follow.png`) });
+        await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.setCameraMode('OVERVIEW'));
+        await page.locator('#hk-arena-canvas').screenshot({ path: path.join(shotDir, `${c.slug}-overview.png`) });
       }
+    }
+
+    if (shotDir) {
+      await page.goto('/games/hotline-kumir?level=1&seed=42&mute=1');
+      await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.waitForAtlasReady());
+      await expect(page.locator('#hk-briefing-overlay')).toBeVisible();
+      await page.screenshot({ path: path.join(shotDir, 'briefing-portraits.png') });
     }
   });
 });

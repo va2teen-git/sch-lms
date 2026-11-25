@@ -126,7 +126,63 @@ export type StyleBadge = 'GHOST' | 'ESCAPE' | 'COMBAT';
 export type RankGrade = 'S' | 'A' | 'B' | 'C';
 export type AudioMood = 'SILENT' | 'STEALTH' | 'ALERT' | 'COMBAT';
 
-export type TileKind = 'WALL' | 'FLOOR' | 'COVER' | 'EXIT' | 'TERMINAL' | 'RELAY' | 'GBR_SPAWN';
+export type TileKind = 'WALL' | 'WINDOW' | 'FLOOR' | 'COVER' | 'EXIT' | 'TERMINAL' | 'RELAY' | 'GBR_SPAWN';
+
+export type FloorKind =
+  | 'asphalt'
+  | 'sidewalk'
+  | 'grass'
+  | 'gravel'
+  | 'kpp_concrete'
+  | 'lobby_marble'
+  | 'lobby_rug'
+  | 'office_carpet'
+  | 'wood_parquet'
+  | 'server_grate'
+  | 'vault_obsidian'
+  | 'vault_crimson'
+  | 'bathroom_tile';
+
+export interface SceneZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  floor: FloorKind;
+  label?: string;
+  indoor?: boolean;
+}
+
+export interface SceneProp {
+  sprite: string;
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  rot?: 0 | 90 | 180 | 270;
+  layer?: 'floor' | 'prop' | 'overhead';
+  flipX?: boolean;
+}
+
+export interface SceneLight {
+  x: number;
+  y: number;
+  radius: number;
+  color: string;
+  intensity?: number;
+  kind?: 'lamp' | 'neon' | 'monitor' | 'headlight' | 'ceiling';
+}
+
+export interface LevelScene {
+  exteriorMargin: number;
+  buildingBounds: { x: number; y: number; w: number; h: number };
+  zones: SceneZone[];
+  props: SceneProp[];
+  lights: SceneLight[];
+  coupePos: { x: number; y: number; rot: 0 | 90 | 180 | 270 };
+  gbrVanPos: { x: number; y: number; rot: 0 | 90 | 180 | 270 };
+  neonSignPos?: { x: number; y: number; text: string; color: string };
+}
 
 export interface DoorState {
   id: string;
@@ -337,6 +393,7 @@ export interface LevelDefinition {
     facing: Direction;
   }>;
   linuxConfig: LinuxLevelConfig;
+  scene: LevelScene;
 }
 
 export interface WorldSnapshot {
@@ -375,6 +432,7 @@ export interface WorldSnapshot {
   terminalPos: { x: number; y: number };
   exitPos: { x: number; y: number };
   gbrSpawnPos: { x: number; y: number };
+  scene: LevelScene;
   lastError: KumirError | null;
   lastResult: LevelResult | null;
 }

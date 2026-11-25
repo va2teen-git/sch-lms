@@ -1,5 +1,6 @@
 import { HOTLINE_KUMIR_LEVELS } from '../../data/hotline-kumir-levels.ts';
 import { HotlineAudioSynth } from './audio-synth.ts';
+import type { CameraMode } from './camera.ts';
 import { HotlineGameEngine } from './game-engine.ts';
 import { HotlineCanvasRenderer } from './renderer.ts';
 import type { LevelResult, MaskId, WorldEvent, WorldSnapshot } from './types.ts';
@@ -10,6 +11,9 @@ declare global {
       getState: () => WorldSnapshot;
       getAudioState: () => ReturnType<HotlineAudioSynth['getAudioState']>;
       getRenderStats: () => ReturnType<HotlineCanvasRenderer['getRenderStats']>;
+      getCameraState: () => ReturnType<HotlineCanvasRenderer['getCameraState']>;
+      setCameraMode: (mode: CameraMode) => void;
+      waitForAtlasReady: () => Promise<void>;
       flushAnimations: () => void;
       selectLevel: (id: number, mask?: MaskId) => void;
       setCode: (code: string) => void;
@@ -78,6 +82,16 @@ export function initHotlineKumirController(
   const btnMute = root.querySelector<HTMLButtonElement>('#hk-btn-mute');
   const btnOpenTerm = root.querySelector<HTMLButtonElement>('#hk-btn-open-term');
 
+  // Camera & portrait controls
+  const tileCoordsEl = root.querySelector<HTMLElement>('#hk-tile-coords');
+  const btnCamFollow = root.querySelector<HTMLButtonElement>('#hk-btn-cam-follow');
+  const btnCamOverview = root.querySelector<HTMLButtonElement>('#hk-btn-cam-overview');
+  const btnCamZoomIn = root.querySelector<HTMLButtonElement>('#hk-btn-cam-zoom-in');
+  const btnCamZoomOut = root.querySelector<HTMLButtonElement>('#hk-btn-cam-zoom-out');
+  const briefingPortraitCanvas = root.querySelector<HTMLCanvasElement>('#hk-briefing-portrait');
+  const gbrPortraitCanvas = root.querySelector<HTMLCanvasElement>('#hk-gbr-portrait');
+  const maskPortraitCanvases = Array.from(root.querySelectorAll<HTMLCanvasElement>('[data-mask-portrait]'));
+
   // Briefing overlay
   const briefingOverlay = root.querySelector<HTMLDivElement>('#hk-briefing-overlay');
   const briefingTitleEl = root.querySelector<HTMLElement>('#hk-briefing-title');
@@ -111,6 +125,36 @@ export function initHotlineKumirController(
 
   const renderer = new HotlineCanvasRenderer(canvas, fastAnim);
   const audio = new HotlineAudioSynth(forceMute);
+
+  const renderPortraits = () => {
+    if (briefingPortraitCanvas) {
+      renderer.drawPortraitToCanvas(briefingPortraitCanvas, selectedMask);
+    }
+    if (gbrPortraitCanvas) {
+      renderer.drawPortraitToCanvas(gbrPortraitCanvas, 'gbr');
+    }
+    for (const c of maskPortraitCanvases) {
+      const m = c.dataset.maskPortrait as MaskId | undefined;
+      if (m) renderer.drawPortraitToCanvas(c, m);
+    }
+  };
+  renderer.onAtlasLoad(renderPortraits);
+
+  const syncCameraButtons = () => {
+    const mode = renderer.getCameraState().mode;
+    if (btnCamFollow) {
+      btnCamFollow.className =
+        mode === 'FOLLOW'
+          ? 'px-2 py-0.5 text-[11px] font-bold bg-cyan-950 border border-cyan-400 text-cyan-200 hover:bg-cyan-900 rounded-0 cursor-pointer'
+          : 'px-2 py-0.5 text-[11px] font-bold bg-slate-900 border border-slate-600 text-slate-300 hover:border-cyan-400 rounded-0 cursor-pointer';
+    }
+    if (btnCamOverview) {
+      btnCamOverview.className =
+        mode === 'OVERVIEW'
+          ? 'px-2 py-0.5 text-[11px] font-bold bg-pink-950 border border-pink-400 text-pink-200 hover:bg-pink-900 rounded-0 cursor-pointer'
+          : 'px-2 py-0.5 text-[11px] font-bold bg-slate-900 border border-slate-600 text-slate-300 hover:border-pink-400 rounded-0 cursor-pointer';
+    }
+  };
 
   let currentLevelId = initialLevel;
   let engine = new HotlineGameEngine(currentLevelId, selectedMask, baseSeed);
@@ -448,8 +492,8 @@ export function initHotlineKumirController(
       maskButtons.forEach((b) => {
         const isSel = b.dataset.maskChoice === selectedMask;
         b.className = isSel
-          ? 'p-2 text-left border-2 border-cyan-400 bg-cyan-950/70 text-white rounded-0 cursor-pointer'
-          : 'p-2 text-left border border-slate-700 bg-slate-900/90 text-slate-300 hover:border-pink-500 rounded-0 cursor-pointer';
+          ? 'p-2 text-left border-2 border-cyan-400 bg-cyan-950/70 text-white rounded-0 cursor-pointer flex items-center gap-2.5'
+          : 'p-2 text-left border border-slate-700 bg-slate-900/90 text-slate-300 hover:border-pink-500 rounded-0 cursor-pointer flex items-center gap-2.5';
       });
     } else {
       if (briefingOverlay) {
@@ -461,11 +505,17 @@ export function initHotlineKumirController(
       hooks.onMissionStart?.(currentLevelId, selectedMask);
     }
 
+    renderPortraits();
+    syncCameraButtons();
     updateUi(engine.getSnapshot(), []);
   };
 
   const runCode = async (): Promise<void> => {
     audio.unlock();
+    if (renderer.getCameraState().mode === 'FREE') {
+      renderer.setCameraMode('FOLLOW');
+      syncCameraButtons();
+    }
     const snapBefore = engine.getSnapshot();
     if (snapBefore.phase === 'BRIEFING') {
       engine.startMission();
@@ -721,6 +771,89 @@ export function initHotlineKumirController(
     }
   });
 
+  btnCamFollow?.addEventListener('click', () => {
+    renderer.setCameraMode('FOLLOW');
+    syncCameraButtons();
+  });
+
+  btnCamOverview?.addEventListener('click', () => {
+    renderer.setCameraMode('OVERVIEW');
+    syncCameraButtons();
+  });
+
+  btnCamZoomIn?.addEventListener('click', () => {
+    renderer.zoomBy(1.18);
+    syncCameraButtons();
+  });
+
+  btnCamZoomOut?.addEventListener('click', () => {
+    renderer.zoomBy(0.84);
+    syncCameraButtons();
+  });
+
+  let isDragging = false;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
+
+  const onCanvasPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
+    canvas.setPointerCapture?.(e.pointerId);
+  };
+
+  const onCanvasPointerMove = (e: PointerEvent) => {
+    if (isDragging) {
+      const dx = e.clientX - lastPointerX;
+      const dy = e.clientY - lastPointerY;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+      renderer.panBy(dx, dy);
+      syncCameraButtons();
+    }
+    if (tileCoordsEl) {
+      const tile = renderer.getHoveredTile(e.clientX, e.clientY);
+      const snap = engine.getSnapshot();
+      if (tile && tile.x >= 0 && tile.y >= 0 && tile.x < snap.width && tile.y < snap.height) {
+        tileCoordsEl.textContent = `x:${tile.x} y:${tile.y}`;
+      } else {
+        tileCoordsEl.textContent = 'x:— y:—';
+      }
+    }
+  };
+
+  const onCanvasPointerUp = (e: PointerEvent) => {
+    if (!isDragging) return;
+    isDragging = false;
+    try {
+      canvas.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // ignore if capture already released
+    }
+  };
+
+  const onCanvasWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    renderer.zoomBy(e.deltaY < 0 ? 1.12 : 0.89, sx, sy);
+    syncCameraButtons();
+  };
+
+  canvas.addEventListener('pointerdown', onCanvasPointerDown);
+  canvas.addEventListener('pointermove', onCanvasPointerMove);
+  canvas.addEventListener('pointerup', onCanvasPointerUp);
+  canvas.addEventListener('pointercancel', onCanvasPointerUp);
+  canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+
+  let resizeObserver: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
+    resizeObserver = new ResizeObserver(() => renderer.resize());
+    resizeObserver.observe(canvas.parentElement);
+  }
+
   const globalKeyHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && termOverlay && !termOverlay.classList.contains('hidden')) {
       e.preventDefault();
@@ -729,6 +862,13 @@ export function initHotlineKumirController(
     }
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return;
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const cur = renderer.getCameraState().mode;
+      renderer.setCameraMode(cur === 'OVERVIEW' ? 'FOLLOW' : 'OVERVIEW');
+      syncCameraButtons();
+      return;
+    }
     if (e.code === 'KeyM') {
       audio.toggleMute();
       updateUi(engine.getSnapshot(), []);
@@ -743,6 +883,12 @@ export function initHotlineKumirController(
     getState: () => engine.getSnapshot(),
     getAudioState: () => audio.getAudioState(),
     getRenderStats: () => renderer.getRenderStats(),
+    getCameraState: () => renderer.getCameraState(),
+    setCameraMode: (mode: CameraMode) => {
+      renderer.setCameraMode(mode);
+      syncCameraButtons();
+    },
+    waitForAtlasReady: () => renderer.waitForAtlasReady(),
     flushAnimations: () => renderer.flushAnimations(),
     selectLevel: (id: number, mask?: MaskId) => loadLevel(id, mask ?? selectedMask, false),
     setCode: (code: string) => {
@@ -773,6 +919,12 @@ export function initHotlineKumirController(
     stopExecutionLoop();
     stopTurnClock();
     window.removeEventListener('keydown', globalKeyHandler);
+    canvas.removeEventListener('pointerdown', onCanvasPointerDown);
+    canvas.removeEventListener('pointermove', onCanvasPointerMove);
+    canvas.removeEventListener('pointerup', onCanvasPointerUp);
+    canvas.removeEventListener('pointercancel', onCanvasPointerUp);
+    canvas.removeEventListener('wheel', onCanvasWheel);
+    resizeObserver?.disconnect();
     renderer.dispose();
     audio.dispose();
   };
