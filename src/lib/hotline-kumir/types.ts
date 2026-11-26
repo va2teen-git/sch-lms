@@ -147,6 +147,13 @@ export type FloorKind =
   | 'vault_crimson'
   | 'bathroom_tile';
 
+export interface WorldRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface SceneZone {
   x: number;
   y: number;
@@ -398,7 +405,7 @@ export interface WorldSnapshot {
   inspectedCount: number;
   requiredInteractableCount: number;
   lastInspectMessage: string | null;
-  collectedIntel: Array<{ id: string; name: string; text: string; code?: string }>;
+  collectedIntel: Array<{ id: string; name: string; text: string; code?: string; category?: InteractableCategory }>;
   exitUnlocked: boolean;
   activeLine: number | null;
   width: number;

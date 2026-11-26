@@ -1,4 +1,5 @@
 import { HOTLINE_KUMIR_LEVELS, getHotlineLevel } from '../../data/hotline-kumir-levels.ts';
+import { ATLAS_SPRITES } from './atlas-manifest.ts';
 import { KUMIR_LIMITS, compileKumir, executeKumirProgram } from './kumir-interpreter.ts';
 import { LinuxHackEngine } from './linux-hack-engine.ts';
 import { createSeededPrng } from './prng.ts';
@@ -100,7 +101,7 @@ export class HotlineGameEngine {
   private readonly enemies: EnemyState[];
   private readonly interactables: InteractableState[];
   private lastInspectMessage: string | null = null;
-  private readonly collectedIntel: Array<{ id: string; name: string; text: string; code?: string }> = [];
+  private readonly collectedIntel: Array<{ id: string; name: string; text: string; code?: string; category?: InteractableCategory }> = [];
 
   private usedLoops = false;
   private usedConditions = false;
@@ -215,8 +216,33 @@ export class HotlineGameEngine {
     }));
     const occupiedKeys = new Set(this.interactables.map((item) => `${item.x},${item.y}`));
     for (const prop of this.levelDef.scene.props) {
+      if (prop.layer === 'floor' || prop.layer === 'overhead') continue;
       const meta = PROP_INTERACTABLE_META[prop.sprite];
       if (!meta) continue;
+      const spriteRect = ATLAS_SPRITES[prop.sprite];
+      const sw = prop.w ?? (spriteRect ? spriteRect.tilesW : 1);
+      const sh = prop.h ?? (spriteRect ? spriteRect.tilesH : 1);
+      const rot = prop.rot || 0;
+      const rotated = rot === 90 || rot === 270;
+      const fw = rotated ? sh : sw;
+      const fh = rotated ? sw : sh;
+      const minX = Math.floor(prop.x + 0.05);
+      const maxX = Math.ceil(prop.x + fw - 0.05) - 1;
+      const minY = Math.floor(prop.y + 0.05);
+      const maxY = Math.ceil(prop.y + fh - 0.05) - 1;
+
+      let alreadyCovered = false;
+      for (let ty = minY; ty <= maxY; ty++) {
+        for (let tx = minX; tx <= maxX; tx++) {
+          if (occupiedKeys.has(`${tx},${ty}`)) {
+            alreadyCovered = true;
+            break;
+          }
+        }
+        if (alreadyCovered) break;
+      }
+      if (alreadyCovered) continue;
+
       const gx = Math.round(prop.x);
       const gy = Math.round(prop.y);
       if (gx < 1 || gx > this.width - 2 || gy < 1 || gy > this.height - 2) continue;
@@ -224,7 +250,6 @@ export class HotlineGameEngine {
       if (tile === 'WALL' || tile === 'WINDOW' || tile === 'TERMINAL' || tile === 'RELAY' || tile === 'EXIT') continue;
       if (this.doors.some((d) => d.x === gx && d.y === gy)) continue;
       const key = `${gx},${gy}`;
-      if (occupiedKeys.has(key)) continue;
       occupiedKeys.add(key);
       this.interactables.push({
         id: `auto-${prop.sprite}-${gx}-${gy}`,
@@ -1173,6 +1198,7 @@ export class HotlineGameEngine {
             name: target.name,
             text: target.inspectText,
             code: target.intelCode,
+            category: target.category,
           });
         }
         events.push({

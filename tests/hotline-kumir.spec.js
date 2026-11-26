@@ -87,7 +87,12 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
     await expect(page.locator('header #hk-level-badge')).toHaveCount(0);
     await expect(page.locator('#hk-mission-panel #hk-level-badge')).toBeVisible();
     await expect(page.locator('#hk-mission-panel #hk-level-badge')).toContainText('Ур.1/5');
+    await expect(page.locator('#hk-mission-desc')).toContainText('Неон-Секьюрити');
     await expect(page.locator('#hk-mission-desc')).toContainText('ПК (T)');
+    await expect(page.locator('#hk-mission-panel #hk-intel-box')).toHaveCount(0);
+    await expect(page.locator('#hk-clues-panel #hk-intel-box')).toBeVisible();
+    await expect(page.locator('#hk-clue-slots [data-clue-slot]')).toHaveCount(6);
+    await expect(page.locator('#hk-clues-count')).toContainText('0/6');
     await expect(page.locator('#hk-snippets')).toHaveCount(0);
     await expect(page.locator('#hk-command-ref')).toHaveCount(0);
 
@@ -96,6 +101,8 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
       const editorPane = document.getElementById('hk-editor-pane').getBoundingClientRect();
       const arenaPane = document.getElementById('hk-arena-pane').getBoundingClientRect();
       const missionPanel = document.getElementById('hk-mission-panel').getBoundingClientRect();
+      const codePanel = document.getElementById('hk-code-panel').getBoundingClientRect();
+      const cluesPanel = document.getElementById('hk-clues-panel').getBoundingClientRect();
       const editor = document.getElementById('hk-code-editor').getBoundingClientRect();
       const canvas = document.getElementById('hk-arena-canvas').getBoundingClientRect();
       const timer = document.getElementById('hk-turn-timer').getBoundingClientRect();
@@ -105,6 +112,7 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
         editorRatio: editorPane.width / total,
         arenaRatio: arenaPane.width / total,
         missionAboveEditor: missionPanel.bottom <= editor.top + 4,
+        cluesBelowEditor: codePanel.bottom <= cluesPanel.top + 4,
         editorVisible: editor.width > 200 && editor.height > 150,
         canvasVisible: canvas.width > 600 && canvas.height > 150,
         timerVisible: timer.width > 40 && timer.height > 20,
@@ -116,6 +124,7 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
     expect(layoutOk.arenaRatio).toBeGreaterThan(0.67);
     expect(layoutOk.arenaRatio).toBeLessThan(0.73);
     expect(layoutOk.missionAboveEditor).toBe(true);
+    expect(layoutOk.cluesBelowEditor).toBe(true);
     expect(layoutOk.editorVisible).toBe(true);
     expect(layoutOk.canvasVisible).toBe(true);
     expect(layoutOk.timerVisible).toBe(true);
@@ -147,12 +156,36 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
     await expect(page.locator('#hk-help-overlay')).toBeHidden();
     expect(await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().turnIndex)).toBe(0);
 
-    // Inspect interior object (urn at 8,2) -> displays collected intel in mission panel
+    // Inspect two interior objects (urn at 8,2 and locker at 10,2) -> fill 2/6 clue slots & switch between them
     await enterEditorRun(page, 'вверх; вверх\nнц 7 раз\nвправо\nкц\nосмотреть сверху');
-    await expect(page.locator('#hk-intel-box')).toBeVisible();
-    await expect(page.locator('#hk-intel-box')).toContainText('УЛИКА:');
+    await expect(page.locator('#hk-clues-count')).toContainText('1/6');
+    await expect(page.locator('#hk-intel-box')).toContainText('УЛИКА #1');
     await expect(page.locator('#hk-intel-box')).toContainText('.gate.conf');
-    expect(await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().inspectedCount)).toBe(1);
+
+    await enterEditorRun(page, 'вправо; вправо; осмотреть сверху');
+    await expect(page.locator('#hk-clues-count')).toContainText('2/6');
+    await expect(page.locator('#hk-intel-box')).toContainText('УЛИКА #2');
+    await expect(page.locator('#hk-intel-box')).toContainText('unlock');
+
+    // Clicking slot 0 reads the first clue at any moment
+    await page.locator('[data-clue-slot="0"]').click();
+    await expect(page.locator('#hk-intel-box')).toContainText('УЛИКА #1');
+    await expect(page.locator('#hk-intel-box')).toContainText('.gate.conf');
+    expect(await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().inspectedCount)).toBe(2);
+
+    // Highlight rectangles are sized to individual objects (door != urn != sofa)
+    const rectsCheck = await page.evaluate(() => {
+      const r = window.__HOTLINE_KUMIR_TEST__.getHighlightRects();
+      const door = r.doors[0]?.rect;
+      const urn = r.interactables.find((i) => i.id === 'l1-urn')?.rect;
+      const sofa = r.interactables.find((i) => i.id === 'l1-sofa')?.rect;
+      return { door, urn, sofa, exit: r.exit };
+    });
+    expect(rectsCheck.door.w).toBeLessThanOrEqual(20);
+    expect(rectsCheck.door.h).toBeGreaterThanOrEqual(44);
+    expect(rectsCheck.urn.w).toBeLessThanOrEqual(24);
+    expect(rectsCheck.sofa.w).toBeGreaterThan(75);
+    expect(rectsCheck.exit.w).toBeLessThanOrEqual(26);
 
     // Idle-Zero check: rAF must stay stopped during idle coding
     const statsBefore = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getRenderStats());
