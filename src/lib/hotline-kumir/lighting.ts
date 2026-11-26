@@ -79,7 +79,8 @@ export function renderLightmap(
   camera: Camera2D,
   snap: WorldSnapshot,
   sirenPhase: number,
-  tilePx: number
+  tilePx: number,
+  gbrVanWorldPos?: { x: number; y: number; rot: number } | null
 ): void {
   const lw = Math.max(1, Math.ceil(camera.viewW / 2));
   const lh = Math.max(1, Math.ceil(camera.viewH / 2));
@@ -162,11 +163,19 @@ export function renderLightmap(
     0.82
   );
 
-  // GBR van strobe cutout
+  // GBR van strobe & headlight cutout
   if (snap.alarmTriggered || snap.gbrSpawned) {
-    const gx = snap.scene.gbrVanPos.x * tilePx;
-    const gy = snap.scene.gbrVanPos.y * tilePx;
+    const gx = gbrVanWorldPos ? gbrVanWorldPos.x : snap.scene.gbrVanPos.x * tilePx;
+    const gy = gbrVanWorldPos ? gbrVanWorldPos.y : snap.scene.gbrVanPos.y * tilePx;
+    const gRot = gbrVanWorldPos ? gbrVanWorldPos.rot : snap.scene.gbrVanPos.rot;
+    const gRad = ((gRot - 90) * Math.PI) / 180;
     punchLight(gx, gy, tilePx * 4.2, 0.95);
+    punchLight(
+      gx + Math.cos(gRad) * tilePx * 1.9,
+      gy + Math.sin(gRad) * tilePx * 1.9,
+      tilePx * 3.1,
+      0.9
+    );
     const pulse = Math.floor(sirenPhase) % 2 === 0 ? 1 : 0.7;
     punchLight(snap.gbrSpawnPos.x * tilePx + tilePx / 2, snap.gbrSpawnPos.y * tilePx + tilePx / 2, tilePx * 3.2 * pulse, 0.85);
   }
@@ -178,7 +187,8 @@ export function renderAdditiveGlows(
   ctx: CanvasRenderingContext2D,
   snap: WorldSnapshot,
   sirenPhase: number,
-  tilePx: number
+  tilePx: number,
+  gbrVanWorldPos?: { x: number; y: number; rot: number } | null
 ): void {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -220,14 +230,34 @@ export function renderAdditiveGlows(
   }
   ctx.restore();
 
-  // GBR van siren glow wash
+  // GBR van directional headlights & siren glow wash
   if (snap.alarmTriggered || snap.gbrSpawned) {
-    const vx = snap.scene.gbrVanPos.x * tilePx;
-    const vy = snap.scene.gbrVanPos.y * tilePx;
+    const vx = gbrVanWorldPos ? gbrVanWorldPos.x : snap.scene.gbrVanPos.x * tilePx;
+    const vy = gbrVanWorldPos ? gbrVanWorldPos.y : snap.scene.gbrVanPos.y * tilePx;
+    const vRot = gbrVanWorldPos ? gbrVanWorldPos.rot : snap.scene.gbrVanPos.rot;
+    const vAng = ((vRot - 90) * Math.PI) / 180;
+    ctx.save();
+    ctx.translate(vx, vy);
+    ctx.rotate(vAng);
+    for (const side of [-9, 9]) {
+      const beamGrad = ctx.createLinearGradient(22, side, 148, side);
+      beamGrad.addColorStop(0, 'rgba(224, 242, 254, 0.34)');
+      beamGrad.addColorStop(1, 'rgba(224, 242, 254, 0)');
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.moveTo(22, side - 3);
+      ctx.lineTo(148, side - 26);
+      ctx.lineTo(148, side + 26);
+      ctx.lineTo(22, side + 3);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
     const redFirst = Math.floor(sirenPhase) % 2 === 0;
     const r = tilePx * 3.8;
     const g1 = ctx.createRadialGradient(vx, vy, 4, vx, vy, r);
-    g1.addColorStop(0, redFirst ? 'rgba(255, 30, 66, 0.38)' : 'rgba(0, 168, 255, 0.38)');
+    g1.addColorStop(0, redFirst ? 'rgba(255, 30, 66, 0.42)' : 'rgba(0, 168, 255, 0.42)');
     g1.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = g1;
     ctx.beginPath();

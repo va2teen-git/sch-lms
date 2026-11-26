@@ -3,16 +3,25 @@ import Layout from '../../layouts/Layout.astro';
 import HotlineKumir from '../../components/HotlineKumir.astro';
 ---
 
-<Layout title="Hotline KuMir — Ночной стелс и скоростное программирование">
+<Layout title="Кибер-Boy — Ночной стелс и скоростное программирование">
   <HotlineKumir />
 </Layout>
 
 <script is:inline src="/static/lms-telemetry.js"></script>
 <script>
   import { initHotlineKumirController } from '../../lib/hotline-kumir/controller.ts';
+  import type { MaskId } from '../../lib/hotline-kumir/types.ts';
 
   const root = document.getElementById('hotline-kumir-root');
   const studentBadge = document.getElementById('hk-student-badge');
+  const backLink = document.getElementById('hk-back-link') as HTMLAnchorElement | null;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const rawReturnTo = urlParams.get('returnTo') || '';
+  if (backLink && /^\/lesson\/[^/]+\/[^/]+$/.test(rawReturnTo) && !rawReturnTo.includes('//')) {
+    backLink.href = rawReturnTo;
+    backLink.textContent = '← К УРОКУ';
+  }
 
   const firstName = (localStorage.getItem('student_firstName') || 'Агент').trim();
   const lastName = (localStorage.getItem('student_lastName') || 'Ночной').trim();
@@ -22,18 +31,57 @@ import HotlineKumir from '../../components/HotlineKumir.astro';
     studentBadge.textContent = `${lastName} ${firstName} (${studentClass})`;
   }
 
+  const studentStorageKey = `${studentClass}:${lastName}:${firstName}`;
+  const levelStorageKey = `cyber_boy_level:${studentStorageKey}`;
+  const maskStorageKey = `cyber_boy_mask:${studentStorageKey}`;
+
+  const cachedLevel = parseInt(localStorage.getItem(levelStorageKey) || '1', 10);
+  const initialLevel = Number.isFinite(cachedLevel) ? Math.min(5, Math.max(1, cachedLevel)) : 1;
+  const cachedMask = (localStorage.getItem(maskStorageKey) || 'richard') as MaskId;
+
   if (root) {
     const tracker = window.LMSTelemetry?.create?.({
-      missionName: 'Hotline KuMir',
+      missionName: 'Кибер-Boy',
       totalStages: 5,
     });
 
     initHotlineKumirController(root, {
+      initialLevel,
+      initialMask: cachedMask,
+      loadSavedProgress: async () => {
+        try {
+          const res = await fetch(
+            `/api/hotline-kumir/progress?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&className=${encodeURIComponent(studentClass)}`
+          );
+          if (!res.ok) return null;
+          const data = await res.json();
+          const currentLevel = Math.min(5, Math.max(1, Number(data?.currentLevel || 1)));
+          localStorage.setItem(levelStorageKey, String(currentLevel));
+          if (data?.selectedMask) {
+            localStorage.setItem(maskStorageKey, String(data.selectedMask));
+          }
+          return {
+            currentLevel,
+            completedCount: Number(data?.completedCount || 0),
+            campaignCompleted: Boolean(data?.campaignCompleted),
+            selectedMask: data?.selectedMask as MaskId | undefined,
+          };
+        } catch {
+          return null;
+        }
+      },
+      onLevelChange: (levelId, mask) => {
+        localStorage.setItem(levelStorageKey, String(levelId));
+        localStorage.setItem(maskStorageKey, mask);
+      },
       onMissionStart: () => {
         tracker?.start?.();
         tracker?.markActivity?.();
       },
       onMissionComplete: async (result, snap) => {
+        const optimisticNext = Math.min(5, result.levelId + 1);
+        localStorage.setItem(levelStorageKey, String(optimisticNext));
+        localStorage.setItem(maskStorageKey, result.mask);
         const meta = {
           level: result.levelId,
           mask: result.mask,
@@ -69,7 +117,7 @@ import HotlineKumir from '../../components/HotlineKumir.astro';
           if (window.parent && window.parent !== window && tracker?.send) {
             tracker.send('hotline_kumir_complete', payload);
           } else {
-            await Promise.all([
+            const [, progRes] = await Promise.all([
               fetch('/api/telemetry', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -96,6 +144,12 @@ import HotlineKumir from '../../components/HotlineKumir.astro';
                 }),
               }),
             ]);
+            if (progRes.ok) {
+              const progData = await progRes.json();
+              if (progData?.currentLevel) {
+                localStorage.setItem(levelStorageKey, String(progData.currentLevel));
+              }
+            }
           }
         } catch (err) {
           console.warn('Telemetry send error:', err);

@@ -63,6 +63,67 @@ test('KuMir interpreter: reports Russian errors with accurate line numbers', () 
   }
 });
 
+test('KuMir interpreter: Cyber-Boy lore commands (пометить, обезвредить, датчики метки, блок закрасить/открыть)', () => {
+  const okLore = compileKumir(`
+    использовать Агент
+    пометить
+    поставить метку
+    активировать
+    отключить лазер вправо
+    бросить маячок вправо
+    приманка влево
+    обезвредить
+    если метка стоит и рядом пк то
+      подключиться
+    все
+    если метки нет или реле неактивно то
+      ждать
+    все
+  `);
+  assert.equal(okLore.ok, true);
+  if (okLore.ok) {
+    const actions: string[] = [];
+    const gen = executeKumirProgram(okLore.program, {
+      evalSensor: (s) => s === 'IS_PAINTED' || s === 'NEAR_TERMINAL',
+    });
+    while (true) {
+      const step = gen.next();
+      if (step.done) break;
+      if (step.value.status === 'YIELD_ACTION') {
+        actions.push(`${step.value.request.action}:${step.value.request.dir || ''}`);
+      }
+    }
+    assert.deepEqual(actions, [
+      'PAINT:',
+      'PAINT:',
+      'PAINT:',
+      'DISABLE:RIGHT',
+      'THROW:RIGHT',
+      'THROW:LEFT',
+      'FINISH:',
+      'HACK:',
+    ]);
+  }
+
+  const oldPaint = compileKumir('закрасить');
+  assert.equal(oldPaint.ok, false);
+  if (!oldPaint.ok) {
+    assert.match(oldPaint.errors[0].messageRu, /пометить/);
+  }
+
+  const oldSensor = compileKumir('если клетка закрашена то ждать все');
+  assert.equal(oldSensor.ok, false);
+  if (!oldSensor.ok) {
+    assert.match(oldSensor.errors[0].messageRu, /метка стоит/);
+  }
+
+  const openDoor = compileKumir('открыть вправо');
+  assert.equal(openDoor.ok, false);
+  if (!openDoor.ok) {
+    assert.match(openDoor.errors[0].messageRu, /выбить дверь/);
+  }
+});
+
 test('KuMir interpreter: stops empty infinite loop and recursive overflow safely', () => {
   const loopRes = compileKumir('нц пока сверху стена\nкц');
   assert.equal(loopRes.ok, true);
@@ -216,7 +277,7 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
   g1.runProgramImmediate('вверх; вверх\nнц 4 раз\nвправо\nкц\nподключиться');
   g1.execLinuxCommand('unlock 4821');
   g1.exitTerminal();
-  const r1 = g1.runProgramImmediate('нц 10 раз\nвправо\nкц\nзакрасить\nвправо; вправо; вправо\nнц 4 раз\nвниз\nкц');
+  const r1 = g1.runProgramImmediate('нц 10 раз\nвправо\nкц\nпометить\nвправо; вправо; вправо\nнц 4 раз\nвниз\nкц');
   assert.equal(r1.snapshot.phase, 'EXTRACTION');
   assert.equal(r1.snapshot.lastResult?.styleBadge, 'GHOST');
 
@@ -227,7 +288,7 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
   g2.execLinuxCommand('camctl off cam-01 NEON-774');
   g2.execLinuxCommand('laserctl off L1 NEON-774');
   g2.exitTerminal();
-  const r2 = g2.runProgramImmediate('вверх\nнц 5 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nзакрасить\nнц 5 раз\nвверх\nкц\nнц 9 раз\nвправо\nкц\nвниз');
+  const r2 = g2.runProgramImmediate('вверх\nнц 5 раз\nвправо\nкц\nнц 5 раз\nвниз\nкц\nпометить\nнц 5 раз\nвверх\nкц\nнц 9 раз\nвправо\nкц\nвниз');
   assert.equal(r2.snapshot.phase, 'EXTRACTION');
   assert.equal(r2.snapshot.lastResult?.styleBadge, 'GHOST');
 
@@ -240,10 +301,10 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
   g3.execLinuxCommand('vault_unlock MEOA-902');
   g3.exitTerminal();
   g3.runProgramImmediate(
-    'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nзакрасить\nнц 6 раз\nвлево\nкц\nнц 4 раз\nвверх\nкц'
+    'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nпометить\nнц 6 раз\nвлево\nкц\nнц 4 раз\nвверх\nкц'
   );
   const r3 = g3.runProgramImmediate(
-    'ждать; вверх; рывок вправо; бросить вправо; вправо\nесли справа враг то\n  оглушить\n  добить\nвсе\nнц 5 раз\n  вправо\nкц\nвниз; вниз; вправо'
+    'ждать; вверх; рывок вправо; бросить вправо; вправо\nесли справа враг то\n  оглушить\n  обезвредить\nвсе\nнц 5 раз\n  вправо\nкц\nвниз; вниз; вправо'
   );
   assert.equal(r3.snapshot.phase, 'EXTRACTION');
   assert.equal(r3.snapshot.lastResult?.styleBadge, 'GHOST');
@@ -256,7 +317,7 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
   g4.execLinuxCommand('tar -czf /mnt/usb/audit.tar.gz /srv/secret');
   g4.exitTerminal();
   g4.runProgramImmediate(
-    'вверх\nнц 8 раз\nвправо\nкц\nзакрасить\nнц 8 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nзакрасить'
+    'вверх\nнц 8 раз\nвправо\nкц\nпометить\nнц 8 раз\nвлево\nкц\nвверх; вверх; бросить влево\nнц 3 раз\nвверх\nкц\nнц 3 раз\nвправо\nкц\nпометить'
   );
   const r4 = g4.runProgramImmediate(
     'вправо; вправо; вправо; вниз\nнц пока не снизу опасно\n  ждать\nкц\nвниз; отключить влево; вправо; вправо; вправо; вниз'
@@ -267,13 +328,13 @@ test('Full 5-level playthroughs: GHOST stealth routes across all 5 levels', () =
   // Level 5 GHOST (2 relays: *1(6,9) and *2(26,5), silent truncate -s 0)
   const g5 = new HotlineGameEngine(5, 'richard', 42);
   g5.startMission();
-  g5.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; закрасить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться');
+  g5.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; пометить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться');
   g5.execLinuxCommand('chmod 600 /home/root_backup/.ssh/id_rsa');
   g5.execLinuxCommand('scp -P 2222 -i /home/root_backup/.ssh/id_rsa master@127.0.0.1:/vault/dump.sql /mnt/usb/');
   g5.execLinuxCommand('truncate -s 0 /var/log/access.log');
   g5.exitTerminal();
   const r5 = g5.runProgramImmediate(
-    'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; закрасить; вверх; влево; вверх; вверх; вправо'
+    'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; пометить; вверх; влево; вверх; вверх; вправо'
   );
   assert.equal(r5.snapshot.phase, 'EXTRACTION');
   assert.equal(r5.snapshot.lastResult?.styleBadge, 'GHOST');
@@ -290,7 +351,7 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   g3Esc.execLinuxCommand('vault_unlock MEOA-902');
   g3Esc.exitTerminal();
   const r3Esc = g3Esc.runProgramImmediate(
-    'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nзакрасить; влево; влево; вверх; выбить дверь вверх; вверх; вверх\nнц 5 раз\nвправо\nкц'
+    'вниз; вниз; вниз\nнц 6 раз\nвправо\nкц\nпометить; влево; влево; вверх; выбить дверь вверх; вверх; вверх\nнц 5 раз\nвправо\nкц'
   );
   assert.equal(r3Esc.snapshot.phase, 'EXTRACTION');
   assert.equal(r3Esc.snapshot.lastResult?.styleBadge, 'ESCAPE');
@@ -306,14 +367,14 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   // Level 5 ESCAPE via rm tamper
   const g5Esc = new HotlineGameEngine(5, 'richard', 42);
   g5Esc.startMission();
-  g5Esc.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; закрасить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться');
+  g5Esc.runProgramImmediate('нц 4 раз\nвправо\nкц\nнц 6 раз\nвниз\nкц\nвправо; пометить\nнц 6 раз\nвправо\nкц\nнц 3 раз\nвверх\nкц\nподключиться');
   g5Esc.execLinuxCommand('chmod 600 /home/root_backup/.ssh/id_rsa');
   g5Esc.execLinuxCommand('scp -P 2222 -i /home/root_backup/.ssh/id_rsa master@127.0.0.1:/vault/dump.sql /mnt/usb/');
   g5Esc.execLinuxCommand('rm /var/log/access.log');
   g5Esc.exitTerminal();
   assert.equal(g5Esc.getSnapshot().phase, 'ESCAPE_RACE');
   const r5Esc = g5Esc.runProgramImmediate(
-    'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; закрасить; вверх; влево; вверх; вверх; вправо'
+    'вниз; вниз; вниз\nнц 8 раз\nвправо\nкц\nвверх\nнц пока не сверху опасно\n  ждать\nкц\nвверх; вверх; отключить влево\nнц 6 раз\nвправо\nкц\nвверх; пометить; вверх; влево; вверх; вверх; вправо'
   );
   assert.equal(r5Esc.snapshot.phase, 'EXTRACTION');
   assert.equal(r5Esc.snapshot.lastResult?.styleBadge, 'ESCAPE');
@@ -338,8 +399,8 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   g1.execLinuxCommand('unlock 4821');
   g1.exitTerminal();
 
-  const killIfNear = 'если рядом враг то\n  оглушить\n  добить\nвсе';
-  g1.runProgramImmediate(`${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nзакрасить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц`);
+  const killIfNear = 'если рядом враг то\n  оглушить\n  обезвредить\nвсе';
+  g1.runProgramImmediate(`${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nпометить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц`);
   const endSnap = g1.getSnapshot();
   assert.equal(endSnap.phase, 'EXTRACTION');
   assert.equal(endSnap.lastResult?.styleBadge, 'COMBAT');
@@ -352,7 +413,7 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   g4Bear.execLinuxCommand('gridctl reset --no-alarm');
   g4Bear.execLinuxCommand('tar -czf /mnt/usb/audit.tar.gz /srv/secret');
   g4Bear.exitTerminal();
-  g4Bear.runProgramImmediate('вверх\nнц 8 раз\nвправо\nкц\nзакрасить');
+  g4Bear.runProgramImmediate('вверх\nнц 8 раз\nвправо\nкц\nпометить');
   // Trigger alarm by breaching D2(22,6) and wait for GBR (gbr_boar + gbr_bear)
   g4Bear.runProgramImmediate('вправо; выбить дверь вверх');
   while (!g4Bear.getSnapshot().gbrSpawned) {

@@ -36,10 +36,14 @@ export interface HotlineLevelProgressRow {
 export interface StudentHotlineProgressSummary {
   completedCount: number;
   totalLevels: number;
+  currentLevel: number;
+  campaignCompleted: boolean;
+  selectedMask: string;
   levels: HotlineLevelProgressRow[];
 }
 
 const RANK_WEIGHT: Record<string, number> = { S: 4, A: 3, B: 2, C: 1 };
+const TOTAL_CAMPAIGN_LEVELS = 5;
 
 export function ensureHotlineKumirProgressSchema(db: Database.Database): void {
   db.exec(`
@@ -65,6 +69,19 @@ export function ensureHotlineKumirProgressSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_hk_progress_student
       ON hotline_kumir_progress(first_name, last_name, student_class);
+
+    CREATE TABLE IF NOT EXISTS hotline_kumir_state (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      student_class TEXT NOT NULL,
+      current_level INTEGER NOT NULL DEFAULT 1,
+      selected_mask TEXT NOT NULL DEFAULT 'richard',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(first_name, last_name, student_class)
+    );
+    CREATE INDEX IF NOT EXISTS idx_hk_state_student
+      ON hotline_kumir_state(first_name, last_name, student_class);
   `);
 }
 
@@ -73,6 +90,23 @@ export function hasHotlineKumirProgressTable(db: Database.Database): boolean {
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='hotline_kumir_progress'")
     .get() as { name?: string } | undefined;
   return Boolean(row?.name);
+}
+
+function hasHotlineKumirStateTable(db: Database.Database): boolean {
+  const row = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='hotline_kumir_state'")
+    .get() as { name?: string } | undefined;
+  return Boolean(row?.name);
+}
+
+function computeNextLevel(completedLevelIds: Iterable<number>): { currentLevel: number; campaignCompleted: boolean } {
+  const done = new Set(completedLevelIds);
+  for (let lvl = 1; lvl <= TOTAL_CAMPAIGN_LEVELS; lvl++) {
+    if (!done.has(lvl)) {
+      return { currentLevel: lvl, campaignCompleted: false };
+    }
+  }
+  return { currentLevel: TOTAL_CAMPAIGN_LEVELS, campaignCompleted: true };
 }
 
 export function upsertHotlineKumirProgress(
@@ -84,6 +118,12 @@ export function upsertHotlineKumirProgress(
   const firstName = rec.firstName.trim();
   const lastName = rec.lastName.trim();
   const className = rec.className.trim();
+
+  const beforeSummary = getStudentHotlineProgress(db, { firstName, lastName, className });
+  const maxAllowedLevel = beforeSummary.campaignCompleted ? TOTAL_CAMPAIGN_LEVELS : beforeSummary.currentLevel;
+  if (rec.levelId > maxAllowedLevel) {
+    throw new Error('LEVEL_LOCKED');
+  }
 
   const existing = db
     .prepare(
@@ -172,6 +212,19 @@ export function upsertHotlineKumirProgress(
     );
   }
 
+  const completedIds = new Set(beforeSummary.levels.map((l) => l.levelId));
+  completedIds.add(rec.levelId);
+  const { currentLevel: nextLevel } = computeNextLevel(completedIds);
+
+  db.prepare(
+    `INSERT INTO hotline_kumir_state (first_name, last_name, student_class, current_level, selected_mask, updated_at)
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(first_name, last_name, student_class) DO UPDATE SET
+       current_level = excluded.current_level,
+       selected_mask = excluded.selected_mask,
+       updated_at = CURRENT_TIMESTAMP`
+  ).run(firstName, lastName, className, nextLevel, rec.maskId || 'richard');
+
   return getStudentHotlineProgress(db, { firstName, lastName, className });
 }
 
@@ -180,8 +233,19 @@ export function getStudentHotlineProgress(
   student: { firstName: string; lastName: string; className: string }
 ): StudentHotlineProgressSummary {
   if (!hasHotlineKumirProgressTable(db)) {
-    return { completedCount: 0, totalLevels: 5, levels: [] };
+    return {
+      completedCount: 0,
+      totalLevels: TOTAL_CAMPAIGN_LEVELS,
+      currentLevel: 1,
+      campaignCompleted: false,
+      selectedMask: 'richard',
+      levels: [],
+    };
   }
+
+  const firstName = student.firstName.trim();
+  const lastName = student.lastName.trim();
+  const className = student.className.trim();
 
   const rows = db
     .prepare(
@@ -192,7 +256,7 @@ export function getStudentHotlineProgress(
        WHERE first_name = ? AND last_name = ? AND student_class = ?
        ORDER BY level_id ASC`
     )
-    .all(student.firstName.trim(), student.lastName.trim(), student.className.trim()) as Array<{
+    .all(firstName, lastName, className) as Array<{
     level_id: number;
     best_rank: string;
     best_score: number;
@@ -224,9 +288,27 @@ export function getStudentHotlineProgress(
     updatedAt: r.updated_at,
   }));
 
+  const { currentLevel, campaignCompleted } = computeNextLevel(levels.map((l) => l.levelId));
+
+  let selectedMask = 'richard';
+  if (hasHotlineKumirStateTable(db)) {
+    const stateRow = db
+      .prepare(
+        `SELECT selected_mask FROM hotline_kumir_state
+         WHERE first_name = ? AND last_name = ? AND student_class = ?`
+      )
+      .get(firstName, lastName, className) as { selected_mask?: string } | undefined;
+    if (stateRow?.selected_mask) {
+      selectedMask = stateRow.selected_mask;
+    }
+  }
+
   return {
     completedCount: levels.length,
-    totalLevels: 5,
+    totalLevels: TOTAL_CAMPAIGN_LEVELS,
+    currentLevel,
+    campaignCompleted,
+    selectedMask,
     levels,
   };
 }

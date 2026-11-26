@@ -220,6 +220,10 @@ export class HotlineCanvasRenderer {
   private shakeIntensity = 0;
   private sirenPhase = 0;
   private dpr = 1;
+  private gbrVanCurrentX: number | null = null;
+  private gbrVanAnim: { fromX: number; toX: number; elapsed: number; duration: number } | null = null;
+  private gbrLastProgress = -1;
+  private gbrSkidAlpha = 0;
 
   private readonly onVisibilityChange = () => {
     if (typeof document !== 'undefined' && document.hidden) {
@@ -324,6 +328,49 @@ export class HotlineCanvasRenderer {
     };
   }
 
+  getGbrAnimationState(): { active: boolean; progress: number; x: number | null; animating: boolean } {
+    return {
+      active: Boolean(this.snapshot && (this.snapshot.alarmTriggered || this.snapshot.gbrSpawned)),
+      progress: this.gbrLastProgress < 0 ? 0 : Number(this.gbrLastProgress.toFixed(3)),
+      x: this.gbrVanCurrentX !== null ? Number(this.gbrVanCurrentX.toFixed(1)) : null,
+      animating: this.gbrVanAnim !== null,
+    };
+  }
+
+  private getGbrVanTarget(snap: WorldSnapshot): {
+    progress: number;
+    startX: number;
+    parkX: number;
+    targetX: number;
+    y: number;
+    rot: number;
+  } | null {
+    if (!snap.alarmTriggered && !snap.gbrSpawned) return null;
+    const parkX = Math.max(snap.scene.gbrVanPos.x, snap.width + 1.8) * TILE_PX;
+    const startX = (snap.width + snap.scene.exteriorMargin + 2.6) * TILE_PX;
+    const raw = (snap.gbrEtaMaxTurns - snap.gbrEtaTurns) / Math.max(1, snap.gbrEtaMaxTurns);
+    const progress = snap.gbrSpawned ? 1 : Math.min(0.92, 0.14 + Math.max(0, raw) * 0.78);
+    const targetX = startX + (parkX - startX) * progress;
+    return {
+      progress,
+      startX,
+      parkX,
+      targetX,
+      y: snap.scene.gbrVanPos.y * TILE_PX,
+      rot: snap.scene.gbrVanPos.rot,
+    };
+  }
+
+  private getCurrentGbrVanWorldPos(snap: WorldSnapshot): { x: number; y: number; rot: number } | null {
+    const target = this.getGbrVanTarget(snap);
+    if (!target) return null;
+    return {
+      x: this.gbrVanCurrentX ?? target.targetX,
+      y: target.y,
+      rot: target.rot,
+    };
+  }
+
   resize(): void {
     if (!this.snapshot) return;
     this.ensureCanvasDimensions();
@@ -376,9 +423,40 @@ export class HotlineCanvasRenderer {
       this.camera.zoom = 1.0;
       const p = tileCenter(snapshot.player.x, snapshot.player.y);
       this.camera.followTarget(p.cx, p.cy, 16, true);
+      this.gbrVanCurrentX = null;
+      this.gbrVanAnim = null;
+      this.gbrLastProgress = -1;
+      this.gbrSkidAlpha = 0;
     }
 
     this.ensureBackdropCache(snapshot);
+
+    const vanTarget = this.getGbrVanTarget(snapshot);
+    if (!vanTarget) {
+      this.gbrVanCurrentX = null;
+      this.gbrVanAnim = null;
+      this.gbrLastProgress = -1;
+      this.gbrSkidAlpha = 0;
+    } else if (this.fastAnim) {
+      this.gbrVanCurrentX = vanTarget.targetX;
+      this.gbrVanAnim = null;
+      this.gbrLastProgress = vanTarget.progress;
+      this.gbrSkidAlpha = vanTarget.progress >= 0.7 ? 0.65 : 0;
+    } else if (Math.abs(this.gbrLastProgress - vanTarget.progress) > 0.001) {
+      const fromX = this.gbrVanCurrentX ?? vanTarget.startX;
+      this.gbrVanCurrentX = fromX;
+      this.gbrVanAnim = {
+        fromX,
+        toX: vanTarget.targetX,
+        elapsed: 0,
+        duration: snapshot.gbrSpawned ? 350 : 380,
+      };
+      this.gbrLastProgress = vanTarget.progress;
+      if (vanTarget.progress >= 0.7) {
+        this.gbrSkidAlpha = 0.65;
+      }
+      this.spawnBurst(vanTarget.targetX / TILE_PX + 1.1, snapshot.scene.gbrVanPos.y, ['#94A3B8', '#FF1E42', '#00A8FF'], 8, 280);
+    }
 
     if (!this.fastAnim && events.length > 0) {
       this.ingestEvents(snapshot, events);
@@ -415,6 +493,13 @@ export class HotlineCanvasRenderer {
     this.fxTimerMs = 0;
     this.fxKind = 'NONE';
     this.shakeIntensity = 0;
+    this.gbrVanAnim = null;
+    if (this.snapshot) {
+      const vt = this.getGbrVanTarget(this.snapshot);
+      this.gbrVanCurrentX = vt ? vt.targetX : null;
+      this.gbrLastProgress = vt ? vt.progress : -1;
+      this.gbrSkidAlpha = vt && vt.progress >= 0.7 ? 0.65 : 0;
+    }
     this.stopLoop();
   }
 
@@ -432,7 +517,8 @@ export class HotlineCanvasRenderer {
       this.throwArcs.length > 0 ||
       this.particles.length > 0 ||
       this.shockwaves.length > 0 ||
-      this.fxTimerMs > 0
+      this.fxTimerMs > 0 ||
+      this.gbrVanAnim !== null
     );
   }
 
@@ -541,8 +627,32 @@ export class HotlineCanvasRenderer {
         if (ev.x !== undefined && ev.y !== undefined) {
           this.spawnBurst(ev.x, ev.y, ['#FF1E42', '#F8FAFC'], 14, 280);
         }
-      } else if (ev.type === 'ALERT_TRIGGERED' || ev.type === 'GBR_ARRIVED') {
+      } else if (ev.type === 'ALERT_TRIGGERED') {
         this.triggerFx('ALARM_PULSE', MAX_FX_MS, 5.5);
+      } else if (ev.type === 'GBR_ARRIVED') {
+        this.triggerFx('ALARM_PULSE', MAX_FX_MS, 5.5);
+        this.shockwaves.push({
+          x: snap.gbrSpawnPos.x,
+          y: snap.gbrSpawnPos.y,
+          maxR: TILE_PX * 1.6,
+          color: '#FF1E42',
+          life: 320,
+          maxLife: 320,
+        });
+        const entryFromX = Math.min(snap.width + 1, Math.round(snap.scene.gbrVanPos.x));
+        const entryFromY = Math.round(snap.scene.gbrVanPos.y);
+        for (const e of snap.enemies) {
+          if (e.isGbr) {
+            this.moveAnims.set(e.id, {
+              fromX: entryFromX,
+              fromY: entryFromY,
+              toX: e.x,
+              toY: e.y,
+              elapsed: 0,
+              duration: 240,
+            });
+          }
+        }
       }
     }
   }
@@ -620,6 +730,16 @@ export class HotlineCanvasRenderer {
         if (this.fxTimerMs === 0) {
           this.fxKind = 'NONE';
           this.shakeIntensity = 0;
+        }
+      }
+      if (this.gbrVanAnim) {
+        this.gbrVanAnim.elapsed += dt;
+        const t = Math.min(1, this.gbrVanAnim.elapsed / this.gbrVanAnim.duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        this.gbrVanCurrentX = this.gbrVanAnim.fromX + (this.gbrVanAnim.toX - this.gbrVanAnim.fromX) * eased;
+        if (t >= 1) {
+          this.gbrVanCurrentX = this.gbrVanAnim.toX;
+          this.gbrVanAnim = null;
         }
       }
       this.sirenPhase += dt * 0.012;
@@ -1016,7 +1136,8 @@ export class HotlineCanvasRenderer {
     this.drawLightingAndCones(ctx, snap);
 
     // L3: GBR Van, Dash Trails, Animated Multi-Layer Characters
-    this.drawGbrStreetPresence(ctx, snap);
+    const gbrVanWorldPos = this.getCurrentGbrVanWorldPos(snap);
+    this.drawGbrStreetPresence(ctx, snap, gbrVanWorldPos);
     this.drawDashTrails(ctx);
 
     for (const enemy of snap.enemies) {
@@ -1028,12 +1149,12 @@ export class HotlineCanvasRenderer {
     this.drawOverheadProps(ctx, snap);
 
     // L5a: Additive Neon Glows & Particles in world space
-    renderAdditiveGlows(ctx, snap, this.sirenPhase, TILE_PX);
+    renderAdditiveGlows(ctx, snap, this.sirenPhase, TILE_PX, gbrVanWorldPos);
     this.drawEffectsOverlay(ctx);
 
     // L5b: Half-res Offscreen Night Lightmap in screen space
     if (this.lightCanvas) {
-      renderLightmap(this.lightCanvas, this.camera, snap, this.sirenPhase, TILE_PX);
+      renderLightmap(this.lightCanvas, this.camera, snap, this.sirenPhase, TILE_PX, gbrVanWorldPos);
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       ctx.drawImage(this.lightCanvas, 0, 0, viewW, viewH);
     }
@@ -1362,18 +1483,36 @@ export class HotlineCanvasRenderer {
     }
   }
 
-  private drawGbrStreetPresence(ctx: CanvasRenderingContext2D, snap: WorldSnapshot): void {
-    if (!snap.alarmTriggered && !snap.gbrSpawned) return;
-    const vanPos = snap.scene.gbrVanPos;
-    const vx = Math.max(vanPos.x, snap.width + 2.2) * TILE_PX;
-    const vy = vanPos.y * TILE_PX;
+  private drawGbrStreetPresence(
+    ctx: CanvasRenderingContext2D,
+    snap: WorldSnapshot,
+    gbrVanWorldPos: { x: number; y: number; rot: number } | null
+  ): void {
+    if (!gbrVanWorldPos || (!snap.alarmTriggered && !snap.gbrSpawned)) return;
+    const vx = gbrVanWorldPos.x;
+    const vy = gbrVanWorldPos.y;
     const redFirst = Math.floor(this.sirenPhase) % 2 === 0;
+
+    if (this.gbrSkidAlpha > 0) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(15, 23, 42, ${this.gbrSkidAlpha.toFixed(2)})`;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([10, 4]);
+      ctx.beginPath();
+      ctx.moveTo(vx + 22, vy - 12);
+      ctx.lineTo(vx + 110, vy - 12);
+      ctx.moveTo(vx + 22, vy + 12);
+      ctx.lineTo(vx + 110, vy + 12);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     const vanRect = ATLAS_SPRITES['van_gbr_swat'];
     if (vanRect && this.atlasReady && this.atlasImg) {
       ctx.save();
       ctx.translate(vx, vy);
-      ctx.rotate((vanPos.rot * Math.PI) / 180);
+      ctx.rotate((gbrVanWorldPos.rot * Math.PI) / 180);
       const vw = vanRect.w * 2;
       const vh = vanRect.h * 2;
       ctx.drawImage(this.atlasImg, vanRect.x, vanRect.y, vanRect.w, vanRect.h, -vw / 2, -vh / 2, vw, vh);
@@ -1656,6 +1795,14 @@ export class HotlineCanvasRenderer {
       if (e.status === 'offline') continue;
       ctx.fillStyle = e.isGbr ? '#FF1E42' : '#FACC15';
       ctx.fillRect(mx + e.x * cell, my + e.y * cell, cell, cell);
+    }
+
+    if (snap.alarmTriggered || snap.gbrSpawned) {
+      const progress = this.gbrLastProgress >= 0 ? this.gbrLastProgress : snap.gbrSpawned ? 1 : 0.2;
+      const vanMiniX = mx + mw + Math.max(1, Math.round((1 - progress) * 8));
+      const vanMiniY = my + Math.min(mh - cell, Math.max(0, Math.round(snap.scene.gbrVanPos.y * cell)));
+      ctx.fillStyle = Math.floor(this.sirenPhase) % 2 === 0 ? '#FF1E42' : '#00A8FF';
+      ctx.fillRect(vanMiniX - 2, vanMiniY - 1, cell + 2, cell + 2);
     }
 
     // Player dot
