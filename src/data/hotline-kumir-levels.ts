@@ -46,6 +46,8 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     ccs: 3,
     tpr: 0.54,
     briefingTime: '00:14',
+    missionSummary:
+      'Пройди в сторожку, взломай ПК (T), поставь ЭМИ-метку (*) во дворе и выйди в (E). При желании осмотри предметы [?] командой «осмотреть».',
     briefingText:
       'На линии Куратор. Ты припарковал купе у въезда на внешний КПП корпорации «Неон-Секьюрити». Пройди через проходную в сторожку, подключись к дежурному ПК (T), достань PIN из скрытого конфига в Linux-терминале, открой шлюз (D), поставь ЭМИ-метку (*) во дворе и уходи на точку эвакуации (E). Не попадайся в луч камеры (K) у задней стены — наряд ГБР дежурит рядом.',
     asciiMap: [
@@ -71,7 +73,7 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     starterCode: [
       '| Уровень 1: проход с улицы в сторожку КПП и первый взлом',
       '| Цель: дойти до (T), вызвать «подключиться», затем (*) и (E)',
-      '| Команды: вправо, влево, вверх, вниз, пометить, подключиться',
+      '| Предметы [?] можно изучить командой «осмотреть»; «помощь» откроет справку',
     ].join('\n'),
     hints: [
       'От старта (S) на тротуаре: 2 шага вверх и 4 вправо ко входу, рядом ПК (T).',
@@ -90,6 +92,57 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     ],
     lasers: [],
     patrols: [],
+    interactables: [
+      {
+        id: 'l1-urn',
+        x: 8,
+        y: 2,
+        category: 'urn',
+        name: 'Офисная урна',
+        inspectText: 'Скомканный лист смены: скрытый конфиг .gate.conf виден по команде ls -la.',
+        drawIcon: 'urn',
+      },
+      {
+        id: 'l1-locker',
+        x: 10,
+        y: 2,
+        category: 'crate',
+        name: 'Металлический шкаф',
+        inspectText: 'Журнал КПП: шлюз D(11,3) открывается с дежурного ПК (T) командой unlock.',
+      },
+      {
+        id: 'l1-sofa',
+        x: 6,
+        y: 9,
+        category: 'furniture',
+        name: 'Кожаный диван',
+        inspectText: 'Под подушкой заметка: камера (11,7) светит вправо на (12..13,7) — обходи сверху.',
+      },
+      {
+        id: 'l1-palm',
+        x: 10,
+        y: 9,
+        category: 'plant',
+        name: 'Пальма в кадке',
+        inspectText: 'Стикер на горшке: «Не забудь поставить ЭМИ-метку командой пометить на (*)».',
+      },
+      {
+        id: 'l1-crate-mil',
+        x: 14,
+        y: 5,
+        category: 'crate',
+        name: 'Армейский ящик (укрытие)',
+        inspectText: 'За ящиком C(14,5) работает команда «укрыться» — камера тебя не заметит.',
+      },
+      {
+        id: 'l1-crate-wood',
+        x: 12,
+        y: 1,
+        category: 'crate',
+        name: 'Деревянный ящик',
+        inspectText: 'Накладная хоздвора: ЭМИ-реле (*) установлено в точке (15,3).',
+      },
+    ],
     scene: {
       exteriorMargin: 4,
       buildingBounds: { x: 5, y: 1, w: 7, h: 10 },
@@ -219,6 +272,8 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     ccs: 5,
     tpr: 0.66,
     briefingTime: '01:02',
+    missionSummary:
+      'Доберясь до стойки (T), отключи камеру и лазер L1 в Linux, поставь метку (*) и эвакуируйся в (E). Ищи зацепки в предметах [?].',
     briefingText:
       'Вход в бизнес-центр «Неон-Плаза». Вращающаяся камера (K), лазерный барьер (===) и патруль Крысы (P) перекрывают главный зал. Проберись через стеклянные двери фойе к стойке ресепшена (T), вытащи токен из истории команд Linux-ПК или штурмуй восточный шлюз D2!',
     asciiMap: [
@@ -283,6 +338,49 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
         kind: 'patrol_rat',
         route: [{ x: 13, y: 5 }, { x: 14, y: 5 }, { x: 15, y: 5 }],
         facing: 'RIGHT',
+      },
+    ],
+    interactables: [
+      {
+        id: 'l2-urn',
+        x: 7,
+        y: 2,
+        category: 'urn',
+        name: 'Урна у ресепшена',
+        inspectText: 'Чек админа: конфигурация охраны лежит в каталоге /srv/desk/.env.',
+        drawIcon: 'urn',
+      },
+      {
+        id: 'l2-palm',
+        x: 5,
+        y: 2,
+        category: 'plant',
+        name: 'Декоративная пальма',
+        inspectText: 'Бирка обслуживания: камера cam-01 вращается каждые 2 такта.',
+      },
+      {
+        id: 'l2-sofa',
+        x: 5,
+        y: 9,
+        category: 'furniture',
+        name: 'Малиновый диван',
+        inspectText: 'Забытая визитка: проверь историю команд терминала — cat ~/.bash_history.',
+      },
+      {
+        id: 'l2-armchair',
+        x: 10,
+        y: 9,
+        category: 'furniture',
+        name: 'Кресло ожидания',
+        inspectText: 'Записка охранника: южную дверь D2(16,6) можно выбить, но это вызовет ГБР.',
+      },
+      {
+        id: 'l2-vending',
+        x: 18,
+        y: 7,
+        category: 'item',
+        name: 'Торговый автомат',
+        inspectText: 'Сервисный стикер: идентификатор лазерного барьера — L1.',
       },
     ],
     scene: {
@@ -429,6 +527,8 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     ccs: 6,
     tpr: 0.73,
     briefingTime: '02:18',
+    missionSummary:
+      'Укройся у перегородки (C), отвлеки Ворона командой «бросить», взломай ПК (T), пометь (*) и уйди в (E). Осматривай интерьер [?].',
     briefingText:
       'Опенспейс и переговорная третьего крыла. Вращающиеся камеры, офисные перегородки (C) и зоркий Ворон (обзор 3 клетки!). Разработчики оставили в кеше дамп памяти core.dmp, а файл координат в /opt/vault закрыт правами 000. Укройся за перегородкой (C), отвлеки Ворона ЭМИ-маячком «бросить» и выбери стелс-проход D1 либо штурмовую дверь D2.',
     asciiMap: [
@@ -505,6 +605,49 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
         kind: 'patrol_raven',
         route: [{ x: 14, y: 3 }, { x: 15, y: 3 }, { x: 16, y: 3 }],
         facing: 'RIGHT',
+      },
+    ],
+    interactables: [
+      {
+        id: 'l3-palm',
+        x: 5,
+        y: 2,
+        category: 'plant',
+        name: 'Офисная пальма',
+        inspectText: 'Под листьями спрятан черновик: Ворон видит на 3 клетки вперёд, отвлекай его командой «бросить».',
+      },
+      {
+        id: 'l3-urn',
+        x: 11,
+        y: 5,
+        category: 'urn',
+        name: 'Урна у рабочего места',
+        inspectText: 'Обрывок распечатки: права 000 на /opt/vault/coords.txt снимаются через chmod +r.',
+        drawIcon: 'urn',
+      },
+      {
+        id: 'l3-filing',
+        x: 13,
+        y: 5,
+        category: 'crate',
+        name: 'Металлическая картотека',
+        inspectText: 'На папке пометка: дамп памяти аналитика лежит в /home/analyst/.cache/core.dmp.',
+      },
+      {
+        id: 'l3-sofa',
+        x: 20,
+        y: 7,
+        category: 'furniture',
+        name: 'Кожаный диван',
+        inspectText: 'Забытый блокнот: пароль из дампа закодирован в Base64 (base64 -d).',
+      },
+      {
+        id: 'l3-archive-box',
+        x: 21,
+        y: 11,
+        category: 'crate',
+        name: 'Архивный короб',
+        inspectText: 'Опись архива: северный шлюз D1(18,3) открывается командой vault_unlock.',
       },
     ],
     scene: {
@@ -648,6 +791,8 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     ccs: 7,
     tpr: 0.79,
     briefingTime: '03:05',
+    missionSummary:
+      'Взломай пульт ЦОД (T), сбрось сетку и сохрани /srv/secret на /mnt/usb, активируй ОБА реле (*) и выйди в (E).',
     briefingText:
       'Охлаждаемый серверный ЦОД с ДВУМЯ ЭМИ-реле (*). Спустись через нижнюю галерею к пульту управления (T) или взломай западный лазерный контур командой «отключить». Осмотри процессы, порты и cron — стажёр оставил скрипт 777. Упакуй секретный каталог на /mnt/usb, отметь оба реле (*) и берегись щитовика ГБР «Медведя».',
     asciiMap: [
@@ -731,6 +876,33 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
         kind: 'patrol_rat',
         route: [{ x: 10, y: 4 }, { x: 11, y: 4 }, { x: 12, y: 4 }],
         facing: 'RIGHT',
+      },
+    ],
+    interactables: [
+      {
+        id: 'l4-urn',
+        x: 11,
+        y: 7,
+        category: 'urn',
+        name: 'Урна в пультовой',
+        inspectText: 'Черновик стажёра: проверь /etc/crontab и /opt/scripts/backup.sh (права 777).',
+        drawIcon: 'urn',
+      },
+      {
+        id: 'l4-crate',
+        x: 12,
+        y: 5,
+        category: 'crate',
+        name: 'Аппаратный ящик ЦОД',
+        inspectText: 'Инструкция инженера: западный лазер (8..9,4) отключается прямо из КуМир командой «отключить».',
+      },
+      {
+        id: 'l4-fuse',
+        x: 5,
+        y: 11,
+        category: 'item',
+        name: 'Электрощиток ЦОД',
+        inspectText: 'Схема питания: на объекте два ЭМИ-реле — в (21,7) и (16,2). Оба нужно пометить.',
       },
     ],
     scene: {
@@ -860,6 +1032,8 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
     ccs: 8,
     tpr: 0.84,
     briefingTime: '04:30',
+    missionSummary:
+      'Пометь ОБА реле (*), скачай дамп на (T) через scp и чисто зачисти лог (truncate -s 0), затем эвакуируйся в (E).',
     briefingText:
       'Рассвет близко. Активируй ОБА ЭМИ-реле (* на юге и * на востоке), проникни в центральное ядро (T), найди ключ id_rsa, поправь права (chmod 600), скачай дамп базы через scp на /mnt/usb и зачисти журнал. Вращающиеся камеры, Ворон и Крыса прикрывают выход — используй укрытия (C), приманку «бросить» и штурм D2(23,2) или шлюз D1(25,3)!',
     asciiMap: [
@@ -951,6 +1125,33 @@ export const HOTLINE_KUMIR_LEVELS: LevelDefinition[] = [
         kind: 'patrol_rat',
         route: [{ x: 24, y: 7 }, { x: 25, y: 7 }, { x: 26, y: 7 }],
         facing: 'RIGHT',
+      },
+    ],
+    interactables: [
+      {
+        id: 'l5-urn',
+        x: 13,
+        y: 6,
+        category: 'urn',
+        name: 'Урна у ядра',
+        inspectText: 'Распечатка правил: удаление access.log через rm поднимет тревогу, используй truncate -s 0.',
+        drawIcon: 'urn',
+      },
+      {
+        id: 'l5-sofa',
+        x: 15,
+        y: 13,
+        category: 'furniture',
+        name: 'Диван охраны',
+        inspectText: 'Памятка админа: резервный SSH-ключ id_rsa лежит в /home/root_backup/.ssh (нужен chmod 600).',
+      },
+      {
+        id: 'l5-console',
+        x: 11,
+        y: 5,
+        category: 'item',
+        name: 'Операторская консоль',
+        inspectText: 'План ядра: первое реле (*) в (6,9), второе в (26,5). Выход E(26,2) за двойным шлюзом.',
       },
     ],
     scene: {

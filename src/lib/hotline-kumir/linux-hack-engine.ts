@@ -438,7 +438,9 @@ export class LinuxHackEngine {
       case 'clear':
         return { output: '', exitCode: 0, noiseDelta: 0, clearScreen: true, effects: [] };
 
-      case 'help': {
+      case 'help':
+      case 'помощь':
+      case 'справка': {
         const customNames = Object.keys(this.config.customCommands);
         const lines = [
           'Доступные команды песочницы Linux:',
@@ -450,6 +452,7 @@ export class LinuxHackEngine {
         if (customNames.length > 0) {
           lines.push(`  Утилиты узла: ${customNames.join(', ')}`);
         }
+        lines.push('  Для справки по языку КуМир введите «помощь» или «справка» в редакторе слева.');
         return { output: lines.join('\n'), exitCode: 0, noiseDelta: 0, effects: [] };
       }
 

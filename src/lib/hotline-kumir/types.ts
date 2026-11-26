@@ -19,7 +19,9 @@ export type ActionCommandKind =
   | 'DASH'
   | 'STRIKE'
   | 'THROW'
-  | 'FINISH';
+  | 'FINISH'
+  | 'INTERACT'
+  | 'HELP';
 
 export type SensorKind =
   | 'IS_CLEAR'
@@ -28,6 +30,7 @@ export type SensorKind =
   | 'IS_DANGER'
   | 'HAS_ENEMY'
   | 'HAS_DOOR'
+  | 'HAS_INTERACTABLE'
   | 'NEAR_TERMINAL'
   | 'IS_ALARM'
   | 'GBR_INSIDE'
@@ -40,7 +43,7 @@ export type BoolExprNode =
   | { kind: 'SENSOR'; sensor: SensorKind; dir?: SensorDirection; negatePainted?: boolean; span: SourceSpan };
 
 export type StmtNode =
-  | { kind: 'ACTION'; action: ActionCommandKind; dir?: Direction; span: SourceSpan }
+  | { kind: 'ACTION'; action: ActionCommandKind; dir?: Direction; topic?: string; span: SourceSpan }
   | { kind: 'IF'; cond: BoolExprNode; thenBranch: StmtNode[]; elseBranch?: StmtNode[]; span: SourceSpan }
   | { kind: 'WHILE'; cond: BoolExprNode; body: StmtNode[]; span: SourceSpan }
   | { kind: 'REPEAT'; count: number; body: StmtNode[]; span: SourceSpan }
@@ -65,6 +68,7 @@ export interface ProgramNode {
 export interface KumirActionRequest {
   action: ActionCommandKind;
   dir?: Direction;
+  topic?: string;
   line: number;
 }
 
@@ -246,6 +250,8 @@ export type WorldEventType =
   | 'ROBOT_DASHED'
   | 'ROBOT_CROUCHED'
   | 'TILE_PAINTED'
+  | 'OBJECT_INSPECTED'
+  | 'HELP_OPENED'
   | 'DOOR_OPENED'
   | 'DOOR_BROKEN'
   | 'CAMERA_DISABLED'
@@ -362,6 +368,24 @@ export interface LevelResult {
   timeSpentSec: number;
 }
 
+export type InteractableCategory = 'crate' | 'plant' | 'urn' | 'furniture' | 'item';
+
+export interface InteractableDefinition {
+  id: string;
+  x: number;
+  y: number;
+  category: InteractableCategory;
+  name: string;
+  inspectText: string;
+  intelCode?: string;
+  required?: boolean;
+  drawIcon?: 'urn';
+}
+
+export interface InteractableState extends InteractableDefinition {
+  inspected: boolean;
+}
+
 export interface LevelDefinition {
   id: number;
   slug: string;
@@ -373,6 +397,7 @@ export interface LevelDefinition {
   tpr: number;
   briefingTime: string;
   briefingText: string;
+  missionSummary?: string;
   asciiMap: string[];
   turnTimerStealthSec: number;
   turnTimerAlertSec: number;
@@ -392,6 +417,7 @@ export interface LevelDefinition {
     route: Array<{ x: number; y: number }>;
     facing: Direction;
   }>;
+  interactables?: InteractableDefinition[];
   linuxConfig: LinuxLevelConfig;
   scene: LevelScene;
 }
@@ -399,6 +425,8 @@ export interface LevelDefinition {
 export interface WorldSnapshot {
   levelId: number;
   levelTitle: string;
+  missionSummary: string;
+  briefingText: string;
   theme: LevelThemeId;
   mask: MaskId;
   phase: GamePhase;
@@ -418,6 +446,11 @@ export interface WorldSnapshot {
   hackCompleted: boolean;
   paintedCount: number;
   requiredPaintCount: number;
+  interactables: InteractableState[];
+  inspectedCount: number;
+  requiredInteractableCount: number;
+  lastInspectMessage: string | null;
+  collectedIntel: Array<{ id: string; name: string; text: string; code?: string }>;
   exitUnlocked: boolean;
   activeLine: number | null;
   width: number;

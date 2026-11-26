@@ -9,6 +9,8 @@ import type {
   DoorState,
   EnemyState,
   GamePhase,
+  InteractableCategory,
+  InteractableState,
   KumirError,
   KumirSensorReader,
   LaserState,
@@ -28,6 +30,21 @@ import type {
   WorldEvent,
   WorldSnapshot,
 } from './types.ts';
+
+const PROP_INTERACTABLE_META: Record<string, { category: InteractableCategory; name: string }> = {
+  crate_wood: { category: 'crate', name: 'Деревянный ящик' },
+  crate_mil: { category: 'crate', name: 'Армейский ящик' },
+  box_archive: { category: 'crate', name: 'Архивный короб' },
+  locker_steel: { category: 'crate', name: 'Металлический шкаф' },
+  filing_cabinet: { category: 'crate', name: 'Картотека' },
+  potted_palm: { category: 'plant', name: 'Пальма в кадке' },
+  planter_concrete: { category: 'plant', name: 'Бетонная клумба' },
+  bush_hedge: { category: 'plant', name: 'Декоративный куст' },
+  dumpster: { category: 'urn', name: 'Контейнер / урна' },
+  sofa_leather: { category: 'furniture', name: 'Кожаный диван' },
+  sofa_magenta: { category: 'furniture', name: 'Малиновый диван' },
+  armchair: { category: 'furniture', name: 'Мягкое кресло' },
+};
 
 const DIR_DELTAS: Record<Direction, { dx: number; dy: number }> = {
   UP: { dx: 0, dy: -1 },
@@ -81,6 +98,9 @@ export class HotlineGameEngine {
   private readonly cameras: CameraState[];
   private readonly lasers: LaserState[];
   private readonly enemies: EnemyState[];
+  private readonly interactables: InteractableState[];
+  private lastInspectMessage: string | null = null;
+  private readonly collectedIntel: Array<{ id: string; name: string; text: string; code?: string }> = [];
 
   private usedLoops = false;
   private usedConditions = false;
@@ -189,6 +209,35 @@ export class HotlineGameEngine {
     this.gbrEtaSec = this.levelDef.gbrEtaSec + sprintSecBonus;
     this.idsMaxNoise = this.mask === 'sprint' ? 4 : 3;
 
+    this.interactables = (this.levelDef.interactables || []).map((item) => ({
+      ...item,
+      inspected: false,
+    }));
+    const occupiedKeys = new Set(this.interactables.map((item) => `${item.x},${item.y}`));
+    for (const prop of this.levelDef.scene.props) {
+      const meta = PROP_INTERACTABLE_META[prop.sprite];
+      if (!meta) continue;
+      const gx = Math.round(prop.x);
+      const gy = Math.round(prop.y);
+      if (gx < 1 || gx > this.width - 2 || gy < 1 || gy > this.height - 2) continue;
+      const tile = this.tiles[gy][gx];
+      if (tile === 'WALL' || tile === 'WINDOW' || tile === 'TERMINAL' || tile === 'RELAY' || tile === 'EXIT') continue;
+      if (this.doors.some((d) => d.x === gx && d.y === gy)) continue;
+      const key = `${gx},${gy}`;
+      if (occupiedKeys.has(key)) continue;
+      occupiedKeys.add(key);
+      this.interactables.push({
+        id: `auto-${prop.sprite}-${gx}-${gy}`,
+        x: gx,
+        y: gy,
+        category: meta.category,
+        name: meta.name,
+        inspectText: 'Ничего секретного не обнаружено, только бытовые вещи.',
+        required: false,
+        inspected: false,
+      });
+    }
+
     this.turnTimeMaxSec = this.levelDef.turnTimerStealthSec;
     this.turnTimeLeftSec = this.turnTimeMaxSec;
 
@@ -240,6 +289,9 @@ export class HotlineGameEngine {
     if (!this.hackCompleted) return false;
     for (const k of this.requiredPaintKeys) {
       if (!this.paintedSet.has(k)) return false;
+    }
+    if (this.interactables.some((item) => item.required && !item.inspected)) {
+      return false;
     }
     if (this.phase === 'GBR_BREACH_COMBAT') {
       const gbrUnits = this.enemies.filter((e) => e.isGbr);
@@ -328,6 +380,32 @@ export class HotlineGameEngine {
       }
     }
     return false;
+  }
+
+  private findInteractableTarget(explicit?: Direction): InteractableState | undefined {
+    if (explicit) {
+      const d = DIR_DELTAS[explicit];
+      const tx = this.player.x + d.dx;
+      const ty = this.player.y + d.dy;
+      return this.interactables.find((item) => item.x === tx && item.y === ty);
+    }
+
+    const candidates: Array<{ x: number; y: number }> = [{ x: this.player.x, y: this.player.y }];
+    const orderedDirs = [this.player.facing, ...ALL_DIRS.filter((d) => d !== this.player.facing)];
+    for (const dir of orderedDirs) {
+      const d = DIR_DELTAS[dir];
+      candidates.push({ x: this.player.x + d.dx, y: this.player.y + d.dy });
+    }
+
+    for (const pt of candidates) {
+      const uninspected = this.interactables.find((item) => item.x === pt.x && item.y === pt.y && !item.inspected);
+      if (uninspected) return uninspected;
+    }
+    for (const pt of candidates) {
+      const anyItem = this.interactables.find((item) => item.x === pt.x && item.y === pt.y);
+      if (anyItem) return anyItem;
+    }
+    return undefined;
   }
 
   private findEnemyAt(x: number, y: number): EnemyState | undefined {
@@ -430,6 +508,23 @@ export class HotlineGameEngine {
             }
             const d = DIR_DELTAS[resolveDir()];
             return this.doors.some((door) => door.x === this.player.x + d.dx && door.y === this.player.y + d.dy && !door.open);
+          }
+          case 'HAS_INTERACTABLE': {
+            if (dir === 'ANY') {
+              if (this.interactables.some((item) => item.x === this.player.x && item.y === this.player.y && !item.inspected)) {
+                return true;
+              }
+              return ALL_DIRS.some((ad) => {
+                const delta = DIR_DELTAS[ad];
+                return this.interactables.some(
+                  (item) => item.x === this.player.x + delta.dx && item.y === this.player.y + delta.dy && !item.inspected
+                );
+              });
+            }
+            const d = DIR_DELTAS[resolveDir()];
+            return this.interactables.some(
+              (item) => item.x === this.player.x + d.dx && item.y === this.player.y + d.dy && !item.inspected
+            );
           }
           case 'NEAR_TERMINAL':
             return manhattan(this.player.x, this.player.y, this.terminalPos.x, this.terminalPos.y) <= 1;
@@ -939,13 +1034,15 @@ export class HotlineGameEngine {
   stepNextAction(): {
     done: boolean;
     openedTerminal: boolean;
+    openedHelp: boolean;
+    helpTopic?: string;
     events: WorldEvent[];
     error: KumirError | null;
     snapshot: WorldSnapshot;
   } {
     const events: WorldEvent[] = [];
     if (!this.activeProgramGen) {
-      return { done: true, openedTerminal: false, events, error: null, snapshot: this.getSnapshot() };
+      return { done: true, openedTerminal: false, openedHelp: false, events, error: null, snapshot: this.getSnapshot() };
     }
 
     if (this.totalStepsSession >= KUMIR_LIMITS.MAX_TOTAL_STEPS_SESSION) {
@@ -958,7 +1055,7 @@ export class HotlineGameEngine {
       };
       this.lastError = err;
       this.activeProgramGen = null;
-      return { done: true, openedTerminal: false, events, error: err, snapshot: this.getSnapshot() };
+      return { done: true, openedTerminal: false, openedHelp: false, events, error: err, snapshot: this.getSnapshot() };
     }
 
     const next = this.activeProgramGen.next();
@@ -976,6 +1073,7 @@ export class HotlineGameEngine {
       return {
         done: true,
         openedTerminal: false,
+        openedHelp: false,
         events,
         error: this.lastError,
         snapshot: this.getSnapshot(),
@@ -985,7 +1083,7 @@ export class HotlineGameEngine {
     const yielded = next.value;
     if (yielded.status !== 'YIELD_ACTION') {
       this.activeProgramGen = null;
-      return { done: true, openedTerminal: false, events, error: null, snapshot: this.getSnapshot() };
+      return { done: true, openedTerminal: false, openedHelp: false, events, error: null, snapshot: this.getSnapshot() };
     }
 
     this.totalStepsSession++;
@@ -1019,10 +1117,66 @@ export class HotlineGameEngine {
       }
       this.turnIndex++;
       this.decrementTurnEtaAndTick(events);
-      return { done: true, openedTerminal: false, events, error: err, snapshot: this.getSnapshot() };
+      return { done: true, openedTerminal: false, openedHelp: false, events, error: err, snapshot: this.getSnapshot() };
     };
 
     switch (req.action) {
+      case 'HELP': {
+        this.totalStepsSession = Math.max(0, this.totalStepsSession - 1);
+        this.activeLine = null;
+        this.activeProgramGen = null;
+        events.push({
+          type: 'HELP_OPENED',
+          line: req.line,
+          label: req.topic || 'all',
+          moodAfter: this.getAudioMood(),
+        });
+        return {
+          done: true,
+          openedTerminal: false,
+          openedHelp: true,
+          helpTopic: req.topic,
+          events,
+          error: null,
+          snapshot: this.getSnapshot(),
+        };
+      }
+
+      case 'INTERACT': {
+        const target = this.findInteractableTarget(req.dir);
+        if (!target) {
+          if (manhattan(this.player.x, this.player.y, this.terminalPos.x, this.terminalPos.y) <= 1) {
+            return failTurn(
+              'E_RT_NO_TARGET',
+              `Строка ${req.line}: рядом служебный ПК — для подключения введите «подключиться».`
+            );
+          }
+          return failTurn(
+            'E_RT_NO_TARGET',
+            `Строка ${req.line}: рядом нет предмета интерьера для осмотра (ящика, цветка, урны или мебели). Подойдите к маркеру [?].`
+          );
+        }
+        target.inspected = true;
+        this.lastInspectMessage = `${target.name}: ${target.inspectText}`;
+        if (!this.collectedIntel.some((entry) => entry.id === target.id)) {
+          this.collectedIntel.push({
+            id: target.id,
+            name: target.name,
+            text: target.inspectText,
+            code: target.intelCode,
+          });
+        }
+        events.push({
+          type: 'OBJECT_INSPECTED',
+          line: req.line,
+          x: target.x,
+          y: target.y,
+          label: this.lastInspectMessage,
+          moodAfter: this.getAudioMood(),
+        });
+        break;
+      }
+
       case 'MOVE': {
         const dir = req.dir || this.player.facing;
         this.player.facing = dir;
@@ -1052,7 +1206,7 @@ export class HotlineGameEngine {
             this.phase = 'MISSION_KO';
             events.push({ type: 'PLAYER_KO', x: nx, y: ny, moodAfter: this.getAudioMood() });
             this.activeProgramGen = null;
-            return { done: true, openedTerminal: false, events, error: null, snapshot: this.getSnapshot() };
+            return { done: true, openedTerminal: false, openedHelp: false, events, error: null, snapshot: this.getSnapshot() };
           }
           break;
         }
@@ -1356,7 +1510,7 @@ export class HotlineGameEngine {
     // Check victory right after player's movement onto E!
     if (this.player.x === this.exitPos.x && this.player.y === this.exitPos.y && this.isExitUnlocked()) {
       this.finalizeVictory(events);
-      return { done: true, openedTerminal: false, events, error: null, snapshot: this.getSnapshot() };
+      return { done: true, openedTerminal: false, openedHelp: false, events, error: null, snapshot: this.getSnapshot() };
     }
 
     if (req.action !== 'HACK') {
@@ -1366,12 +1520,13 @@ export class HotlineGameEngine {
     // Check again in case mission KO happened
     if (this.phase === 'MISSION_KO') {
       this.activeProgramGen = null;
-      return { done: true, openedTerminal, events, error: null, snapshot: this.getSnapshot() };
+      return { done: true, openedTerminal, openedHelp: false, events, error: null, snapshot: this.getSnapshot() };
     }
 
     return {
       done: false,
       openedTerminal,
+      openedHelp: false,
       events,
       error: null,
       snapshot: this.getSnapshot(),
@@ -1381,6 +1536,8 @@ export class HotlineGameEngine {
   runProgramImmediate(source: string): {
     compiledOk: boolean;
     openedTerminal: boolean;
+    openedHelp: boolean;
+    helpTopic?: string;
     events: WorldEvent[];
     errors: KumirError[];
     snapshot: WorldSnapshot;
@@ -1390,6 +1547,7 @@ export class HotlineGameEngine {
       return {
         compiledOk: false,
         openedTerminal: false,
+        openedHelp: false,
         events: [],
         errors: prep.errors,
         snapshot: this.getSnapshot(),
@@ -1398,12 +1556,18 @@ export class HotlineGameEngine {
 
     const allEvents: WorldEvent[] = [];
     let openedTerminal = false;
+    let openedHelp = false;
+    let helpTopic: string | undefined;
     while (true) {
       const step = this.stepNextAction();
       allEvents.push(...step.events);
       if (step.openedTerminal) openedTerminal = true;
-      if (step.openedTerminal) {
-        // Keep remainder paused or finish cleanly after terminal opens
+      if (step.openedHelp) {
+        openedHelp = true;
+        helpTopic = step.helpTopic;
+      }
+      if (step.openedTerminal || step.openedHelp) {
+        // Keep remainder paused or finish cleanly after terminal/help opens
         this.activeProgramGen = null;
         break;
       }
@@ -1413,6 +1577,8 @@ export class HotlineGameEngine {
     return {
       compiledOk: true,
       openedTerminal,
+      openedHelp,
+      helpTopic,
       events: allEvents,
       errors: this.lastError ? [this.lastError] : [],
       snapshot: this.getSnapshot(),
@@ -1442,6 +1608,8 @@ export class HotlineGameEngine {
     return {
       levelId: this.levelDef.id,
       levelTitle: this.levelDef.title,
+      missionSummary: this.levelDef.missionSummary || this.levelDef.briefingText,
+      briefingText: this.levelDef.briefingText,
       theme: this.levelDef.theme,
       mask: this.mask,
       phase: this.phase,
@@ -1461,6 +1629,11 @@ export class HotlineGameEngine {
       hackCompleted: this.hackCompleted,
       paintedCount: this.paintedSet.size,
       requiredPaintCount: this.requiredPaintKeys.size,
+      interactables: this.interactables.map((item) => ({ ...item })),
+      inspectedCount: this.interactables.filter((item) => item.inspected).length,
+      requiredInteractableCount: this.interactables.filter((item) => item.required).length,
+      lastInspectMessage: this.lastInspectMessage,
+      collectedIntel: this.collectedIntel.map((entry) => ({ ...entry })),
       exitUnlocked: this.isExitUnlocked(),
       activeLine: this.activeLine,
       width: this.width,
