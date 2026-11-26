@@ -443,7 +443,7 @@ export function initHotlineKumirController(
       if (snap.alarmTriggered || snap.gbrSpawned) {
         etaTrackerEl.classList.remove('hidden');
         etaTextEl.textContent = snap.gbrSpawned
-          ? 'ГБР В ЗДАНИИ! ПРОРВИТЕ ЗАСЛОН К ВЫХОДУ (ВЫХ)'
+          ? 'ГБР ПРОРВАЛСЯ ЧЕРЕЗ ГЛАВНЫЙ ВХОД! УХОДИТЕ В ЗАПАСНОЙ ВЫХОД (ВЫХ)'
           : `ГБР ПРИБУДЕТ ЧЕРЕЗ: ${snap.gbrEtaTurns} ХОД. (${snap.gbrEtaSec} С)`;
         const progressIdx = snap.gbrSpawned
           ? 4
@@ -521,8 +521,8 @@ export function initHotlineKumirController(
       rows.push({
         done: snap.exitUnlocked && snap.phase === 'EXTRACTION',
         text: snap.exitUnlocked
-          ? '✓ Выход (E) открыт — двигайся к точке эвакуации'
-          : '○ Выход (E) откроется после выполнения целей',
+          ? '✓ Запасной выход (E) открыт — двигайся к эвакуации'
+          : '○ Запасной выход (E) откроется после выполнения целей',
       });
       for (const r of rows) {
         const li = document.createElement('li');
@@ -999,7 +999,11 @@ export function initHotlineKumirController(
         } else if (t === 'COVER') {
           hoverInfoEl.textContent = 'Укрытие (C) → «укрыться»';
         } else if (t === 'EXIT') {
-          hoverInfoEl.textContent = snap.exitUnlocked ? 'Выход (E) открыт!' : 'Выход (E) — заблокирован';
+          hoverInfoEl.textContent = snap.exitUnlocked
+            ? 'Запасная дверь (выход) открыта!'
+            : 'Запасная дверь (выход) — заблокирована';
+        } else if (t === 'GBR_SPAWN') {
+          hoverInfoEl.textContent = 'Главный вход (дверь штурма ГБР)';
         } else if (door) {
           hoverInfoEl.textContent = door.open ? 'Проход открыт' : 'Электродверь (D) → ПК или «выбить дверь»';
         } else if (cam) {

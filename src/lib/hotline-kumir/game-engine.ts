@@ -566,12 +566,21 @@ export class HotlineGameEngine {
     this.gbrEtaTurns = 0;
     this.gbrEtaSec = 0;
 
-    const offsets = [
-      { dx: 0, dy: 0 },
-      { dx: -1, dy: 0 },
-      { dx: 0, dy: -1 },
-      { dx: 1, dy: 0 },
-    ];
+    const fromLeft = this.gbrSpawnPos.x < this.width / 2;
+    const offsets = fromLeft
+      ? [
+          { dx: 0, dy: 0 },
+          { dx: 1, dy: 0 },
+          { dx: 0, dy: -1 },
+          { dx: 0, dy: 1 },
+          { dx: -1, dy: 0 },
+        ]
+      : [
+          { dx: 0, dy: 0 },
+          { dx: -1, dy: 0 },
+          { dx: 0, dy: -1 },
+          { dx: 1, dy: 0 },
+        ];
 
     this.levelDef.gbrSquad.forEach((kind, idx) => {
       let sx = this.gbrSpawnPos.x;
@@ -591,7 +600,7 @@ export class HotlineGameEngine {
         isGbr: true,
         x: sx,
         y: sy,
-        facing: 'LEFT',
+        facing: fromLeft ? 'RIGHT' : 'LEFT',
         status: 'active',
         stunTurns: 0,
         shielded: kind === 'gbr_bear',

@@ -380,13 +380,16 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
     expect(combatState.phase).toBe('GBR_BREACH_COMBAT');
     await expect(page.locator('#hk-phase-badge')).toContainText('БОЙ С ГБР');
 
-    await enterEditorRun(page, 'нц 5 раз\nвлево\nкц\nвверх; вверх; влево; вверх; вверх; подключиться');
-    await runLinuxInModal(page, ['unlock 4821']);
-
     const killIfNear = 'если рядом враг то\n  оглушить\n  обезвредить\nвсе';
     await enterEditorRun(
       page,
-      `${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nпометить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц`
+      `${killIfNear}\nнц 5 раз\n  ${killIfNear}\n  влево\nкц\nвверх; ${killIfNear}; вверх; ${killIfNear}; влево; ${killIfNear}; вверх; ${killIfNear}; вверх; подключиться`
+    );
+    await runLinuxInModal(page, ['unlock 4821']);
+
+    await enterEditorRun(
+      page,
+      `${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nпометить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц\nнц пока не рядом враг\n  ждать\nкц\nоглушить\nобезвредить`
     );
 
     await expect(page.locator('#hk-result-overlay')).toBeVisible();
@@ -420,7 +423,7 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70
     await page.waitForTimeout(550);
     const gbr2 = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getGbrAnimationState());
     expect(gbr2.progress).toBeGreaterThan(gbr1.progress);
-    expect(gbr2.x).toBeLessThan(gbr1.x);
+    expect(gbr2.x).toBeGreaterThan(gbr1.x);
     expect(gbr2.animating).toBe(false);
 
     const markerLeft = await page.locator('#hk-gbr-van-marker').evaluate((el) => parseFloat(el.style.left || '0'));
