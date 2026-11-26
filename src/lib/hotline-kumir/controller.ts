@@ -4,6 +4,7 @@ import type { CameraMode } from './camera.ts';
 import { HotlineGameEngine } from './game-engine.ts';
 import { KUMIR_HELP_SECTIONS, resolveHelpSectionId } from './kumir-help.ts';
 import { HotlineCanvasRenderer } from './renderer.ts';
+import { CyberTerminalView } from '../terminal/cyber-terminal-view.ts';
 import type { LevelResult, MaskId, WorldEvent, WorldSnapshot } from './types.ts';
 
 declare global {
@@ -127,12 +128,22 @@ export function initHotlineKumirController(
 
   // Terminal overlay
   const termOverlay = root.querySelector<HTMLDivElement>('#hk-terminal-overlay');
+  const termWindowEl = root.querySelector<HTMLElement>('#hk-term-window');
+  const termTitleEl = root.querySelector<HTMLElement>('#hk-term-title');
   const termOutputEl = root.querySelector<HTMLPreElement>('#hk-term-output');
   const termPromptEl = root.querySelector<HTMLElement>('#hk-term-prompt');
   const termInput = root.querySelector<HTMLInputElement>('#hk-term-input');
   const termHeaderStatus = root.querySelector<HTMLElement>('#hk-term-perimeter');
   const btnTermClose = root.querySelector<HTMLButtonElement>('#hk-term-close');
   const btnTermHint = root.querySelector<HTMLButtonElement>('#hk-term-hint');
+
+  const termView = new CyberTerminalView({
+    windowEl: termWindowEl,
+    outputEl: termOutputEl,
+    inputEl: termInput,
+    promptEl: termPromptEl,
+    titleEl: termTitleEl,
+  });
 
   // Result overlay
   const resultOverlay = root.querySelector<HTMLDivElement>('#hk-result-overlay');
@@ -185,7 +196,6 @@ export function initHotlineKumirController(
   let execTimer: ReturnType<typeof setInterval> | null = null;
   let turnClockTimer: ReturnType<typeof setInterval> | null = null;
   let turnClockLeft = engine.getSnapshot().turnTimeMaxSec;
-  let termHistIdx = -1;
   let missionReported = false;
   let alertReported = false;
   let campaignCompleted = false;
@@ -282,17 +292,10 @@ export function initHotlineKumirController(
     codeEditor.focus();
   };
 
-  const appendTermLine = (text: string, cls = 'text-cyan-200') => {
-    if (!termOutputEl) return;
-    const lineEl = document.createElement('div');
-    lineEl.className = `${cls} whitespace-pre-wrap break-words`;
-    lineEl.textContent = text;
-    termOutputEl.appendChild(lineEl);
-    termOutputEl.scrollTop = termOutputEl.scrollHeight;
-  };
-
   const syncTerminalHeader = (snap: WorldSnapshot) => {
-    if (termPromptEl) termPromptEl.textContent = engine.getLinuxEngine().getPrompt();
+    const prompt = engine.getLinuxEngine().getPrompt();
+    termView.setPrompt(prompt);
+    termView.setTitle(`${prompt.replace(/>$/, '')} — bash`);
     if (termHeaderStatus) {
       const activeCams = snap.cameras.filter((c) => c.enabled).length;
       const activeLasers = snap.lasers.filter((l) => l.enabled).length;
@@ -314,12 +317,13 @@ export function initHotlineKumirController(
     }
     syncTerminalHeader(snap);
     if (termOutputEl && termOutputEl.childElementCount === 0) {
-      appendTermLine(
-        `[LINUX SANDBOX] Подключение к целевому узлу (Уровень ${snap.levelId}). Введите «help» или «ls -la».`,
-        'text-pink-400 font-bold'
+      termView.appendLine(
+        `// terminal://cyber-boy — узел уровня ${snap.levelId}. Введите «help» или «ls -la».`,
+        'info',
+        'ct-boot'
       );
     }
-    setTimeout(() => termInput?.focus(), 20);
+    setTimeout(() => termView.focus(), 20);
     updateUi(snap, []);
   };
 
@@ -615,7 +619,7 @@ export function initHotlineKumirController(
 
     if (levelBadgeEl) levelBadgeEl.textContent = `Ур.${lvlDef.id}/5: ${lvlDef.title}`;
     codeEditor.value = lvlDef.starterCode;
-    if (termOutputEl) termOutputEl.innerHTML = '';
+    termView.clear();
     if (termOverlay) {
       termOverlay.classList.add('hidden');
       termOverlay.classList.remove('flex');
@@ -815,7 +819,7 @@ export function initHotlineKumirController(
   btnTermHint?.addEventListener('click', () => {
     const lvl = HOTLINE_KUMIR_LEVELS.find((l) => l.id === currentLevelId);
     if (lvl) {
-      appendTermLine(`[ПОДСКАЗКА]: ${lvl.linuxConfig.hints[0]}`, 'text-amber-300');
+      termView.appendLine(`[ПОДСКАЗКА]: ${lvl.linuxConfig.hints[0]}`, 'warn');
     }
   });
 
@@ -855,78 +859,31 @@ export function initHotlineKumirController(
     }
   });
 
-  termInput?.addEventListener('keydown', (e) => {
-    const lx = engine.getLinuxEngine();
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeTerminalModal();
-      return;
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const cmd = termInput.value;
-      termInput.value = '';
-      termHistIdx = -1;
-      appendTermLine(`${lx.getPrompt()} ${cmd}`, 'text-slate-200');
+  const unbindTerminal = termView.bindInteractive({
+    onEscape: () => closeTerminalModal(),
+    getPrompt: () => engine.getLinuxEngine().getPrompt(),
+    getHistory: () => engine.getLinuxEngine().getHistory(),
+    autocomplete: (val) => engine.getLinuxEngine().autocomplete(val),
+    onCommand: (cmd) => {
+      const lx = engine.getLinuxEngine();
+      termView.appendCommand(lx.getPrompt(), cmd);
       const res = engine.execLinuxCommand(cmd);
-      if (res.result.clearScreen && termOutputEl) {
-        termOutputEl.innerHTML = '';
+      if (res.result.clearScreen) {
+        termView.clear();
       } else if (res.result.output) {
-        appendTermLine(
-          res.result.output,
-          res.result.exitCode === 0 ? 'text-emerald-300' : 'text-rose-400'
-        );
+        termView.appendLine(res.result.output, res.result.exitCode === 0 ? 'ok' : 'err');
+        if (res.result.exitCode !== 0) {
+          termView.flashError();
+        }
       }
       if (res.result.objectiveCompletedNow) {
-        appendTermLine(
+        termView.appendLine(
           '[УСПЕХ]: Задача узла выполнена! Закройте терминал и двигайтесь к эвакуации (ВЫХ).',
-          'text-cyan-300 font-bold'
+          'accent'
         );
       }
       updateUi(res.snapshot, res.events);
-      return;
-    }
-
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const hist = lx.getHistory();
-      if (hist.length === 0) return;
-      if (termHistIdx === -1) termHistIdx = hist.length - 1;
-      else termHistIdx = Math.max(0, termHistIdx - 1);
-      termInput.value = hist[termHistIdx] || '';
-      return;
-    }
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const hist = lx.getHistory();
-      if (termHistIdx === -1) return;
-      termHistIdx++;
-      if (termHistIdx >= hist.length) {
-        termHistIdx = -1;
-        termInput.value = '';
-      } else {
-        termInput.value = hist[termHistIdx] || '';
-      }
-      return;
-    }
-
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const matches = lx.autocomplete(termInput.value);
-      if (matches.length === 1) {
-        const parts = termInput.value.split(/\s+/);
-        if (parts.length <= 1) {
-          termInput.value = matches[0] + ' ';
-        } else {
-          parts[parts.length - 1] = matches[0];
-          termInput.value = parts.join(' ');
-        }
-      } else if (matches.length > 1) {
-        appendTermLine(matches.join('  '), 'text-slate-400');
-      }
-    }
+    },
   });
 
   btnCamFollow?.addEventListener('click', () => {
@@ -1167,6 +1124,7 @@ export function initHotlineKumirController(
     canvas.removeEventListener('wheel', onCanvasWheel);
     codeEditor.removeEventListener('paste', blockPasteOrDrop);
     codeEditor.removeEventListener('drop', blockPasteOrDrop);
+    unbindTerminal();
     resizeObserver?.disconnect();
     renderer.dispose();
     audio.dispose();

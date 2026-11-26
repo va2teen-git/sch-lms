@@ -1,0 +1,103 @@
+---
+export interface Props {
+  id?: string;
+  title?: string;
+  titleId?: string;
+  mode?: 'interactive' | 'stream';
+  outputId?: string;
+  outputTag?: 'div' | 'pre';
+  inputId?: string;
+  promptId?: string;
+  promptText?: string;
+  placeholder?: string;
+  fullHeight?: boolean;
+  compact?: boolean;
+  showGrid?: boolean;
+  showChevron?: boolean;
+  promptAccent?: 'cyan' | 'emerald' | 'amber' | 'rose';
+  windowClass?: string;
+  bodyClass?: string;
+  autofocus?: boolean;
+}
+
+const {
+  id,
+  title = 'student@school-lms:~ — bash',
+  titleId,
+  mode = 'interactive',
+  outputId,
+  outputTag = 'div',
+  inputId,
+  promptId,
+  promptText = 'student@school-lms:~>',
+  placeholder = 'Введите команду (help — справка)...',
+  fullHeight = false,
+  compact = false,
+  showGrid = true,
+  showChevron = true,
+  promptAccent = 'cyan',
+  windowClass = '',
+  bodyClass = '',
+  autofocus = false,
+} = Astro.props;
+
+const rootClasses = ['ct-window', fullHeight ? 'ct-window--full' : '', windowClass]
+  .filter(Boolean)
+  .join(' ');
+const bodyClasses = ['ct-body', compact ? 'ct-body--compact' : '', bodyClass]
+  .filter(Boolean)
+  .join(' ');
+---
+
+<div
+  id={id}
+  class={rootClasses}
+  data-ct-mode={mode}
+  data-ct-prompt-accent={promptAccent}
+>
+  {showGrid && <div class="ct-grid-bg" aria-hidden="true"></div>}
+
+  <div class="ct-titlebar">
+    <div class="ct-titlebar-left">
+      <div class="ct-dots" aria-hidden="true">
+        <span class="ct-dot ct-dot--red"></span>
+        <span class="ct-dot ct-dot--amber"></span>
+        <span class="ct-dot ct-dot--green"></span>
+      </div>
+      <span id={titleId} class="ct-title">{title}</span>
+    </div>
+    <div class="ct-titlebar-right">
+      <slot name="titlebar-right" />
+    </div>
+  </div>
+
+  {outputTag === 'pre' ? (
+    <pre id={outputId} class={bodyClasses}><slot /></pre>
+  ) : (
+    <div id={outputId} class={bodyClasses}>
+      <slot />
+    </div>
+  )}
+
+  {mode === 'interactive' && (
+    <div class="ct-input-bar">
+      {showChevron && (
+        <span class="ct-chevron" aria-hidden="true">❯</span>
+      )}
+      <span id={promptId} class="ct-prompt">{promptText}</span>
+      <input
+        id={inputId}
+        type="text"
+        class="ct-input"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder={placeholder}
+        autofocus={autofocus}
+      />
+    </div>
+  )}
+
+  <slot name="footer" />
+</div>

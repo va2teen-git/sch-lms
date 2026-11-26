@@ -1,5 +1,7 @@
 ---
 // src/components/Terminal.astro
+import CyberTerminal from './ui/CyberTerminal.astro';
+
 export interface PhaseConfig {
   setup: string; // stringified function (vfs) => void
   onCommand: string; // stringified function (cmd, args) => { success: boolean, message?: string }
@@ -17,7 +19,15 @@ export interface Props {
 
 const { missionName, phases, level, requireStart = false, renderStartOverlay = true, theme = 'green', hardcoreReset = false } = Astro.props;
 const themeClass = theme === 'orange' ? 'text-warning' : theme === 'red' ? 'text-danger' : 'text-success';
+const promptAccent = theme === 'orange' ? 'amber' : theme === 'red' ? 'rose' : 'cyan';
 const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (requireStart ? 3 : 1);
+let totalPhasesCount = 1;
+try {
+  const parsedPhases = JSON.parse(phases);
+  if (Array.isArray(parsedPhases) && parsedPhases.length > 0) {
+    totalPhasesCount = parsedPhases.length;
+  }
+} catch {}
 ---
 
 {requireStart && renderStartOverlay && (
@@ -31,7 +41,26 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
 </div>
 )}
 
-<div id="terminal-output" class="flex-grow-1 overflow-auto bg-black p-3 rounded-0 font-monospace" style="font-size: 1.1rem; line-height: 1.4; color: #f8f9fa; white-space: pre-wrap;">
+<CyberTerminal
+    id="linux-terminal-window"
+    title="root@sys-server:/ — bash"
+    titleId="terminal-title"
+    mode="interactive"
+    outputId="terminal-output"
+    inputId="cmd-input"
+    promptId="prompt-path"
+    promptText="root@sys-server:/#"
+    placeholder="Введите команду Linux (help — справка)..."
+    fullHeight={true}
+    showGrid={true}
+    showChevron={true}
+    promptAccent={promptAccent}
+    autofocus={true}
+>
+    <Fragment slot="titlebar-right">
+        <span id="terminal-phase-badge" class="ct-badge">ФАЗА 1 / {totalPhasesCount}</span>
+    </Fragment>
+    <div class="ct-boot mb-2">// terminal://linux-sandbox — bash</div>
     <div class="text-white">Ubuntu 24.04.1 LTS sys-server tty1</div>
     <br>
     <div class="text-white">sys-server login: root</div>
@@ -40,12 +69,7 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
     <br>
     <div class="text-white">Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 6.8.0-45-generic x86_64)</div>
     <br>
-</div>
-
-<div class="input-group bg-black">
-    <span class={`input-group-text bg-black ${themeClass} border-0 rounded-0 font-monospace pe-2`} id="prompt-path" style="font-size: 1.1rem;">root@sys-server:/#</span>
-    <input type="text" id="cmd-input" class="form-control bg-black text-white border-0 rounded-0 shadow-none font-monospace px-0" autocomplete="off" autofocus style="font-size: 1.1rem; box-shadow: none !important; outline: none !important;">
-</div>
+</CyberTerminal>
 
 <script define:vars={{ missionName, phasesJson: phases, resolvedLevel, requireStart, themeClass, hardcoreReset }}>
     const phases = JSON.parse(phasesJson).map(p => ({
@@ -59,10 +83,32 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
     let currentPath = '/';
     let vfs = { '/': { 'var': { 'log': {} }, 'etc': {}, 'home': {} } };
     const actionLog = [];
+    const cmdHistory = [];
+    let cmdHistoryIdx = -1;
+    let errorFlashTimer = null;
 
+    const windowEl = document.getElementById('linux-terminal-window');
+    const titleEl = document.getElementById('terminal-title');
+    const phaseBadgeEl = document.getElementById('terminal-phase-badge');
     const outputDiv = document.getElementById('terminal-output');
     const inputField = document.getElementById('cmd-input');
     const promptPath = document.getElementById('prompt-path');
+
+    function updatePhaseBadge() {
+        if (!phaseBadgeEl) return;
+        const shownPhase = Math.min(currentPhase + 1, phases.length);
+        phaseBadgeEl.textContent = `ФАЗА ${shownPhase} / ${phases.length}`;
+    }
+
+    function flashWindowError() {
+        if (!windowEl) return;
+        if (errorFlashTimer) clearTimeout(errorFlashTimer);
+        windowEl.classList.add('ct-window--error');
+        errorFlashTimer = setTimeout(() => {
+            windowEl.classList.remove('ct-window--error');
+            errorFlashTimer = null;
+        }, 320);
+    }
 
     function restartAfterAfk() {
         if (window.phaseTimer) clearTimeout(window.phaseTimer);
@@ -70,9 +116,11 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
         currentPath = '/';
         vfs = { '/': { 'var': { 'log': {} }, 'etc': {}, 'home': {} } };
         isLocked = false;
-        printLine('\n--- СИМУЛЯЦИЯ ВОЗОБНОВЛЕНА ПОСЛЕ ПАУЗЫ ---\n', 'text-warning fw-bold');
+        updatePrompt();
+        updatePhaseBadge();
+        printLine('\n--- СИМУЛЯЦИЯ ВОЗОБНОВЛЕНА ПОСЛЕ ПАУЗЫ ---\n', 'text-warning ct-line--warn fw-bold');
         const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
-        if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+        if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info ct-line--info fw-bold');
         inputField.focus();
         schedulePhaseTimeout();
     }
@@ -132,11 +180,13 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
         let displayPath = currentPath;
         if (displayPath !== '/') displayPath = displayPath.replace(/\/$/, '');
         promptPath.innerText = `root@sys-server:${displayPath}#`;
+        if (titleEl) titleEl.textContent = `root@sys-server:${displayPath} — bash`;
     }
 
     function failPhase(msg, isTimeout = false) {
         if (window.phaseTimer) clearTimeout(window.phaseTimer);
         window.phaseTimer = null;
+        flashWindowError();
         const failedStage = currentPhase + 1;
         actionLog.push({ time: new Date().toISOString(), action: `phase_${failedStage}_fail_${isTimeout ? 'timeout' : 'wrong'}` });
 
@@ -154,17 +204,19 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
 
         setTimeout(() => {
             if (telemetry.getState().isAfkPaused) return;
-            printLine(msg, 'text-info fw-bold');
+            printLine(msg, 'text-info ct-line--info fw-bold');
             setTimeout(() => {
                 if (telemetry.getState().isAfkPaused) return;
                 if (hardcoreReset) {
                     currentPhase = 0;
                     currentPath = '/';
                     vfs = { '/': { 'var': { 'log': {} }, 'etc': {}, 'home': {} } };
-                    printLine(`\n--- INITIATING SYSTEM ROLLBACK TO PRE-INCIDENT STATE ---\n`, 'text-danger fw-bold');
+                    updatePrompt();
+                    updatePhaseBadge();
+                    printLine(`\n--- INITIATING SYSTEM ROLLBACK TO PRE-INCIDENT STATE ---\n`, 'text-danger ct-line--err fw-bold');
                 }
                 const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
-                if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+                if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info ct-line--info fw-bold');
                 isLocked = false;
                 inputField.focus();
                 schedulePhaseTimeout();
@@ -183,7 +235,7 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
         
         if (currentPhase >= phases.length) {
             setTimeout(() => {
-                printLine(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nSYSTEM RECOVERY COMPLETE. All threats neutralized.\nDisconnecting...`, 'text-success fw-bold');
+                printLine(`\nBroadcast message from root@sys-server (tty1) ${getBroadcastTime()}:\n\nSYSTEM RECOVERY COMPLETE. All threats neutralized.\nDisconnecting...`, 'text-success ct-line--ok fw-bold');
                 telemetry.complete({
                     stage: phases.length,
                     wave: resolvedLevel === 3 ? phases.length : undefined,
@@ -198,8 +250,9 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
                 telemetry.advanceStage(currentPhase + 1, { action_log: actionLog });
             }
             setTimeout(() => {
+                updatePhaseBadge();
                 const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
-                if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+                if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info ct-line--info fw-bold');
                 isLocked = false;
                 inputField.focus();
                 schedulePhaseTimeout();
@@ -211,14 +264,44 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
         if (e.key === 'Enter') {
             const cmdText = inputField.value.trim().replace(/\s+/g, ' ');
             inputField.value = '';
+            cmdHistoryIdx = -1;
             if (cmdText) {
-                printLine(`<span class="${themeClass}">${promptPath.innerText}</span> <span class="text-white">${cmdText}</span>`, 'text-white');
+                if (cmdHistory[cmdHistory.length - 1] !== cmdText) {
+                    cmdHistory.push(cmdText);
+                }
+                printLine(`<span class="${themeClass}">${promptPath.innerText}</span> <span class="text-white">${cmdText}</span>`, 'text-white ct-line--cmd');
                 processCommand(cmdText);
+            }
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (cmdHistory.length === 0) return;
+            if (cmdHistoryIdx === -1) cmdHistoryIdx = cmdHistory.length - 1;
+            else cmdHistoryIdx = Math.max(0, cmdHistoryIdx - 1);
+            inputField.value = cmdHistory[cmdHistoryIdx] || '';
+            return;
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (cmdHistoryIdx === -1) return;
+            cmdHistoryIdx++;
+            if (cmdHistoryIdx >= cmdHistory.length) {
+                cmdHistoryIdx = -1;
+                inputField.value = '';
+            } else {
+                inputField.value = cmdHistory[cmdHistoryIdx] || '';
             }
         }
     });
 
-    document.body.addEventListener('click', () => { if (!isLocked) inputField.focus(); });
+    document.body.addEventListener('click', (e) => {
+        if (isLocked || inputField.disabled) return;
+        const sel = window.getSelection && window.getSelection().toString();
+        if (sel) return;
+        if (e.target instanceof Element && e.target.closest('button')) return;
+        inputField.focus();
+    });
 
     function getFileContent(pathString) {
         if (!pathString.startsWith('/')) {
@@ -346,9 +429,10 @@ const resolvedLevel = (level === 1 || level === 2 || level === 3) ? level : (req
     }
 
     function startSimulation() {
+        updatePhaseBadge();
         setTimeout(() => {
             const setupMsg = phases[currentPhase].setup(vfs, rnd, getBroadcastTime);
-            if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info fw-bold');
+            if (setupMsg) printLine(`\n${setupMsg}\n`, 'text-info ct-line--info fw-bold');
             schedulePhaseTimeout();
         }, 1500);
     }
