@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { compileKumir, executeKumirProgram } from '../src/lib/hotline-kumir/kumir-interpreter.ts';
 import { ATLAS_SPRITES } from '../src/lib/hotline-kumir/atlas-manifest.ts';
 import { HotlineGameEngine, HOTLINE_KUMIR_LEVELS } from '../src/lib/hotline-kumir/game-engine.ts';
+import {
+  getDoorVisualBounds,
+  getExitFenceHoleVisualBounds,
+  getInteractableVisualBounds,
+} from '../src/lib/hotline-kumir/object-bounds.ts';
 import type { KumirSensorReader } from '../src/lib/hotline-kumir/types.ts';
 
 test('KuMir interpreter: compiles classic and speed-coding syntax with yo normalization', () => {
@@ -536,4 +541,79 @@ test('Interior interactables: inspect crates, plants, urns, furniture, HAS_INTER
   } finally {
     l1.interactables = orig;
   }
+});
+
+test('Level prop layout invariants: zero wall/window/laser/spawn clipping and 6 authored clues per level', () => {
+  for (const lvl of HOTLINE_KUMIR_LEVELS) {
+    assert.ok(
+      (lvl.interactables?.length || 0) >= 6,
+      `Level ${lvl.id} must have at least 6 authored clues`
+    );
+
+    const h = lvl.asciiMap.length;
+    const w = lvl.asciiMap[0].length;
+    for (const p of lvl.scene.props) {
+      if (p.layer === 'floor' || p.layer === 'overhead') continue;
+      const r = ATLAS_SPRITES[p.sprite];
+      assert.ok(r, `Missing sprite ${p.sprite}`);
+      const sw = p.w ?? r.tilesW;
+      const sh = p.h ?? r.tilesH;
+      const rot = p.rot || 0;
+      const fw = rot === 90 || rot === 270 ? sh : sw;
+      const fh = rot === 90 || rot === 270 ? sw : sh;
+      const minX = Math.floor(p.x + 0.02);
+      const maxX = Math.ceil(p.x + fw - 0.02) - 1;
+      const minY = Math.floor(p.y + 0.02);
+      const maxY = Math.ceil(p.y + fh - 0.02) - 1;
+      for (let gy = minY; gy <= maxY; gy++) {
+        for (let gx = minX; gx <= maxX; gx++) {
+          if (gx < 0 || gx >= w || gy < 0 || gy >= h) continue;
+          const ch = lvl.asciiMap[gy][gx];
+          assert.notEqual(ch, '#', `Level ${lvl.id} prop ${p.sprite} clips wall at (${gx},${gy})`);
+          assert.notEqual(ch, 'W', `Level ${lvl.id} prop ${p.sprite} clips window at (${gx},${gy})`);
+          assert.notEqual(ch, '=', `Level ${lvl.id} prop ${p.sprite} clips laser at (${gx},${gy})`);
+          assert.notEqual(ch, 'S', `Level ${lvl.id} prop ${p.sprite} clips player spawn at (${gx},${gy})`);
+          assert.notEqual(ch, 'G', `Level ${lvl.id} prop ${p.sprite} clips GBR entry at (${gx},${gy})`);
+        }
+      }
+    }
+  }
+});
+
+test('Object-bound highlights: size adapts to doors, urns, sofas, vending machines & fence hole', () => {
+  const g1 = new HotlineGameEngine(1, 'richard', 42);
+  g1.startMission();
+  const s1 = g1.getSnapshot();
+
+  // No duplicate auto-interactable created on multi-tile sofa or desk tiles covered by authored interactables
+  assert.equal(
+    s1.interactables.some((i) => i.id.startsWith('auto-sofa_leather')),
+    false
+  );
+
+  const doorBounds = getDoorVisualBounds(s1.doors[0], s1);
+  assert.ok(Math.min(doorBounds.w, doorBounds.h) <= 20, `Door highlight must fit door frame, got ${doorBounds.w}x${doorBounds.h}`);
+  assert.ok(Math.max(doorBounds.w, doorBounds.h) >= 44, `Door highlight length must span jambs, got ${doorBounds.w}x${doorBounds.h}`);
+
+  const urn = s1.interactables.find((i) => i.id === 'l1-urn')!;
+  const sofa = s1.interactables.find((i) => i.id === 'l1-sofa')!;
+  const urnRect = getInteractableVisualBounds(urn, s1);
+  const sofaRect = getInteractableVisualBounds(sofa, s1);
+  assert.ok(urnRect.w <= 24 && urnRect.h <= 24, `Urn highlight should be compact, got ${urnRect.w}x${urnRect.h}`);
+  assert.ok(sofaRect.w > 75 && sofaRect.h < 44, `Sofa highlight should match 2x1 sprite, got ${sofaRect.w}x${sofaRect.h}`);
+
+  const holeRect = getExitFenceHoleVisualBounds(s1);
+  assert.ok(holeRect.w <= 26 && holeRect.h >= 36, `Exit fence hole highlight must fit gap, got ${holeRect.w}x${holeRect.h}`);
+
+  const g2 = new HotlineGameEngine(2, 'richard', 42);
+  const s2 = g2.getSnapshot();
+  const vend = s2.interactables.find((i) => i.id === 'l2-vending')!;
+  const vendRect = getInteractableVisualBounds(vend, s2);
+  assert.ok(vendRect.h > 75 && vendRect.w < 44, `Vending highlight should be 1x2 vertical, got ${vendRect.w}x${vendRect.h}`);
+
+  const g3 = new HotlineGameEngine(3, 'richard', 42);
+  const s3 = g3.getSnapshot();
+  const rotSofa = s3.interactables.find((i) => i.id === 'l3-sofa')!;
+  const rotSofaRect = getInteractableVisualBounds(rotSofa, s3);
+  assert.ok(rotSofaRect.h > 75 && rotSofaRect.w < 44, `Rotated sofa highlight should be vertical, got ${rotSofaRect.w}x${rotSofaRect.h}`);
 });

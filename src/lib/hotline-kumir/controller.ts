@@ -28,6 +28,7 @@ declare global {
       runCode: () => Promise<void>;
       execLinux: (cmd: string) => { output: string; exitCode: number; snapshot: WorldSnapshot };
       forceTimeout: () => WorldSnapshot;
+      getHighlightRects: () => ReturnType<HotlineCanvasRenderer['getHighlightRects']>;
     };
     LMSTelemetry?: {
       create?: (opts: Record<string, unknown>) => {
@@ -85,6 +86,8 @@ export function initHotlineKumirController(
   const errorBox = root.querySelector<HTMLDivElement>('#hk-error-box');
   const missionDescEl = root.querySelector<HTMLElement>('#hk-mission-desc');
   const missionObjectivesEl = root.querySelector<HTMLUListElement>('#hk-mission-objectives');
+  const cluesCountEl = root.querySelector<HTMLElement>('#hk-clues-count');
+  const clueSlotsEl = root.querySelector<HTMLDivElement>('#hk-clue-slots');
   const intelBoxEl = root.querySelector<HTMLDivElement>('#hk-intel-box');
   const hoverInfoEl = root.querySelector<HTMLElement>('#hk-hover-info');
 
@@ -205,6 +208,82 @@ export function initHotlineKumirController(
   let alertReported = false;
   let campaignCompleted = false;
   let levelOverriddenByTest = false;
+  let selectedClueIndex: number | null = null;
+  let lastCollectedCount = 0;
+
+  const CLUE_ICONS: Record<string, string> = {
+    urn: '🗑',
+    crate: '📦',
+    plant: '🪴',
+    furniture: '🛋',
+    item: '📟',
+  };
+
+  const renderCluesPanel = (snap: WorldSnapshot) => {
+    const clues = snap.collectedIntel;
+    if (clues.length > lastCollectedCount) {
+      selectedClueIndex = clues.length - 1;
+    }
+    lastCollectedCount = clues.length;
+    if (clues.length === 0) {
+      selectedClueIndex = null;
+    } else if (selectedClueIndex === null || selectedClueIndex >= clues.length) {
+      selectedClueIndex = clues.length - 1;
+    }
+
+    const slotCount = Math.max(6, clues.length);
+    if (cluesCountEl) {
+      cluesCountEl.textContent = `${clues.length}/${slotCount}`;
+    }
+
+    if (clueSlotsEl) {
+      const existingButtons = Array.from(clueSlotsEl.querySelectorAll<HTMLButtonElement>('[data-clue-slot]'));
+      if (existingButtons.length !== slotCount) {
+        clueSlotsEl.innerHTML = '';
+        for (let i = 0; i < slotCount; i++) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.clueSlot = String(i);
+          clueSlotsEl.appendChild(btn);
+        }
+      }
+      const buttons = Array.from(clueSlotsEl.querySelectorAll<HTMLButtonElement>('[data-clue-slot]'));
+      buttons.forEach((btn, idx) => {
+        const clue = clues[idx];
+        if (!clue) {
+          btn.disabled = true;
+          btn.title = `Слот улики ${idx + 1} (пусто)`;
+          btn.setAttribute('aria-pressed', 'false');
+          btn.textContent = `${idx + 1}`;
+          btn.className =
+            'h-7 text-[10px] font-bold bg-slate-950/80 border border-slate-800 text-slate-600 rounded-0 cursor-default';
+          return;
+        }
+        const isActive = idx === selectedClueIndex;
+        const icon = CLUE_ICONS[clue.category || 'item'] || '📄';
+        btn.disabled = false;
+        btn.title = `${clue.name} — нажмите для чтения`;
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        btn.textContent = `${idx + 1}${icon}`;
+        btn.className = isActive
+          ? 'h-7 text-[10px] font-black bg-amber-900/90 border-2 border-cyan-300 text-amber-100 rounded-0 cursor-pointer'
+          : 'h-7 text-[10px] font-bold bg-amber-950/80 border border-amber-500/80 text-amber-200 hover:border-cyan-400 rounded-0 cursor-pointer';
+      });
+    }
+
+    if (intelBoxEl) {
+      if (selectedClueIndex !== null && clues[selectedClueIndex]) {
+        const clue = clues[selectedClueIndex];
+        intelBoxEl.textContent = `УЛИКА #${selectedClueIndex + 1} · ${clue.name}: ${clue.text}`;
+        intelBoxEl.className =
+          'flex-1 min-h-0 overflow-y-auto px-2.5 py-1.5 text-[11px] leading-snug text-amber-200 bg-amber-950/35 select-text';
+      } else {
+        intelBoxEl.textContent = 'Улики пока не собраны. Подойди к объекту [?] и введи «осмотреть».';
+        intelBoxEl.className =
+          'flex-1 min-h-0 overflow-y-auto px-2.5 py-1.5 text-[11px] leading-snug text-slate-400 select-text';
+      }
+    }
+  };
 
   const stopExecutionLoop = () => {
     if (execTimer !== null) {
@@ -452,7 +531,7 @@ export function initHotlineKumirController(
       if (snap.alarmTriggered || snap.gbrSpawned) {
         etaTrackerEl.classList.remove('hidden');
         etaTextEl.textContent = snap.gbrSpawned
-          ? 'ГБР ПРОРВАЛСЯ ЧЕРЕЗ ГЛАВНЫЙ ВХОД! УХОДИТЕ В ЗАПАСНОЙ ВЫХОД (ВЫХ)'
+          ? 'ГБР ПРОРВАЛСЯ ЧЕРЕЗ ГЛАВНЫЙ ВХОД! УХОДИТЕ ЧЕРЕЗ ЛАЗ В ЗАБОРЕ (E)'
           : `ГБР ПРИБУДЕТ ЧЕРЕЗ: ${snap.gbrEtaTurns} ХОД. (${snap.gbrEtaSec} С)`;
         const progressIdx = snap.gbrSpawned
           ? 4
@@ -494,7 +573,7 @@ export function initHotlineKumirController(
     }
 
     if (missionDescEl) {
-      missionDescEl.textContent = snap.missionSummary;
+      missionDescEl.textContent = snap.briefingText;
     }
 
     if (missionObjectivesEl) {
@@ -530,8 +609,8 @@ export function initHotlineKumirController(
       rows.push({
         done: snap.exitUnlocked && snap.phase === 'EXTRACTION',
         text: snap.exitUnlocked
-          ? '✓ Запасной выход (E) открыт — двигайся к эвакуации'
-          : '○ Запасной выход (E) откроется после выполнения целей',
+          ? '✓ Лаз в заборе (E) открыт — двигайся к эвакуации'
+          : '○ Лаз в заборе (E) откроется после выполнения целей',
       });
       for (const r of rows) {
         const li = document.createElement('li');
@@ -541,16 +620,7 @@ export function initHotlineKumirController(
       }
     }
 
-    if (intelBoxEl) {
-      if (snap.lastInspectMessage) {
-        const extra = snap.collectedIntel.length > 1 ? ` (улик: ${snap.collectedIntel.length})` : '';
-        intelBoxEl.textContent = `УЛИКА: ${snap.lastInspectMessage}${extra}`;
-        intelBoxEl.classList.remove('hidden');
-      } else {
-        intelBoxEl.textContent = '';
-        intelBoxEl.classList.add('hidden');
-      }
-    }
+    renderCluesPanel(snap);
 
     if (errorBox) {
       if (snap.lastError) {
@@ -619,6 +689,8 @@ export function initHotlineKumirController(
     selectedMask = mask;
     missionReported = false;
     alertReported = false;
+    selectedClueIndex = null;
+    lastCollectedCount = 0;
     engine = new HotlineGameEngine(levelId, mask, baseSeed + levelId);
     const lvlDef = HOTLINE_KUMIR_LEVELS.find((l) => l.id === levelId) || HOTLINE_KUMIR_LEVELS[0];
 
@@ -898,6 +970,17 @@ export function initHotlineKumirController(
     },
   });
 
+  const onClueSlotClick = (e: Event) => {
+    const btn = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-clue-slot]');
+    if (!btn || btn.disabled) return;
+    const idx = Number(btn.dataset.clueSlot);
+    const snap = engine.getSnapshot();
+    if (!Number.isInteger(idx) || idx < 0 || idx >= snap.collectedIntel.length) return;
+    selectedClueIndex = idx;
+    renderCluesPanel(snap);
+  };
+  clueSlotsEl?.addEventListener('click', onClueSlotClick);
+
   btnCamFollow?.addEventListener('click', () => {
     renderer.setCameraMode('FOLLOW');
     syncCameraButtons();
@@ -940,47 +1023,30 @@ export function initHotlineKumirController(
       syncCameraButtons();
     }
     const rawTile = renderer.getHoveredTile(e.clientX, e.clientY);
+    const hoveredObj = renderer.getHoveredObject(e.clientX, e.clientY);
     const snap = engine.getSnapshot();
     const validTile =
       rawTile && rawTile.x >= 0 && rawTile.y >= 0 && rawTile.x < snap.width && rawTile.y < snap.height
         ? rawTile
         : null;
+    renderer.setHoveredObject(hoveredObj);
     renderer.setHoveredTile(validTile);
 
     if (tileCoordsEl) {
-      tileCoordsEl.textContent = validTile ? `x:${validTile.x} y:${validTile.y}` : 'x:— y:—';
+      if (hoveredObj) {
+        tileCoordsEl.textContent = `x:${hoveredObj.tileX} y:${hoveredObj.tileY}`;
+      } else {
+        tileCoordsEl.textContent = validTile ? `x:${validTile.x} y:${validTile.y}` : 'x:— y:—';
+      }
     }
     if (hoverInfoEl) {
-      if (!validTile) {
+      if (hoveredObj) {
+        hoverInfoEl.textContent = hoveredObj.label;
+      } else if (!validTile) {
         hoverInfoEl.textContent = 'Наведи на объект';
       } else {
-        const obj = snap.interactables.find((item) => item.x === validTile.x && item.y === validTile.y);
-        const door = snap.doors.find((d) => d.x === validTile.x && d.y === validTile.y);
-        const cam = snap.cameras.find((c) => c.x === validTile.x && c.y === validTile.y);
-        const enemy = snap.enemies.find((en) => en.x === validTile.x && en.y === validTile.y && en.status !== 'offline');
         const t = snap.tiles[validTile.y][validTile.x];
-        if (obj) {
-          hoverInfoEl.textContent = obj.inspected ? `${obj.name} (осмотрено ✓)` : `${obj.name} → «осмотреть»`;
-        } else if (t === 'TERMINAL') {
-          hoverInfoEl.textContent = snap.hackCompleted ? 'Служебный ПК (взломан ✓)' : 'Служебный ПК → «подключиться»';
-        } else if (t === 'RELAY') {
-          hoverInfoEl.textContent = 'ЭМИ-реле (*) → «пометить»';
-        } else if (t === 'COVER') {
-          hoverInfoEl.textContent = 'Укрытие (C) → «укрыться»';
-        } else if (t === 'EXIT') {
-          hoverInfoEl.textContent = snap.exitUnlocked
-            ? 'Запасная дверь (выход) открыта!'
-            : 'Запасная дверь (выход) — заблокирована';
-        } else if (t === 'GBR_SPAWN') {
-          hoverInfoEl.textContent = 'Главный вход (дверь штурма ГБР)';
-        } else if (door) {
-          hoverInfoEl.textContent = door.open ? 'Проход открыт' : 'Электродверь (D) → ПК или «выбить дверь»';
-        } else if (cam) {
-          hoverInfoEl.textContent = cam.enabled ? 'Камера (K) → «отключить»' : 'Камера отключена';
-        } else if (enemy) {
-          hoverInfoEl.textContent =
-            enemy.status === 'stunned' ? 'Оглушён → «обезвредить»' : 'Охрана → «бросить» / «оглушить»';
-        } else if (t === 'WALL' || t === 'WINDOW') {
+        if (t === 'WALL' || t === 'WINDOW') {
           hoverInfoEl.textContent = t === 'WINDOW' ? 'Стеклянная витрина' : 'Стена';
         } else {
           hoverInfoEl.textContent = 'Проходимая клетка';
@@ -990,6 +1056,7 @@ export function initHotlineKumirController(
   };
 
   const onCanvasPointerLeave = () => {
+    renderer.setHoveredObject(null);
     renderer.setHoveredTile(null);
     if (tileCoordsEl) tileCoordsEl.textContent = 'x:— y:—';
     if (hoverInfoEl) hoverInfoEl.textContent = 'Наведи на объект';
@@ -1098,6 +1165,7 @@ export function initHotlineKumirController(
       updateUi(res.snapshot, res.events);
       return res.snapshot;
     },
+    getHighlightRects: () => renderer.getHighlightRects(),
   };
 
   loadLevel(initialLevel, selectedMask, !params.has('skipBriefing'));
@@ -1141,6 +1209,7 @@ export function initHotlineKumirController(
     canvas.removeEventListener('wheel', onCanvasWheel);
     codeEditor.removeEventListener('paste', blockPasteOrDrop);
     codeEditor.removeEventListener('drop', blockPasteOrDrop);
+    clueSlotsEl?.removeEventListener('click', onClueSlotClick);
     unbindTerminal();
     resizeObserver?.disconnect();
     renderer.dispose();

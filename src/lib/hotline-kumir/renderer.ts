@@ -1,6 +1,16 @@
 import { ATLAS_SPRITES, ATLAS_URL } from './atlas-manifest.ts';
 import { Camera2D, TILE_PX, type CameraMode } from './camera.ts';
 import { buildClosedDoorSet, computeConePolygon, renderAdditiveGlows, renderLightmap } from './lighting.ts';
+import {
+  findHoveredObject,
+  getCoverVisualBounds,
+  getDoorVisualBounds,
+  getExitFenceHoleVisualBounds,
+  getInteractableVisualBounds,
+  getRelayVisualBounds,
+  getTerminalVisualBounds,
+  type HoveredObjectInfo,
+} from './object-bounds.ts';
 import type {
   Direction,
   EnemyState,
@@ -10,6 +20,7 @@ import type {
   SceneProp,
   TileKind,
   WorldEvent,
+  WorldRect,
   WorldSnapshot,
 } from './types.ts';
 
@@ -225,6 +236,7 @@ export class HotlineCanvasRenderer {
   private gbrLastProgress = -1;
   private gbrSkidAlpha = 0;
   private hoveredTile: { x: number; y: number } | null = null;
+  private hoveredObject: HoveredObjectInfo | null = null;
 
   private readonly onVisibilityChange = () => {
     if (typeof document !== 'undefined' && document.hidden) {
@@ -413,6 +425,16 @@ export class HotlineCanvasRenderer {
     return this.camera.screenToTile(sx, sy, TILE_PX);
   }
 
+  getHoveredObject(clientX: number, clientY: number): HoveredObjectInfo | null {
+    if (!this.snapshot) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    const { wx, wy } = this.camera.screenToWorld(sx, sy);
+    return findHoveredObject(wx, wy, this.snapshot);
+  }
+
   setHoveredTile(tile: { x: number; y: number } | null): void {
     const prev = this.hoveredTile;
     if ((prev === null && tile === null) || (prev && tile && prev.x === tile.x && prev.y === tile.y)) {
@@ -422,6 +444,43 @@ export class HotlineCanvasRenderer {
     if (this.snapshot) {
       this.drawFrame();
     }
+  }
+
+  setHoveredObject(target: HoveredObjectInfo | null): void {
+    const prev = this.hoveredObject;
+    const same =
+      (prev === null && target === null) ||
+      (prev &&
+        target &&
+        prev.kind === target.kind &&
+        prev.tileX === target.tileX &&
+        prev.tileY === target.tileY &&
+        prev.rect.x === target.rect.x &&
+        prev.rect.y === target.rect.y);
+    if (same) return;
+    this.hoveredObject = target;
+    if (this.snapshot) {
+      this.drawFrame();
+    }
+  }
+
+  getHighlightRects(): {
+    doors: Array<{ id: string; rect: WorldRect }>;
+    interactables: Array<{ id: string; rect: WorldRect }>;
+    terminal: WorldRect;
+    exit: WorldRect;
+  } | null {
+    if (!this.snapshot) return null;
+    const snap = this.snapshot;
+    return {
+      doors: snap.doors.map((d) => ({ id: d.id, rect: getDoorVisualBounds(d, snap) })),
+      interactables: snap.interactables.map((obj) => ({
+        id: obj.id,
+        rect: getInteractableVisualBounds(obj, snap),
+      })),
+      terminal: getTerminalVisualBounds(snap),
+      exit: getExitFenceHoleVisualBounds(snap),
+    };
   }
 
   renderSnapshot(snapshot: WorldSnapshot, events: WorldEvent[] = []): void {
@@ -447,6 +506,7 @@ export class HotlineCanvasRenderer {
       this.gbrLastProgress = -1;
       this.gbrSkidAlpha = 0;
       this.hoveredTile = null;
+      this.hoveredObject = null;
     }
 
     this.ensureBackdropCache(snapshot);
@@ -897,8 +957,21 @@ export class HotlineCanvasRenderer {
     g.fillRect(snap.width * TILE_PX, 0, 4, snap.height * TILE_PX);
 
     // 2. Scene Zones (sidewalks, grass, gravel, interior marble/carpet/parquet/grate)
+    const bb = snap.scene.buildingBounds;
     for (const zone of snap.scene.zones) {
       const variants = FLOOR_SPRITE_VARIANTS[zone.floor];
+      g.save();
+      if (zone.indoor) {
+        // Clip interior floor strictly to building wall centerlines so it never leaks outside thin walls
+        g.beginPath();
+        g.rect(
+          bb.x * TILE_PX + TILE_PX / 2,
+          bb.y * TILE_PX + TILE_PX / 2,
+          Math.max(0, (bb.w - 1) * TILE_PX),
+          Math.max(0, (bb.h - 1) * TILE_PX)
+        );
+        g.clip();
+      }
       for (let y = zone.y; y < zone.y + zone.h; y++) {
         for (let x = zone.x; x < zone.x + zone.w; x++) {
           const px = x * TILE_PX;
@@ -916,6 +989,7 @@ export class HotlineCanvasRenderer {
         g.textAlign = 'left';
         g.fillText(zone.label, zone.x * TILE_PX + 8, zone.y * TILE_PX + 14);
       }
+      g.restore();
     }
 
     // 3. Subtle yet crisp KuMir Tactical Grid inside playable arena (dual-contrast for light & dark floors)
@@ -1004,6 +1078,24 @@ export class HotlineCanvasRenderer {
     const wallOff = (TILE_PX - wallThick) / 2; // 17 px
     const fenceThick = 6;
     const fenceOff = (TILE_PX - fenceThick) / 2; // 21 px
+    const fenceHoleX = snap.width - 1;
+    const fenceHoleY = snap.exitPos.y;
+
+    // Escape dirt trail leading through the fence hole to the outer alley
+    {
+      const trailStartX = snap.exitPos.x * TILE_PX + 10;
+      const trailEndX = (fenceHoleX + 1) * TILE_PX + 18;
+      const trailY = fenceHoleY * TILE_PX + TILE_PX / 2;
+      g.save();
+      g.fillStyle = 'rgba(42, 34, 28, 0.55)';
+      g.fillRect(trailStartX, trailY - 12, trailEndX - trailStartX, 24);
+      g.fillStyle = 'rgba(100, 116, 139, 0.35)';
+      for (let tx = trailStartX + 4; tx < trailEndX - 4; tx += 9) {
+        const dy = ((tx * 7) % 13) - 6;
+        g.fillRect(tx, trailY + dy, 3, 2);
+      }
+      g.restore();
+    }
 
     for (let y = 0; y < snap.height; y++) {
       for (let x = 0; x < snap.width; x++) {
@@ -1011,7 +1103,83 @@ export class HotlineCanvasRenderer {
         const px = x * TILE_PX;
         const py = y * TILE_PX;
 
-        if (tile === 'WALL' && isBorderTile(x, y)) {
+        if (tile === 'WALL' && isBorderTile(x, y) && x === fenceHoleX && y === fenceHoleY) {
+          // Drawn breached hole in the eastern chain-link perimeter fence
+          const fx = px + fenceOff;
+
+          // Top & bottom intact fence stubs ending at torn edges
+          g.fillStyle = '#0A0614';
+          g.fillRect(fx - 1, py, fenceThick + 2, 10);
+          g.fillRect(fx - 1, py + TILE_PX - 10, fenceThick + 2, 10);
+          g.fillStyle = '#475569';
+          g.fillRect(fx, py, fenceThick, 9);
+          g.fillRect(fx, py + TILE_PX - 9, fenceThick, 9);
+
+          // Bent steel fence posts framing the cut gap
+          g.fillStyle = '#0A0614';
+          g.fillRect(fx - 2, py + 6, fenceThick + 4, 6);
+          g.fillRect(fx - 2, py + TILE_PX - 12, fenceThick + 4, 6);
+          g.fillStyle = '#94A3B8';
+          g.fillRect(fx - 1, py + 7, fenceThick + 2, 4);
+          g.fillRect(fx - 1, py + TILE_PX - 11, fenceThick + 2, 4);
+
+          // Cast shadow on ground from peeled-back mesh flaps
+          g.fillStyle = 'rgba(4, 2, 12, 0.45)';
+          g.beginPath();
+          g.moveTo(fx + 5, py + 9);
+          g.lineTo(fx + 22, py + 15);
+          g.lineTo(fx + 19, py + 21);
+          g.lineTo(fx + 4, py + 13);
+          g.closePath();
+          g.fill();
+          g.beginPath();
+          g.moveTo(fx + 5, py + TILE_PX - 9);
+          g.lineTo(fx + 22, py + TILE_PX - 15);
+          g.lineTo(fx + 19, py + TILE_PX - 21);
+          g.lineTo(fx + 4, py + TILE_PX - 13);
+          g.closePath();
+          g.fill();
+
+          // Peeled-back chain-link mesh flaps (top & bottom) bent outward to the right
+          g.strokeStyle = '#CBD5E1';
+          g.lineWidth = 1.5;
+          g.beginPath();
+          // Top torn flap
+          g.moveTo(fx + 3, py + 8);
+          g.lineTo(fx + 19, py + 14);
+          g.lineTo(fx + 15, py + 19);
+          g.lineTo(fx + 4, py + 12);
+          // Bottom torn flap
+          g.moveTo(fx + 3, py + TILE_PX - 8);
+          g.lineTo(fx + 19, py + TILE_PX - 14);
+          g.lineTo(fx + 15, py + TILE_PX - 19);
+          g.lineTo(fx + 4, py + TILE_PX - 12);
+          g.stroke();
+
+          // Chain-link cross-hatch wires inside bent flaps
+          g.strokeStyle = '#64748B';
+          g.lineWidth = 1;
+          g.beginPath();
+          g.moveTo(fx + 7, py + 10);
+          g.lineTo(fx + 13, py + 16);
+          g.moveTo(fx + 11, py + 11);
+          g.lineTo(fx + 17, py + 15);
+          g.moveTo(fx + 7, py + TILE_PX - 10);
+          g.lineTo(fx + 13, py + TILE_PX - 16);
+          g.moveTo(fx + 11, py + TILE_PX - 11);
+          g.lineTo(fx + 17, py + TILE_PX - 15);
+          g.stroke();
+
+          // Snipped wire curls on the ground
+          g.strokeStyle = '#94A3B8';
+          g.lineWidth = 1.2;
+          g.beginPath();
+          g.moveTo(fx - 7, py + 17);
+          g.lineTo(fx - 3, py + 20);
+          g.moveTo(fx - 8, py + TILE_PX - 17);
+          g.lineTo(fx - 4, py + TILE_PX - 20);
+          g.stroke();
+        } else if (tile === 'WALL' && isBorderTile(x, y)) {
           const fn = isBorderTile(x, y - 1) && isStruct(x, y - 1);
           const fs = isBorderTile(x, y + 1) && isStruct(x, y + 1);
           const fw = isBorderTile(x - 1, y) && isStruct(x - 1, y);
@@ -1030,6 +1198,19 @@ export class HotlineCanvasRenderer {
           if (fs) g.fillRect(px + fenceOff, py + fenceOff, fenceThick, TILE_PX - fenceOff);
           if (fw) g.fillRect(px, py + fenceOff, fenceOff, fenceThick);
           if (fe) g.fillRect(px + fenceOff, py + fenceOff, TILE_PX - fenceOff, fenceThick);
+
+          // Chain-link mesh texture ticks along fence spans
+          g.fillStyle = '#64748B';
+          if (fn || fs) {
+            for (let sy = py + 4; sy < py + TILE_PX - 2; sy += 8) {
+              g.fillRect(px + fenceOff + 1, sy, fenceThick - 2, 2);
+            }
+          }
+          if (fw || fe) {
+            for (let sx = px + 4; sx < px + TILE_PX - 2; sx += 8) {
+              g.fillRect(sx, py + fenceOff + 1, 2, fenceThick - 2);
+            }
+          }
 
           // Fence post cap
           g.fillStyle = '#94A3B8';
@@ -1225,34 +1406,34 @@ export class HotlineCanvasRenderer {
     }
   }
 
-  private drawCornerBrackets(
+  private drawRectBrackets(
     ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
+    rect: WorldRect,
     color: string,
-    len: number,
+    maxLen: number,
     lineWidth: number
   ): void {
-    const pad = 2;
-    const x0 = px + pad;
-    const y0 = py + pad;
-    const x1 = px + TILE_PX - pad;
-    const y1 = py + TILE_PX - pad;
+    const x0 = rect.x;
+    const y0 = rect.y;
+    const x1 = rect.x + rect.w;
+    const y1 = rect.y + rect.h;
+    const lenX = Math.max(4, Math.min(maxLen, rect.w * 0.3));
+    const lenY = Math.max(4, Math.min(maxLen, rect.h * 0.3));
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.beginPath();
-    ctx.moveTo(x0, y0 + len);
+    ctx.moveTo(x0, y0 + lenY);
     ctx.lineTo(x0, y0);
-    ctx.lineTo(x0 + len, y0);
-    ctx.moveTo(x1 - len, y0);
+    ctx.lineTo(x0 + lenX, y0);
+    ctx.moveTo(x1 - lenX, y0);
     ctx.lineTo(x1, y0);
-    ctx.lineTo(x1, y0 + len);
-    ctx.moveTo(x0, y1 - len);
+    ctx.lineTo(x1, y0 + lenY);
+    ctx.moveTo(x0, y1 - lenY);
     ctx.lineTo(x0, y1);
-    ctx.lineTo(x0 + len, y1);
-    ctx.moveTo(x1 - len, y1);
+    ctx.lineTo(x0 + lenX, y1);
+    ctx.moveTo(x1 - lenX, y1);
     ctx.lineTo(x1, y1);
-    ctx.lineTo(x1, y1 - len);
+    ctx.lineTo(x1, y1 - lenY);
     ctx.stroke();
   }
 
@@ -1275,22 +1456,26 @@ export class HotlineCanvasRenderer {
         }
 
         if (tile === 'COVER') {
-          this.drawCornerBrackets(ctx, px, py, 'rgba(56, 189, 248, 0.55)', 6, 1.4);
+          const coverRect = getCoverVisualBounds(x, y, snap);
+          this.drawRectBrackets(ctx, coverRect, 'rgba(56, 189, 248, 0.65)', 6, 1.4);
+          const bx = Math.round(coverRect.x);
+          const by = Math.round(coverRect.y);
           ctx.fillStyle = 'rgba(9, 4, 20, 0.85)';
-          ctx.fillRect(px + 3, py + 3, 12, 12);
+          ctx.fillRect(bx, by, 12, 12);
           ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
           ctx.lineWidth = 1;
-          ctx.strokeRect(px + 3, py + 3, 12, 12);
+          ctx.strokeRect(bx, by, 12, 12);
           ctx.fillStyle = '#7DD3FC';
           ctx.font = 'bold 9px monospace';
           ctx.textAlign = 'center';
-          ctx.fillText('C', px + 9, py + 12);
+          ctx.fillText('C', bx + 6, by + 9);
         } else if (tile === 'RELAY') {
           if (!this.drawSprite(ctx, isPainted ? 'relay_on' : 'relay_off', px + 3, py + 3, TILE_PX - 6, TILE_PX - 6)) {
             ctx.fillStyle = isPainted ? '#082F49' : '#2E0927';
             ctx.fillRect(px + 6, py + 6, TILE_PX - 12, TILE_PX - 12);
           }
-          this.drawCornerBrackets(ctx, px, py, isPainted ? '#22D3EE' : '#F472B6', 7, 1.6);
+          const relayRect = getRelayVisualBounds(x, y);
+          this.drawRectBrackets(ctx, relayRect, isPainted ? '#22D3EE' : '#F472B6', 7, 1.6);
           ctx.fillStyle = isPainted ? '#67E8F9' : '#F472B6';
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';
@@ -1300,88 +1485,70 @@ export class HotlineCanvasRenderer {
             ctx.fillStyle = '#0F172A';
             ctx.fillRect(px + 5, py + 5, TILE_PX - 10, TILE_PX - 10);
           }
-          this.drawCornerBrackets(ctx, px, py, snap.hackCompleted ? '#34D399' : '#00F0FF', 7, 1.6);
+          const termRect = getTerminalVisualBounds(snap);
+          this.drawRectBrackets(ctx, termRect, snap.hackCompleted ? '#34D399' : '#00F0FF', 7, 1.6);
           ctx.fillStyle = snap.hackCompleted ? '#34D399' : '#38BDF8';
           ctx.font = 'bold 9px monospace';
           ctx.textAlign = 'center';
           ctx.fillText('ПК', px + TILE_PX / 2, py + TILE_PX - 4);
         } else if (tile === 'EXIT') {
           const open = snap.exitUnlocked;
-          const horizWall =
-            (x > 0 && (snap.tiles[y][x - 1] === 'WALL' || snap.tiles[y][x - 1] === 'WINDOW')) ||
-            (x + 1 < snap.width && (snap.tiles[y][x + 1] === 'WALL' || snap.tiles[y][x + 1] === 'WINDOW'));
-          ctx.fillStyle = open ? 'rgba(16, 185, 129, 0.30)' : 'rgba(255, 30, 66, 0.18)';
-          ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
-          ctx.strokeStyle = open ? '#10B981' : '#FF1E42';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+          const exitRect = getExitFenceHoleVisualBounds(snap);
 
-          // Emergency exit door jambs & panic-bar leaf
-          ctx.save();
-          ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2);
-          if (!horizWall) ctx.rotate(Math.PI / 2);
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(-TILE_PX / 2, -6, 5, 12);
-          ctx.fillRect(TILE_PX / 2 - 5, -6, 5, 12);
           if (open) {
-            ctx.fillStyle = '#065F46';
-            ctx.fillRect(-TILE_PX / 2 + 5, -4, 6, TILE_PX - 14);
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
+            ctx.fillRect(exitRect.x, exitRect.y, exitRect.w, exitRect.h);
+            this.drawRectBrackets(ctx, exitRect, '#34D399', 7, 1.8);
+
+            // Animated-contrast emerald chevrons guiding through the hole in the fence
             ctx.strokeStyle = '#34D399';
-            ctx.lineWidth = 1.4;
-            ctx.strokeRect(-TILE_PX / 2 + 5, -4, 6, TILE_PX - 14);
+            ctx.lineWidth = 2;
+            const cy = exitRect.y + exitRect.h / 2;
+            for (let c = 0; c < 2; c++) {
+              const ox = exitRect.x + 6 + c * 7;
+              ctx.beginPath();
+              ctx.moveTo(ox - 2.5, cy - 5);
+              ctx.lineTo(ox + 2.5, cy);
+              ctx.lineTo(ox - 2.5, cy + 5);
+              ctx.stroke();
+            }
           } else {
-            ctx.fillStyle = '#4C0519';
-            ctx.fillRect(-TILE_PX / 2 + 5, -3, TILE_PX - 10, 6);
-            ctx.fillStyle = '#E2E8F0';
-            ctx.fillRect(-TILE_PX / 2 + 9, -1, TILE_PX - 18, 2);
-          }
-          ctx.restore();
-
-          ctx.strokeStyle = open ? '#34D399' : '#FB7185';
-          ctx.lineWidth = 2;
-          for (let c = -1; c <= 1; c++) {
-            const ox = px + TILE_PX / 2 + c * 7;
-            const oy = py + 15;
+            // Thin taut barrier wire across the fence hole until objectives are complete
+            const wireX = exitRect.x + exitRect.w / 2;
+            ctx.strokeStyle = 'rgba(255, 30, 66, 0.85)';
+            ctx.lineWidth = 1.6;
+            ctx.setLineDash([4, 3]);
             ctx.beginPath();
-            ctx.moveTo(ox - 2.5, oy - 5);
-            ctx.lineTo(ox + 2.5, oy);
-            ctx.lineTo(ox - 2.5, oy + 5);
+            ctx.moveTo(wireX, exitRect.y + 4);
+            ctx.lineTo(wireX, exitRect.y + exitRect.h - 4);
             ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#FF1E42';
+            ctx.fillRect(wireX - 2.5, exitRect.y + exitRect.h / 2 - 2.5, 5, 5);
           }
-
-          ctx.fillStyle = open ? '#6EE7B7' : '#FDA4AF';
-          ctx.font = 'bold 9px monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText(open ? 'ВЫХ' : 'ЗАП', px + TILE_PX / 2, py + TILE_PX - 7);
         } else if (tile === 'GBR_SPAWN') {
           const horizWall =
             (x > 0 && (snap.tiles[y][x - 1] === 'WALL' || snap.tiles[y][x - 1] === 'WINDOW')) ||
             (x + 1 < snap.width && (snap.tiles[y][x + 1] === 'WALL' || snap.tiles[y][x + 1] === 'WINDOW'));
-          ctx.fillStyle = snap.gbrSpawned ? 'rgba(255, 30, 66, 0.28)' : 'rgba(255, 30, 66, 0.14)';
-          ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
-          ctx.strokeStyle = '#FF1E42';
-          ctx.setLineDash([4, 3]);
-          ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
-          ctx.setLineDash([]);
 
-          // Main entrance door frame for GBR breach
+          // Clean architectural main entrance doorway (no red GBR square)
           ctx.save();
           ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2);
           if (!horizWall) ctx.rotate(Math.PI / 2);
+          // Threshold plate
+          ctx.fillStyle = 'rgba(51, 65, 85, 0.65)';
+          ctx.fillRect(-TILE_PX / 2 + 4, -5, TILE_PX - 8, 10);
+          // Jambs matching 14px wall thickness
           ctx.fillStyle = '#334155';
           ctx.fillRect(-TILE_PX / 2, -7, 6, 14);
           ctx.fillRect(TILE_PX / 2 - 6, -7, 6, 14);
+          // Entrance door leaf swung inward
           ctx.fillStyle = snap.gbrSpawned ? '#7F1D1D' : '#1E293B';
           ctx.fillRect(-TILE_PX / 2 + 6, -4, 7, TILE_PX - 14);
-          ctx.strokeStyle = snap.gbrSpawned ? '#FF1E42' : '#94A3B8';
+          ctx.strokeStyle = snap.gbrSpawned ? '#FF1E42' : '#64748B';
           ctx.lineWidth = 1.4;
           ctx.strokeRect(-TILE_PX / 2 + 6, -4, 7, TILE_PX - 14);
           ctx.restore();
-
-          ctx.fillStyle = '#FCA5A5';
-          ctx.font = 'bold 9px monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText('ГБР', px + TILE_PX / 2, py + TILE_PX - 7);
         }
       }
     }
@@ -1390,6 +1557,7 @@ export class HotlineCanvasRenderer {
     for (const obj of snap.interactables) {
       const px = obj.x * TILE_PX;
       const py = obj.y * TILE_PX;
+      const objRect = getInteractableVisualBounds(obj, snap);
 
       if (obj.drawIcon === 'urn') {
         const cx = px + TILE_PX / 2;
@@ -1414,27 +1582,31 @@ export class HotlineCanvasRenderer {
       }
 
       if (!obj.inspected) {
-        this.drawCornerBrackets(ctx, px, py, '#FBBF24', 7, 1.8);
+        this.drawRectBrackets(ctx, objRect, '#FBBF24', 8, 1.8);
+        const bx = Math.round(objRect.x + objRect.w - 13);
+        const by = Math.round(objRect.y);
         ctx.fillStyle = '#090414';
-        ctx.fillRect(px + TILE_PX - 16, py + 3, 13, 13);
+        ctx.fillRect(bx, by, 13, 13);
         ctx.strokeStyle = '#FBBF24';
         ctx.lineWidth = 1.2;
-        ctx.strokeRect(px + TILE_PX - 16, py + 3, 13, 13);
+        ctx.strokeRect(bx, by, 13, 13);
         ctx.fillStyle = '#FDE68A';
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('?', px + TILE_PX - 9.5, py + 13);
+        ctx.fillText('?', bx + 6.5, by + 10);
       } else {
-        this.drawCornerBrackets(ctx, px, py, 'rgba(52, 211, 153, 0.45)', 5, 1.2);
+        this.drawRectBrackets(ctx, objRect, 'rgba(52, 211, 153, 0.5)', 6, 1.2);
+        const bx = Math.round(objRect.x + objRect.w - 12);
+        const by = Math.round(objRect.y);
         ctx.fillStyle = 'rgba(9, 4, 20, 0.85)';
-        ctx.fillRect(px + TILE_PX - 15, py + 3, 12, 12);
+        ctx.fillRect(bx, by, 12, 12);
         ctx.strokeStyle = 'rgba(52, 211, 153, 0.65)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(px + TILE_PX - 15, py + 3, 12, 12);
+        ctx.strokeRect(bx, by, 12, 12);
         ctx.fillStyle = '#6EE7B7';
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('✓', px + TILE_PX - 9, py + 12);
+        ctx.fillText('✓', bx + 6, by + 9);
       }
     }
 
@@ -1446,6 +1618,7 @@ export class HotlineCanvasRenderer {
       const px = d.x * TILE_PX;
       const py = d.y * TILE_PX;
       const horiz = isWall(d.x - 1, d.y) || isWall(d.x + 1, d.y);
+      const doorRect = getDoorVisualBounds(d, snap);
 
       ctx.save();
       ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2);
@@ -1486,20 +1659,30 @@ export class HotlineCanvasRenderer {
       ctx.restore();
 
       if (!d.open) {
-        ctx.fillStyle = 'rgba(9, 4, 20, 0.85)';
-        ctx.fillRect(px + 3, py + 3, 12, 12);
+        // Tight highlight frame strictly matching the door's own bounds (46x18 or 18x46)
+        this.drawRectBrackets(ctx, doorRect, '#FF007F', 6, 1.8);
+        const bx = Math.round(doorRect.x + (horiz ? 2 : 3));
+        const by = Math.round(doorRect.y + (horiz ? -12 : 2));
+        ctx.fillStyle = 'rgba(9, 4, 20, 0.88)';
+        ctx.fillRect(bx, by, 11, 11);
         ctx.strokeStyle = '#FF007F';
         ctx.lineWidth = 1;
-        ctx.strokeRect(px + 3, py + 3, 12, 12);
+        ctx.strokeRect(bx, by, 11, 11);
         ctx.fillStyle = '#F9A8D4';
-        ctx.font = 'bold 9px monospace';
+        ctx.font = 'bold 8px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('D', px + 9, py + 12);
+        ctx.fillText('D', bx + 5.5, by + 8.5);
       }
     }
 
-    // Hover cursor highlight (Idle-Zero safe: drawn only on pointer move)
-    if (
+    // Hover cursor highlight (bound to object visual bounds when hovering an object, else passable tile)
+    if (this.hoveredObject) {
+      const hr = this.hoveredObject.rect;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.88)';
+      ctx.lineWidth = 1.8;
+      ctx.strokeRect(hr.x, hr.y, hr.w, hr.h);
+      this.drawRectBrackets(ctx, hr, '#00F0FF', 8, 2);
+    } else if (
       this.hoveredTile &&
       this.hoveredTile.x >= 0 &&
       this.hoveredTile.y >= 0 &&
@@ -1508,8 +1691,8 @@ export class HotlineCanvasRenderer {
     ) {
       const ht = snap.tiles[this.hoveredTile.y][this.hoveredTile.x];
       if (ht !== 'WALL' && ht !== 'WINDOW') {
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.55)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.42)';
+        ctx.lineWidth = 1.2;
         ctx.strokeRect(
           this.hoveredTile.x * TILE_PX + 1.5,
           this.hoveredTile.y * TILE_PX + 1.5,
