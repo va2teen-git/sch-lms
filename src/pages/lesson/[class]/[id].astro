@@ -396,19 +396,27 @@ const tasks = [
           <!-- Hidden input for keyboard focus & mobile capture -->
           <input id="sprint-hidden-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="absolute opacity-0 pointer-events-none" aria-hidden="true" />
 
-          <!-- Didactic Definition HUD Card -->
-          <div id="sprint-def-card" class="max-w-4xl w-full mb-3 bg-gradient-to-r from-cyan-950/80 via-gray-900/90 to-cyan-950/80 border border-cyan-800/80 p-3 sm:p-4 rounded-xs flex items-start gap-3 shadow-[0_0_25px_rgba(6,182,212,0.1)]">
-            <div class="text-cyan-400 text-lg font-black shrink-0 mt-0.5">📖</div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold">ДИДАКТИЧЕСКИЙ ТЕРМИН // АКТИВНОЕ ОПРЕДЕЛЕНИЕ</span>
-                <span id="sprint-def-step" class="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950 px-2 py-0.5 border border-cyan-800/70">1 / {sprintTerms.length}</span>
+          <!-- Terminal Input History Window -->
+          <div id="sprint-terminal-history" class="max-w-4xl w-full mb-3 bg-black/90 border border-cyan-800/80 rounded-xs shadow-[0_0_25px_rgba(6,182,212,0.12)] flex flex-col overflow-hidden">
+            <div class="bg-gray-900/95 border-b border-cyan-900/70 px-3 py-1.5 flex items-center justify-between gap-2 shrink-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="flex items-center gap-1.5 shrink-0" aria-hidden="true">
+                  <span class="w-2.5 h-2.5 rounded-full bg-red-500/75"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-400/75"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400/75"></span>
+                </div>
+                <span class="text-[11px] font-mono text-cyan-300/90 tracking-wide truncate">student@logo-storm:~/history — bash</span>
               </div>
-              <div class="mt-1 flex flex-wrap items-baseline gap-2">
-                <span id="sprint-def-term" class="text-base sm:text-lg font-black text-white tracking-wide uppercase">...</span>
-                <span class="text-cyan-500 font-bold">—</span>
-                <span id="sprint-def-desc" class="text-xs sm:text-sm text-gray-300 italic leading-relaxed">...</span>
+              <span id="sprint-def-step" class="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950 px-2 py-0.5 border border-cyan-800/70 shrink-0">1 / {sprintTerms.length}</span>
+            </div>
+            <div id="sprint-history-log" class="h-36 sm:h-44 overflow-y-auto px-3 sm:px-4 py-2.5 font-mono text-xs sm:text-sm leading-relaxed space-y-1.5">
+              <div id="sprint-history-boot" class="text-[11px] text-cyan-500/70">// terminal://logo-storm — история введённых терминов (всего: {sprintTerms.length})</div>
+              <div id="sprint-history-entries" class="space-y-1"></div>
+              <div id="sprint-history-active-line" class="flex items-start gap-2 pt-0.5">
+                <span class="text-cyan-400 font-bold shrink-0">❯</span>
+                <span class="flex-1 break-words text-emerald-300"><span id="sprint-history-current"></span><span id="sprint-history-cursor" class="inline-block w-2 h-3.5 bg-cyan-400 align-middle ml-0.5 animate-pulse"></span></span>
               </div>
+              <div id="sprint-history-done" class="hidden text-cyan-300 font-bold pt-1 text-xs"></div>
             </div>
           </div>
 
@@ -1721,10 +1729,15 @@ const tasks = [
   const sprintResAccEl = document.getElementById('sprint-res-acc');
   const sprintResErrorsEl = document.getElementById('sprint-res-errors');
 
-  // Definition HUD elements
-  const sprintDefTermEl = document.getElementById('sprint-def-term');
-  const sprintDefDescEl = document.getElementById('sprint-def-desc');
+  // Terminal history HUD elements
   const sprintDefStepEl = document.getElementById('sprint-def-step');
+  const sprintHistoryLogEl = document.getElementById('sprint-history-log');
+  const sprintHistoryBootEl = document.getElementById('sprint-history-boot');
+  const sprintHistoryEntriesEl = document.getElementById('sprint-history-entries');
+  const sprintHistoryActiveLineEl = document.getElementById('sprint-history-active-line');
+  const sprintHistoryCurrentEl = document.getElementById('sprint-history-current');
+  const sprintHistoryCursorEl = document.getElementById('sprint-history-cursor');
+  const sprintHistoryDoneEl = document.getElementById('sprint-history-done');
   const sprintRefreshLbBtn = document.getElementById('sprint-refresh-lb-btn');
 
   // Web Audio API Sound Synth
@@ -1866,6 +1879,7 @@ const tasks = [
   let isSprintStarted = false;
   let isSprintFinished = false;
   let lastSprintResult = null;
+  let sprintCompletedHistory = [];
 
   function shuffleArray(arr) {
     const res = [...arr];
@@ -1900,20 +1914,113 @@ const tasks = [
     return `${term}.`;
   }
 
-  function updateActiveDefinition() {
+  function updateStepBadge() {
     if (!sprintActiveTerms || sprintActiveTerms.length === 0) return;
-    const item = sprintActiveTerms[activeTermIndex];
-    if (!item) return;
-    const term = typeof item === 'string' ? item : (item.term || '');
-    const definition = typeof item === 'string' ? '' : (item.definition || '');
-
-    if (sprintDefTermEl) sprintDefTermEl.textContent = term;
-    if (sprintDefDescEl) {
-      sprintDefDescEl.textContent = definition || 'Термин из теории урока';
-    }
     if (sprintDefStepEl) {
-      sprintDefStepEl.textContent = `${activeTermIndex + 1} / ${sprintActiveTerms.length}`;
+      sprintDefStepEl.textContent = `${Math.min(activeTermIndex + 1, sprintActiveTerms.length)} / ${sprintActiveTerms.length}`;
     }
+  }
+
+  function scrollHistoryToBottom() {
+    if (sprintHistoryLogEl) {
+      sprintHistoryLogEl.scrollTop = sprintHistoryLogEl.scrollHeight;
+    }
+  }
+
+  function updateTerminalLiveInput(isError = false) {
+    if (sprintHistoryCurrentEl) {
+      sprintHistoryCurrentEl.textContent = currentTargetText.slice(0, currentIndex);
+    }
+    if (sprintHistoryCursorEl) {
+      sprintHistoryCursorEl.className = isError
+        ? 'inline-block w-2 h-3.5 bg-red-500 align-middle ml-0.5 shadow-[0_0_8px_rgba(239,68,68,0.8)]'
+        : 'inline-block w-2 h-3.5 bg-cyan-400 align-middle ml-0.5 animate-pulse';
+    }
+    scrollHistoryToBottom();
+  }
+
+  function appendTerminalHistoryEntry(sentenceText) {
+    const entryNum = sprintCompletedHistory.length + 1;
+    const padded = String(entryNum).padStart(2, '0');
+    const elapsedLabel = sprintStartTime
+      ? formatSprintTimer(performance.now() - sprintStartTime)
+      : '00:00.0';
+    sprintCompletedHistory.push({ index: entryNum, text: sentenceText, elapsedLabel });
+
+    if (!sprintHistoryEntriesEl) return;
+
+    const row = document.createElement('div');
+    row.className = 'sprint-history-entry flex items-start gap-2 text-xs sm:text-sm';
+
+    const prefix = document.createElement('span');
+    prefix.className = 'text-cyan-500/80 shrink-0';
+    prefix.textContent = `[${padded}] ❯`;
+
+    const textEl = document.createElement('span');
+    textEl.className = 'sprint-history-text flex-1 break-words';
+    const dashIdx = sentenceText.indexOf(' — ');
+    if (dashIdx !== -1) {
+      const termSpan = document.createElement('span');
+      termSpan.className = 'text-cyan-200 font-semibold';
+      termSpan.textContent = sentenceText.slice(0, dashIdx);
+
+      const defSpan = document.createElement('span');
+      defSpan.className = 'text-emerald-300/90';
+      defSpan.textContent = sentenceText.slice(dashIdx);
+
+      textEl.appendChild(termSpan);
+      textEl.appendChild(defSpan);
+    } else {
+      textEl.classList.add('text-emerald-300/90');
+      textEl.textContent = sentenceText;
+    }
+
+    const badge = document.createElement('span');
+    badge.className = 'text-emerald-400/80 text-[10px] sm:text-[11px] shrink-0 ml-auto';
+    badge.textContent = `[OK ${elapsedLabel}]`;
+
+    row.appendChild(prefix);
+    row.appendChild(textEl);
+    row.appendChild(badge);
+    sprintHistoryEntriesEl.appendChild(row);
+    scrollHistoryToBottom();
+  }
+
+  function resetTerminalHistory() {
+    sprintCompletedHistory = [];
+    if (sprintHistoryEntriesEl) {
+      sprintHistoryEntriesEl.innerHTML = '';
+    }
+    if (sprintHistoryCurrentEl) {
+      sprintHistoryCurrentEl.textContent = '';
+    }
+    if (sprintHistoryBootEl) {
+      sprintHistoryBootEl.textContent = `// terminal://logo-storm — история введённых терминов (всего: ${sprintActiveTerms.length})`;
+    }
+    if (sprintHistoryActiveLineEl) {
+      sprintHistoryActiveLineEl.classList.remove('hidden');
+      sprintHistoryActiveLineEl.classList.add('flex');
+    }
+    if (sprintHistoryDoneEl) {
+      sprintHistoryDoneEl.classList.add('hidden');
+      sprintHistoryDoneEl.textContent = '';
+    }
+    if (sprintHistoryCursorEl) {
+      sprintHistoryCursorEl.className = 'inline-block w-2 h-3.5 bg-cyan-400 align-middle ml-0.5 animate-pulse';
+    }
+    scrollHistoryToBottom();
+  }
+
+  function markTerminalHistoryComplete() {
+    if (sprintHistoryActiveLineEl) {
+      sprintHistoryActiveLineEl.classList.add('hidden');
+      sprintHistoryActiveLineEl.classList.remove('flex');
+    }
+    if (sprintHistoryDoneEl) {
+      sprintHistoryDoneEl.classList.remove('hidden');
+      sprintHistoryDoneEl.textContent = `[DONE] Сессия завершена: введено ${sprintActiveTerms.length} / ${sprintActiveTerms.length} терминов.`;
+    }
+    scrollHistoryToBottom();
   }
 
   function updateLiveMetrics() {
@@ -2006,7 +2113,8 @@ const tasks = [
 
     renderTextDisplay();
     updateLiveMetrics();
-    updateActiveDefinition();
+    resetTerminalHistory();
+    updateStepBadge();
 
     if (sprintPlayArena) sprintPlayArena.classList.remove('hidden');
     if (sprintResultsCard) {
@@ -2100,9 +2208,11 @@ const tasks = [
       if (currentIndex >= currentTargetText.length) {
         completedCharsCount += currentTargetText.length;
         playTermSuccessSound();
+        appendTerminalHistoryEntry(currentTargetText);
         activeTermIndex++;
 
         if (activeTermIndex >= sprintActiveTerms.length) {
+          markTerminalHistoryComplete();
           updateLiveMetrics();
           renderTextDisplay();
           finishSprint();
@@ -2110,11 +2220,13 @@ const tasks = [
           justAdvancedTerm = true;
           currentIndex = 0;
           currentTargetText = formatTermSentence(sprintActiveTerms[activeTermIndex]);
-          updateActiveDefinition();
+          updateStepBadge();
+          updateTerminalLiveInput(false);
           renderTextDisplay();
           updateLiveMetrics();
         }
       } else {
+        updateTerminalLiveInput(false);
         renderTextDisplay();
         updateLiveMetrics();
       }
@@ -2122,9 +2234,11 @@ const tasks = [
       playErrorGlitchSound();
       sprintErrorsCount++;
       updateLiveMetrics();
+      updateTerminalLiveInput(true);
       renderTextDisplay(currentIndex);
       setTimeout(() => {
         if (!isSprintFinished && currentIndex < currentTargetText.length) {
+          updateTerminalLiveInput(false);
           renderTextDisplay();
         }
       }, 120);
