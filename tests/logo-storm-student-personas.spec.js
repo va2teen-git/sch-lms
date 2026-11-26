@@ -22,10 +22,13 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     await expect(overlay).toBeVisible();
     await expect(page.locator('#sprint-terms-count')).toHaveText('7');
 
-    // Novice verifies definition HUD and Top-10 leaderboard are present
-    await expect(page.locator('#sprint-def-card')).toBeVisible();
+    // Novice verifies terminal history window and Top-10 leaderboard are present (definition card removed)
+    await expect(page.locator('#sprint-def-card')).toHaveCount(0);
+    await expect(page.locator('#sprint-terminal-history')).toBeVisible();
+    await expect(page.locator('#sprint-history-log')).toBeVisible();
+    await expect(page.locator('#sprint-history-entries .sprint-history-entry')).toHaveCount(0);
+    await expect(page.locator('#sprint-def-step')).toHaveText('1 / 7');
     await expect(page.locator('#sprint-leaderboard-sidebar')).toBeVisible();
-    await expect(page.locator('#sprint-def-term')).not.toBeEmpty();
 
     // Novice tests sound toggle
     const soundToggle = page.locator('#sprint-sound-toggle');
@@ -84,15 +87,17 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     // Type wrong character
     await page.locator('#sprint-hidden-input').pressSequentially(wrongChar);
 
-    // Errors count must increase to 1, but progress stays 0
+    // Errors count must increase to 1, progress stays 0, terminal live input stays empty
     await expect(page.locator('#sprint-errors-count')).toHaveText('1');
     await expect(page.locator('#sprint-chars-progress')).toHaveText('0');
+    await expect(page.locator('#sprint-history-current')).toHaveText('');
 
     // Now type correct first character
     await page.locator('#sprint-hidden-input').pressSequentially(firstChar);
 
-    // Progress moves to 1
+    // Progress moves to 1 and terminal live input shows typed character
     await expect(page.locator('#sprint-chars-progress')).toHaveText('1');
+    await expect(page.locator('#sprint-history-current')).toHaveText(firstChar);
     await expect(page.locator('#sprint-errors-count')).toHaveText('1');
 
     sim.assertCleanSession();
@@ -128,7 +133,15 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
       expect(termSentence.length).toBeGreaterThan(0);
 
       await page.locator('#sprint-hidden-input').pressSequentially(termSentence);
+
+      const historyEntries = page.locator('#sprint-history-entries .sprint-history-entry');
+      await expect(historyEntries).toHaveCount(t + 1);
+      await expect(historyEntries.nth(t).locator('.sprint-history-text')).toHaveText(termSentence);
     }
+
+    // Terminal history shows session completion state
+    await expect(page.locator('#sprint-history-done')).toBeVisible();
+    await expect(page.locator('#sprint-history-entries .sprint-history-entry')).toHaveCount(totalTerms);
 
     // Results card must appear
     const resultsCard = page.locator('#sprint-results-card');
@@ -154,10 +167,16 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     expect(leaderboardText).not.toContain('Тест');
     expect(leaderboardText).not.toContain('Алиса');
 
+    // Verify retry clears terminal history and resets step counter
+    await page.locator('#sprint-retry-btn').click();
+    await expect(page.locator('#sprint-history-entries .sprint-history-entry')).toHaveCount(0);
+    await expect(page.locator('#sprint-history-current')).toHaveText('');
+    await expect(page.locator('#sprint-def-step')).toHaveText(`1 / ${totalTerms}`);
+
     sim.assertCleanSession();
   });
 
-  test('Persona: DILIGENT — Grade 9 Lesson 8: streams terms one by one, verifying didactic definition synchronization', async ({ page }) => {
+  test('Persona: DILIGENT — Grade 9 Lesson 8: streams terms one by one, recording terminal history', async ({ page }) => {
     const sim = new StudentSimulator(page, { persona: LearnerPersona.DILIGENT });
     await page.goto('/lesson/9-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/8');
 
@@ -168,34 +187,35 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     // Lesson 8 has 12 terms
     await expect(page.locator('#sprint-terms-count')).toHaveText('12');
 
-    // First term is rendered in arena and HUD
+    // First term is rendered in arena and terminal history window is visible
+    await expect(page.locator('#sprint-terminal-history')).toBeVisible();
     await expect(page.locator('#sprint-def-step')).toHaveText('1 / 12');
-    const firstTermHud = await page.locator('#sprint-def-term').textContent();
-    expect(firstTermHud.trim().length).toBeGreaterThan(0);
 
     // Arena only contains the single active term's text
     const term1Text = await page.evaluate(() => 
       Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
     );
-    expect(term1Text.toLowerCase()).toContain(firstTermHud.trim().toLowerCase());
+    expect(term1Text.trim().length).toBeGreaterThan(0);
 
     // Type the first term sentence
     await page.locator('#sprint-hidden-input').pressSequentially(term1Text);
 
-    // Immediately switches to term 2 in HUD and arena
+    // Immediately switches to term 2 and logs term 1 in terminal history
     await expect(page.locator('#sprint-def-step')).toHaveText('2 / 12');
-    const secondTermHud = await page.locator('#sprint-def-term').textContent();
-    expect(secondTermHud.trim().length).toBeGreaterThan(0);
+    const historyEntries = page.locator('#sprint-history-entries .sprint-history-entry');
+    await expect(historyEntries).toHaveCount(1);
+    await expect(historyEntries.first().locator('.sprint-history-text')).toHaveText(term1Text);
 
     const term2Text = await page.evaluate(() => 
       Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
     );
-    expect(term2Text.toLowerCase()).toContain(secondTermHud.trim().toLowerCase());
+    expect(term2Text.trim().length).toBeGreaterThan(0);
+    expect(term2Text).not.toBe(term1Text);
 
     sim.assertCleanSession();
   });
 
-  test('Persona: NOVICE — Grade 11 Basic Lesson 9: launches Logo-Storm, verifies 18 terms and HUD', async ({ page }) => {
+  test('Persona: NOVICE — Grade 11 Basic Lesson 9: launches Logo-Storm, verifies 18 terms and terminal HUD', async ({ page }) => {
     const sim = new StudentSimulator(page, { persona: LearnerPersona.NOVICE });
     await page.goto('/lesson/11-%D0%BA%D0%BB%D0%B0%D1%81%D1%81_%D0%B1%D0%B0%D0%B7%D0%BE%D0%B2%D1%8B%D0%B9/9');
 
@@ -210,12 +230,12 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     // Lesson 9 has 18 terms
     await expect(page.locator('#sprint-terms-count')).toHaveText('18');
     await expect(page.locator('#sprint-def-step')).toHaveText('1 / 18');
+    await expect(page.locator('#sprint-terminal-history')).toBeVisible();
 
-    // Definition HUD displays term and definition
-    const defTerm = await page.locator('#sprint-def-term').textContent();
-    const defDesc = await page.locator('#sprint-def-desc').textContent();
-    expect(defTerm.trim().length).toBeGreaterThan(0);
-    expect(defDesc.trim().length).toBeGreaterThan(0);
+    const firstTermText = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+    );
+    expect(firstTermText.trim().length).toBeGreaterThan(0);
 
     // Close via Esc
     await page.keyboard.press('Escape');
@@ -224,7 +244,7 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     sim.assertCleanSession();
   });
 
-  test('Persona: NOVICE — Grade 7 all existing lessons (4, 5, 6, 7, 8, 9, 22): launch Logo-Storm and verify term counts & HUD', async ({ page }) => {
+  test('Persona: NOVICE — Grade 7 all existing lessons (4, 5, 6, 7, 8, 9, 22): launch Logo-Storm and verify term counts & terminal HUD', async ({ page }) => {
     const expectedLessons = [
       { id: '4', count: 9 },
       { id: '5', count: 9 },
@@ -250,11 +270,12 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
 
       await expect(page.locator('#sprint-terms-count')).toHaveText(String(lesson.count));
       await expect(page.locator('#sprint-def-step')).toHaveText(`1 / ${lesson.count}`);
+      await expect(page.locator('#sprint-terminal-history')).toBeVisible();
 
-      const defTerm = await page.locator('#sprint-def-term').textContent();
-      const defDesc = await page.locator('#sprint-def-desc').textContent();
-      expect(defTerm.trim().length).toBeGreaterThan(0);
-      expect(defDesc.trim().length).toBeGreaterThan(0);
+      const firstTermText = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+      );
+      expect(firstTermText.trim().length).toBeGreaterThan(0);
 
       await page.keyboard.press('Escape');
       await expect(overlay).toBeHidden();
@@ -263,7 +284,7 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     sim.assertCleanSession();
   });
 
-  test('Persona: DILIGENT — Grade 8 Lesson 10: launches Logo-Storm, verifies 12 terms, HUD, and streams a term', async ({ page }) => {
+  test('Persona: DILIGENT — Grade 8 Lesson 10: launches Logo-Storm, verifies 12 terms, terminal history, and shuffle reset', async ({ page }) => {
     const sim = new StudentSimulator(page, { persona: LearnerPersona.DILIGENT });
     await page.goto('/lesson/8-%D0%BA%D0%BB%D0%B0%D1%81%D1%81/10');
 
@@ -278,24 +299,32 @@ test.describe('Logo-Storm Keyboard Trainer: Digital Student Personas Suite', () 
     // Grade 8 Lesson 10 has 12 marked-up terms
     await expect(page.locator('#sprint-terms-count')).toHaveText('12');
     await expect(page.locator('#sprint-def-step')).toHaveText('1 / 12');
+    await expect(page.locator('#sprint-terminal-history')).toBeVisible();
 
-    const firstTermHud = await page.locator('#sprint-def-term').textContent();
-    const firstDefDesc = await page.locator('#sprint-def-desc').textContent();
-    expect(firstTermHud.trim().length).toBeGreaterThan(0);
-    expect(firstDefDesc.trim().length).toBeGreaterThan(0);
-
-    // Arena renders first term sentence and transitions to term 2 on completion
+    // Arena renders first term sentence, logs it to terminal history, and transitions to term 2 on completion
     const term1Text = await page.evaluate(() =>
       Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
     );
-    expect(term1Text.toLowerCase()).toContain(firstTermHud.trim().toLowerCase());
+    expect(term1Text.trim().length).toBeGreaterThan(0);
 
     await page.locator('#sprint-hidden-input').pressSequentially(term1Text);
 
     await expect(page.locator('#sprint-def-step')).toHaveText('2 / 12');
-    const secondTermHud = await page.locator('#sprint-def-term').textContent();
-    expect(secondTermHud.trim().length).toBeGreaterThan(0);
-    expect(secondTermHud.trim().toLowerCase()).not.toBe(firstTermHud.trim().toLowerCase());
+    const historyEntries = page.locator('#sprint-history-entries .sprint-history-entry');
+    await expect(historyEntries).toHaveCount(1);
+    await expect(historyEntries.first().locator('.sprint-history-text')).toHaveText(term1Text);
+
+    const term2Text = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('#sprint-text-display span')).map(s => s.textContent).join('')
+    );
+    expect(term2Text.trim().length).toBeGreaterThan(0);
+    expect(term2Text).not.toBe(term1Text);
+
+    // Shuffle resets terminal history and step counter
+    await page.locator('#sprint-shuffle-btn').click();
+    await expect(historyEntries).toHaveCount(0);
+    await expect(page.locator('#sprint-history-current')).toHaveText('');
+    await expect(page.locator('#sprint-def-step')).toHaveText('1 / 12');
 
     await page.keyboard.press('Escape');
     await expect(overlay).toBeHidden();
