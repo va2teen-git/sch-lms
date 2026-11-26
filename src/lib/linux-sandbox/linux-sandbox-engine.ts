@@ -1,3 +1,4 @@
+import { formatLinuxHelpPlainText } from './linux-help.ts';
 import type {
   LinuxExecResult,
   LinuxLevelConfig,
@@ -189,6 +190,7 @@ export const BUILTIN_COMMANDS = [
   'cp',
   'rm',
   'truncate',
+  'man',
   'help',
   'clear',
 ];
@@ -369,6 +371,8 @@ export class LinuxSandboxEngine {
     let lastCode = 0;
     let totalNoise = 0;
     let clearScreen = false;
+    let openManual = false;
+    let manualTopic = '';
     const allEffects: LinuxWorldEffect[] = [];
 
     for (const item of chain) {
@@ -388,6 +392,10 @@ export class LinuxSandboxEngine {
         segExit = res.exitCode;
         totalNoise += res.noiseDelta;
         if (res.clearScreen) clearScreen = true;
+        if (res.openManual) {
+          openManual = true;
+          manualTopic = res.manualTopic || '';
+        }
         allEffects.push(...res.effects);
       }
 
@@ -409,16 +417,26 @@ export class LinuxSandboxEngine {
       exitCode: lastCode,
       clearScreen,
       noiseDelta: totalNoise,
-      commandTickCost: clearScreen ? 0 : 1,
+      commandTickCost: clearScreen || openManual ? 0 : 1,
       effects: allEffects,
       objectiveCompletedNow,
+      openManual,
+      manualTopic,
     };
   }
 
   private execSingleSegment(
     seg: string,
     stdin: string
-  ): { output: string; exitCode: number; noiseDelta: number; clearScreen?: boolean; effects: LinuxWorldEffect[] } {
+  ): {
+    output: string;
+    exitCode: number;
+    noiseDelta: number;
+    clearScreen?: boolean;
+    openManual?: boolean;
+    manualTopic?: string;
+    effects: LinuxWorldEffect[];
+  } {
     const tokens = splitTokens(seg);
     if (tokens.length === 0) {
       return { output: '', exitCode: 0, noiseDelta: 0, effects: [] };
@@ -447,25 +465,23 @@ export class LinuxSandboxEngine {
       case 'clear':
         return { output: '', exitCode: 0, noiseDelta: 0, clearScreen: true, effects: [] };
 
+      case 'man':
       case 'help':
       case 'помощь':
       case 'справка': {
-        if (this.config.helpLines && this.config.helpLines.length > 0) {
-          return { output: this.config.helpLines.join('\n'), exitCode: 0, noiseDelta: 0, effects: [] };
-        }
-        const customNames = Object.keys(this.config.customCommands);
-        const lines = [
-          'Доступные команды песочницы Linux:',
-          '  ls [-la], cd <путь>, pwd, cat <файл>, grep [-i] <шаблон> [файл]',
-          '  find <путь> -name <маска>, strings <файл>, base64 -d, echo <текст>',
-          '  chmod <права> <файл>, id, ps aux, ss -tulpn / netstat, sudo -l, crontab -l',
-          '  tar -czf <архив> <цель>, scp [-P порт] [-i ключ] ..., cp, rm, truncate -s 0 <файл>',
-        ];
-        if (customNames.length > 0) {
-          lines.push(`  Утилиты узла: ${customNames.join(', ')}`);
-        }
-        lines.push('  Для справки по языку КуМир введите «помощь» или «справка» в редакторе слева.');
-        return { output: lines.join('\n'), exitCode: 0, noiseDelta: 0, effects: [] };
+        const topic = args[0] || '';
+        const text =
+          this.config.helpLines && this.config.helpLines.length > 0
+            ? this.config.helpLines.join('\n')
+            : formatLinuxHelpPlainText(topic);
+        return {
+          output: text,
+          exitCode: 0,
+          noiseDelta: 0,
+          openManual: true,
+          manualTopic: topic,
+          effects: [],
+        };
       }
 
       case 'pwd':
