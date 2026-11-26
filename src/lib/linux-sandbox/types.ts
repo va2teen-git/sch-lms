@@ -34,6 +34,8 @@ export interface LinuxExecResult {
   commandTickCost: number;
   effects: LinuxWorldEffect[];
   objectiveCompletedNow: boolean;
+  openManual?: boolean;
+  manualTopic?: string;
 }
 
 export interface LinuxCustomCommandContext {
@@ -75,6 +77,8 @@ export interface TerminalAdapterExecResult {
   exitCode: number;
   clearScreen?: boolean;
   objectiveCompletedNow?: boolean;
+  openManual?: boolean;
+  manualTopic?: string;
 }
 
 export interface TerminalAdapter {

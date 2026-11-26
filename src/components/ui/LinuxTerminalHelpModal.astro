@@ -1,0 +1,198 @@
+---
+import { LINUX_HELP_SECTIONS } from '../../lib/linux-sandbox/linux-help';
+
+export interface Props {
+  id?: string;
+  closeButtonId?: string;
+}
+
+const {
+  id = 'ct-linux-help-overlay',
+  closeButtonId = 'ct-linux-help-close',
+} = Astro.props;
+---
+
+<div
+  id={id}
+  class="ct-help-overlay"
+  data-ct-help-modal="true"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Руководство по терминалу Linux"
+>
+  <div class="ct-help-dialog">
+    <div class="ct-help-header">
+      <div class="ct-titlebar-left">
+        <div class="ct-dots" aria-hidden="true">
+          <span class="ct-dot ct-dot--red"></span>
+          <span class="ct-dot ct-dot--amber"></span>
+          <span class="ct-dot ct-dot--green"></span>
+        </div>
+        <span class="ct-help-title">РУКОВОДСТВО ПО ТЕРМИНАЛУ LINUX // MAN</span>
+      </div>
+      <button
+        id={closeButtonId}
+        type="button"
+        class="ct-btn ct-btn--danger"
+        data-ct-help-close="true"
+      >
+        ЗАКРЫТЬ [ESC]
+      </button>
+    </div>
+
+    <div class="ct-help-nav" role="navigation" aria-label="Разделы руководства">
+      {LINUX_HELP_SECTIONS.map((sec) => (
+        <button
+          type="button"
+          class="ct-help-nav-btn"
+          data-ct-help-jump={sec.id}
+        >
+          {sec.shortLabel}
+        </button>
+      ))}
+    </div>
+
+    <div class="ct-help-body" data-ct-help-body="true">
+      {LINUX_HELP_SECTIONS.map((sec) => (
+        <section class="ct-help-section" data-ct-help-section={sec.id}>
+          <h3 class="ct-help-section-title">{sec.title}</h3>
+          {sec.entries.map((entry) => (
+            <div class="ct-help-entry">
+              <div class="ct-help-syntax">{entry.syntax}</div>
+              <div class="ct-help-desc">{entry.desc}</div>
+              {entry.example && <pre class="ct-help-example">{entry.example}</pre>}
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
+  </div>
+</div>
+
+<script>
+  import { resolveLinuxHelpSectionId } from '../../lib/linux-sandbox/linux-help';
+
+  interface HelpControllerApi {
+    open: (modalId: string, topic?: string, onClose?: () => void) => void;
+    close: (modalId?: string) => void;
+    isOpen: (modalId?: string) => boolean;
+  }
+
+  declare global {
+    interface Window {
+      CyberTerminalHelp?: HelpControllerApi;
+    }
+  }
+
+  if (!window.CyberTerminalHelp) {
+    const closeCallbacks = new Map<string, () => void>();
+    const openStack: string[] = [];
+
+    const highlightSection = (modal: HTMLElement, sectionId: string | null) => {
+      const sections = modal.querySelectorAll<HTMLElement>('[data-ct-help-section]');
+      const navBtns = modal.querySelectorAll<HTMLElement>('[data-ct-help-jump]');
+      const bodyEl = modal.querySelector<HTMLElement>('[data-ct-help-body]');
+
+      sections.forEach((sec) => {
+        const match = sectionId !== null && sec.dataset.ctHelpSection === sectionId;
+        sec.classList.toggle('ct-help-section--highlight', match);
+      });
+
+      navBtns.forEach((btn) => {
+        const match = sectionId !== null && btn.dataset.ctHelpJump === sectionId;
+        btn.classList.toggle('ct-help-nav-btn--active', match);
+      });
+
+      if (sectionId) {
+        const target = modal.querySelector<HTMLElement>(`[data-ct-help-section="${sectionId}"]`);
+        target?.scrollIntoView?.({ block: 'start' });
+      } else if (bodyEl) {
+        bodyEl.scrollTop = 0;
+      }
+    };
+
+    const closeModal = (modalId?: string) => {
+      const targetId = modalId || openStack[openStack.length - 1];
+      if (!targetId) return;
+      const modal = document.getElementById(targetId);
+      if (modal) {
+        modal.classList.remove('ct-help-overlay--open');
+      }
+      const idx = openStack.lastIndexOf(targetId);
+      if (idx !== -1) openStack.splice(idx, 1);
+
+      const cb = closeCallbacks.get(targetId);
+      closeCallbacks.delete(targetId);
+      cb?.();
+    };
+
+    const openModal = (modalId: string, topic?: string, onClose?: () => void) => {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      if (onClose) closeCallbacks.set(modalId, onClose);
+      else closeCallbacks.delete(modalId);
+
+      const sectionId = resolveLinuxHelpSectionId(topic);
+      modal.classList.add('ct-help-overlay--open');
+      if (!openStack.includes(modalId)) openStack.push(modalId);
+      highlightSection(modal, sectionId);
+    };
+
+    const isOpen = (modalId?: string): boolean => {
+      if (modalId) {
+        const modal = document.getElementById(modalId);
+        return Boolean(modal && modal.classList.contains('ct-help-overlay--open'));
+      }
+      return openStack.some((id) => {
+        const el = document.getElementById(id);
+        return Boolean(el && el.classList.contains('ct-help-overlay--open'));
+      });
+    };
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      const closeBtn = target.closest<HTMLElement>('[data-ct-help-close="true"]');
+      if (closeBtn) {
+        const modal = closeBtn.closest<HTMLElement>('[data-ct-help-modal="true"]');
+        if (modal?.id) closeModal(modal.id);
+        return;
+      }
+
+      const jumpBtn = target.closest<HTMLElement>('[data-ct-help-jump]');
+      if (jumpBtn) {
+        const modal = jumpBtn.closest<HTMLElement>('[data-ct-help-modal="true"]');
+        const secId = jumpBtn.dataset.ctHelpJump || null;
+        if (modal) highlightSection(modal, secId);
+        return;
+      }
+
+      if (target.dataset.ctHelpModal === 'true' && target.id) {
+        closeModal(target.id);
+      }
+    });
+
+    // Capture phase so Escape closes only the help manual without closing underlying terminal overlays
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key !== 'Escape') return;
+        const activeId = openStack[openStack.length - 1];
+        if (!activeId) return;
+        const modal = document.getElementById(activeId);
+        if (!modal || !modal.classList.contains('ct-help-overlay--open')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeModal(activeId);
+      },
+      true
+    );
+
+    window.CyberTerminalHelp = {
+      open: openModal,
+      close: closeModal,
+      isOpen,
+    };
+  }
+</script>

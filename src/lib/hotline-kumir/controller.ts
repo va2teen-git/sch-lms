@@ -5,6 +5,11 @@ import { HotlineGameEngine } from './game-engine.ts';
 import { KUMIR_HELP_SECTIONS, resolveHelpSectionId } from './kumir-help.ts';
 import { HotlineCanvasRenderer } from './renderer.ts';
 import { CyberTerminalView } from '../terminal/cyber-terminal-view.ts';
+import {
+  closeLinuxHelpModal,
+  isLinuxHelpModalOpen,
+  openLinuxHelpModal,
+} from '../terminal/linux-help-modal.ts';
 import type { LevelResult, MaskId, WorldEvent, WorldSnapshot } from './types.ts';
 
 declare global {
@@ -135,7 +140,7 @@ export function initHotlineKumirController(
   const termInput = root.querySelector<HTMLInputElement>('#hk-term-input');
   const termHeaderStatus = root.querySelector<HTMLElement>('#hk-term-perimeter');
   const btnTermClose = root.querySelector<HTMLButtonElement>('#hk-term-close');
-  const btnTermHint = root.querySelector<HTMLButtonElement>('#hk-term-hint');
+  const btnTermHelp = root.querySelector<HTMLButtonElement>('#hk-term-help');
 
   const termView = new CyberTerminalView({
     windowEl: termWindowEl,
@@ -318,7 +323,7 @@ export function initHotlineKumirController(
     syncTerminalHeader(snap);
     if (termOutputEl && termOutputEl.childElementCount === 0) {
       termView.appendLine(
-        `// terminal://cyber-boy — узел уровня ${snap.levelId}. Введите «help» или «ls -la».`,
+        '// terminal://linux-sandbox — сессия открыта. Введите «man» или «help» для руководства по командам.',
         'info',
         'ct-boot'
       );
@@ -620,6 +625,7 @@ export function initHotlineKumirController(
     if (levelBadgeEl) levelBadgeEl.textContent = `Ур.${lvlDef.id}/5: ${lvlDef.title}`;
     codeEditor.value = lvlDef.starterCode;
     termView.clear();
+    closeLinuxHelpModal('hk-term-help-overlay');
     if (termOverlay) {
       termOverlay.classList.add('hidden');
       termOverlay.classList.remove('flex');
@@ -816,11 +822,8 @@ export function initHotlineKumirController(
     closeHelpModal();
   });
 
-  btnTermHint?.addEventListener('click', () => {
-    const lvl = HOTLINE_KUMIR_LEVELS.find((l) => l.id === currentLevelId);
-    if (lvl) {
-      termView.appendLine(`[ПОДСКАЗКА]: ${lvl.linuxConfig.hints[0]}`, 'warn');
-    }
+  btnTermHelp?.addEventListener('click', () => {
+    openLinuxHelpModal('hk-term-help-overlay', undefined, () => termView.focus());
   });
 
   const blockPasteOrDrop = (e: Event) => {
@@ -860,7 +863,13 @@ export function initHotlineKumirController(
   });
 
   const unbindTerminal = termView.bindInteractive({
-    onEscape: () => closeTerminalModal(),
+    onEscape: () => {
+      if (isLinuxHelpModalOpen('hk-term-help-overlay')) {
+        closeLinuxHelpModal('hk-term-help-overlay');
+        return;
+      }
+      closeTerminalModal();
+    },
     getPrompt: () => engine.getLinuxEngine().getPrompt(),
     getHistory: () => engine.getLinuxEngine().getHistory(),
     autocomplete: (val) => engine.getLinuxEngine().autocomplete(val),
@@ -870,6 +879,9 @@ export function initHotlineKumirController(
       const res = engine.execLinuxCommand(cmd);
       if (res.result.clearScreen) {
         termView.clear();
+      } else if (res.result.openManual) {
+        openLinuxHelpModal('hk-term-help-overlay', res.result.manualTopic, () => termView.focus());
+        termView.appendLine('Открыто руководство по командам Linux (закройте [Esc]).', 'info');
       } else if (res.result.output) {
         termView.appendLine(res.result.output, res.result.exitCode === 0 ? 'ok' : 'err');
         if (res.result.exitCode !== 0) {
@@ -1016,6 +1028,11 @@ export function initHotlineKumirController(
   }
 
   const globalKeyHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isLinuxHelpModalOpen('hk-term-help-overlay')) {
+      e.preventDefault();
+      closeLinuxHelpModal('hk-term-help-overlay');
+      return;
+    }
     if (e.key === 'Escape' && helpOverlay && !helpOverlay.classList.contains('hidden')) {
       e.preventDefault();
       closeHelpModal();

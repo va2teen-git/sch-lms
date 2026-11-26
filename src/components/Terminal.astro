@@ -1,6 +1,7 @@
 ---
 // src/components/Terminal.astro
 import CyberTerminal from './ui/CyberTerminal.astro';
+import LinuxTerminalHelpModal from './ui/LinuxTerminalHelpModal.astro';
 
 export interface PhaseConfig {
   setup: string; // stringified function (vfs) => void
@@ -59,6 +60,10 @@ try {
 >
     <Fragment slot="titlebar-right">
         <span id="terminal-phase-badge" class="ct-badge">ФАЗА 1 / {totalPhasesCount}</span>
+        <button id="terminal-help-btn" type="button" class="ct-btn">СПРАВКА [MAN]</button>
+    </Fragment>
+    <Fragment slot="footer">
+        <div class="ct-footer-hint">Руководство по командам Linux: введите «man [команда]» или нажмите «СПРАВКА»</div>
     </Fragment>
     <div class="ct-boot mb-2">// terminal://linux-sandbox — bash</div>
     <div class="text-white">Ubuntu 24.04.1 LTS sys-server tty1</div>
@@ -70,6 +75,8 @@ try {
     <div class="text-white">Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 6.8.0-45-generic x86_64)</div>
     <br>
 </CyberTerminal>
+
+<LinuxTerminalHelpModal id="terminal-help-overlay" closeButtonId="terminal-help-close" />
 
 <script define:vars={{ missionName, phasesJson: phases, resolvedLevel, requireStart, themeClass, hardcoreReset }}>
     const phases = JSON.parse(phasesJson).map(p => ({
@@ -90,9 +97,22 @@ try {
     const windowEl = document.getElementById('linux-terminal-window');
     const titleEl = document.getElementById('terminal-title');
     const phaseBadgeEl = document.getElementById('terminal-phase-badge');
+    const helpBtnEl = document.getElementById('terminal-help-btn');
     const outputDiv = document.getElementById('terminal-output');
     const inputField = document.getElementById('cmd-input');
     const promptPath = document.getElementById('prompt-path');
+
+    function openLinuxManual(topic) {
+        window.CyberTerminalHelp?.open('terminal-help-overlay', topic || '', () => {
+            if (!isLocked && !inputField.disabled) {
+                inputField.focus();
+            }
+        });
+    }
+
+    if (helpBtnEl) {
+        helpBtnEl.addEventListener('click', () => openLinuxManual(''));
+    }
 
     function updatePhaseBadge() {
         if (!phaseBadgeEl) return;
@@ -333,6 +353,12 @@ try {
         }
 
         switch(cmd) {
+            case 'man':
+            case 'справка':
+            case 'помощь':
+                openLinuxManual(args[1] || '');
+                printLine('Открыто руководство по командам Linux (закройте [Esc]).', 'text-info ct-line--info');
+                break;
             case 'help':
             case '--help': 
                 printLine(`<span class="text-info fw-bold">Доступные команды симуляции:</span>
