@@ -51,7 +51,7 @@ async function runLinuxInModal(page, commands) {
   await expect(page.locator('#hk-terminal-overlay')).toBeHidden();
 }
 
-test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 40/60, GBR Anim, Progress)', () => {
+test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 30/70, Interactables, Help, GBR Anim)', () => {
   test.beforeEach(() => {
     cleanupTestStudentDb();
   });
@@ -60,7 +60,7 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 40/60
     cleanupTestStudentDb();
   });
 
-  test('1. Viewport 1366x768, 40/60 split, no clickable operators, Anti-Paste, Zero-Dep & Idle-Zero', async ({ page }) => {
+  test('1. Viewport 1366x768, 30/70 split, mission panel, no unused UI, Help & Interactables, Anti-Paste & Idle-Zero', async ({ page }) => {
     await setupStudentSession(page);
     await page.setViewportSize({ width: 1366, height: 768 });
 
@@ -82,18 +82,20 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 40/60
     expect(externalUrls).toEqual([]);
     expect(consoleErrors).toEqual([]);
 
-    // No level selector, only sequential badge; no clickable snippet buttons
+    // No level selector in header, no bottom command reference buttons; level badge lives in mission panel
     await expect(page.locator('#hk-level-select')).toHaveCount(0);
-    await expect(page.locator('#hk-level-badge')).toBeVisible();
-    await expect(page.locator('#hk-level-badge')).toContainText('Ур.1/5');
+    await expect(page.locator('header #hk-level-badge')).toHaveCount(0);
+    await expect(page.locator('#hk-mission-panel #hk-level-badge')).toBeVisible();
+    await expect(page.locator('#hk-mission-panel #hk-level-badge')).toContainText('Ур.1/5');
+    await expect(page.locator('#hk-mission-desc')).toContainText('ПК (T)');
     await expect(page.locator('#hk-snippets')).toHaveCount(0);
-    await expect(page.locator('#hk-command-ref')).toBeVisible();
-    await expect(page.locator('#hk-command-ref button')).toHaveCount(0);
+    await expect(page.locator('#hk-command-ref')).toHaveCount(0);
 
     const layoutOk = await page.evaluate(() => {
       const doc = document.documentElement;
       const editorPane = document.getElementById('hk-editor-pane').getBoundingClientRect();
       const arenaPane = document.getElementById('hk-arena-pane').getBoundingClientRect();
+      const missionPanel = document.getElementById('hk-mission-panel').getBoundingClientRect();
       const editor = document.getElementById('hk-code-editor').getBoundingClientRect();
       const canvas = document.getElementById('hk-arena-canvas').getBoundingClientRect();
       const timer = document.getElementById('hk-turn-timer').getBoundingClientRect();
@@ -102,16 +104,18 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 40/60
         noHorizontalOverflow: doc.scrollWidth <= doc.clientWidth,
         editorRatio: editorPane.width / total,
         arenaRatio: arenaPane.width / total,
+        missionAboveEditor: missionPanel.bottom <= editor.top + 4,
         editorVisible: editor.width > 200 && editor.height > 150,
-        canvasVisible: canvas.width > 250 && canvas.height > 150,
+        canvasVisible: canvas.width > 600 && canvas.height > 150,
         timerVisible: timer.width > 40 && timer.height > 20,
       };
     });
     expect(layoutOk.noHorizontalOverflow).toBe(true);
-    expect(layoutOk.editorRatio).toBeGreaterThan(0.38);
-    expect(layoutOk.editorRatio).toBeLessThan(0.42);
-    expect(layoutOk.arenaRatio).toBeGreaterThan(0.58);
-    expect(layoutOk.arenaRatio).toBeLessThan(0.62);
+    expect(layoutOk.editorRatio).toBeGreaterThan(0.27);
+    expect(layoutOk.editorRatio).toBeLessThan(0.33);
+    expect(layoutOk.arenaRatio).toBeGreaterThan(0.67);
+    expect(layoutOk.arenaRatio).toBeLessThan(0.73);
+    expect(layoutOk.missionAboveEditor).toBe(true);
     expect(layoutOk.editorVisible).toBe(true);
     expect(layoutOk.canvasVisible).toBe(true);
     expect(layoutOk.timerVisible).toBe(true);
@@ -126,6 +130,29 @@ test.describe('Кибер-Boy: E2E (5 Levels, Manual Input, Lore Commands, 40/60
     expect(pasteBlocked).toBe(true);
     await expect(page.locator('#hk-error-box')).toBeVisible();
     await expect(page.locator('#hk-error-box')).toContainText('Вставка отключена');
+
+    // Help commands ("помощь" & "справка") open language manual without spending a turn
+    await enterEditorRun(page, 'помощь');
+    await expect(page.locator('#hk-help-overlay')).toBeVisible();
+    await expect(page.locator('#hk-help-content')).toContainText('1. Движение и тактика');
+    await expect(page.locator('#hk-help-content')).toContainText('2. Объекты и интерьер');
+    await expect(page.locator('#hk-help-content')).toContainText('4. Датчики (условия)');
+    await page.locator('#hk-help-close').click();
+    await expect(page.locator('#hk-help-overlay')).toBeHidden();
+    expect(await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().turnIndex)).toBe(0);
+
+    await enterEditorRun(page, 'справка датчики');
+    await expect(page.locator('#hk-help-overlay')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#hk-help-overlay')).toBeHidden();
+    expect(await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().turnIndex)).toBe(0);
+
+    // Inspect interior object (urn at 8,2) -> displays collected intel in mission panel
+    await enterEditorRun(page, 'вверх; вверх\nнц 7 раз\nвправо\nкц\nосмотреть сверху');
+    await expect(page.locator('#hk-intel-box')).toBeVisible();
+    await expect(page.locator('#hk-intel-box')).toContainText('УЛИКА:');
+    await expect(page.locator('#hk-intel-box')).toContainText('.gate.conf');
+    expect(await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getState().inspectedCount)).toBe(1);
 
     // Idle-Zero check: rAF must stay stopped during idle coding
     const statsBefore = await page.evaluate(() => window.__HOTLINE_KUMIR_TEST__.getRenderStats());

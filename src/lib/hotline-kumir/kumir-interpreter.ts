@@ -463,11 +463,18 @@ class KumirParser {
     return stmts;
   }
 
-  private parseOptDirection(): Direction | undefined {
+  private parseOptDirection(allowSensorDirs = false): Direction | undefined {
     const t = this.peek();
     if (t.kind === 'WORD' && DIRECTION_MAP[t.norm]) {
       this.advance();
       return DIRECTION_MAP[t.norm];
+    }
+    if (allowSensorDirs && t.kind === 'WORD' && SENSOR_DIR_MAP[t.norm]) {
+      const sdir = SENSOR_DIR_MAP[t.norm];
+      if (sdir === 'UP' || sdir === 'DOWN' || sdir === 'LEFT' || sdir === 'RIGHT') {
+        this.advance();
+        return sdir;
+      }
     }
     return undefined;
   }
@@ -494,6 +501,63 @@ class KumirParser {
         t.col,
         `Строка ${t.line}: вместо «закрасить» в «Кибер-Boy» используется команда «пометить» (или «поставить метку») — она ставит ЭМИ-метку на реле (*).`
       );
+    }
+
+    if (t.norm === 'помощь' || t.norm === 'справка') {
+      const tok = this.advance();
+      let endTok = tok;
+      let topic: string | undefined;
+      const next = this.peek();
+      const allowedTopics = new Set([
+        'команды',
+        'движение',
+        'предметы',
+        'интерьер',
+        'стелс',
+        'бой',
+        'датчики',
+        'условия',
+        'циклы',
+        'ветвление',
+        'алгоритмы',
+      ]);
+      if (next.kind === 'WORD' && allowedTopics.has(next.norm)) {
+        endTok = this.advance();
+        topic = endTok.norm;
+      }
+      return {
+        kind: 'ACTION',
+        action: 'HELP',
+        topic,
+        span: this.spanFrom(tok, endTok),
+      };
+    }
+
+    if (
+      t.norm === 'осмотреть' ||
+      t.norm === 'обыскать' ||
+      t.norm === 'взаимодействовать' ||
+      t.norm === 'взять'
+    ) {
+      const tok = this.advance();
+      let endTok = tok;
+      const obj = this.peek();
+      const interactNouns = new Set([
+        'предмет',
+        'объект',
+        'ящик',
+        'цветок',
+        'урну',
+        'мебель',
+        'диван',
+        'кресло',
+        'шкаф',
+      ]);
+      if (obj.kind === 'WORD' && interactNouns.has(obj.norm)) {
+        endTok = this.advance();
+      }
+      const dir = this.parseOptDirection(true);
+      return { kind: 'ACTION', action: 'INTERACT', dir, span: this.spanFrom(tok, endTok) };
     }
 
     if (t.norm === 'поставить' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'метку') {
@@ -819,7 +883,7 @@ class KumirParser {
           'E_PARSE_BAD_EXPRESSION',
           dirTok.line,
           dirTok.col,
-          `Строка ${dirTok.line}: после «${dirTok.raw}» ожидалось «свободно», «стена», «опасно», «враг» или «дверь».`
+          `Строка ${dirTok.line}: после «${dirTok.raw}» ожидалось «свободно», «стена», «опасно», «враг», «дверь» или «предмет».`
         );
       }
       if (propTok.norm === 'свободно') {
@@ -841,6 +905,10 @@ class KumirParser {
       if (propTok.norm === 'дверь') {
         this.advance();
         return { kind: 'SENSOR', sensor: 'HAS_DOOR', dir, span: this.spanFrom(dirTok, propTok) };
+      }
+      if (propTok.norm === 'предмет') {
+        this.advance();
+        return { kind: 'SENSOR', sensor: 'HAS_INTERACTABLE', dir, span: this.spanFrom(dirTok, propTok) };
       }
       this.fail(
         'E_PARSE_BAD_EXPRESSION',
@@ -925,6 +993,15 @@ class KumirParser {
       const start = this.advance();
       const end = this.advance();
       return { kind: 'SENSOR', sensor: 'HAS_DOOR', dir: 'ANY', span: this.spanFrom(start, end) };
+    }
+
+    if (
+      (t.norm === 'рядом' && this.peek(1).kind === 'WORD' && (this.peek(1).norm === 'предмет' || this.peek(1).norm === 'объект')) ||
+      ((t.norm === 'предмет' || t.norm === 'объект') && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'рядом')
+    ) {
+      const start = this.advance();
+      const end = this.advance();
+      return { kind: 'SENSOR', sensor: 'HAS_INTERACTABLE', dir: 'ANY', span: this.spanFrom(start, end) };
     }
 
     if (
@@ -1037,6 +1114,21 @@ export function* executeKumirProgram(
   function* runBlock(stmts: StmtNode[]): Generator<StepResult, StepResult | null, void> {
     for (const stmt of stmts) {
       if (stmt.kind === 'ACTION') {
+        if (stmt.action === 'HELP') {
+          const request: KumirActionRequest = {
+            action: stmt.action,
+            dir: stmt.dir,
+            topic: stmt.topic,
+            line: stmt.span.startLine,
+          };
+          yield {
+            status: 'YIELD_ACTION',
+            request,
+            line: stmt.span.startLine,
+            callStack: [...callStack],
+          };
+          continue;
+        }
         if (ticksUsed >= KUMIR_LIMITS.MAX_TICKS_PER_TURN) {
           return {
             status: 'PAUSED_TURN_LIMIT',
@@ -1048,6 +1140,7 @@ export function* executeKumirProgram(
         const request: KumirActionRequest = {
           action: stmt.action,
           dir: stmt.dir,
+          topic: stmt.topic,
           line: stmt.span.startLine,
         };
         yield {

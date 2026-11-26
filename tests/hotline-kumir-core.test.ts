@@ -443,3 +443,80 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
     assert.equal(bearAfter?.shielded, false);
   }
 });
+
+test('KuMir help commands (помощь / справка) open guide without spending turns', () => {
+  const c1 = compileKumir('помощь');
+  const c2 = compileKumir('справка датчики');
+  assert.equal(c1.ok, true);
+  assert.equal(c2.ok, true);
+
+  const g = new HotlineGameEngine(1, 'richard', 42);
+  g.startMission();
+  const r1 = g.runProgramImmediate('помощь');
+  assert.equal(r1.compiledOk, true);
+  assert.equal(r1.openedHelp, true);
+  assert.equal(r1.snapshot.turnIndex, 0);
+  assert.ok(r1.events.some((e) => e.type === 'HELP_OPENED'));
+
+  const r2 = g.runProgramImmediate('справка датчики');
+  assert.equal(r2.compiledOk, true);
+  assert.equal(r2.openedHelp, true);
+  assert.equal(r2.helpTopic, 'датчики');
+  assert.equal(r2.snapshot.turnIndex, 0);
+});
+
+test('Interior interactables: inspect crates, plants, urns, furniture, HAS_INTERACTABLE sensor and required gating', () => {
+  const g1 = new HotlineGameEngine(1, 'richard', 42);
+  g1.startMission();
+  const snap0 = g1.getSnapshot();
+  const cats = new Set(snap0.interactables.map((i) => i.category));
+  assert.ok(cats.has('crate'));
+  assert.ok(cats.has('plant'));
+  assert.ok(cats.has('urn'));
+  assert.ok(cats.has('furniture'));
+
+  // Walk to (8,3) adjacent to urn at (8,2), inspect via sensor condition
+  const rUrn = g1.runProgramImmediate('вверх; вверх\nнц 7 раз\nвправо\nкц\nесли сверху предмет то\n  осмотреть сверху\nвсе');
+  assert.equal(rUrn.compiledOk, true);
+  assert.ok(rUrn.events.some((e) => e.type === 'OBJECT_INSPECTED'));
+  assert.equal(rUrn.snapshot.inspectedCount, 1);
+  assert.ok(rUrn.snapshot.lastInspectMessage?.includes('.gate.conf'));
+  assert.equal(rUrn.snapshot.collectedIntel.length, 1);
+
+  // Move to (10,3) below locker (10,2) and test synonym "обыскать шкаф"
+  const rLocker = g1.runProgramImmediate('вправо; вправо\nесли рядом предмет то\n  обыскать шкаф\nвсе');
+  assert.equal(rLocker.snapshot.inspectedCount, 2);
+
+  // Test plant & sofa in guardhouse lounge (10,9) and (6,9) via doorway at x=9,y=6
+  const rLounge = g1.runProgramImmediate(
+    'влево\nнц 6 раз\nвниз\nкц\nвправо\nвзаимодействовать цветок\nнц 4 раз\nвлево\nкц\nвзять диван'
+  );
+  assert.equal(rLounge.snapshot.inspectedCount, 4);
+
+  // Verify required interactable blocks exit until inspected
+  const l1 = HOTLINE_KUMIR_LEVELS[0];
+  const orig = l1.interactables;
+  l1.interactables = [
+    {
+      id: 'req-test',
+      x: 2,
+      y: 5,
+      category: 'urn',
+      name: 'Контрольная урна',
+      inspectText: 'Код доступа найден.',
+      required: true,
+    },
+  ];
+  try {
+    const gReq = new HotlineGameEngine(1, 'richard', 42);
+    gReq.startMission();
+    gReq.runProgramImmediate('вверх; вверх\nнц 4 раз\nвправо\nкц\nподключиться');
+    gReq.execLinuxCommand('unlock 4821');
+    gReq.exitTerminal();
+    gReq.runProgramImmediate('нц 10 раз\nвправо\nкц\nпометить');
+    // Required interactable not yet inspected -> exit must still be locked
+    assert.equal(gReq.isExitUnlocked(), false);
+  } finally {
+    l1.interactables = orig;
+  }
+});

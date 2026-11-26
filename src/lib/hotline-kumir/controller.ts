@@ -2,6 +2,7 @@ import { HOTLINE_KUMIR_LEVELS } from '../../data/hotline-kumir-levels.ts';
 import { HotlineAudioSynth } from './audio-synth.ts';
 import type { CameraMode } from './camera.ts';
 import { HotlineGameEngine } from './game-engine.ts';
+import { KUMIR_HELP_SECTIONS, resolveHelpSectionId } from './kumir-help.ts';
 import { HotlineCanvasRenderer } from './renderer.ts';
 import type { LevelResult, MaskId, WorldEvent, WorldSnapshot } from './types.ts';
 
@@ -75,8 +76,15 @@ export function initHotlineKumirController(
   const canvas = root.querySelector<HTMLCanvasElement>('#hk-arena-canvas');
   const codeEditor = root.querySelector<HTMLTextAreaElement>('#hk-code-editor');
   const gutterEl = root.querySelector<HTMLPreElement>('#hk-line-gutter');
-  const commandRefEl = root.querySelector<HTMLDivElement>('#hk-command-ref');
   const errorBox = root.querySelector<HTMLDivElement>('#hk-error-box');
+  const missionDescEl = root.querySelector<HTMLElement>('#hk-mission-desc');
+  const missionObjectivesEl = root.querySelector<HTMLUListElement>('#hk-mission-objectives');
+  const intelBoxEl = root.querySelector<HTMLDivElement>('#hk-intel-box');
+  const hoverInfoEl = root.querySelector<HTMLElement>('#hk-hover-info');
+
+  const helpOverlay = root.querySelector<HTMLDivElement>('#hk-help-overlay');
+  const helpContentEl = root.querySelector<HTMLDivElement>('#hk-help-content');
+  const btnHelpClose = root.querySelector<HTMLButtonElement>('#hk-help-close');
 
   const levelBadgeEl = root.querySelector<HTMLElement>('#hk-level-badge');
   const campaignBadgeEl = root.querySelector<HTMLElement>('#hk-campaign-badge');
@@ -210,21 +218,68 @@ export function initHotlineKumirController(
     }
   };
 
-  const renderCommandRef = () => {
-    if (!commandRefEl) return;
-    const lvl = HOTLINE_KUMIR_LEVELS.find((l) => l.id === currentLevelId) || HOTLINE_KUMIR_LEVELS[0];
-    commandRefEl.innerHTML = '';
-    const title = document.createElement('span');
-    title.className = 'text-[10px] font-bold text-pink-400 uppercase mr-1';
-    title.textContent = 'КОМАНДЫ (ввод вручную):';
-    commandRefEl.appendChild(title);
-    for (const snip of lvl.snippetPreset) {
-      const badge = document.createElement('span');
-      badge.className =
-        'px-1.5 py-0.5 text-[10px] font-mono bg-slate-900/90 border border-pink-500/40 text-cyan-200 rounded-0';
-      badge.textContent = snip;
-      commandRefEl.appendChild(badge);
+  const renderHelpSections = (targetSectionId: string | null) => {
+    if (!helpContentEl) return;
+    helpContentEl.innerHTML = '';
+    for (const sec of KUMIR_HELP_SECTIONS) {
+      const card = document.createElement('section');
+      card.dataset.helpSection = sec.id;
+      const isTarget = targetSectionId === sec.id;
+      card.className = `bg-[#090414] border ${isTarget ? 'border-amber-400 ring-1 ring-amber-400' : sec.accent.split(' ')[1] || 'border-slate-700'} p-3 space-y-2 rounded-0`;
+
+      const heading = document.createElement('h3');
+      heading.className = `text-xs font-black uppercase ${sec.accent.split(' ')[0] || 'text-cyan-300'}`;
+      heading.textContent = sec.title;
+      card.appendChild(heading);
+
+      const list = document.createElement('div');
+      list.className = 'space-y-1.5';
+      for (const entry of sec.entries) {
+        const row = document.createElement('div');
+        row.className = 'border-t border-slate-800/80 pt-1.5 first:border-t-0 first:pt-0';
+        const syn = document.createElement('div');
+        syn.className = 'font-bold text-cyan-200';
+        syn.textContent = entry.syntax;
+        const desc = document.createElement('div');
+        desc.className = 'text-[11px] text-slate-300';
+        desc.textContent = entry.desc;
+        row.appendChild(syn);
+        row.appendChild(desc);
+        if (entry.example) {
+          const ex = document.createElement('pre');
+          ex.className = 'mt-1 px-2 py-1 bg-black border border-slate-800 text-[11px] text-emerald-300 whitespace-pre-wrap';
+          ex.textContent = entry.example;
+          row.appendChild(ex);
+        }
+        list.appendChild(row);
+      }
+      card.appendChild(list);
+      helpContentEl.appendChild(card);
     }
+
+    if (targetSectionId) {
+      const targetEl = helpContentEl.querySelector<HTMLElement>(`[data-help-section="${targetSectionId}"]`);
+      targetEl?.scrollIntoView?.({ block: 'start' });
+    } else {
+      helpContentEl.scrollTop = 0;
+    }
+  };
+
+  const openHelpModal = (topic?: string) => {
+    const targetId = resolveHelpSectionId(topic);
+    renderHelpSections(targetId);
+    if (helpOverlay) {
+      helpOverlay.classList.remove('hidden');
+      helpOverlay.classList.add('flex');
+    }
+  };
+
+  const closeHelpModal = () => {
+    if (helpOverlay) {
+      helpOverlay.classList.add('hidden');
+      helpOverlay.classList.remove('flex');
+    }
+    codeEditor.focus();
   };
 
   const appendTermLine = (text: string, cls = 'text-cyan-200') => {
@@ -335,7 +390,8 @@ export function initHotlineKumirController(
       else if (ev.type === 'ENEMY_STUNNED' || ev.type === 'ENEMY_OFFLINE' || ev.type === 'ENEMY_SHIELD_BROKEN')
         audio.playSfx('strike');
       else if (ev.type === 'ALERT_TRIGGERED' || ev.type === 'GBR_ARRIVED') audio.playSfx('alarm');
-      else if (ev.type === 'TERMINAL_HACKED' || ev.type === 'DOOR_OPENED') audio.playSfx('terminal_ok');
+      else if (ev.type === 'TERMINAL_HACKED' || ev.type === 'DOOR_OPENED' || ev.type === 'OBJECT_INSPECTED')
+        audio.playSfx('terminal_ok');
       else if (ev.type === 'WALL_CRASH' || ev.type === 'PLAYER_KO') audio.playSfx('error');
       else if (ev.type === 'EXTRACTION') audio.playSfx('victory');
     }
@@ -357,10 +413,10 @@ export function initHotlineKumirController(
       turnTimerEl.textContent = `${String(Math.max(0, Math.ceil(turnClockLeft))).padStart(2, '0')}с`;
       turnTimerEl.className =
         turnClockLeft <= 5
-          ? 'px-3 py-1 font-mono text-xl font-black bg-red-950 border-2 border-red-500 text-red-400 rounded-0'
+          ? 'px-2 py-0.5 font-mono text-base font-black bg-red-950 border-2 border-red-500 text-red-400 rounded-0'
           : snap.alarmTriggered
-            ? 'px-3 py-1 font-mono text-xl font-black bg-pink-950 border-2 border-pink-500 text-pink-300 rounded-0'
-            : 'px-3 py-1 font-mono text-xl font-black bg-slate-950 border-2 border-cyan-400 text-cyan-300 rounded-0';
+            ? 'px-2 py-0.5 font-mono text-base font-black bg-pink-950 border-2 border-pink-500 text-pink-300 rounded-0'
+            : 'px-2 py-0.5 font-mono text-base font-black bg-slate-950 border-2 border-cyan-400 text-cyan-300 rounded-0';
     }
 
     if (phaseBadgeEl) {
@@ -428,6 +484,65 @@ export function initHotlineKumirController(
       statusObjEl.textContent = `${hackTxt}  |  ${paintTxt}  |  ${exitTxt}`;
     }
 
+    if (missionDescEl) {
+      missionDescEl.textContent = snap.missionSummary;
+    }
+
+    if (missionObjectivesEl) {
+      missionObjectivesEl.innerHTML = '';
+      const rows: Array<{ done: boolean; text: string; tone?: string }> = [
+        {
+          done: snap.hackCompleted,
+          text: snap.hackCompleted
+            ? '✓ Взломан служебный ПК (T)'
+            : '○ Подойти к ПК (T) и ввести «подключиться»',
+        },
+        {
+          done: snap.paintedCount >= snap.requiredPaintCount,
+          text:
+            snap.paintedCount >= snap.requiredPaintCount
+              ? `✓ ЭМИ-реле (*): ${snap.paintedCount}/${snap.requiredPaintCount}`
+              : `○ ЭМИ-реле (*): ${snap.paintedCount}/${snap.requiredPaintCount} — команда «пометить»`,
+        },
+      ];
+      if (snap.interactables.length > 0) {
+        const reqDone =
+          snap.requiredInteractableCount > 0 &&
+          snap.interactables.filter((i) => i.required && i.inspected).length >= snap.requiredInteractableCount;
+        rows.push({
+          done: reqDone,
+          text:
+            snap.requiredInteractableCount > 0
+              ? `○ Собрать улики [?]: ${snap.inspectedCount}/${snap.requiredInteractableCount} («осмотреть»)`
+              : `• Объекты интерьера [?]: ${snap.inspectedCount}/${snap.interactables.length} («осмотреть»)`,
+          tone: 'text-amber-300',
+        });
+      }
+      rows.push({
+        done: snap.exitUnlocked && snap.phase === 'EXTRACTION',
+        text: snap.exitUnlocked
+          ? '✓ Выход (E) открыт — двигайся к точке эвакуации'
+          : '○ Выход (E) откроется после выполнения целей',
+      });
+      for (const r of rows) {
+        const li = document.createElement('li');
+        li.className = r.done ? 'text-emerald-300 font-bold' : r.tone || 'text-slate-300';
+        li.textContent = r.text;
+        missionObjectivesEl.appendChild(li);
+      }
+    }
+
+    if (intelBoxEl) {
+      if (snap.lastInspectMessage) {
+        const extra = snap.collectedIntel.length > 1 ? ` (улик: ${snap.collectedIntel.length})` : '';
+        intelBoxEl.textContent = `УЛИКА: ${snap.lastInspectMessage}${extra}`;
+        intelBoxEl.classList.remove('hidden');
+      } else {
+        intelBoxEl.textContent = '';
+        intelBoxEl.classList.add('hidden');
+      }
+    }
+
     if (errorBox) {
       if (snap.lastError) {
         errorBox.textContent = snap.lastError.messageRu;
@@ -471,7 +586,9 @@ export function initHotlineKumirController(
         snap.phase === 'BRIEFING' ||
         snap.phase === 'EXTRACTION' ||
         snap.phase === 'MISSION_KO' ||
-        execTimer !== null
+        execTimer !== null ||
+        (helpOverlay && !helpOverlay.classList.contains('hidden')) ||
+        (termOverlay && !termOverlay.classList.contains('hidden'))
       ) {
         return;
       }
@@ -503,12 +620,15 @@ export function initHotlineKumirController(
       termOverlay.classList.add('hidden');
       termOverlay.classList.remove('flex');
     }
+    if (helpOverlay) {
+      helpOverlay.classList.add('hidden');
+      helpOverlay.classList.remove('flex');
+    }
     if (resultOverlay) {
       resultOverlay.classList.add('hidden');
       resultOverlay.classList.remove('flex');
     }
 
-    renderCommandRef();
     resetTurnClock();
     hooks.onLevelChange?.(levelId, mask);
 
@@ -572,6 +692,10 @@ export function initHotlineKumirController(
       while (true) {
         const step = engine.stepNextAction();
         updateUi(step.snapshot, step.events);
+        if (step.openedHelp) {
+          openHelpModal(step.helpTopic);
+          break;
+        }
         if (step.openedTerminal) {
           openTerminalModal();
           break;
@@ -589,6 +713,12 @@ export function initHotlineKumirController(
       const tickFn = () => {
         const step = engine.stepNextAction();
         updateUi(step.snapshot, step.events);
+        if (step.openedHelp) {
+          stopExecutionLoop();
+          openHelpModal(step.helpTopic);
+          resolve();
+          return;
+        }
         if (step.openedTerminal) {
           stopExecutionLoop();
           openTerminalModal();
@@ -648,6 +778,7 @@ export function initHotlineKumirController(
     }
     const step = engine.stepNextAction();
     updateUi(step.snapshot, step.events);
+    if (step.openedHelp) openHelpModal(step.helpTopic);
     if (step.openedTerminal) openTerminalModal();
   });
 
@@ -675,6 +806,10 @@ export function initHotlineKumirController(
 
   btnTermClose?.addEventListener('click', () => {
     closeTerminalModal();
+  });
+
+  btnHelpClose?.addEventListener('click', () => {
+    closeHelpModal();
   });
 
   btnTermHint?.addEventListener('click', () => {
@@ -835,15 +970,56 @@ export function initHotlineKumirController(
       renderer.panBy(dx, dy);
       syncCameraButtons();
     }
+    const rawTile = renderer.getHoveredTile(e.clientX, e.clientY);
+    const snap = engine.getSnapshot();
+    const validTile =
+      rawTile && rawTile.x >= 0 && rawTile.y >= 0 && rawTile.x < snap.width && rawTile.y < snap.height
+        ? rawTile
+        : null;
+    renderer.setHoveredTile(validTile);
+
     if (tileCoordsEl) {
-      const tile = renderer.getHoveredTile(e.clientX, e.clientY);
-      const snap = engine.getSnapshot();
-      if (tile && tile.x >= 0 && tile.y >= 0 && tile.x < snap.width && tile.y < snap.height) {
-        tileCoordsEl.textContent = `x:${tile.x} y:${tile.y}`;
+      tileCoordsEl.textContent = validTile ? `x:${validTile.x} y:${validTile.y}` : 'x:— y:—';
+    }
+    if (hoverInfoEl) {
+      if (!validTile) {
+        hoverInfoEl.textContent = 'Наведи на объект';
       } else {
-        tileCoordsEl.textContent = 'x:— y:—';
+        const obj = snap.interactables.find((item) => item.x === validTile.x && item.y === validTile.y);
+        const door = snap.doors.find((d) => d.x === validTile.x && d.y === validTile.y);
+        const cam = snap.cameras.find((c) => c.x === validTile.x && c.y === validTile.y);
+        const enemy = snap.enemies.find((en) => en.x === validTile.x && en.y === validTile.y && en.status !== 'offline');
+        const t = snap.tiles[validTile.y][validTile.x];
+        if (obj) {
+          hoverInfoEl.textContent = obj.inspected ? `${obj.name} (осмотрено ✓)` : `${obj.name} → «осмотреть»`;
+        } else if (t === 'TERMINAL') {
+          hoverInfoEl.textContent = snap.hackCompleted ? 'Служебный ПК (взломан ✓)' : 'Служебный ПК → «подключиться»';
+        } else if (t === 'RELAY') {
+          hoverInfoEl.textContent = 'ЭМИ-реле (*) → «пометить»';
+        } else if (t === 'COVER') {
+          hoverInfoEl.textContent = 'Укрытие (C) → «укрыться»';
+        } else if (t === 'EXIT') {
+          hoverInfoEl.textContent = snap.exitUnlocked ? 'Выход (E) открыт!' : 'Выход (E) — заблокирован';
+        } else if (door) {
+          hoverInfoEl.textContent = door.open ? 'Проход открыт' : 'Электродверь (D) → ПК или «выбить дверь»';
+        } else if (cam) {
+          hoverInfoEl.textContent = cam.enabled ? 'Камера (K) → «отключить»' : 'Камера отключена';
+        } else if (enemy) {
+          hoverInfoEl.textContent =
+            enemy.status === 'stunned' ? 'Оглушён → «обезвредить»' : 'Охрана → «бросить» / «оглушить»';
+        } else if (t === 'WALL' || t === 'WINDOW') {
+          hoverInfoEl.textContent = t === 'WINDOW' ? 'Стеклянная витрина' : 'Стена';
+        } else {
+          hoverInfoEl.textContent = 'Проходимая клетка';
+        }
       }
     }
+  };
+
+  const onCanvasPointerLeave = () => {
+    renderer.setHoveredTile(null);
+    if (tileCoordsEl) tileCoordsEl.textContent = 'x:— y:—';
+    if (hoverInfoEl) hoverInfoEl.textContent = 'Наведи на объект';
   };
 
   const onCanvasPointerUp = (e: PointerEvent) => {
@@ -869,6 +1045,7 @@ export function initHotlineKumirController(
   canvas.addEventListener('pointermove', onCanvasPointerMove);
   canvas.addEventListener('pointerup', onCanvasPointerUp);
   canvas.addEventListener('pointercancel', onCanvasPointerUp);
+  canvas.addEventListener('pointerleave', onCanvasPointerLeave);
   canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
 
   let resizeObserver: ResizeObserver | null = null;
@@ -878,6 +1055,11 @@ export function initHotlineKumirController(
   }
 
   const globalKeyHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && helpOverlay && !helpOverlay.classList.contains('hidden')) {
+      e.preventDefault();
+      closeHelpModal();
+      return;
+    }
     if (e.key === 'Escape' && termOverlay && !termOverlay.classList.contains('hidden')) {
       e.preventDefault();
       closeTerminalModal();
@@ -977,6 +1159,7 @@ export function initHotlineKumirController(
     canvas.removeEventListener('pointermove', onCanvasPointerMove);
     canvas.removeEventListener('pointerup', onCanvasPointerUp);
     canvas.removeEventListener('pointercancel', onCanvasPointerUp);
+    canvas.removeEventListener('pointerleave', onCanvasPointerLeave);
     canvas.removeEventListener('wheel', onCanvasWheel);
     codeEditor.removeEventListener('paste', blockPasteOrDrop);
     codeEditor.removeEventListener('drop', blockPasteOrDrop);

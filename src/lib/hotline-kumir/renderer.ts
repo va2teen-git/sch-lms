@@ -224,6 +224,7 @@ export class HotlineCanvasRenderer {
   private gbrVanAnim: { fromX: number; toX: number; elapsed: number; duration: number } | null = null;
   private gbrLastProgress = -1;
   private gbrSkidAlpha = 0;
+  private hoveredTile: { x: number; y: number } | null = null;
 
   private readonly onVisibilityChange = () => {
     if (typeof document !== 'undefined' && document.hidden) {
@@ -405,6 +406,17 @@ export class HotlineCanvasRenderer {
     return this.camera.screenToTile(sx, sy, TILE_PX);
   }
 
+  setHoveredTile(tile: { x: number; y: number } | null): void {
+    const prev = this.hoveredTile;
+    if ((prev === null && tile === null) || (prev && tile && prev.x === tile.x && prev.y === tile.y)) {
+      return;
+    }
+    this.hoveredTile = tile;
+    if (this.snapshot) {
+      this.drawFrame();
+    }
+  }
+
   renderSnapshot(snapshot: WorldSnapshot, events: WorldEvent[] = []): void {
     const levelChanged = this.snapshot?.levelId !== snapshot.levelId;
     this.snapshot = snapshot;
@@ -427,6 +439,7 @@ export class HotlineCanvasRenderer {
       this.gbrVanAnim = null;
       this.gbrLastProgress = -1;
       this.gbrSkidAlpha = 0;
+      this.hoveredTile = null;
     }
 
     this.ensureBackdropCache(snapshot);
@@ -437,6 +450,7 @@ export class HotlineCanvasRenderer {
       this.gbrVanAnim = null;
       this.gbrLastProgress = -1;
       this.gbrSkidAlpha = 0;
+      this.hoveredTile = null;
     } else if (this.fastAnim) {
       this.gbrVanCurrentX = vanTarget.targetX;
       this.gbrVanAnim = null;
@@ -614,6 +628,16 @@ export class HotlineCanvasRenderer {
           maxLife: 260,
         });
         this.spawnBurst(ev.x, ev.y, ['#00F0FF', '#FF007F'], 10, 260);
+      } else if (ev.type === 'OBJECT_INSPECTED' && ev.x !== undefined && ev.y !== undefined) {
+        this.shockwaves.push({
+          x: ev.x,
+          y: ev.y,
+          maxR: TILE_PX * 1.15,
+          color: '#FBBF24',
+          life: 260,
+          maxLife: 260,
+        });
+        this.spawnBurst(ev.x, ev.y, ['#FBBF24', '#00F0FF', '#F8FAFC'], 10, 260);
       } else if (ev.type === 'DOOR_BROKEN' && ev.x !== undefined && ev.y !== undefined) {
         this.triggerFx('SHAKE', 240, 4.5);
         this.spawnBurst(ev.x, ev.y, ['#F59E0B', '#F8FAFC', '#FF007F'], 16, 300);
@@ -877,16 +901,30 @@ export class HotlineCanvasRenderer {
       }
     }
 
-    // 3. Subtle KuMir Tactical Grid inside playable arena
-    g.strokeStyle = 'rgba(255, 255, 255, 0.065)';
-    g.lineWidth = 1;
+    // 3. Subtle yet crisp KuMir Tactical Grid inside playable arena (dual-contrast for light & dark floors)
     for (let y = 0; y < snap.height; y++) {
       for (let x = 0; x < snap.width; x++) {
         const tile = snap.tiles[y][x];
         if (tile === 'WALL' || tile === 'WINDOW') continue;
         const px = x * TILE_PX;
         const py = y * TILE_PX;
+        // Dark seam for light/grey tiles (sidewalk, concrete, marble, gravel, bathroom)
+        g.strokeStyle = 'rgba(5, 3, 14, 0.28)';
+        g.lineWidth = 1;
         g.strokeRect(px + 0.5, py + 0.5, TILE_PX - 1, TILE_PX - 1);
+        // Inner soft highlight for dark floors (obsidian, carpet, grate)
+        g.strokeStyle = 'rgba(186, 230, 253, 0.09)';
+        g.strokeRect(px + 1.5, py + 1.5, TILE_PX - 3, TILE_PX - 3);
+        // Subtle 4px corner ticks for instant step counting
+        g.fillStyle = 'rgba(125, 211, 252, 0.26)';
+        g.fillRect(px + 1, py + 1, 4, 1);
+        g.fillRect(px + 1, py + 1, 1, 4);
+        g.fillRect(px + TILE_PX - 5, py + 1, 4, 1);
+        g.fillRect(px + TILE_PX - 2, py + 1, 1, 4);
+        g.fillRect(px + 1, py + TILE_PX - 2, 4, 1);
+        g.fillRect(px + 1, py + TILE_PX - 5, 1, 4);
+        g.fillRect(px + TILE_PX - 5, py + TILE_PX - 2, 4, 1);
+        g.fillRect(px + TILE_PX - 2, py + TILE_PX - 5, 1, 4);
       }
     }
 
@@ -1170,6 +1208,37 @@ export class HotlineCanvasRenderer {
     }
   }
 
+  private drawCornerBrackets(
+    ctx: CanvasRenderingContext2D,
+    px: number,
+    py: number,
+    color: string,
+    len: number,
+    lineWidth: number
+  ): void {
+    const pad = 2;
+    const x0 = px + pad;
+    const y0 = py + pad;
+    const x1 = px + TILE_PX - pad;
+    const y1 = py + TILE_PX - pad;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0 + len);
+    ctx.lineTo(x0, y0);
+    ctx.lineTo(x0 + len, y0);
+    ctx.moveTo(x1 - len, y0);
+    ctx.lineTo(x1, y0);
+    ctx.lineTo(x1, y0 + len);
+    ctx.moveTo(x0, y1 - len);
+    ctx.lineTo(x0, y1);
+    ctx.lineTo(x0 + len, y1);
+    ctx.moveTo(x1 - len, y1);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x1, y1 - len);
+    ctx.stroke();
+  }
+
   private drawWorldObjects(ctx: CanvasRenderingContext2D, snap: WorldSnapshot): void {
     const paintedKeys = new Set(snap.paintedTiles.map((pt) => `${pt.x},${pt.y}`));
 
@@ -1188,11 +1257,23 @@ export class HotlineCanvasRenderer {
           ctx.strokeRect(px + 5, py + 5, TILE_PX - 10, TILE_PX - 10);
         }
 
-        if (tile === 'RELAY') {
+        if (tile === 'COVER') {
+          this.drawCornerBrackets(ctx, px, py, 'rgba(56, 189, 248, 0.55)', 6, 1.4);
+          ctx.fillStyle = 'rgba(9, 4, 20, 0.85)';
+          ctx.fillRect(px + 3, py + 3, 12, 12);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px + 3, py + 3, 12, 12);
+          ctx.fillStyle = '#7DD3FC';
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('C', px + 9, py + 12);
+        } else if (tile === 'RELAY') {
           if (!this.drawSprite(ctx, isPainted ? 'relay_on' : 'relay_off', px + 3, py + 3, TILE_PX - 6, TILE_PX - 6)) {
             ctx.fillStyle = isPainted ? '#082F49' : '#2E0927';
             ctx.fillRect(px + 6, py + 6, TILE_PX - 12, TILE_PX - 12);
           }
+          this.drawCornerBrackets(ctx, px, py, isPainted ? '#22D3EE' : '#F472B6', 7, 1.6);
           ctx.fillStyle = isPainted ? '#67E8F9' : '#F472B6';
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';
@@ -1202,6 +1283,7 @@ export class HotlineCanvasRenderer {
             ctx.fillStyle = '#0F172A';
             ctx.fillRect(px + 5, py + 5, TILE_PX - 10, TILE_PX - 10);
           }
+          this.drawCornerBrackets(ctx, px, py, snap.hackCompleted ? '#34D399' : '#00F0FF', 7, 1.6);
           ctx.fillStyle = snap.hackCompleted ? '#34D399' : '#38BDF8';
           ctx.font = 'bold 9px monospace';
           ctx.textAlign = 'center';
@@ -1242,6 +1324,58 @@ export class HotlineCanvasRenderer {
           ctx.textAlign = 'center';
           ctx.fillText('ГБР', px + TILE_PX / 2, py + TILE_PX / 2 + 3);
         }
+      }
+    }
+
+    // Interactive interior objects (crates, plants, urns, upholstered furniture, items)
+    for (const obj of snap.interactables) {
+      const px = obj.x * TILE_PX;
+      const py = obj.y * TILE_PX;
+
+      if (obj.drawIcon === 'urn') {
+        const cx = px + TILE_PX / 2;
+        const cy = py + TILE_PX / 2;
+        ctx.fillStyle = 'rgba(4, 2, 12, 0.45)';
+        ctx.beginPath();
+        ctx.arc(cx + 2, cy + 2, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#94A3B8';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.fillStyle = '#0F172A';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillRect(cx - 2, cy - 1, 4, 2);
+      }
+
+      if (!obj.inspected) {
+        this.drawCornerBrackets(ctx, px, py, '#FBBF24', 7, 1.8);
+        ctx.fillStyle = '#090414';
+        ctx.fillRect(px + TILE_PX - 16, py + 3, 13, 13);
+        ctx.strokeStyle = '#FBBF24';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(px + TILE_PX - 16, py + 3, 13, 13);
+        ctx.fillStyle = '#FDE68A';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('?', px + TILE_PX - 9.5, py + 13);
+      } else {
+        this.drawCornerBrackets(ctx, px, py, 'rgba(52, 211, 153, 0.45)', 5, 1.2);
+        ctx.fillStyle = 'rgba(9, 4, 20, 0.85)';
+        ctx.fillRect(px + TILE_PX - 15, py + 3, 12, 12);
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.65)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + TILE_PX - 15, py + 3, 12, 12);
+        ctx.fillStyle = '#6EE7B7';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('✓', px + TILE_PX - 9, py + 12);
       }
     }
 
@@ -1291,6 +1425,39 @@ export class HotlineCanvasRenderer {
         ctx.strokeRect(-TILE_PX / 2 + 6, -5, 8, TILE_PX - 14);
       }
       ctx.restore();
+
+      if (!d.open) {
+        ctx.fillStyle = 'rgba(9, 4, 20, 0.85)';
+        ctx.fillRect(px + 3, py + 3, 12, 12);
+        ctx.strokeStyle = '#FF007F';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 3, py + 3, 12, 12);
+        ctx.fillStyle = '#F9A8D4';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('D', px + 9, py + 12);
+      }
+    }
+
+    // Hover cursor highlight (Idle-Zero safe: drawn only on pointer move)
+    if (
+      this.hoveredTile &&
+      this.hoveredTile.x >= 0 &&
+      this.hoveredTile.y >= 0 &&
+      this.hoveredTile.x < snap.width &&
+      this.hoveredTile.y < snap.height
+    ) {
+      const ht = snap.tiles[this.hoveredTile.y][this.hoveredTile.x];
+      if (ht !== 'WALL' && ht !== 'WINDOW') {
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(
+          this.hoveredTile.x * TILE_PX + 1.5,
+          this.hoveredTile.y * TILE_PX + 1.5,
+          TILE_PX - 3,
+          TILE_PX - 3
+        );
+      }
     }
   }
 
