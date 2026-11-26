@@ -283,68 +283,16 @@ export interface WorldEvent {
   moodAfter: AudioMood;
 }
 
-export interface VfsFileNode {
-  kind: 'file';
-  name: string;
-  content: string;
-  mode: number;
-  owner: string;
-  size: number;
-  isBinary?: boolean;
-  stringsLines?: string[];
-}
-
-export interface VfsDirNode {
-  kind: 'dir';
-  name: string;
-  mode: number;
-  owner: string;
-  children: Record<string, VfsNode>;
-}
-
-export type VfsNode = VfsFileNode | VfsDirNode;
-
-export type LinuxWorldEffect =
-  | { type: 'UNLOCK_DOOR'; doorId?: string }
-  | { type: 'DISABLE_CAMERA'; cameraId?: string }
-  | { type: 'DISABLE_LASER'; laserId?: string }
-  | { type: 'COMPLETE_HACK' }
-  | { type: 'TRIGGER_ALARM'; reason: string };
-
-export interface LinuxExecResult {
-  output: string;
-  exitCode: number;
-  clearScreen?: boolean;
-  noiseDelta: number;
-  commandTickCost: number;
-  effects: LinuxWorldEffect[];
-  objectiveCompletedNow: boolean;
-}
-
-export interface LinuxLevelConfig {
-  user: string;
-  host: string;
-  homeDir: string;
-  idInfo: string;
-  sudoListOutput: string;
-  crontabContent: string;
-  processes: string[];
-  sockets: string[];
-  honeypotPaths: string[];
-  requiredFlags: string[];
-  vfsRoot: VfsDirNode;
-  customCommands: Record<
-    string,
-    (args: string[], ctx: { flags: Set<string>; vfsRoot: VfsDirNode }) => {
-      output: string;
-      exitCode: number;
-      noiseDelta?: number;
-      setFlags?: string[];
-      effects?: LinuxWorldEffect[];
-    }
-  >;
-  hints: string[];
-}
+export type {
+  VfsFileNode,
+  VfsDirNode,
+  VfsNode,
+  LinuxWorldEffect,
+  LinuxExecResult,
+  LinuxCustomCommandContext,
+  LinuxCustomCommandResult,
+  LinuxLevelConfig,
+} from '../linux-sandbox/types.ts';
 
 export interface LevelResult {
   levelId: number;
