@@ -12,6 +12,7 @@ declare global {
       getAudioState: () => ReturnType<HotlineAudioSynth['getAudioState']>;
       getRenderStats: () => ReturnType<HotlineCanvasRenderer['getRenderStats']>;
       getCameraState: () => ReturnType<HotlineCanvasRenderer['getCameraState']>;
+      getGbrAnimationState: () => ReturnType<HotlineCanvasRenderer['getGbrAnimationState']>;
       setCameraMode: (mode: CameraMode) => void;
       waitForAtlasReady: () => Promise<void>;
       flushAnimations: () => void;
@@ -33,6 +34,15 @@ declare global {
 }
 
 export interface HotlineControllerHooks {
+  initialLevel?: number;
+  initialMask?: MaskId;
+  loadSavedProgress?: () => Promise<{
+    currentLevel: number;
+    completedCount: number;
+    campaignCompleted: boolean;
+    selectedMask?: MaskId;
+  } | null>;
+  onLevelChange?: (levelId: number, mask: MaskId) => void;
   onMissionComplete?: (result: LevelResult, snap: WorldSnapshot) => void;
   onMissionStart?: (levelId: number, mask: MaskId) => void;
   onAlertTriggered?: (levelId: number, reason: string) => void;
@@ -50,10 +60,14 @@ export function initHotlineKumirController(
   hooks: HotlineControllerHooks = {}
 ): () => void {
   const params = new URLSearchParams(window.location.search);
-  const initialLevel = Math.min(5, Math.max(1, parseInt(params.get('level') || '1', 10) || 1));
+  const initialLevel = Math.min(5, Math.max(1, hooks.initialLevel ?? 1));
   const initialMaskParam = params.get('mask') as MaskId | null;
   let selectedMask: MaskId =
-    initialMaskParam && MASK_INFO[initialMaskParam] ? initialMaskParam : 'richard';
+    initialMaskParam && MASK_INFO[initialMaskParam]
+      ? initialMaskParam
+      : hooks.initialMask && MASK_INFO[hooks.initialMask]
+        ? hooks.initialMask
+        : 'richard';
   const baseSeed = parseInt(params.get('seed') || '1337', 10) || 1337;
   const fastAnim = params.get('fastAnim') === '1';
   const forceMute = params.get('mute') === '1';
@@ -61,15 +75,17 @@ export function initHotlineKumirController(
   const canvas = root.querySelector<HTMLCanvasElement>('#hk-arena-canvas');
   const codeEditor = root.querySelector<HTMLTextAreaElement>('#hk-code-editor');
   const gutterEl = root.querySelector<HTMLPreElement>('#hk-line-gutter');
-  const snippetsEl = root.querySelector<HTMLDivElement>('#hk-snippets');
+  const commandRefEl = root.querySelector<HTMLDivElement>('#hk-command-ref');
   const errorBox = root.querySelector<HTMLDivElement>('#hk-error-box');
 
-  const levelSelect = root.querySelector<HTMLSelectElement>('#hk-level-select');
+  const levelBadgeEl = root.querySelector<HTMLElement>('#hk-level-badge');
+  const campaignBadgeEl = root.querySelector<HTMLElement>('#hk-campaign-badge');
   const maskLabelEl = root.querySelector<HTMLElement>('#hk-mask-badge');
   const phaseBadgeEl = root.querySelector<HTMLElement>('#hk-phase-badge');
   const turnTimerEl = root.querySelector<HTMLElement>('#hk-turn-timer');
   const etaTrackerEl = root.querySelector<HTMLElement>('#hk-gbr-tracker');
   const etaTextEl = root.querySelector<HTMLElement>('#hk-gbr-eta-text');
+  const gbrVanMarkerEl = root.querySelector<HTMLElement>('#hk-gbr-van-marker');
   const etaSegs = Array.from(root.querySelectorAll<HTMLElement>('[data-gbr-seg]'));
   const statusObjEl = root.querySelector<HTMLElement>('#hk-obj-status');
   const idsBadgeEl = root.querySelector<HTMLElement>('#hk-ids-badge');
@@ -164,6 +180,8 @@ export function initHotlineKumirController(
   let termHistIdx = -1;
   let missionReported = false;
   let alertReported = false;
+  let campaignCompleted = false;
+  let levelOverriddenByTest = false;
 
   const stopExecutionLoop = () => {
     if (execTimer !== null) {
@@ -192,30 +210,20 @@ export function initHotlineKumirController(
     }
   };
 
-  const renderSnippets = () => {
-    if (!snippetsEl) return;
+  const renderCommandRef = () => {
+    if (!commandRefEl) return;
     const lvl = HOTLINE_KUMIR_LEVELS.find((l) => l.id === currentLevelId) || HOTLINE_KUMIR_LEVELS[0];
-    snippetsEl.innerHTML = '';
+    commandRefEl.innerHTML = '';
+    const title = document.createElement('span');
+    title.className = 'text-[10px] font-bold text-pink-400 uppercase mr-1';
+    title.textContent = 'КОМАНДЫ (ввод вручную):';
+    commandRefEl.appendChild(title);
     for (const snip of lvl.snippetPreset) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className =
-        'px-2 py-1 text-[11px] font-mono bg-slate-900 border border-pink-500/60 text-cyan-300 hover:bg-pink-950/60 hover:border-pink-400 rounded-0 cursor-pointer transition-colors';
-      btn.textContent = snip.split('\n')[0];
-      btn.title = snip;
-      btn.addEventListener('click', () => {
-        audio.unlock();
-        audio.playSfx('key');
-        const start = codeEditor.selectionStart;
-        const end = codeEditor.selectionEnd;
-        const prefix = start > 0 && codeEditor.value[start - 1] !== '\n' ? '\n' : '';
-        const insert = `${prefix}${snip}\n`;
-        codeEditor.value = codeEditor.value.slice(0, start) + insert + codeEditor.value.slice(end);
-        codeEditor.selectionStart = codeEditor.selectionEnd = start + insert.length;
-        codeEditor.focus();
-        syncGutter(null);
-      });
-      snippetsEl.appendChild(btn);
+      const badge = document.createElement('span');
+      badge.className =
+        'px-1.5 py-0.5 text-[10px] font-mono bg-slate-900/90 border border-pink-500/40 text-cyan-200 rounded-0';
+      badge.textContent = snip;
+      commandRefEl.appendChild(badge);
     }
   };
 
@@ -384,6 +392,18 @@ export function initHotlineKumirController(
         const progressIdx = snap.gbrSpawned
           ? 4
           : Math.min(3, Math.max(0, Math.floor(((snap.gbrEtaMaxTurns - snap.gbrEtaTurns) / Math.max(1, snap.gbrEtaMaxTurns)) * 4)));
+        if (gbrVanMarkerEl) {
+          const pct = snap.gbrSpawned
+            ? 85
+            : Math.min(
+                82,
+                Math.max(
+                  4,
+                  Math.round(((snap.gbrEtaMaxTurns - snap.gbrEtaTurns) / Math.max(1, snap.gbrEtaMaxTurns)) * 82)
+                )
+              );
+          gbrVanMarkerEl.style.left = `${pct}%`;
+        }
         etaSegs.forEach((seg, idx) => {
           seg.className =
             idx <= progressIdx
@@ -392,12 +412,18 @@ export function initHotlineKumirController(
         });
       } else {
         etaTrackerEl.classList.add('hidden');
+        if (gbrVanMarkerEl) gbrVanMarkerEl.style.left = '0%';
       }
+    }
+
+    if (campaignBadgeEl) {
+      if (campaignCompleted) campaignBadgeEl.classList.remove('hidden');
+      else campaignBadgeEl.classList.add('hidden');
     }
 
     if (statusObjEl) {
       const hackTxt = snap.hackCompleted ? 'ПК: ВЗЛОМАН ✓' : 'ПК: ЗАКРЫТ';
-      const paintTxt = `РЕЛЕ *: ${snap.paintedCount}/${snap.requiredPaintCount}`;
+      const paintTxt = `МЕТКИ (*): ${snap.paintedCount}/${snap.requiredPaintCount}`;
       const exitTxt = snap.exitUnlocked ? 'ВЫХОД: ОТКРЫТ → E' : 'ВЫХОД: ЗАБЛОКИРОВАН';
       statusObjEl.textContent = `${hackTxt}  |  ${paintTxt}  |  ${exitTxt}`;
     }
@@ -406,7 +432,7 @@ export function initHotlineKumirController(
       if (snap.lastError) {
         errorBox.textContent = snap.lastError.messageRu;
         errorBox.classList.remove('hidden');
-      } else {
+      } else if (!errorBox.textContent?.includes('Вставка отключена')) {
         errorBox.classList.add('hidden');
       }
     }
@@ -419,6 +445,9 @@ export function initHotlineKumirController(
     }
 
     if (snap.phase === 'EXTRACTION' && snap.lastResult) {
+      if (snap.lastResult.levelId >= 5) {
+        campaignCompleted = true;
+      }
       if (!missionReported) {
         missionReported = true;
         hooks.onMissionComplete?.(snap.lastResult, snap);
@@ -467,7 +496,7 @@ export function initHotlineKumirController(
     engine = new HotlineGameEngine(levelId, mask, baseSeed + levelId);
     const lvlDef = HOTLINE_KUMIR_LEVELS.find((l) => l.id === levelId) || HOTLINE_KUMIR_LEVELS[0];
 
-    if (levelSelect) levelSelect.value = String(levelId);
+    if (levelBadgeEl) levelBadgeEl.textContent = `Ур.${lvlDef.id}/5: ${lvlDef.title}`;
     codeEditor.value = lvlDef.starterCode;
     if (termOutputEl) termOutputEl.innerHTML = '';
     if (termOverlay) {
@@ -479,8 +508,9 @@ export function initHotlineKumirController(
       resultOverlay.classList.remove('flex');
     }
 
-    renderSnippets();
+    renderCommandRef();
     resetTurnClock();
+    hooks.onLevelChange?.(levelId, mask);
 
     if (briefingOverlay && showBriefing) {
       briefingOverlay.classList.remove('hidden');
@@ -600,11 +630,6 @@ export function initHotlineKumirController(
     });
   });
 
-  levelSelect?.addEventListener('change', () => {
-    const nxt = parseInt(levelSelect.value, 10) || 1;
-    loadLevel(nxt, selectedMask, true);
-  });
-
   btnRun?.addEventListener('click', () => {
     void runCode();
   });
@@ -659,7 +684,24 @@ export function initHotlineKumirController(
     }
   });
 
-  codeEditor.addEventListener('input', () => syncGutter(null));
+  const blockPasteOrDrop = (e: Event) => {
+    e.preventDefault();
+    audio.unlock();
+    audio.playSfx('error');
+    if (errorBox) {
+      errorBox.textContent = 'Вставка отключена — вводи команды алгоритма вручную с клавиатуры!';
+      errorBox.classList.remove('hidden');
+    }
+  };
+  codeEditor.addEventListener('paste', blockPasteOrDrop);
+  codeEditor.addEventListener('drop', blockPasteOrDrop);
+
+  codeEditor.addEventListener('input', () => {
+    if (errorBox && errorBox.textContent?.includes('Вставка отключена')) {
+      errorBox.classList.add('hidden');
+    }
+    syncGutter(null);
+  });
 
   codeEditor.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey || e.shiftKey) && e.key === 'Enter') {
@@ -675,25 +717,6 @@ export function initHotlineKumirController(
       codeEditor.selectionStart = codeEditor.selectionEnd = s + 2;
       syncGutter(null);
       return;
-    }
-    if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
-      const s = codeEditor.selectionStart;
-      const before = codeEditor.value.slice(0, s);
-      const lineStart = before.lastIndexOf('\n') + 1;
-      const curLine = before.slice(lineStart).trim();
-      const indentMatch = before.slice(lineStart).match(/^(\s*)/);
-      const indent = indentMatch ? indentMatch[1] : '';
-      let autoClose = '';
-      if (/^нц(\s|$)/i.test(curLine)) autoClose = `\n${indent}  \n${indent}кц`;
-      else if (/^если\s+.*\s+то$/i.test(curLine)) autoClose = `\n${indent}  \n${indent}все`;
-      if (autoClose) {
-        e.preventDefault();
-        const after = codeEditor.value.slice(codeEditor.selectionEnd);
-        codeEditor.value = before + autoClose + after;
-        const cursorPos = before.length + 1 + indent.length + 2;
-        codeEditor.selectionStart = codeEditor.selectionEnd = cursorPos;
-        syncGutter(null);
-      }
     }
   });
 
@@ -884,13 +907,17 @@ export function initHotlineKumirController(
     getAudioState: () => audio.getAudioState(),
     getRenderStats: () => renderer.getRenderStats(),
     getCameraState: () => renderer.getCameraState(),
+    getGbrAnimationState: () => renderer.getGbrAnimationState(),
     setCameraMode: (mode: CameraMode) => {
       renderer.setCameraMode(mode);
       syncCameraButtons();
     },
     waitForAtlasReady: () => renderer.waitForAtlasReady(),
     flushAnimations: () => renderer.flushAnimations(),
-    selectLevel: (id: number, mask?: MaskId) => loadLevel(id, mask ?? selectedMask, false),
+    selectLevel: (id: number, mask?: MaskId) => {
+      levelOverriddenByTest = true;
+      loadLevel(id, mask ?? selectedMask, false);
+    },
     setCode: (code: string) => {
       codeEditor.value = code;
       syncGutter(null);
@@ -915,6 +942,33 @@ export function initHotlineKumirController(
 
   loadLevel(initialLevel, selectedMask, !params.has('skipBriefing'));
 
+  if (hooks.loadSavedProgress) {
+    void hooks.loadSavedProgress().then((saved) => {
+      if (!saved || levelOverriddenByTest) return;
+      campaignCompleted = Boolean(saved.campaignCompleted);
+      const snap = engine.getSnapshot();
+      const untouched =
+        snap.player.stepsTaken === 0 &&
+        !snap.alarmTriggered &&
+        !snap.hackCompleted &&
+        snap.paintedCount === 0;
+      if (!untouched) {
+        updateUi(snap, []);
+        return;
+      }
+      const targetLevel = Math.min(5, Math.max(1, saved.currentLevel || 1));
+      const targetMask =
+        !initialMaskParam && saved.selectedMask && MASK_INFO[saved.selectedMask]
+          ? saved.selectedMask
+          : selectedMask;
+      if (targetLevel !== currentLevelId || targetMask !== selectedMask) {
+        loadLevel(targetLevel, targetMask, !params.has('skipBriefing'));
+      } else {
+        updateUi(snap, []);
+      }
+    });
+  }
+
   return () => {
     stopExecutionLoop();
     stopTurnClock();
@@ -924,6 +978,8 @@ export function initHotlineKumirController(
     canvas.removeEventListener('pointerup', onCanvasPointerUp);
     canvas.removeEventListener('pointercancel', onCanvasPointerUp);
     canvas.removeEventListener('wheel', onCanvasWheel);
+    codeEditor.removeEventListener('paste', blockPasteOrDrop);
+    codeEditor.removeEventListener('drop', blockPasteOrDrop);
     resizeObserver?.disconnect();
     renderer.dispose();
     audio.dispose();

@@ -30,10 +30,21 @@ export const GET: APIRoute = async ({ request }) => {
     });
   } catch (err) {
     console.error('hotline-kumir progress GET error:', err);
-    return new Response(JSON.stringify({ success: true, completedCount: 0, totalLevels: 5, levels: [] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        completedCount: 0,
+        totalLevels: 5,
+        currentLevel: 1,
+        campaignCompleted: false,
+        selectedMask: 'richard',
+        levels: [],
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   } finally {
     db?.close();
   }
@@ -94,6 +105,15 @@ export const POST: APIRoute = async ({ request }) => {
       db.close();
     }
   } catch (err) {
+    if (err instanceof Error && err.message === 'LEVEL_LOCKED') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Previous levels must be completed first' }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
     console.error('hotline-kumir progress POST error:', err);
     return new Response(JSON.stringify({ success: false, error: 'Database error' }), {
       status: 500,

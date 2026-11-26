@@ -210,7 +210,8 @@ const BASIC_ACTION_MAP: Record<string, ActionCommandKind> = {
   вниз: 'MOVE',
   влево: 'MOVE',
   вправо: 'MOVE',
-  закрасить: 'PAINT',
+  пометить: 'PAINT',
+  активировать: 'PAINT',
 };
 
 class KumirParser {
@@ -295,12 +296,12 @@ class KumirParser {
       if (this.peek().kind === 'WORD' && this.peek().norm === 'использовать') {
         const useTok = this.advance();
         const modTok = this.peek();
-        if (modTok.kind !== 'WORD' || modTok.norm !== 'робот') {
+        if (modTok.kind !== 'WORD' || (modTok.norm !== 'робот' && modTok.norm !== 'агент')) {
           this.fail(
             'E_PARSE_UNEXPECTED_TOKEN',
             modTok.line,
             modTok.col,
-            `Строка ${useTok.line}: после «использовать» ожидалось «Робот».`
+            `Строка ${useTok.line}: после «использовать» ожидалось «Робот» или «Агент».`
           );
         }
         this.advance();
@@ -316,7 +317,7 @@ class KumirParser {
           'E_PARSE_UNEXPECTED_TOKEN',
           1,
           1,
-          'Строка 1: редактор пуст. Введите хотя бы одну команду для Робота (например: «вправо»).'
+          'Строка 1: редактор пуст. Введите хотя бы одну команду для Агента (например: «вправо»).'
         );
       }
 
@@ -486,6 +487,21 @@ class KumirParser {
     if (t.norm === 'если') return this.parseIfStmt();
     if (t.norm === 'нц') return this.parseLoopStmt();
 
+    if (t.norm === 'закрасить') {
+      this.fail(
+        'E_PARSE_UNEXPECTED_TOKEN',
+        t.line,
+        t.col,
+        `Строка ${t.line}: вместо «закрасить» в «Кибер-Boy» используется команда «пометить» (или «поставить метку») — она ставит ЭМИ-метку на реле (*).`
+      );
+    }
+
+    if (t.norm === 'поставить' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'метку') {
+      const start = this.advance();
+      const end = this.advance();
+      return { kind: 'ACTION', action: 'PAINT', span: this.spanFrom(start, end) };
+    }
+
     if (BASIC_ACTION_MAP[t.norm]) {
       const tok = this.advance();
       const action = BASIC_ACTION_MAP[tok.norm];
@@ -527,15 +543,23 @@ class KumirParser {
     }
 
     if (t.norm === 'открыть') {
-      const tok = this.advance();
-      const dir = this.parseOptDirection();
-      return { kind: 'ACTION', action: 'BREACH_DOOR', dir, span: this.spanFrom(tok, tok) };
+      this.fail(
+        'E_PARSE_UNEXPECTED_TOKEN',
+        t.line,
+        t.col,
+        `Строка ${t.line}: электродверь заблокирована — открой её через ПК (T) командой «подключиться» или примени «выбить дверь» (поднимет тревогу!).`
+      );
     }
 
     if (t.norm === 'отключить') {
       const tok = this.advance();
+      let endTok = tok;
+      const obj = this.peek();
+      if (obj.kind === 'WORD' && (obj.norm === 'камеру' || obj.norm === 'лазер' || obj.norm === 'щиток')) {
+        endTok = this.advance();
+      }
       const dir = this.parseOptDirection();
-      return { kind: 'ACTION', action: 'DISABLE', dir, span: this.spanFrom(tok, tok) };
+      return { kind: 'ACTION', action: 'DISABLE', dir, span: this.spanFrom(tok, endTok) };
     }
 
     if (t.norm === 'рывок') {
@@ -552,11 +576,22 @@ class KumirParser {
 
     if (t.norm === 'бросить') {
       const tok = this.advance();
+      let endTok = tok;
+      const obj = this.peek();
+      if (obj.kind === 'WORD' && (obj.norm === 'маячок' || obj.norm === 'приманку')) {
+        endTok = this.advance();
+      }
+      const dir = this.parseOptDirection();
+      return { kind: 'ACTION', action: 'THROW', dir, span: this.spanFrom(tok, endTok) };
+    }
+
+    if (t.norm === 'приманка') {
+      const tok = this.advance();
       const dir = this.parseOptDirection();
       return { kind: 'ACTION', action: 'THROW', dir, span: this.spanFrom(tok, tok) };
     }
 
-    if (t.norm === 'добить') {
+    if (t.norm === 'обезвредить' || t.norm === 'вырубить' || t.norm === 'добить') {
       const tok = this.advance();
       const dir = this.parseOptDirection();
       return { kind: 'ACTION', action: 'FINISH', dir, span: this.spanFrom(tok, tok) };
@@ -815,14 +850,26 @@ class KumirParser {
       );
     }
 
-    if (t.norm === 'клетка') {
+    if (t.norm === 'метка' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'стоит') {
+      const start = this.advance();
+      const end = this.advance();
+      return { kind: 'SENSOR', sensor: 'IS_PAINTED', span: this.spanFrom(start, end) };
+    }
+
+    if (t.norm === 'метки' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'нет') {
+      const start = this.advance();
+      const end = this.advance();
+      return { kind: 'SENSOR', sensor: 'IS_PAINTED', negatePainted: true, span: this.spanFrom(start, end) };
+    }
+
+    if (t.norm === 'реле') {
       const start = this.advance();
       const p = this.peek();
-      if (p.kind === 'WORD' && p.norm === 'закрашена') {
+      if (p.kind === 'WORD' && p.norm === 'активно') {
         this.advance();
         return { kind: 'SENSOR', sensor: 'IS_PAINTED', span: this.spanFrom(start, p) };
       }
-      if (p.kind === 'WORD' && p.norm === 'чистая') {
+      if (p.kind === 'WORD' && p.norm === 'неактивно') {
         this.advance();
         return { kind: 'SENSOR', sensor: 'IS_PAINTED', negatePainted: true, span: this.spanFrom(start, p) };
       }
@@ -830,7 +877,35 @@ class KumirParser {
         'E_PARSE_BAD_EXPRESSION',
         start.line,
         start.col,
-        `Строка ${start.line}: после «клетка» ожидалось «закрашена» или «чистая».`
+        `Строка ${start.line}: после «реле» ожидалось «активно» или «неактивно».`
+      );
+    }
+
+    if (t.norm === 'клетка') {
+      const start = this.advance();
+      const p = this.peek();
+      if (p.kind === 'WORD' && p.norm === 'помечена') {
+        this.advance();
+        return { kind: 'SENSOR', sensor: 'IS_PAINTED', span: this.spanFrom(start, p) };
+      }
+      if (p.kind === 'WORD' && p.norm === 'без' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'метки') {
+        this.advance();
+        const end = this.advance();
+        return { kind: 'SENSOR', sensor: 'IS_PAINTED', negatePainted: true, span: this.spanFrom(start, end) };
+      }
+      if (p.kind === 'WORD' && (p.norm === 'закрашена' || p.norm === 'чистая')) {
+        this.fail(
+          'E_PARSE_BAD_EXPRESSION',
+          start.line,
+          start.col,
+          `Строка ${start.line}: используйте датчик «метка стоит» или «метки нет» (вместо «клетка закрашена / чистая»).`
+        );
+      }
+      this.fail(
+        'E_PARSE_BAD_EXPRESSION',
+        start.line,
+        start.col,
+        `Строка ${start.line}: после «клетка» ожидалось «помечена» или «без метки» (рекомендуется «метка стоит» / «метки нет»).`
       );
     }
 
@@ -853,8 +928,8 @@ class KumirParser {
     }
 
     if (
-      (t.norm === 'рядом' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'терминал') ||
-      (t.norm === 'терминал' && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'рядом')
+      (t.norm === 'рядом' && this.peek(1).kind === 'WORD' && (this.peek(1).norm === 'терминал' || this.peek(1).norm === 'пк')) ||
+      ((t.norm === 'терминал' || t.norm === 'пк') && this.peek(1).kind === 'WORD' && this.peek(1).norm === 'рядом')
     ) {
       const start = this.advance();
       const end = this.advance();

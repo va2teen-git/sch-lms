@@ -1033,7 +1033,7 @@ export class HotlineGameEngine {
         if (!this.isPassable(nx, ny)) {
           return failTurn(
             'E_RT_WALL_CRASH',
-            `Строка ${req.line}: Робот упёрся в стену или закрытую дверь. Используйте датчик «свободно» или «выбить дверь».`,
+            `Строка ${req.line}: Агент упёрся в стену или закрытую дверь. Используйте датчик «свободно» или «выбить дверь».`,
             true
           );
         }
@@ -1149,7 +1149,7 @@ export class HotlineGameEngine {
         if (manhattan(this.player.x, this.player.y, this.terminalPos.x, this.terminalPos.y) > 1) {
           return failTurn(
             'E_RT_NO_TERMINAL',
-            `Строка ${req.line}: рядом нет ПК «T» для команды «взломать / подключиться».`
+            `Строка ${req.line}: рядом нет ПК (T) для команды «подключиться / взломать».`
           );
         }
         this.enterTerminal();
@@ -1338,7 +1338,7 @@ export class HotlineGameEngine {
         const ty = this.player.y + d.dy;
         const target = this.enemies.find((e) => e.x === tx && e.y === ty && e.status === 'stunned');
         if (!target) {
-          return failTurn('E_RT_NO_TARGET', `Строка ${req.line}: рядом нет оглушённого врага для «добить».`);
+          return failTurn('E_RT_NO_TARGET', `Строка ${req.line}: рядом нет оглушённого врага для команды «обезвредить».`);
         }
         target.status = 'offline';
         events.push({
