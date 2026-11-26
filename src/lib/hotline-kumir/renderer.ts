@@ -347,8 +347,15 @@ export class HotlineCanvasRenderer {
     rot: number;
   } | null {
     if (!snap.alarmTriggered && !snap.gbrSpawned) return null;
-    const parkX = Math.max(snap.scene.gbrVanPos.x, snap.width + 1.8) * TILE_PX;
-    const startX = (snap.width + snap.scene.exteriorMargin + 2.6) * TILE_PX;
+    const fromLeft = snap.scene.gbrVanPos.x < snap.width / 2;
+    const parkX =
+      (fromLeft
+        ? Math.min(snap.scene.gbrVanPos.x, -1.5)
+        : Math.max(snap.scene.gbrVanPos.x, snap.width + 1.8)) * TILE_PX;
+    const startX =
+      (fromLeft
+        ? -snap.scene.exteriorMargin - 2.6
+        : snap.width + snap.scene.exteriorMargin + 2.6) * TILE_PX;
     const raw = (snap.gbrEtaMaxTurns - snap.gbrEtaTurns) / Math.max(1, snap.gbrEtaMaxTurns);
     const progress = snap.gbrSpawned ? 1 : Math.min(0.92, 0.14 + Math.max(0, raw) * 0.78);
     const targetX = startX + (parkX - startX) * progress;
@@ -469,7 +476,14 @@ export class HotlineCanvasRenderer {
       if (vanTarget.progress >= 0.7) {
         this.gbrSkidAlpha = 0.65;
       }
-      this.spawnBurst(vanTarget.targetX / TILE_PX + 1.1, snapshot.scene.gbrVanPos.y, ['#94A3B8', '#FF1E42', '#00A8FF'], 8, 280);
+      const fromLeft = snapshot.scene.gbrVanPos.x < snapshot.width / 2;
+      this.spawnBurst(
+        vanTarget.targetX / TILE_PX + (fromLeft ? -1.1 : 1.1),
+        snapshot.scene.gbrVanPos.y,
+        ['#94A3B8', '#FF1E42', '#00A8FF'],
+        8,
+        280
+      );
     }
 
     if (!this.fastAnim && events.length > 0) {
@@ -663,7 +677,10 @@ export class HotlineCanvasRenderer {
           life: 320,
           maxLife: 320,
         });
-        const entryFromX = Math.min(snap.width + 1, Math.round(snap.scene.gbrVanPos.x));
+        const entryFromX =
+          snap.scene.gbrVanPos.x < snap.width / 2
+            ? Math.max(-1, Math.round(snap.scene.gbrVanPos.x))
+            : Math.min(snap.width + 1, Math.round(snap.scene.gbrVanPos.x));
         const entryFromY = Math.round(snap.scene.gbrVanPos.y);
         for (const e of snap.enemies) {
           if (e.isGbr) {
@@ -1290,11 +1307,35 @@ export class HotlineCanvasRenderer {
           ctx.fillText('ПК', px + TILE_PX / 2, py + TILE_PX - 4);
         } else if (tile === 'EXIT') {
           const open = snap.exitUnlocked;
+          const horizWall =
+            (x > 0 && (snap.tiles[y][x - 1] === 'WALL' || snap.tiles[y][x - 1] === 'WINDOW')) ||
+            (x + 1 < snap.width && (snap.tiles[y][x + 1] === 'WALL' || snap.tiles[y][x + 1] === 'WINDOW'));
           ctx.fillStyle = open ? 'rgba(16, 185, 129, 0.30)' : 'rgba(255, 30, 66, 0.18)';
           ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
           ctx.strokeStyle = open ? '#10B981' : '#FF1E42';
           ctx.lineWidth = 2;
           ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+
+          // Emergency exit door jambs & panic-bar leaf
+          ctx.save();
+          ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2);
+          if (!horizWall) ctx.rotate(Math.PI / 2);
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(-TILE_PX / 2, -6, 5, 12);
+          ctx.fillRect(TILE_PX / 2 - 5, -6, 5, 12);
+          if (open) {
+            ctx.fillStyle = '#065F46';
+            ctx.fillRect(-TILE_PX / 2 + 5, -4, 6, TILE_PX - 14);
+            ctx.strokeStyle = '#34D399';
+            ctx.lineWidth = 1.4;
+            ctx.strokeRect(-TILE_PX / 2 + 5, -4, 6, TILE_PX - 14);
+          } else {
+            ctx.fillStyle = '#4C0519';
+            ctx.fillRect(-TILE_PX / 2 + 5, -3, TILE_PX - 10, 6);
+            ctx.fillStyle = '#E2E8F0';
+            ctx.fillRect(-TILE_PX / 2 + 9, -1, TILE_PX - 18, 2);
+          }
+          ctx.restore();
 
           ctx.strokeStyle = open ? '#34D399' : '#FB7185';
           ctx.lineWidth = 2;
@@ -1313,16 +1354,34 @@ export class HotlineCanvasRenderer {
           ctx.textAlign = 'center';
           ctx.fillText(open ? 'ВЫХ' : 'ЗАП', px + TILE_PX / 2, py + TILE_PX - 7);
         } else if (tile === 'GBR_SPAWN') {
-          ctx.fillStyle = 'rgba(255, 30, 66, 0.16)';
+          const horizWall =
+            (x > 0 && (snap.tiles[y][x - 1] === 'WALL' || snap.tiles[y][x - 1] === 'WINDOW')) ||
+            (x + 1 < snap.width && (snap.tiles[y][x + 1] === 'WALL' || snap.tiles[y][x + 1] === 'WINDOW'));
+          ctx.fillStyle = snap.gbrSpawned ? 'rgba(255, 30, 66, 0.28)' : 'rgba(255, 30, 66, 0.14)';
           ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
           ctx.strokeStyle = '#FF1E42';
           ctx.setLineDash([4, 3]);
           ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
           ctx.setLineDash([]);
+
+          // Main entrance door frame for GBR breach
+          ctx.save();
+          ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2);
+          if (!horizWall) ctx.rotate(Math.PI / 2);
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(-TILE_PX / 2, -7, 6, 14);
+          ctx.fillRect(TILE_PX / 2 - 6, -7, 6, 14);
+          ctx.fillStyle = snap.gbrSpawned ? '#7F1D1D' : '#1E293B';
+          ctx.fillRect(-TILE_PX / 2 + 6, -4, 7, TILE_PX - 14);
+          ctx.strokeStyle = snap.gbrSpawned ? '#FF1E42' : '#94A3B8';
+          ctx.lineWidth = 1.4;
+          ctx.strokeRect(-TILE_PX / 2 + 6, -4, 7, TILE_PX - 14);
+          ctx.restore();
+
           ctx.fillStyle = '#FCA5A5';
           ctx.font = 'bold 9px monospace';
           ctx.textAlign = 'center';
-          ctx.fillText('ГБР', px + TILE_PX / 2, py + TILE_PX / 2 + 3);
+          ctx.fillText('ГБР', px + TILE_PX / 2, py + TILE_PX - 7);
         }
       }
     }
@@ -1661,15 +1720,18 @@ export class HotlineCanvasRenderer {
     const redFirst = Math.floor(this.sirenPhase) % 2 === 0;
 
     if (this.gbrSkidAlpha > 0) {
+      const fromLeft = snap.scene.gbrVanPos.x < snap.width / 2;
+      const skidStart = fromLeft ? vx - 22 : vx + 22;
+      const skidEnd = fromLeft ? vx - 110 : vx + 110;
       ctx.save();
       ctx.strokeStyle = `rgba(15, 23, 42, ${this.gbrSkidAlpha.toFixed(2)})`;
       ctx.lineWidth = 4;
       ctx.setLineDash([10, 4]);
       ctx.beginPath();
-      ctx.moveTo(vx + 22, vy - 12);
-      ctx.lineTo(vx + 110, vy - 12);
-      ctx.moveTo(vx + 22, vy + 12);
-      ctx.lineTo(vx + 110, vy + 12);
+      ctx.moveTo(skidStart, vy - 12);
+      ctx.lineTo(skidEnd, vy - 12);
+      ctx.moveTo(skidStart, vy + 12);
+      ctx.lineTo(skidEnd, vy + 12);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
@@ -1966,7 +2028,10 @@ export class HotlineCanvasRenderer {
 
     if (snap.alarmTriggered || snap.gbrSpawned) {
       const progress = this.gbrLastProgress >= 0 ? this.gbrLastProgress : snap.gbrSpawned ? 1 : 0.2;
-      const vanMiniX = mx + mw + Math.max(1, Math.round((1 - progress) * 8));
+      const fromLeft = snap.scene.gbrVanPos.x < snap.width / 2;
+      const vanMiniX = fromLeft
+        ? mx - Math.max(3, Math.round((1 - progress) * 8) + 2)
+        : mx + mw + Math.max(1, Math.round((1 - progress) * 8));
       const vanMiniY = my + Math.min(mh - cell, Math.max(0, Math.round(snap.scene.gbrVanPos.y * cell)));
       ctx.fillStyle = Math.floor(this.sirenPhase) % 2 === 0 ? '#FF1E42' : '#00A8FF';
       ctx.fillRect(vanMiniX - 2, vanMiniY - 1, cell + 2, cell + 2);

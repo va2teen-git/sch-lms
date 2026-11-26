@@ -164,6 +164,19 @@ test('Calibration invariants: themes, rotating cameras, 2 relays on L4-5, rich a
 
     const g = new HotlineGameEngine(lvl.id, 'richard', 42);
     g.startMission();
+    const initSnap = g.getSnapshot();
+    const gbrToExitDist =
+      Math.abs(initSnap.gbrSpawnPos.x - initSnap.exitPos.x) +
+      Math.abs(initSnap.gbrSpawnPos.y - initSnap.exitPos.y);
+    assert.ok(
+      gbrToExitDist >= 12,
+      `Level ${lvl.id} GBR main door and emergency exit must be separated (dist=${gbrToExitDist})`
+    );
+    assert.equal(
+      initSnap.gbrSpawnPos.x,
+      lvl.scene.buildingBounds.x,
+      `Level ${lvl.id} GBR must enter through building main facade door`
+    );
     const res = g.runProgramImmediate(lvl.starterCode);
     assert.equal(res.openedTerminal, false, `Level ${lvl.id} starterCode must not auto-open terminal`);
     assert.notEqual(res.snapshot.phase, 'EXTRACTION', `Level ${lvl.id} starterCode must not auto-solve`);
@@ -395,12 +408,16 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   const gbrEnemy = combatSnap.enemies.find((e) => e.isGbr);
   assert.ok(gbrEnemy && gbrEnemy.telegraphNext !== null);
 
-  g1.runProgramImmediate('нц 5 раз\nвлево\nкц\nвверх; вверх; влево; вверх; вверх; подключиться');
+  const killIfNear = 'если рядом враг то\n  оглушить\n  обезвредить\nвсе';
+  g1.runProgramImmediate(
+    `${killIfNear}\nнц 5 раз\n  ${killIfNear}\n  влево\nкц\nвверх; ${killIfNear}; вверх; ${killIfNear}; влево; ${killIfNear}; вверх; ${killIfNear}; вверх; подключиться`
+  );
   g1.execLinuxCommand('unlock 4821');
   g1.exitTerminal();
 
-  const killIfNear = 'если рядом враг то\n  оглушить\n  обезвредить\nвсе';
-  g1.runProgramImmediate(`${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nпометить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц`);
+  g1.runProgramImmediate(
+    `${killIfNear}\nнц 9 раз\n  ${killIfNear}\n  вправо\nкц\nпометить\nнц 3 раз\n  ${killIfNear}\n  вправо\nкц\nнц 4 раз\n  ${killIfNear}\n  вниз\nкц\nнц пока не рядом враг\n  ждать\nкц\nоглушить\nобезвредить`
+  );
   const endSnap = g1.getSnapshot();
   assert.equal(endSnap.phase, 'EXTRACTION');
   assert.equal(endSnap.lastResult?.styleBadge, 'COMBAT');
@@ -423,7 +440,7 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
   assert.ok(bear && bear.shielded === true);
   let bearGuard = 0;
   while (
-    bearGuard++ < 40 &&
+    bearGuard++ < 60 &&
     Math.abs(
       (g4Bear.getSnapshot().enemies.find((e) => e.kind === 'gbr_bear')?.x ?? 0) -
         g4Bear.getSnapshot().player.x
@@ -432,7 +449,7 @@ test('Multi-route variants: EMP flank, assault breach shortcuts (ESCAPE), and Be
         (g4Bear.getSnapshot().enemies.find((e) => e.kind === 'gbr_bear')?.y ?? 0) -
           g4Bear.getSnapshot().player.y
       ) >
-    2
+    1
   ) {
     g4Bear.handleTurnTimeout();
     if (g4Bear.getSnapshot().phase === 'MISSION_KO') break;
